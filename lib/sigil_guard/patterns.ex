@@ -26,7 +26,7 @@ defmodule SigilGuard.Patterns do
   @type scan_hit :: %{
           name: String.t(),
           category: String.t(),
-          severity: :low | :medium | :high | :critical,
+          severity: :low | :medium | :high,
           match: String.t(),
           offset: non_neg_integer(),
           length: non_neg_integer(),
@@ -36,7 +36,7 @@ defmodule SigilGuard.Patterns do
   @type compiled_pattern :: %{
           name: String.t(),
           category: String.t(),
-          severity: :low | :medium | :high | :critical,
+          severity: :low | :medium | :high,
           regex: Regex.t(),
           replacement_hint: String.t() | nil
         }
@@ -45,7 +45,7 @@ defmodule SigilGuard.Patterns do
     %{
       name: "aws_access_key",
       category: "credential",
-      severity: :critical,
+      severity: :high,
       pattern: "(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}",
       replacement_hint: "[AWS_KEY]"
     },
@@ -66,14 +66,14 @@ defmodule SigilGuard.Patterns do
     %{
       name: "database_uri",
       category: "credential",
-      severity: :critical,
+      severity: :high,
       pattern: "(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@",
       replacement_hint: "[DATABASE_URI]"
     },
     %{
       name: "private_key",
       category: "credential",
-      severity: :critical,
+      severity: :high,
       pattern: "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
       replacement_hint: "[PRIVATE_KEY]"
     },
@@ -165,6 +165,5 @@ defmodule SigilGuard.Patterns do
   defp parse_severity("low"), do: :low
   defp parse_severity("medium"), do: :medium
   defp parse_severity("high"), do: :high
-  defp parse_severity("critical"), do: :critical
   defp parse_severity(_other), do: nil
 end

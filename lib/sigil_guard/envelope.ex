@@ -42,7 +42,7 @@ defmodule SigilGuard.Envelope do
       "identity" => identity,
       "nonce" => nonce_hex,
       "timestamp" => timestamp,
-      "verdict" => format_verdict(verdict)
+      "verdict" => canonical_verdict(verdict)
     }
     |> then(fn fields ->
       @canonical_keys
@@ -132,6 +132,11 @@ defmodule SigilGuard.Envelope do
   defp format_verdict(:allowed), do: "Allowed"
   defp format_verdict(:blocked), do: "Blocked"
   defp format_verdict(:scanned), do: "Scanned"
+
+  # Canonical bytes use lowercase to match sigil-protocol crate
+  defp canonical_verdict(:allowed), do: "allowed"
+  defp canonical_verdict(:blocked), do: "blocked"
+  defp canonical_verdict(:scanned), do: "scanned"
 
   defp parse_verdict("Allowed"), do: :allowed
   defp parse_verdict("Blocked"), do: :blocked

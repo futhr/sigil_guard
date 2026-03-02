@@ -3,17 +3,15 @@ defmodule SigilGuard.Identity do
   Identity provider behaviour and trust levels for the SIGIL protocol.
 
   Trust levels form a monotonic hierarchy — higher levels subsume lower ones.
-  The SIGIL protocol uses trust levels to gate access to risky operations:
-  a tool classified as `:high` risk requires at least `:verified` trust.
+  Matches the `sigil-protocol` Rust crate's `TrustLevel` enum (v0.1.5).
 
   ## Trust Level Hierarchy
 
-      :anonymous < :authenticated < :verified < :sovereign
+      :low < :medium < :high
 
-  - **anonymous** — No identity assertion. Rate-limited, scan-only access.
-  - **authenticated** — Identity proven via token/session. Standard access.
-  - **verified** — Identity cryptographically bound (e.g., DID + Ed25519). Elevated access.
-  - **sovereign** — Self-sovereign identity with full audit trail. Maximum access.
+  - **low** — Anonymous or unverified user. Rate-limited, scan-only access.
+  - **medium** — Verified identity (email, OIDC, social login). Standard access.
+  - **high** — Strong verification (eIDAS, government ID, hardware key). Full access.
 
   ## Implementing an Identity Provider
 
@@ -27,7 +25,7 @@ defmodule SigilGuard.Identity do
 
         @impl true
         def trust_level(context) do
-          if context.verified?, do: :verified, else: :authenticated
+          if context.verified?, do: :high, else: :medium
         end
 
         @impl true
@@ -38,7 +36,7 @@ defmodule SigilGuard.Identity do
 
   """
 
-  @type trust_level :: :anonymous | :authenticated | :verified | :sovereign
+  @type trust_level :: :low | :medium | :high
 
   @doc "Return the identity string (e.g., DID, principal ID) for the given context."
   @callback identity(context :: term()) :: String.t()
@@ -50,10 +48,9 @@ defmodule SigilGuard.Identity do
   @callback bindings(context :: term()) :: [String.t()]
 
   @trust_order %{
-    anonymous: 0,
-    authenticated: 1,
-    verified: 2,
-    sovereign: 3
+    low: 0,
+    medium: 1,
+    high: 2
   }
 
   @doc """
@@ -63,13 +60,13 @@ defmodule SigilGuard.Identity do
 
   ## Examples
 
-      iex> SigilGuard.Identity.compare_trust(:anonymous, :verified)
+      iex> SigilGuard.Identity.compare_trust(:low, :high)
       :lt
 
-      iex> SigilGuard.Identity.compare_trust(:sovereign, :authenticated)
+      iex> SigilGuard.Identity.compare_trust(:high, :medium)
       :gt
 
-      iex> SigilGuard.Identity.compare_trust(:verified, :verified)
+      iex> SigilGuard.Identity.compare_trust(:medium, :medium)
       :eq
 
   """
@@ -90,10 +87,10 @@ defmodule SigilGuard.Identity do
 
   ## Examples
 
-      iex> SigilGuard.Identity.sufficient_trust?(:verified, :authenticated)
+      iex> SigilGuard.Identity.sufficient_trust?(:high, :medium)
       true
 
-      iex> SigilGuard.Identity.sufficient_trust?(:anonymous, :verified)
+      iex> SigilGuard.Identity.sufficient_trust?(:low, :high)
       false
 
   """
@@ -108,11 +105,11 @@ defmodule SigilGuard.Identity do
   ## Examples
 
       iex> SigilGuard.Identity.trust_levels()
-      [:anonymous, :authenticated, :verified, :sovereign]
+      [:low, :medium, :high]
 
   """
   @spec trust_levels() :: [trust_level(), ...]
   def trust_levels do
-    [:anonymous, :authenticated, :verified, :sovereign]
+    [:low, :medium, :high]
   end
 end

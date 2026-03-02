@@ -19,7 +19,7 @@ defmodule SigilGuard do
         backend: :elixir  # or :nif
 
   The `:elixir` backend (default) uses pure OTP `:crypto`.
-  The `:nif` backend wraps the Rust `sigil-protocol` crate for protocol parity.
+  The `:nif` backend reimplements SIGIL protocol operations in Rust for performance.
 
   ## Quick Start
 
@@ -32,8 +32,8 @@ defmodule SigilGuard do
       # => "key=[AWS_KEY]"
 
       # Evaluate policy
-      :allowed = SigilGuard.policy_verdict("read_file", :authenticated)
-      :blocked = SigilGuard.policy_verdict("delete_database", :anonymous)
+      :allowed = SigilGuard.policy_verdict("read_file", :medium)
+      :blocked = SigilGuard.policy_verdict("delete_database", :low)
 
   ## Architecture
 
@@ -126,10 +126,10 @@ defmodule SigilGuard do
 
   ## Examples
 
-      iex> SigilGuard.policy_verdict("read_file", :authenticated)
+      iex> SigilGuard.policy_verdict("read_file", :medium)
       :allowed
 
-      iex> SigilGuard.policy_verdict("delete_database", :anonymous)
+      iex> SigilGuard.policy_verdict("delete_database", :low)
       :blocked
 
   """

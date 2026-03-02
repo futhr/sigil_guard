@@ -7,7 +7,7 @@ defmodule SigilGuard.Backend do
   between different processing strategies:
 
     * `:elixir` - Pure Elixir using OTP `:crypto` (default, safe)
-    * `:nif` - Rust NIF wrapping `sigil-protocol` crate (fastest)
+    * `:nif` - Rust NIF reimplementing SIGIL protocol operations (fastest)
 
   ## Configuration
 

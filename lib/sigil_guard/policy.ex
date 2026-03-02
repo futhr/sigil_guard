@@ -6,19 +6,23 @@ defmodule SigilGuard.Policy do
   sufficient to proceed. Supports configurable risk mappings, confirmation
   flow for borderline cases, and rate limiting.
 
-  ## Risk Levels
+  Matches the `sigil-protocol` Rust crate's `RiskLevel` enum (v0.1.5).
 
-      :none < :low < :medium < :high < :critical
+  ## Risk Level Hierarchy
+
+      :low < :medium < :high
+
+  - **low** — Read-only, within workspace. Requires `:low` trust.
+  - **medium** — State-modifying but recoverable. Requires `:medium` trust.
+  - **high** — Destructive or irreversible. Requires `:high` trust.
 
   ## Default Trust Thresholds
 
   | Risk Level | Minimum Trust Required |
   |------------|----------------------|
-  | `:none`    | `:anonymous`         |
-  | `:low`     | `:anonymous`         |
-  | `:medium`  | `:authenticated`     |
-  | `:high`    | `:verified`          |
-  | `:critical`| `:sovereign`         |
+  | `:low`     | `:low`               |
+  | `:medium`  | `:medium`            |
+  | `:high`    | `:high`              |
 
   ## Custom Policy Implementation
 
@@ -40,7 +44,7 @@ defmodule SigilGuard.Policy do
 
   alias SigilGuard.Identity
 
-  @type risk_level :: :none | :low | :medium | :high | :critical
+  @type risk_level :: :low | :medium | :high
   @type verdict :: :allowed | :blocked | {:confirm, String.t()}
 
   @doc "Evaluate an action against a trust level and return a verdict."
@@ -55,19 +59,15 @@ defmodule SigilGuard.Policy do
   @callback classify_risk(action :: String.t(), opts :: keyword()) :: risk_level()
 
   @default_trust_thresholds %{
-    none: :anonymous,
-    low: :anonymous,
-    medium: :authenticated,
-    high: :verified,
-    critical: :sovereign
+    low: :low,
+    medium: :medium,
+    high: :high
   }
 
   @risk_order %{
-    none: 0,
-    low: 1,
-    medium: 2,
-    high: 3,
-    critical: 4
+    low: 0,
+    medium: 1,
+    high: 2
   }
 
   @doc """
@@ -85,10 +85,10 @@ defmodule SigilGuard.Policy do
 
   ## Examples
 
-      iex> SigilGuard.Policy.evaluate("read_file", :authenticated)
+      iex> SigilGuard.Policy.evaluate("read_file", :medium)
       :allowed
 
-      iex> SigilGuard.Policy.evaluate("delete_database", :anonymous)
+      iex> SigilGuard.Policy.evaluate("delete_database", :low)
       :blocked
 
   """
@@ -96,7 +96,7 @@ defmodule SigilGuard.Policy do
   def evaluate(action, trust_level, opts \\ []) do
     risk = Keyword.get_lazy(opts, :risk_level, fn -> classify_risk(action, opts) end)
     thresholds = Keyword.get(opts, :trust_thresholds, @default_trust_thresholds)
-    required_trust = Map.get(thresholds, risk, :authenticated)
+    required_trust = Map.get(thresholds, risk, :medium)
 
     emit_decision(action, risk, trust_level, required_trust)
 
@@ -122,9 +122,8 @@ defmodule SigilGuard.Policy do
 
   ## Built-in Risk Heuristics
 
-    * `"delete_"`, `"drop_"`, `"destroy_"` → `:critical`
-    * `"write_"`, `"update_"`, `"execute_"`, `"run_"` → `:high`
-    * `"create_"`, `"modify_"`, `"send_"` → `:medium`
+    * `"delete_"`, `"drop_"`, `"destroy_"`, `"execute_"`, `"run_"` → `:high`
+    * `"write_"`, `"update_"`, `"create_"`, `"modify_"`, `"send_"` → `:medium`
     * `"read_"`, `"get_"`, `"list_"`, `"search_"` → `:low`
     * Everything else → `:medium`
 
@@ -185,10 +184,10 @@ defmodule SigilGuard.Policy do
   ## Examples
 
       iex> SigilGuard.Policy.trust_threshold(:high)
-      :verified
+      :high
 
       iex> SigilGuard.Policy.trust_threshold(:low)
-      :anonymous
+      :low
 
   """
   @spec trust_threshold(risk_level()) :: Identity.trust_level()
@@ -202,12 +201,12 @@ defmodule SigilGuard.Policy do
   ## Examples
 
       iex> SigilGuard.Policy.risk_levels()
-      [:none, :low, :medium, :high, :critical]
+      [:low, :medium, :high]
 
   """
   @spec risk_levels() :: [risk_level(), ...]
   def risk_levels do
-    [:none, :low, :medium, :high, :critical]
+    [:low, :medium, :high]
   end
 
   @doc """
@@ -218,7 +217,7 @@ defmodule SigilGuard.Policy do
       iex> SigilGuard.Policy.compare_risk(:low, :high)
       :lt
 
-      iex> SigilGuard.Policy.compare_risk(:critical, :medium)
+      iex> SigilGuard.Policy.compare_risk(:high, :medium)
       :gt
 
   """
@@ -237,13 +236,13 @@ defmodule SigilGuard.Policy do
   # -- Private --
 
   @prefix_risk_mappings [
-    {"delete_", :critical},
-    {"drop_", :critical},
-    {"destroy_", :critical},
-    {"write_", :high},
-    {"update_", :high},
+    {"delete_", :high},
+    {"drop_", :high},
+    {"destroy_", :high},
     {"execute_", :high},
     {"run_", :high},
+    {"write_", :medium},
+    {"update_", :medium},
     {"create_", :medium},
     {"modify_", :medium},
     {"send_", :medium},
