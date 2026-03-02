@@ -37,7 +37,7 @@ defmodule SigilGuard.MixProject do
         coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.html": :test,
-        "coveralls.github": :test,
+        "coveralls.lcov": :test,
         cover: :test,
         "cover.html": :test
       ]

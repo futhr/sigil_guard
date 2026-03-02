@@ -4,7 +4,7 @@
 
 **SIGIL Protocol integration for Elixir — with optional Rust NIF backend**
 
-[![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg?style=flat-square)](https://hex.pm/packages/sigil_guard) [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg?style=flat-square)](https://hexdocs.pm/sigil_guard) [![CI](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml) [![Coverage Status](https://coveralls.io/repos/github/futhr/sigil_guard/badge.svg?branch=main)](https://coveralls.io/github/futhr/sigil_guard?branch=main) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg?style=flat-square)](https://hex.pm/packages/sigil_guard) [![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg?style=flat-square)](https://hexdocs.pm/sigil_guard) [![CI](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/futhr/sigil_guard/graph/badge.svg?branch=main)](https://codecov.io/gh/futhr/sigil_guard) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 [Installation](#installation) |
 [Quick Start](#quick-start) |

@@ -64,9 +64,15 @@ jobs:
       - name: Run tests
         run: mix test
 
-      - name: Upload coverage to Coveralls
+      - name: Generate coverage report
         if: matrix.elixir == '1.18' && matrix.otp == '28'
-        run: mix coveralls.github
+        run: mix coveralls.lcov
+
+      - name: Upload coverage reports to Codecov
+        if: matrix.elixir == '1.18' && matrix.otp == '28'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   quality:
     name: Code Quality
