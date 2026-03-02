@@ -46,7 +46,11 @@ defmodule SigilGuard.Audit do
           metadata: map(),
           timestamp: String.t(),
           prev_hmac: String.t() | nil,
-          hmac: String.t() | nil
+          hmac: String.t() | nil,
+          event_type: SigilGuard.Audit.EventType.t() | nil,
+          actor_info: SigilGuard.Audit.Actor.t() | nil,
+          action_info: SigilGuard.Audit.Action.t() | nil,
+          result_info: SigilGuard.Audit.ExecutionResult.t() | nil
         }
 
   @enforce_keys [:id, :type, :actor, :action, :result, :timestamp]
@@ -59,6 +63,10 @@ defmodule SigilGuard.Audit do
     :timestamp,
     :prev_hmac,
     :hmac,
+    :event_type,
+    :actor_info,
+    :action_info,
+    :result_info,
     metadata: %{}
   ]
 
