@@ -4,7 +4,8 @@ use rustler::{Atom, Decoder, Encoder, Env, NifResult, Term};
 
 use crate::atoms;
 
-/// Verdict enum matching Elixir atoms
+/// Verdict enum matching sigil-protocol's Verdict.
+/// Variants: Allowed, Blocked, Scanned.
 #[derive(Debug, Clone, Copy)]
 pub enum Verdict {
     Allowed,
@@ -32,6 +33,15 @@ impl Verdict {
             None
         }
     }
+
+    /// Convert to sigil-protocol crate Verdict.
+    pub fn to_proto(self) -> sigil_protocol::Verdict {
+        match self {
+            Verdict::Allowed => sigil_protocol::Verdict::Allowed,
+            Verdict::Blocked => sigil_protocol::Verdict::Blocked,
+            Verdict::Scanned => sigil_protocol::Verdict::Scanned,
+        }
+    }
 }
 
 impl<'a> Decoder<'a> for Verdict {
@@ -51,26 +61,24 @@ impl Encoder for Verdict {
     }
 }
 
-/// Trust level enum matching Elixir atoms
+/// Trust level enum matching sigil-protocol's TrustLevel (3 levels).
+/// Low < Medium < High.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TrustLevel {
-    Anonymous,
-    Authenticated,
-    Verified,
-    Sovereign,
+    Low,
+    Medium,
+    High,
 }
 
 impl<'a> Decoder<'a> for TrustLevel {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let atom: Atom = term.decode()?;
-        if atom == atoms::anonymous() {
-            Ok(TrustLevel::Anonymous)
-        } else if atom == atoms::authenticated() {
-            Ok(TrustLevel::Authenticated)
-        } else if atom == atoms::verified() {
-            Ok(TrustLevel::Verified)
-        } else if atom == atoms::sovereign() {
-            Ok(TrustLevel::Sovereign)
+        if atom == atoms::low() {
+            Ok(TrustLevel::Low)
+        } else if atom == atoms::medium() {
+            Ok(TrustLevel::Medium)
+        } else if atom == atoms::high() {
+            Ok(TrustLevel::High)
         } else {
             Err(rustler::Error::BadArg)
         }
@@ -80,10 +88,9 @@ impl<'a> Decoder<'a> for TrustLevel {
 impl Encoder for TrustLevel {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         match self {
-            TrustLevel::Anonymous => atoms::anonymous().encode(env),
-            TrustLevel::Authenticated => atoms::authenticated().encode(env),
-            TrustLevel::Verified => atoms::verified().encode(env),
-            TrustLevel::Sovereign => atoms::sovereign().encode(env),
+            TrustLevel::Low => atoms::low().encode(env),
+            TrustLevel::Medium => atoms::medium().encode(env),
+            TrustLevel::High => atoms::high().encode(env),
         }
     }
 }
@@ -91,31 +98,30 @@ impl Encoder for TrustLevel {
 impl fmt::Display for TrustLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TrustLevel::Anonymous => write!(f, "anonymous"),
-            TrustLevel::Authenticated => write!(f, "authenticated"),
-            TrustLevel::Verified => write!(f, "verified"),
-            TrustLevel::Sovereign => write!(f, "sovereign"),
+            TrustLevel::Low => write!(f, "low"),
+            TrustLevel::Medium => write!(f, "medium"),
+            TrustLevel::High => write!(f, "high"),
         }
     }
 }
 
-/// Risk level enum matching Elixir atoms
+/// Risk level enum matching sigil-protocol's RiskLevel (3 levels).
+/// Low < Medium < High.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RiskLevel {
-    None,
     Low,
     Medium,
     High,
-    Critical,
 }
 
 impl RiskLevel {
+    /// Map risk level to required trust level.
+    /// Matches sigil-protocol: Low→Low, Medium→Medium, High→High.
     pub fn required_trust(&self) -> TrustLevel {
         match self {
-            RiskLevel::None | RiskLevel::Low => TrustLevel::Anonymous,
-            RiskLevel::Medium => TrustLevel::Authenticated,
-            RiskLevel::High => TrustLevel::Verified,
-            RiskLevel::Critical => TrustLevel::Sovereign,
+            RiskLevel::Low => TrustLevel::Low,
+            RiskLevel::Medium => TrustLevel::Medium,
+            RiskLevel::High => TrustLevel::High,
         }
     }
 }
@@ -123,16 +129,12 @@ impl RiskLevel {
 impl<'a> Decoder<'a> for RiskLevel {
     fn decode(term: Term<'a>) -> NifResult<Self> {
         let atom: Atom = term.decode()?;
-        if atom == atoms::none() {
-            Ok(RiskLevel::None)
-        } else if atom == atoms::low() {
+        if atom == atoms::low() {
             Ok(RiskLevel::Low)
         } else if atom == atoms::medium() {
             Ok(RiskLevel::Medium)
         } else if atom == atoms::high() {
             Ok(RiskLevel::High)
-        } else if atom == atoms::critical() {
-            Ok(RiskLevel::Critical)
         } else {
             Err(rustler::Error::BadArg)
         }
@@ -142,11 +144,9 @@ impl<'a> Decoder<'a> for RiskLevel {
 impl Encoder for RiskLevel {
     fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
         match self {
-            RiskLevel::None => atoms::none().encode(env),
             RiskLevel::Low => atoms::low().encode(env),
             RiskLevel::Medium => atoms::medium().encode(env),
             RiskLevel::High => atoms::high().encode(env),
-            RiskLevel::Critical => atoms::critical().encode(env),
         }
     }
 }
@@ -154,16 +154,16 @@ impl Encoder for RiskLevel {
 impl fmt::Display for RiskLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RiskLevel::None => write!(f, "none"),
             RiskLevel::Low => write!(f, "low"),
             RiskLevel::Medium => write!(f, "medium"),
             RiskLevel::High => write!(f, "high"),
-            RiskLevel::Critical => write!(f, "critical"),
         }
     }
 }
 
-/// Scan hit structure matching Elixir map
+/// Scan hit structure matching Elixir map.
+/// This is a SigilGuard extension — sigil-protocol's SensitivityScanner
+/// only returns Option<String> (category name), not detailed hit info.
 #[derive(Debug, Clone)]
 pub struct ScanHit {
     pub name: String,

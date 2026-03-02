@@ -3,15 +3,16 @@ use rustler::{Encoder, Env, NifResult, Term};
 use crate::atoms;
 use crate::types::{RiskLevel, TrustLevel};
 
-/// Risk classification by action prefix, matching Elixir implementation.
+/// Risk classification by action prefix.
+/// Matches sigil-protocol's 3-level RiskLevel (Low, Medium, High).
 const PREFIX_RISK_MAPPINGS: &[(&str, RiskLevel)] = &[
-    ("delete_", RiskLevel::Critical),
-    ("drop_", RiskLevel::Critical),
-    ("destroy_", RiskLevel::Critical),
-    ("write_", RiskLevel::High),
-    ("update_", RiskLevel::High),
+    ("delete_", RiskLevel::High),
+    ("drop_", RiskLevel::High),
+    ("destroy_", RiskLevel::High),
     ("execute_", RiskLevel::High),
     ("run_", RiskLevel::High),
+    ("write_", RiskLevel::Medium),
+    ("update_", RiskLevel::Medium),
     ("create_", RiskLevel::Medium),
     ("modify_", RiskLevel::Medium),
     ("send_", RiskLevel::Medium),
@@ -60,12 +61,7 @@ fn classify_by_prefix(action: &str) -> RiskLevel {
 }
 
 fn one_level_below(actual: TrustLevel, required: TrustLevel) -> bool {
-    let levels = [
-        TrustLevel::Anonymous,
-        TrustLevel::Authenticated,
-        TrustLevel::Verified,
-        TrustLevel::Sovereign,
-    ];
+    let levels = [TrustLevel::Low, TrustLevel::Medium, TrustLevel::High];
 
     let actual_idx = levels.iter().position(|l| *l == actual);
     let required_idx = levels.iter().position(|l| *l == required);

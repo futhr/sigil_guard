@@ -3,7 +3,7 @@ name = "sigil_guard_nif"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tobias Bohwalli <hi@futhr.io>"]
-description = "Rustler NIF for SigilGuard - wraps sigil-protocol crate"
+description = "Rustler NIF for SigilGuard — uses sigil-protocol crate for protocol operations"
 
 [lib]
 name = "sigil_guard_nif"
@@ -11,11 +11,11 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rustler = "0.34"
-# sigil-protocol = { version = "0.1", features = ["registry"] }
+sigil-protocol = "0.1"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
-ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand = "0.8"
 hmac = "0.12"
 sha2 = "0.10"

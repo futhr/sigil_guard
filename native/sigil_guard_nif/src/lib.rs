@@ -1,7 +1,8 @@
 //! SigilGuard NIF - Rust NIF for SIGIL Protocol operations
 //!
-//! This NIF wraps core SIGIL protocol operations for performance and
-//! protocol parity with the Rust reference implementation.
+//! Uses the `sigil-protocol` crate for type definitions and core operations
+//! (envelope signing/verification, canonical bytes). Extends the protocol
+//! with detailed scanning (offsets/hits) and HMAC-SHA256 audit chain.
 //!
 //! ## Safety
 //!

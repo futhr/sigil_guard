@@ -7,17 +7,10 @@ rustler::atoms! {
     blocked,
     scanned,
     confirm,
-    // Trust levels
-    anonymous,
-    authenticated,
-    verified,
-    sovereign,
-    // Risk levels
-    none,
+    // Trust levels (matches sigil-protocol TrustLevel: Low, Medium, High)
     low,
     medium,
     high,
-    critical,
     // Error reasons
     broken,
     invalid_signature,

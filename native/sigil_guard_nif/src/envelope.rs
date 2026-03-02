@@ -1,14 +1,14 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signer, SigningKey};
 use rustler::{Encoder, Env, NifResult, Term};
+use sigil_protocol::sigil_envelope::SigilEnvelope;
 
 use crate::atoms;
 use crate::types::Verdict;
 
-/// Produce canonical bytes matching the Elixir implementation exactly.
+/// Produce canonical bytes using sigil-protocol's SigilEnvelope::canonical_bytes().
 ///
-/// Fields in lexicographic key order: identity, nonce, timestamp, verdict
-/// Compact JSON, no whitespace, excluding signature and reason.
+/// Guarantees format matches the Rust reference implementation exactly.
 #[rustler::nif]
 fn canonical_bytes<'a>(
     env: Env<'a>,
@@ -17,23 +17,19 @@ fn canonical_bytes<'a>(
     timestamp: String,
     nonce_hex: String,
 ) -> NifResult<Term<'a>> {
-    let verdict_str = verdict.to_string_capitalized();
+    let proto_verdict = verdict.to_proto();
+    let bytes = SigilEnvelope::canonical_bytes(&identity, &proto_verdict, &timestamp, &nonce_hex);
 
-    // Build canonical JSON with lexicographic key order
-    let canonical = format!(
-        r#"{{"identity":{},"nonce":{},"timestamp":{},"verdict":{}}}"#,
-        serde_json::to_string(&identity).map_err(|_| rustler::Error::BadArg)?,
-        serde_json::to_string(&nonce_hex).map_err(|_| rustler::Error::BadArg)?,
-        serde_json::to_string(&timestamp).map_err(|_| rustler::Error::BadArg)?,
-        serde_json::to_string(verdict_str).map_err(|_| rustler::Error::BadArg)?,
-    );
-
-    Ok(canonical.encode(env))
+    Ok(String::from_utf8(bytes)
+        .map_err(|_| rustler::Error::BadArg)?
+        .encode(env))
 }
 
-/// Sign an envelope with Ed25519.
+/// Sign an envelope using sigil-protocol types with Ed25519.
 ///
-/// Expects opts to contain a private_key binary (32-byte seed).
+/// Uses SigilEnvelope::canonical_bytes() for the signing payload,
+/// ensuring protocol parity with the Rust reference.
+/// Supports timestamp/nonce overrides for deterministic testing.
 #[rustler::nif]
 fn envelope_sign<'a>(
     env: Env<'a>,
@@ -41,7 +37,7 @@ fn envelope_sign<'a>(
     verdict: Verdict,
     opts: Term<'a>,
 ) -> NifResult<Term<'a>> {
-    // Extract private_key from opts keyword list
+    // Extract private_key from opts
     let private_key_atom = rustler::types::atom::Atom::from_str(env, "private_key").unwrap();
     let private_key_b64u: String = opts.map_get(private_key_atom.encode(env))?.decode()?;
 
@@ -53,15 +49,15 @@ fn envelope_sign<'a>(
         return Err(rustler::Error::BadArg);
     }
 
-    let signing_key = SigningKey::from_bytes(
-        key_bytes
-            .as_slice()
-            .try_into()
-            .map_err(|_| rustler::Error::BadArg)?,
-    );
+    let seed: [u8; 32] = key_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| rustler::Error::BadArg)?;
+
+    let signing_key = SigningKey::from_bytes(&seed);
     let verifying_key = signing_key.verifying_key();
 
-    // Extract optional fields
+    // Extract optional overrides (for testing)
     let timestamp_atom = rustler::types::atom::Atom::from_str(env, "timestamp").unwrap();
     let timestamp: String = match opts.map_get(timestamp_atom.encode(env)) {
         Ok(term) => term.decode()?,
@@ -80,20 +76,16 @@ fn envelope_sign<'a>(
         Err(_) => None,
     };
 
-    let verdict_str = verdict.to_string_capitalized();
+    // Use crate's canonical_bytes (static method) for protocol-correct format
+    let proto_verdict = verdict.to_proto();
+    let canonical =
+        SigilEnvelope::canonical_bytes(&identity, &proto_verdict, &timestamp, &nonce_hex);
 
-    // Build canonical bytes
-    let canonical = format!(
-        r#"{{"identity":{},"nonce":{},"timestamp":{},"verdict":{}}}"#,
-        serde_json::to_string(&identity).unwrap(),
-        serde_json::to_string(&nonce_hex).unwrap(),
-        serde_json::to_string(&timestamp).unwrap(),
-        serde_json::to_string(verdict_str).unwrap(),
-    );
-
-    // Sign
-    let signature = signing_key.sign(canonical.as_bytes());
+    // Sign with Ed25519
+    let signature = signing_key.sign(&canonical);
     let signature_b64u = URL_SAFE_NO_PAD.encode(signature.to_bytes());
+
+    let verdict_str = verdict.to_string_capitalized();
 
     // Build result map
     let mut map = Term::map_new(env);
@@ -117,7 +109,7 @@ fn envelope_sign<'a>(
         map = map.map_put("reason".encode(env), r.encode(env)).unwrap();
     }
 
-    // Also include public key for verification
+    // Include public key for verification convenience
     let pub_key_b64u = URL_SAFE_NO_PAD.encode(verifying_key.as_bytes());
     map = map
         .map_put("public_key".encode(env), pub_key_b64u.encode(env))
@@ -126,29 +118,13 @@ fn envelope_sign<'a>(
     Ok(map)
 }
 
-/// Verify an envelope's Ed25519 signature.
+/// Verify an envelope's Ed25519 signature using sigil-protocol's SigilEnvelope.verify().
 #[rustler::nif]
 fn envelope_verify<'a>(
     env: Env<'a>,
     envelope: Term<'a>,
     public_key_b64u: String,
 ) -> NifResult<Term<'a>> {
-    // Decode public key
-    let pub_bytes = match URL_SAFE_NO_PAD.decode(&public_key_b64u) {
-        Ok(b) => b,
-        Err(_) => return Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
-    };
-
-    let verifying_key = match VerifyingKey::from_bytes(
-        pub_bytes
-            .as_slice()
-            .try_into()
-            .map_err(|_| rustler::Error::BadArg)?,
-    ) {
-        Ok(k) => k,
-        Err(_) => return Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
-    };
-
     // Extract envelope fields
     let identity: String = envelope.map_get("identity".encode(env))?.decode()?;
     let verdict_str: String = envelope.map_get("verdict".encode(env))?.decode()?;
@@ -156,31 +132,28 @@ fn envelope_verify<'a>(
     let nonce_hex: String = envelope.map_get("nonce".encode(env))?.decode()?;
     let signature_b64u: String = envelope.map_get("signature".encode(env))?.decode()?;
 
-    // Decode signature
-    let sig_bytes = match URL_SAFE_NO_PAD.decode(&signature_b64u) {
-        Ok(b) => b,
-        Err(_) => return Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
+    // Parse verdict string to crate Verdict
+    let proto_verdict = match verdict_str.as_str() {
+        "Allowed" => sigil_protocol::Verdict::Allowed,
+        "Blocked" => sigil_protocol::Verdict::Blocked,
+        "Scanned" => sigil_protocol::Verdict::Scanned,
+        _ => return Err(rustler::Error::BadArg),
     };
 
-    let sig_array: &[u8; 64] = sig_bytes
-        .as_slice()
-        .try_into()
-        .map_err(|_| rustler::Error::BadArg)?;
-    let signature = Signature::from_bytes(sig_array);
+    // Construct SigilEnvelope and use the crate's verify method
+    let sigil_envelope = SigilEnvelope {
+        identity,
+        verdict: proto_verdict,
+        timestamp,
+        nonce: nonce_hex,
+        signature: signature_b64u,
+        reason: None,
+    };
 
-    // Rebuild canonical bytes
-    let canonical = format!(
-        r#"{{"identity":{},"nonce":{},"timestamp":{},"verdict":{}}}"#,
-        serde_json::to_string(&identity).unwrap(),
-        serde_json::to_string(&nonce_hex).unwrap(),
-        serde_json::to_string(&timestamp).unwrap(),
-        serde_json::to_string(&verdict_str).unwrap(),
-    );
-
-    // Verify
-    match verifying_key.verify(canonical.as_bytes(), &signature) {
-        Ok(()) => Ok(atoms::ok().encode(env)),
-        Err(_) => Ok((atoms::error(), atoms::invalid_signature()).encode(env)),
+    match sigil_envelope.verify(&public_key_b64u) {
+        Ok(true) => Ok(atoms::ok().encode(env)),
+        Ok(false) => Ok((atoms::error(), atoms::invalid_signature()).encode(env)),
+        Err(_) => Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
     }
 }
 
@@ -190,14 +163,12 @@ fn generate_timestamp() -> String {
     let secs = dur.as_secs();
     let millis = dur.subsec_millis();
 
-    // Convert to rough UTC datetime
     let days = secs / 86400;
     let rem = secs % 86400;
     let hours = rem / 3600;
     let minutes = (rem % 3600) / 60;
     let seconds = rem % 60;
 
-    // Simple date calculation (good enough for timestamps)
     let (year, month, day) = days_to_ymd(days as i64);
 
     format!(
@@ -207,7 +178,6 @@ fn generate_timestamp() -> String {
 }
 
 fn days_to_ymd(days: i64) -> (i64, u32, u32) {
-    // Algorithm from http://howardhinnant.github.io/date_algorithms.html
     let z = days + 719468;
     let era = if z >= 0 { z } else { z - 146096 } / 146097;
     let doe = (z - era * 146097) as u32;
@@ -225,9 +195,5 @@ fn generate_nonce() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);
-    hex_encode(&bytes)
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }

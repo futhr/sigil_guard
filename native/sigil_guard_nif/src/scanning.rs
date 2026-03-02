@@ -4,7 +4,7 @@ use rustler::{Encoder, Env, NifResult, Term};
 use crate::atoms;
 use crate::types::{RiskLevel, ScanHit};
 
-/// Built-in SIGIL patterns matching the Elixir Patterns module
+/// Built-in SIGIL patterns with sigil-protocol's 3-level RiskLevel severity.
 struct Pattern {
     name: &'static str,
     category: &'static str,
@@ -18,7 +18,7 @@ fn built_in_patterns() -> Vec<Pattern> {
         Pattern {
             name: "aws_access_key",
             category: "credential",
-            severity: RiskLevel::Critical,
+            severity: RiskLevel::High,
             regex: Regex::new(r"(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}").unwrap(),
             replacement_hint: Some("[AWS_KEY]"),
         },
@@ -35,21 +35,21 @@ fn built_in_patterns() -> Vec<Pattern> {
         Pattern {
             name: "bearer_token",
             category: "credential",
-            severity: RiskLevel::High,
+            severity: RiskLevel::Medium,
             regex: Regex::new(r"Bearer\s+[a-zA-Z0-9_\-.]{20,}").unwrap(),
             replacement_hint: Some("[BEARER_TOKEN]"),
         },
         Pattern {
             name: "database_uri",
             category: "connection_string",
-            severity: RiskLevel::Critical,
+            severity: RiskLevel::High,
             regex: Regex::new(r"(?i)(postgres|mysql|mongodb)://[^\s]+").unwrap(),
             replacement_hint: Some("[DATABASE_URI]"),
         },
         Pattern {
             name: "private_key",
             category: "cryptographic_key",
-            severity: RiskLevel::Critical,
+            severity: RiskLevel::High,
             regex: Regex::new(r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----").unwrap(),
             replacement_hint: Some("[PRIVATE_KEY]"),
         },
@@ -101,10 +101,8 @@ fn redact<'a>(
     hits: Vec<Term<'a>>,
     _opts: Term<'a>,
 ) -> NifResult<Term<'a>> {
-    // Decode default replacement from opts
     let default_replacement = "[REDACTED]";
 
-    // Decode hits into (offset, length, replacement_hint) tuples
     let mut replacements: Vec<(usize, usize, String)> = Vec::new();
 
     for hit_term in &hits {
