@@ -22,7 +22,7 @@ defmodule SigilGuard.Backend.NIFTest do
       hit = hd(hits)
       assert hit[:name] == "aws_access_key"
       assert hit[:category] == "credential"
-      assert hit[:severity] == :critical
+      assert hit[:severity] == :high
     end
 
     test "detects bearer tokens" do
@@ -94,28 +94,28 @@ defmodule SigilGuard.Backend.NIFTest do
       assert is_binary(bytes)
       assert bytes =~ "identity"
       assert bytes =~ "verdict"
-      assert bytes =~ "Allowed"
+      assert bytes =~ "allowed"
     end
 
     test "encodes verdict correctly" do
       bytes =
         NIFBackend.canonical_bytes("did:sigil:bob", :blocked, "2024-01-01T00:00:00.000Z", "beef")
 
-      assert bytes =~ "Blocked"
+      assert bytes =~ "blocked"
     end
   end
 
   describe "evaluate_policy/3" do
-    test "allows low-risk actions for authenticated users" do
-      assert :allowed = NIFBackend.evaluate_policy("read_file", :authenticated, [])
+    test "allows low-risk actions for medium trust users" do
+      assert :allowed = NIFBackend.evaluate_policy("read_file", :medium, [])
     end
 
-    test "blocks critical actions for anonymous users" do
-      assert :blocked = NIFBackend.evaluate_policy("delete_database", :anonymous, [])
+    test "blocks high-risk actions for low trust users" do
+      assert :blocked = NIFBackend.evaluate_policy("delete_database", :low, [])
     end
 
-    test "allows critical actions for sovereign users" do
-      assert :allowed = NIFBackend.evaluate_policy("delete_database", :sovereign, [])
+    test "allows high-risk actions for high trust users" do
+      assert :allowed = NIFBackend.evaluate_policy("delete_database", :high, [])
     end
   end
 
@@ -124,12 +124,12 @@ defmodule SigilGuard.Backend.NIFTest do
       assert :low = NIFBackend.classify_risk("read_file", [])
     end
 
-    test "classifies delete actions as critical risk" do
-      assert :critical = NIFBackend.classify_risk("delete_database", [])
+    test "classifies delete actions as high risk" do
+      assert :high = NIFBackend.classify_risk("delete_database", [])
     end
 
-    test "classifies write actions as high risk" do
-      assert :high = NIFBackend.classify_risk("write_file", [])
+    test "classifies write actions as medium risk" do
+      assert :medium = NIFBackend.classify_risk("write_file", [])
     end
 
     test "classifies create actions as medium risk" do

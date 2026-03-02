@@ -164,6 +164,40 @@ defmodule SigilGuard.VaultTest do
     end
   end
 
+  describe "format_status/1" do
+    test "redacts master key from :sys.get_status" do
+      {:status, _pid, _mod, items} = :sys.get_status(InMemory)
+      status_str = inspect(items, limit: :infinity)
+
+      # Master key should be redacted, not leaked as raw bytes
+      assert status_str =~ "REDACTED"
+      refute status_str =~ "master_key: <<"
+    end
+  end
+
+  describe "Vault.Entry struct" do
+    test "creates entry with defaults" do
+      entry = %SigilGuard.Vault.Entry{}
+
+      assert entry.id == nil
+      assert entry.ciphertext == nil
+      assert entry.description == nil
+      assert entry.created_at == nil
+      assert entry.tags == []
+    end
+
+    test "creates entry with fields" do
+      entry = %SigilGuard.Vault.Entry{
+        id: "vault_abc",
+        description: "test key",
+        tags: ["api_key", "prod"]
+      }
+
+      assert entry.id == "vault_abc"
+      assert entry.tags == ["api_key", "prod"]
+    end
+  end
+
   describe "SigilGuard.Vault facade" do
     test "encrypt/3 delegates to backend" do
       {:ok, vault_id} = SigilGuard.Vault.encrypt("test", "desc", InMemory)

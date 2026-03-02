@@ -74,15 +74,15 @@ defmodule SigilGuard.Backend.ElixirTest do
 
   describe "evaluate_policy/3" do
     test "delegates to Policy" do
-      assert :allowed = ElixirBackend.evaluate_policy("read_file", :authenticated, [])
-      assert :blocked = ElixirBackend.evaluate_policy("delete_database", :anonymous, [])
+      assert :allowed = ElixirBackend.evaluate_policy("read_file", :medium, [])
+      assert :blocked = ElixirBackend.evaluate_policy("delete_database", :low, [])
     end
   end
 
   describe "classify_risk/2" do
     test "delegates to Policy" do
       assert :low = ElixirBackend.classify_risk("read_file", [])
-      assert :critical = ElixirBackend.classify_risk("delete_database", [])
+      assert :high = ElixirBackend.classify_risk("delete_database", [])
     end
   end
 

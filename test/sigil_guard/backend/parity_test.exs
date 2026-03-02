@@ -156,7 +156,7 @@ defmodule SigilGuard.Backend.ParityTest do
       "unknown_action"
     ]
 
-    @trust_levels [:anonymous, :authenticated, :verified, :sovereign]
+    @trust_levels [:low, :medium, :high]
 
     test "classify_risk produces identical results" do
       for action <- @actions do

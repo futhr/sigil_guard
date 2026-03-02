@@ -23,7 +23,7 @@ defmodule SigilGuard.ScannerTest do
 
       assert hit.name == "aws_access_key"
       assert hit.category == "credential"
-      assert hit.severity == :critical
+      assert hit.severity == :high
       assert hit.match == "AKIAIOSFODNN7EXAMPLE"
       assert hit.replacement_hint == "[AWS_KEY]"
     end
@@ -54,7 +54,7 @@ defmodule SigilGuard.ScannerTest do
       hit = Enum.find(hits, &(&1.name == "database_uri"))
 
       assert hit
-      assert hit.severity == :critical
+      assert hit.severity == :high
     end
 
     test "detects MySQL URIs" do
@@ -74,7 +74,7 @@ defmodule SigilGuard.ScannerTest do
       hit = Enum.find(hits, &(&1.name == "private_key"))
 
       assert hit
-      assert hit.severity == :critical
+      assert hit.severity == :high
     end
 
     test "detects EC private keys" do

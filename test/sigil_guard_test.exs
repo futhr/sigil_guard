@@ -31,20 +31,20 @@ defmodule SigilGuardTest do
   end
 
   describe "policy_verdict/3" do
-    test "allows safe actions for authenticated users" do
-      assert :allowed = SigilGuard.policy_verdict("read_file", :authenticated)
+    test "allows low-risk actions for medium trust users" do
+      assert :allowed = SigilGuard.policy_verdict("read_file", :medium)
     end
 
-    test "blocks critical actions for anonymous users" do
-      assert :blocked = SigilGuard.policy_verdict("delete_database", :anonymous)
+    test "blocks high-risk actions for low trust users" do
+      assert :blocked = SigilGuard.policy_verdict("delete_database", :low)
     end
 
-    test "allows critical actions for sovereign users" do
-      assert :allowed = SigilGuard.policy_verdict("delete_database", :sovereign)
+    test "allows high-risk actions for high trust users" do
+      assert :allowed = SigilGuard.policy_verdict("delete_database", :high)
     end
 
     test "returns confirmation for borderline cases" do
-      assert {:confirm, reason} = SigilGuard.policy_verdict("create_user", :anonymous)
+      assert {:confirm, reason} = SigilGuard.policy_verdict("create_user", :low)
       assert is_binary(reason)
     end
   end

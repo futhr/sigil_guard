@@ -176,6 +176,65 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
+  describe "typed audit fields" do
+    test "new events have nil typed fields by default" do
+      event = Audit.new_event("test", "actor", "action", "result")
+
+      assert event.event_type == nil
+      assert event.actor_info == nil
+      assert event.action_info == nil
+      assert event.result_info == nil
+    end
+
+    test "accepts typed Actor struct" do
+      actor = %SigilGuard.Audit.Actor{
+        channel: "mcp",
+        user_id: "did:web:alice",
+        username: "Alice"
+      }
+
+      event = %{Audit.new_event("test", "actor", "action", "result") | actor_info: actor}
+      assert event.actor_info.channel == "mcp"
+      assert event.actor_info.user_id == "did:web:alice"
+    end
+
+    test "accepts typed Action struct" do
+      action = %SigilGuard.Audit.Action{
+        description: "read_file",
+        risk_level: :low,
+        approved: true,
+        allowed: true
+      }
+
+      event = %{Audit.new_event("test", "actor", "action", "result") | action_info: action}
+      assert event.action_info.risk_level == :low
+    end
+
+    test "accepts typed ExecutionResult struct" do
+      result = %SigilGuard.Audit.ExecutionResult{
+        success: true,
+        exit_code: 0,
+        duration_ms: 42,
+        error: nil
+      }
+
+      event = %{Audit.new_event("test", "actor", "action", "result") | result_info: result}
+      assert event.result_info.success == true
+      assert event.result_info.duration_ms == 42
+    end
+  end
+
+  describe "secure_compare edge cases" do
+    test "detects tampered HMAC with different length" do
+      events = [Audit.new_event("test", "alice", "action", "ok")]
+      signed = Audit.build_chain(events, @secret_key)
+
+      # Replace HMAC with a shorter string to trigger different-length branch
+      short_hmac = List.update_at(signed, 0, fn e -> %{e | hmac: "short"} end)
+      assert {:broken, 0} = Audit.verify_chain(short_hmac, @secret_key)
+    end
+  end
+
   describe "canonical_bytes/1" do
     test "produces deterministic JSON" do
       event = %Audit{

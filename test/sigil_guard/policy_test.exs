@@ -14,83 +14,65 @@ defmodule SigilGuard.PolicyTest do
   alias SigilGuard.Policy
 
   describe "evaluate/3" do
-    test "allows low-risk actions for anonymous users" do
-      assert :allowed = Policy.evaluate("read_file", :anonymous)
+    test "allows low-risk actions for low trust users" do
+      assert :allowed = Policy.evaluate("read_file", :low)
     end
 
-    test "allows medium-risk actions for authenticated users" do
-      assert :allowed = Policy.evaluate("create_resource", :authenticated)
+    test "allows medium-risk actions for medium trust users" do
+      assert :allowed = Policy.evaluate("create_resource", :medium)
     end
 
-    test "allows high-risk actions for verified users" do
-      assert :allowed = Policy.evaluate("execute_command", :verified)
+    test "allows high-risk actions for high trust users" do
+      assert :allowed = Policy.evaluate("delete_database", :high)
     end
 
-    test "allows critical actions for sovereign users" do
-      assert :allowed = Policy.evaluate("delete_database", :sovereign)
-    end
-
-    test "blocks critical actions for anonymous users" do
-      assert :blocked = Policy.evaluate("delete_database", :anonymous)
-    end
-
-    test "blocks high-risk actions for anonymous users" do
-      assert :blocked = Policy.evaluate("execute_command", :anonymous)
+    test "blocks high-risk actions for low trust users" do
+      assert :blocked = Policy.evaluate("delete_database", :low)
     end
 
     test "offers confirmation when one trust level below" do
-      # Medium risk needs :authenticated, anonymous is one below
-      assert {:confirm, reason} = Policy.evaluate("create_resource", :anonymous)
+      # Medium risk needs :medium, low is one below
+      assert {:confirm, reason} = Policy.evaluate("create_resource", :low)
       assert is_binary(reason)
       assert String.contains?(reason, "create_resource")
     end
 
-    test "offers confirmation for high-risk with authenticated trust" do
-      assert {:confirm, _reason} = Policy.evaluate("write_file", :authenticated)
+    test "offers confirmation for high-risk with medium trust" do
+      assert {:confirm, _reason} = Policy.evaluate("delete_database", :medium)
     end
 
     test "accepts risk_level override" do
-      assert :blocked = Policy.evaluate("innocent_action", :anonymous, risk_level: :critical)
+      assert :blocked = Policy.evaluate("innocent_action", :low, risk_level: :high)
     end
 
     test "accepts custom trust_thresholds" do
       thresholds = %{
-        none: :anonymous,
-        low: :anonymous,
-        medium: :anonymous,
-        high: :anonymous,
-        critical: :anonymous
+        low: :low,
+        medium: :low,
+        high: :low
       }
 
       assert :allowed =
-               Policy.evaluate("delete_database", :anonymous, trust_thresholds: thresholds)
+               Policy.evaluate("delete_database", :low, trust_thresholds: thresholds)
     end
 
     test "accepts custom risk_mappings" do
       mappings = %{"safe_delete" => :low}
-      assert :allowed = Policy.evaluate("safe_delete", :anonymous, risk_mappings: mappings)
+      assert :allowed = Policy.evaluate("safe_delete", :low, risk_mappings: mappings)
     end
   end
 
   describe "classify_risk/2" do
-    test "classifies delete_ as critical" do
-      assert :critical = Policy.classify_risk("delete_user")
+    test "classifies delete_ as high" do
+      assert :high = Policy.classify_risk("delete_user")
     end
 
-    test "classifies drop_ as critical" do
-      assert :critical = Policy.classify_risk("drop_table")
+    test "classifies drop_ as high" do
+      assert :high = Policy.classify_risk("drop_table")
     end
 
-    test "classifies destroy_ as critical" do
-      assert :critical = Policy.classify_risk("destroy_session")
-    end
-
-    test "classifies write_ as high" do
-      assert :high = Policy.classify_risk("write_file")
-    end
-
-    test "classifies update_ as high" do
-      assert :high = Policy.classify_risk("update_config")
+    test "classifies destroy_ as high" do
+      assert :high = Policy.classify_risk("destroy_session")
     end
 
     test "classifies execute_ as high" do
@@ -99,6 +81,14 @@ defmodule SigilGuard.PolicyTest do
 
     test "classifies run_ as high" do
       assert :high = Policy.classify_risk("run_migration")
+    end
+
+    test "classifies write_ as medium" do
+      assert :medium = Policy.classify_risk("write_file")
+    end
+
+    test "classifies update_ as medium" do
+      assert :medium = Policy.classify_risk("update_config")
     end
 
     test "classifies create_ as medium" do
@@ -134,24 +124,22 @@ defmodule SigilGuard.PolicyTest do
     end
 
     test "uses custom risk_mappings" do
-      mappings = %{"custom_action" => :critical}
-      assert :critical = Policy.classify_risk("custom_action", risk_mappings: mappings)
+      mappings = %{"custom_action" => :high}
+      assert :high = Policy.classify_risk("custom_action", risk_mappings: mappings)
     end
   end
 
   describe "trust_threshold/1" do
     test "returns correct defaults for all risk levels" do
-      assert :anonymous = Policy.trust_threshold(:none)
-      assert :anonymous = Policy.trust_threshold(:low)
-      assert :authenticated = Policy.trust_threshold(:medium)
-      assert :verified = Policy.trust_threshold(:high)
-      assert :sovereign = Policy.trust_threshold(:critical)
+      assert :low = Policy.trust_threshold(:low)
+      assert :medium = Policy.trust_threshold(:medium)
+      assert :high = Policy.trust_threshold(:high)
     end
   end
 
   describe "risk_levels/0" do
     test "returns all risk levels in ascending order" do
-      assert [:none, :low, :medium, :high, :critical] = Policy.risk_levels()
+      assert [:low, :medium, :high] = Policy.risk_levels()
     end
   end
 
@@ -161,24 +149,24 @@ defmodule SigilGuard.PolicyTest do
     end
 
     test "higher risk is :gt" do
-      assert :gt = Policy.compare_risk(:critical, :medium)
+      assert :gt = Policy.compare_risk(:high, :medium)
     end
 
     test "equal risk is :eq" do
       assert :eq = Policy.compare_risk(:medium, :medium)
     end
 
-    test "none is less than all others" do
-      for level <- [:low, :medium, :high, :critical] do
-        assert :lt = Policy.compare_risk(:none, level)
+    test "low is less than all others" do
+      for level <- [:medium, :high] do
+        assert :lt = Policy.compare_risk(:low, level)
       end
     end
   end
 
   describe "trust monotonicity" do
     test "higher trust always subsumes lower trust for any risk level" do
-      trust_levels = [:anonymous, :authenticated, :verified, :sovereign]
-      risk_levels = [:none, :low, :medium, :high, :critical]
+      trust_levels = [:low, :medium, :high]
+      risk_levels = [:low, :medium, :high]
 
       for risk <- risk_levels do
         verdicts =
@@ -203,7 +191,6 @@ defmodule SigilGuard.PolicyTest do
 
   describe "rate_check/2" do
     test "allows requests within limit" do
-      # Use a unique table for this test to avoid conflicts
       table = :rate_test_allows
 
       assert :ok = Policy.rate_check("user1", max_requests: 5, rate_store: table)

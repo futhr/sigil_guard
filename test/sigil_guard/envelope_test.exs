@@ -23,7 +23,7 @@ defmodule SigilGuard.EnvelopeTest do
         )
 
       assert bytes ==
-               ~s({"identity":"did:sigil:alice","nonce":"abcd1234","timestamp":"2024-01-01T00:00:00.000Z","verdict":"Allowed"})
+               ~s({"identity":"did:sigil:alice","nonce":"abcd1234","timestamp":"2024-01-01T00:00:00.000Z","verdict":"allowed"})
     end
 
     test "keys are in strict lexicographic order" do
@@ -42,8 +42,8 @@ defmodule SigilGuard.EnvelopeTest do
       refute Map.has_key?(decoded, "reason")
     end
 
-    test "formats verdict atoms as capitalized strings" do
-      for {atom, string} <- [{:allowed, "Allowed"}, {:blocked, "Blocked"}, {:scanned, "Scanned"}] do
+    test "formats verdict atoms as lowercase strings in canonical bytes" do
+      for {atom, string} <- [{:allowed, "allowed"}, {:blocked, "blocked"}, {:scanned, "scanned"}] do
         bytes = Envelope.canonical_bytes("id", atom, "ts", "nc")
         decoded = Jason.decode!(bytes)
         assert decoded["verdict"] == string

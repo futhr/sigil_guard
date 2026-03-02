@@ -63,7 +63,7 @@ defmodule SigilGuard.BackendTest do
     end
 
     test "policy_verdict dispatches through backend" do
-      assert :allowed = SigilGuard.policy_verdict("read_file", :authenticated)
+      assert :allowed = SigilGuard.policy_verdict("read_file", :medium)
     end
   end
 end

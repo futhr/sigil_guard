@@ -20,7 +20,7 @@ defmodule SigilGuard.PatternsTest do
       for pattern <- patterns do
         assert is_binary(pattern.name)
         assert is_binary(pattern.category)
-        assert pattern.severity in [:low, :medium, :high, :critical]
+        assert pattern.severity in [:low, :medium, :high]
         assert %Regex{} = pattern.regex
       end
     end
@@ -130,8 +130,7 @@ defmodule SigilGuard.PatternsTest do
       for {severity_str, severity_atom} <- [
             {"low", :low},
             {"medium", :medium},
-            {"high", :high},
-            {"critical", :critical}
+            {"high", :high}
           ] do
         raw = [%{"name" => "s", "pattern" => "s", "severity" => severity_str}]
         assert [pattern] = Patterns.compile(raw)

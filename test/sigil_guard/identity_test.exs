@@ -3,7 +3,7 @@ defmodule SigilGuard.IdentityTest do
   Tests for `SigilGuard.Identity`.
 
   Validates trust level comparison, ordering, minimum trust requirements,
-  and the trust level hierarchy (anonymous < authenticated < verified < sovereign).
+  and the trust level hierarchy (low < medium < high).
   """
 
   use ExUnit.Case, async: true
@@ -13,16 +13,12 @@ defmodule SigilGuard.IdentityTest do
   alias SigilGuard.Identity
 
   describe "compare_trust/2" do
-    test "anonymous < authenticated" do
-      assert :lt = Identity.compare_trust(:anonymous, :authenticated)
+    test "low < medium" do
+      assert :lt = Identity.compare_trust(:low, :medium)
     end
 
-    test "authenticated < verified" do
-      assert :lt = Identity.compare_trust(:authenticated, :verified)
-    end
-
-    test "verified < sovereign" do
-      assert :lt = Identity.compare_trust(:verified, :sovereign)
+    test "medium < high" do
+      assert :lt = Identity.compare_trust(:medium, :high)
     end
 
     test "equal levels return :eq" do
@@ -32,8 +28,8 @@ defmodule SigilGuard.IdentityTest do
     end
 
     test "higher trust returns :gt" do
-      assert :gt = Identity.compare_trust(:sovereign, :anonymous)
-      assert :gt = Identity.compare_trust(:verified, :authenticated)
+      assert :gt = Identity.compare_trust(:high, :low)
+      assert :gt = Identity.compare_trust(:medium, :low)
     end
 
     test "full ordering is transitive" do
@@ -62,34 +58,32 @@ defmodule SigilGuard.IdentityTest do
     end
 
     test "higher level is sufficient" do
-      assert Identity.sufficient_trust?(:sovereign, :anonymous)
-      assert Identity.sufficient_trust?(:verified, :authenticated)
-      assert Identity.sufficient_trust?(:authenticated, :anonymous)
+      assert Identity.sufficient_trust?(:high, :low)
+      assert Identity.sufficient_trust?(:high, :medium)
+      assert Identity.sufficient_trust?(:medium, :low)
     end
 
     test "lower level is insufficient" do
-      refute Identity.sufficient_trust?(:anonymous, :authenticated)
-      refute Identity.sufficient_trust?(:authenticated, :verified)
-      refute Identity.sufficient_trust?(:verified, :sovereign)
+      refute Identity.sufficient_trust?(:low, :medium)
+      refute Identity.sufficient_trust?(:medium, :high)
     end
 
-    test "anonymous is only sufficient for anonymous" do
-      assert Identity.sufficient_trust?(:anonymous, :anonymous)
-      refute Identity.sufficient_trust?(:anonymous, :authenticated)
-      refute Identity.sufficient_trust?(:anonymous, :verified)
-      refute Identity.sufficient_trust?(:anonymous, :sovereign)
+    test "low is only sufficient for low" do
+      assert Identity.sufficient_trust?(:low, :low)
+      refute Identity.sufficient_trust?(:low, :medium)
+      refute Identity.sufficient_trust?(:low, :high)
     end
 
-    test "sovereign is sufficient for all levels" do
+    test "high is sufficient for all levels" do
       for level <- Identity.trust_levels() do
-        assert Identity.sufficient_trust?(:sovereign, level)
+        assert Identity.sufficient_trust?(:high, level)
       end
     end
   end
 
   describe "trust_levels/0" do
-    test "returns all four levels in ascending order" do
-      assert [:anonymous, :authenticated, :verified, :sovereign] = Identity.trust_levels()
+    test "returns all three levels in ascending order" do
+      assert [:low, :medium, :high] = Identity.trust_levels()
     end
   end
 end
