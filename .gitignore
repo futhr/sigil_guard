@@ -1,0 +1,15 @@
+/_build/
+/cover/
+/deps/
+/doc/
+/tmp/
+erl_crash.dump
+*.ez
+sigil_guard-*.tar
+.elixir_ls/
+.cache/
+.vscode/
+priv/plts/
+native/*/target/
+priv/native/
+bench/output/*.md
