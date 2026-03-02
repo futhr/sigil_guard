@@ -22,6 +22,7 @@ defmodule SigilGuard.TestSigner do
   # Fixed seed for deterministic test keypair
   @seed :crypto.hash(:sha256, "sigil_guard_test_seed_v1")
 
+  @doc false
   @spec keypair() :: {binary(), binary()}
   def keypair do
     {pub, priv} = :crypto.generate_key(:eddsa, :ed25519, @seed)

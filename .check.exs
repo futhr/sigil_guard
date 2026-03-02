@@ -20,7 +20,7 @@
 
     # Static analysis
     {:credo, command: "mix credo --strict"},
-    {:sobelow, command: "mix sobelow --config"},
+    {:sobelow, command: "mix sobelow --config --compact"},
 
     # Rust clippy linting (only if native Rust code exists and cargo installed)
     {:rust_clippy,
