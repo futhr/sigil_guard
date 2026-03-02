@@ -12,4 +12,3 @@ sigil_guard-*.tar
 priv/plts/
 native/*/target/
 priv/native/
-bench/output/*.md
