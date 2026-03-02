@@ -1,0 +1,8 @@
+# NIF shared libraries reference enif_* symbols provided by the
+# BEAM VM at runtime. macOS requires explicit opt-in for unresolved
+# symbols at link time (Linux allows this by default).
+[target.'cfg(target_os = "macos")']
+rustflags = [
+  "-C", "link-arg=-undefined",
+  "-C", "link-arg=dynamic_lookup",
+]
