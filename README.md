@@ -111,13 +111,13 @@ envelope = SigilGuard.Envelope.sign("did:sigil:alice", :allowed,
 ### Policy Enforcement
 
 ```elixir
-:allowed = SigilGuard.policy_verdict("read_file", :authenticated)
-:blocked = SigilGuard.policy_verdict("delete_database", :anonymous)
-{:confirm, reason} = SigilGuard.policy_verdict("create_user", :anonymous)
+:allowed = SigilGuard.policy_verdict("read_file", :medium)
+:blocked = SigilGuard.policy_verdict("delete_database", :low)
+{:confirm, reason} = SigilGuard.policy_verdict("create_user", :low)
 ```
 
-Trust levels: `:anonymous < :authenticated < :verified < :sovereign`
-Risk levels: `:none < :low < :medium < :high < :critical`
+Trust levels: `:low < :medium < :high`
+Risk levels: `:low < :medium < :high`
 
 ### Tamper-Evident Audit
 
@@ -190,8 +190,9 @@ in pure Elixir or via a Rust NIF for maximum performance.
 | **Elixir** | Full | Medium | Stable | Default, safe, works everywhere |
 | **NIF** | None | Lowest | Beta | Protocol parity, performance |
 
-The NIF backend wraps the Rust `sigil-protocol` crate, so protocol changes
-only require a Cargo.toml version bump — no Elixir re-implementation needed.
+The NIF backend uses the `sigil-protocol` Rust crate for protocol operations
+(envelope signing/verification, canonical bytes) with ed25519-dalek, hmac/sha2,
+and regex for extensions (detailed scanning, audit HMAC chain).
 
 ---
 
@@ -208,7 +209,7 @@ only require a Cargo.toml version bump — no Elixir re-implementation needed.
 SigilGuard.Backend.Elixir         SigilGuard.Backend.NIF
               |                               |
               v                               v
-   OTP :crypto + Regex              Rustler + sigil-protocol
+   OTP :crypto + Regex              Rustler + ed25519-dalek + hmac/sha2
 ```
 
 ### Module Overview
