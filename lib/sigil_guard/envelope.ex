@@ -45,11 +45,12 @@ defmodule SigilGuard.Envelope do
       "verdict" => canonical_verdict(verdict)
     }
     |> then(fn fields ->
-      @canonical_keys
-      |> Enum.map(fn key -> [?", key, ?", ?:, Jason.encode!(fields[key])] end)
-      |> Enum.intersperse(",")
-      |> then(fn parts -> [?{ | parts] ++ [?}] end)
-      |> IO.iodata_to_binary()
+      parts =
+        @canonical_keys
+        |> Enum.map(fn key -> [?", key, ?", ?:, Jason.encode!(fields[key])] end)
+        |> Enum.intersperse(",")
+
+      IO.iodata_to_binary([?{, parts, ?}])
     end)
   end
 
