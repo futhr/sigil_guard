@@ -56,7 +56,6 @@ defmodule SigilGuard.Signer do
   """
   @spec generate_keypair() :: {public_key :: binary(), private_key :: binary()}
   def generate_keypair do
-    {pub, priv} = :crypto.generate_key(:eddsa, :ed25519)
-    {pub, priv}
+    :crypto.generate_key(:eddsa, :ed25519)
   end
 end
