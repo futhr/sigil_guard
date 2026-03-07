@@ -196,39 +196,40 @@ defmodule SigilGuard.Audit do
       "type" => event.type
     }
 
-    ~w(action actor id result timestamp type)
-    |> Enum.map_join(",", fn key -> ~s("#{key}":#{Jason.encode!(fields[key])}) end)
-    |> then(fn inner -> "{#{inner}}" end)
+    inner =
+      ~w(action actor id result timestamp type)
+      |> Enum.map_join(",", fn key -> ~s("#{key}":#{Jason.encode!(fields[key])}) end)
+
+    "{#{inner}}"
   end
 
   # -- Private --
 
   defp compute_hmac(key, data) do
-    :crypto.mac(:hmac, :sha256, key, data)
-    |> Base.encode16(case: :lower)
+    Base.encode16(:crypto.mac(:hmac, :sha256, key, data), case: :lower)
   end
 
   defp generate_event_id do
-    :crypto.strong_rand_bytes(16)
-    |> Base.encode16(case: :lower)
+    Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
   end
 
   defp generate_timestamp do
-    DateTime.utc_now(:millisecond)
-    |> DateTime.to_iso8601()
+    DateTime.to_iso8601(DateTime.utc_now(:millisecond))
   end
 
   # Constant-time comparison to prevent timing attacks on HMAC
   # verification. Regular == short-circuits on the first differing
   # byte, leaking information about matching prefix length.
   defp secure_compare(a, b) when byte_size(a) == byte_size(b) do
-    a
-    |> :binary.bin_to_list()
-    |> Enum.zip(:binary.bin_to_list(b))
-    |> Enum.reduce(0, fn {x, y}, acc ->
-      Bitwise.bor(acc, Bitwise.bxor(x, y))
-    end)
-    |> Kernel.==(0)
+    diff =
+      a
+      |> :binary.bin_to_list()
+      |> Enum.zip(:binary.bin_to_list(b))
+      |> Enum.reduce(0, fn {x, y}, acc ->
+        Bitwise.bor(acc, Bitwise.bxor(x, y))
+      end)
+
+    diff == 0
   end
 
   defp secure_compare(_, _), do: false
