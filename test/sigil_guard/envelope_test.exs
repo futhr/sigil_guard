@@ -90,7 +90,7 @@ defmodule SigilGuard.EnvelopeTest do
       refute String.contains?(signature, "=")
       refute String.contains?(signature, "+")
       refute String.contains?(signature, "/")
-      assert {:ok, _decoded} = Base.url_decode64(signature, padding: false)
+      assert {:ok, _} = Base.url_decode64(signature, padding: false)
     end
 
     test "generates timestamp and nonce when not provided" do
@@ -158,7 +158,7 @@ defmodule SigilGuard.EnvelopeTest do
     test "rejects wrong public key" do
       envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
 
-      {other_pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+      {other_pub, _} = :crypto.generate_key(:eddsa, :ed25519)
       other_b64u = Base.url_encode64(other_pub, padding: false)
 
       assert {:error, :invalid_signature} = Envelope.verify(envelope, other_b64u)
@@ -200,7 +200,7 @@ defmodule SigilGuard.EnvelopeTest do
       ts = Envelope.generate_timestamp()
 
       assert String.ends_with?(ts, "Z")
-      assert {:ok, _dt, _offset} = DateTime.from_iso8601(ts)
+      assert {:ok, _, _} = DateTime.from_iso8601(ts)
     end
   end
 
@@ -213,7 +213,7 @@ defmodule SigilGuard.EnvelopeTest do
     end
 
     test "generates unique values" do
-      nonces = for _i <- 1..100, do: Envelope.generate_nonce()
+      nonces = for _ <- 1..100, do: Envelope.generate_nonce()
 
       assert length(Enum.uniq(nonces)) == 100
     end

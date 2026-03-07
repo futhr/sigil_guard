@@ -35,7 +35,7 @@ defmodule SigilGuard.AuditTest do
     end
 
     test "generates unique IDs" do
-      events = for _i <- 1..100, do: Audit.new_event("test", "actor", "action", "result")
+      events = for _ <- 1..100, do: Audit.new_event("test", "actor", "action", "result")
       ids = Enum.map(events, & &1.id)
 
       assert length(Enum.uniq(ids)) == 100

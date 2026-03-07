@@ -20,8 +20,8 @@ defmodule SigilGuard.SignerTest do
     end
 
     test "generates unique keypairs" do
-      {pub1, _priv} = Signer.generate_keypair()
-      {pub2, _priv} = Signer.generate_keypair()
+      {pub1, _} = Signer.generate_keypair()
+      {pub2, _} = Signer.generate_keypair()
 
       assert pub1 != pub2
     end
@@ -29,7 +29,7 @@ defmodule SigilGuard.SignerTest do
 
   describe "Ed25519.new/1" do
     test "creates a signer struct from private key" do
-      {_pub, priv} = Signer.generate_keypair()
+      {_, priv} = Signer.generate_keypair()
       signer = Ed25519.new(priv)
 
       assert %Ed25519{} = signer
@@ -58,7 +58,7 @@ defmodule SigilGuard.SignerTest do
     end
 
     test "different messages produce different signatures" do
-      {_pub, priv} = Signer.generate_keypair()
+      {_, priv} = Signer.generate_keypair()
       signer = Ed25519.new(priv)
 
       sig1 = Ed25519.sign_with(signer, "message one")
@@ -68,7 +68,7 @@ defmodule SigilGuard.SignerTest do
     end
 
     test "signatures are deterministic for Ed25519" do
-      {_pub, priv} = Signer.generate_keypair()
+      {_, priv} = Signer.generate_keypair()
       signer = Ed25519.new(priv)
       message = "deterministic test"
 
@@ -98,8 +98,8 @@ defmodule SigilGuard.SignerTest do
     end
 
     test "returns false for wrong key" do
-      {_pub, priv} = Signer.generate_keypair()
-      {other_pub, _priv} = Signer.generate_keypair()
+      {_, priv} = Signer.generate_keypair()
+      {other_pub, _} = Signer.generate_keypair()
       signer = Ed25519.new(priv)
       signature = Ed25519.sign_with(signer, "message")
 
@@ -121,7 +121,7 @@ defmodule SigilGuard.SignerTest do
 
   describe "Ed25519 Agent-based API" do
     test "sign/1 and public_key/0 work via Agent" do
-      {_pub, priv} = Signer.generate_keypair()
+      {_, priv} = Signer.generate_keypair()
       start_supervised!({Ed25519, private_key: priv})
 
       message = "agent test message"

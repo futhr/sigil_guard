@@ -17,7 +17,7 @@ defmodule SigilGuard.Application do
   use Application
 
   @impl Application
-  def start(_type, _args) do
+  def start(_, _) do
     children =
       if SigilGuard.Config.registry_enabled?() do
         [

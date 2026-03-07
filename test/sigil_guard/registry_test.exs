@@ -51,7 +51,7 @@ defmodule SigilGuard.RegistryTest do
     end
 
     test "returns error when server is unreachable" do
-      assert {:error, _reason} = Registry.fetch_bundle(url: "http://localhost:1", timeout: 500)
+      assert {:error, _} = Registry.fetch_bundle(url: "http://localhost:1", timeout: 500)
     end
 
     test "returns error for invalid JSON", %{bypass: bypass, url: url} do
@@ -59,7 +59,7 @@ defmodule SigilGuard.RegistryTest do
         Plug.Conn.resp(conn, 200, "not json")
       end)
 
-      assert {:error, _reason} = Registry.fetch_bundle(url: url)
+      assert {:error, _} = Registry.fetch_bundle(url: url)
     end
   end
 

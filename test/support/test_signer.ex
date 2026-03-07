@@ -31,13 +31,13 @@ defmodule SigilGuard.TestSigner do
 
   @impl SigilGuard.Signer
   def sign(message) do
-    {_pub, priv} = keypair()
+    {_, priv} = keypair()
     :crypto.sign(:eddsa, :none, message, [priv, :ed25519])
   end
 
   @impl SigilGuard.Signer
   def public_key do
-    {pub, _priv} = keypair()
+    {pub, _} = keypair()
     pub
   end
 

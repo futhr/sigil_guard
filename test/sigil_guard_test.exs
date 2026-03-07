@@ -13,7 +13,7 @@ defmodule SigilGuardTest do
   describe "scan/2" do
     test "delegates to Scanner" do
       assert {:ok, "clean"} = SigilGuard.scan("clean")
-      assert {:hit, _hits} = SigilGuard.scan("AKIAIOSFODNN7EXAMPLE")
+      assert {:hit, _} = SigilGuard.scan("AKIAIOSFODNN7EXAMPLE")
     end
   end
 

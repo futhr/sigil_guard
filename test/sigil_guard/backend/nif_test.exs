@@ -36,7 +36,7 @@ defmodule SigilGuard.Backend.NIFTest do
     end
 
     test "detects private keys" do
-      assert {:hit, _hits} = NIFBackend.scan("-----BEGIN PRIVATE KEY-----", [])
+      assert {:hit, _} = NIFBackend.scan("-----BEGIN PRIVATE KEY-----", [])
     end
 
     test "returns hits sorted by offset" do

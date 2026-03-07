@@ -118,7 +118,7 @@ defmodule SigilGuard.Patterns do
     {:ok, patterns}
   end
 
-  def parse_bundle(_other), do: {:error, :invalid_bundle_format}
+  def parse_bundle(_), do: {:error, :invalid_bundle_format}
 
   @doc """
   Merge two pattern lists, with `override` taking precedence on name collision.
@@ -135,7 +135,7 @@ defmodule SigilGuard.Patterns do
   defp compile_pattern(raw) do
     case Regex.compile(extract_regex_source(raw)) do
       {:ok, regex} -> build_compiled(raw, regex)
-      {:error, _reason} -> nil
+      {:error, _} -> nil
     end
   end
 
@@ -165,5 +165,5 @@ defmodule SigilGuard.Patterns do
   defp parse_severity("low"), do: :low
   defp parse_severity("medium"), do: :medium
   defp parse_severity("high"), do: :high
-  defp parse_severity(_other), do: nil
+  defp parse_severity(_), do: nil
 end

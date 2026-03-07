@@ -172,7 +172,7 @@ defmodule SigilGuard.Policy do
           :ok
         end
 
-      _expired_or_new ->
+      _ ->
         :ets.insert(table, {identity, 1, now})
         :ok
     end
@@ -284,7 +284,7 @@ defmodule SigilGuard.Policy do
       :undefined ->
         :ets.new(table, [:named_table, :public, :set])
 
-      _ref ->
+      _ ->
         :ok
     end
   end

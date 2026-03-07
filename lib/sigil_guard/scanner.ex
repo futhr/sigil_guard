@@ -104,7 +104,7 @@ defmodule SigilGuard.Scanner do
     Enum.flat_map(patterns, fn pattern ->
       pattern.regex
       |> Regex.scan(text, return: :index)
-      |> Enum.map(fn [{offset, length} | _rest] ->
+      |> Enum.map(fn [{offset, length} | _] ->
         %{
           name: pattern.name,
           category: pattern.category,

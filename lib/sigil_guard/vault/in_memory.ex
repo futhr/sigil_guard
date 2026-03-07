@@ -92,7 +92,7 @@ defmodule SigilGuard.Vault.InMemory do
   end
 
   @impl GenServer
-  def handle_call({:encrypt, plaintext, description}, _from, state) do
+  def handle_call({:encrypt, plaintext, description}, _, state) do
     vault_id = generate_vault_id()
     iv = :crypto.strong_rand_bytes(12)
 
@@ -119,7 +119,7 @@ defmodule SigilGuard.Vault.InMemory do
   end
 
   @impl GenServer
-  def handle_call({:decrypt, vault_id}, _from, state) do
+  def handle_call({:decrypt, vault_id}, _, state) do
     result =
       case :ets.lookup(state.table, vault_id) do
         [{^vault_id, entry}] ->
@@ -144,13 +144,13 @@ defmodule SigilGuard.Vault.InMemory do
   end
 
   @impl GenServer
-  def handle_call({:exists?, vault_id}, _from, state) do
+  def handle_call({:exists?, vault_id}, _, state) do
     exists = :ets.member(state.table, vault_id)
     {:reply, exists, state}
   end
 
   @impl GenServer
-  def handle_call(:list_entries, _from, state) do
+  def handle_call(:list_entries, _, state) do
     entries =
       :ets.foldl(
         fn {id, entry}, acc -> [{id, entry.description} | acc] end,
@@ -162,7 +162,7 @@ defmodule SigilGuard.Vault.InMemory do
   end
 
   @impl GenServer
-  def handle_call({:delete, vault_id}, _from, state) do
+  def handle_call({:delete, vault_id}, _, state) do
     result =
       if :ets.member(state.table, vault_id) do
         :ets.delete(state.table, vault_id)

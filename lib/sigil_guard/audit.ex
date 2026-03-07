@@ -169,7 +169,7 @@ defmodule SigilGuard.Audit do
   """
   @spec build_chain([t()], binary()) :: [t()]
   def build_chain(events, key) do
-    {signed, _last_hmac} =
+    {signed, _} =
       Enum.map_reduce(events, nil, fn event, prev_hmac ->
         signed = sign_event(event, key, prev_hmac)
         {signed, signed.hmac}
@@ -231,5 +231,5 @@ defmodule SigilGuard.Audit do
     |> Kernel.==(0)
   end
 
-  defp secure_compare(_a, _b), do: false
+  defp secure_compare(_, _), do: false
 end

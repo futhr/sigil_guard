@@ -37,7 +37,7 @@ defmodule SigilGuard.Signer.Ed25519 do
   """
   @spec new(binary()) :: t()
   def new(private_key) when byte_size(private_key) == 32 do
-    {public_key, _priv} = :crypto.generate_key(:eddsa, :ed25519, private_key)
+    {public_key, _} = :crypto.generate_key(:eddsa, :ed25519, private_key)
 
     %__MODULE__{
       private_key: private_key,

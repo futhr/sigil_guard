@@ -29,7 +29,7 @@ defmodule SigilGuard.ScannerTest do
     end
 
     test "detects ASIA-prefixed AWS keys (temporary credentials)" do
-      assert {:hit, _hits} = Scanner.scan("ASIA1234567890ABCDEF")
+      assert {:hit, _} = Scanner.scan("ASIA1234567890ABCDEF")
     end
 
     test "detects generic API key assignments" do
@@ -78,15 +78,15 @@ defmodule SigilGuard.ScannerTest do
     end
 
     test "detects EC private keys" do
-      assert {:hit, _hits} = Scanner.scan("-----BEGIN EC PRIVATE KEY-----")
+      assert {:hit, _} = Scanner.scan("-----BEGIN EC PRIVATE KEY-----")
     end
 
     test "detects OpenSSH private keys" do
-      assert {:hit, _hits} = Scanner.scan("-----BEGIN OPENSSH PRIVATE KEY-----")
+      assert {:hit, _} = Scanner.scan("-----BEGIN OPENSSH PRIVATE KEY-----")
     end
 
     test "detects generic private keys" do
-      assert {:hit, _hits} = Scanner.scan("-----BEGIN PRIVATE KEY-----")
+      assert {:hit, _} = Scanner.scan("-----BEGIN PRIVATE KEY-----")
     end
 
     test "detects generic secret assignments" do

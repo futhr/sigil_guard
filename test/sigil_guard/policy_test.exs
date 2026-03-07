@@ -38,7 +38,7 @@ defmodule SigilGuard.PolicyTest do
     end
 
     test "offers confirmation for high-risk with medium trust" do
-      assert {:confirm, _reason} = Policy.evaluate("delete_database", :medium)
+      assert {:confirm, _} = Policy.evaluate("delete_database", :medium)
     end
 
     test "accepts risk_level override" do
@@ -200,7 +200,7 @@ defmodule SigilGuard.PolicyTest do
     test "blocks requests exceeding limit" do
       table = :rate_test_blocks
 
-      for _i <- 1..3 do
+      for _ <- 1..3 do
         Policy.rate_check("user2", max_requests: 3, rate_store: table)
       end
 
@@ -211,7 +211,7 @@ defmodule SigilGuard.PolicyTest do
     test "different identities have independent limits" do
       table = :rate_test_independent
 
-      for _i <- 1..3 do
+      for _ <- 1..3 do
         Policy.rate_check("alice", max_requests: 3, rate_store: table)
       end
 

@@ -69,44 +69,43 @@ defmodule SigilGuard.Backend.NIF do
 
     @doc false
     @spec scan(String.t(), term()) :: {:ok, String.t()} | {:hit, list()}
-    def scan(_text, _opts), do: :erlang.nif_error(:nif_not_loaded)
+    def scan(_, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec redact(String.t(), list(), term()) :: String.t()
-    def redact(_text, _hits, _opts), do: :erlang.nif_error(:nif_not_loaded)
+    def redact(_, _, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec scan_and_redact(String.t(), term()) :: String.t()
-    def scan_and_redact(_text, _opts), do: :erlang.nif_error(:nif_not_loaded)
+    def scan_and_redact(_, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec canonical_bytes(String.t(), atom(), String.t(), String.t()) :: binary()
-    def canonical_bytes(_identity, _verdict, _timestamp, _nonce_hex),
-      do: :erlang.nif_error(:nif_not_loaded)
+    def canonical_bytes(_, _, _, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec envelope_sign(String.t(), atom(), term()) :: map()
-    def envelope_sign(_identity, _verdict, _opts), do: :erlang.nif_error(:nif_not_loaded)
+    def envelope_sign(_, _, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec envelope_verify(map(), String.t()) :: :ok | {:error, term()}
-    def envelope_verify(_envelope, _public_key_b64u), do: :erlang.nif_error(:nif_not_loaded)
+    def envelope_verify(_, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec evaluate_policy(String.t(), atom(), term()) :: atom() | {atom(), String.t()}
-    def evaluate_policy(_action, _trust_level, _opts), do: :erlang.nif_error(:nif_not_loaded)
+    def evaluate_policy(_, _, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec classify_risk(String.t(), term()) :: atom()
-    def classify_risk(_action, _opts), do: :erlang.nif_error(:nif_not_loaded)
+    def classify_risk(_, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec audit_sign_event(map(), binary(), String.t() | nil) :: map()
-    def audit_sign_event(_event, _key, _prev_hmac), do: :erlang.nif_error(:nif_not_loaded)
+    def audit_sign_event(_, _, _), do: :erlang.nif_error(:nif_not_loaded)
 
     @doc false
     @spec audit_verify_chain(list(), binary()) :: :ok | {:broken, non_neg_integer()}
-    def audit_verify_chain(_events, _key), do: :erlang.nif_error(:nif_not_loaded)
+    def audit_verify_chain(_, _), do: :erlang.nif_error(:nif_not_loaded)
   end
 
   # -- Backend Implementation --

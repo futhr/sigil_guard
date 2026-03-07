@@ -89,5 +89,5 @@ defmodule SigilGuard.Audit.EventType do
   def from_string("SigilInterception"), do: {:ok, :sigil_interception}
   def from_string("McpToolGated"), do: {:ok, :mcp_tool_gated}
   def from_string("DelegationCrossing"), do: {:ok, :delegation_crossing}
-  def from_string(_other), do: :error
+  def from_string(_), do: :error
 end

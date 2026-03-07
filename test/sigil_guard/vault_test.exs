@@ -49,7 +49,7 @@ defmodule SigilGuard.VaultTest do
 
     test "each encryption produces a unique vault ID" do
       ids =
-        for _i <- 1..50 do
+        for _ <- 1..50 do
           {:ok, id} = InMemory.encrypt("same-secret", "test")
           id
         end
@@ -166,7 +166,7 @@ defmodule SigilGuard.VaultTest do
 
   describe "format_status/1" do
     test "redacts master key from :sys.get_status" do
-      {:status, _pid, _mod, items} = :sys.get_status(InMemory)
+      {:status, _, _, items} = :sys.get_status(InMemory)
       status_str = inspect(items, limit: :infinity)
 
       # Master key should be redacted, not leaked as raw bytes

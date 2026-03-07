@@ -96,7 +96,7 @@ defmodule SigilGuard.Registry do
         metadata =
           case result do
             {:ok, body} -> Map.merge(telemetry_meta, %{count: map_size(body), source: :registry})
-            {:error, _reason} -> Map.merge(telemetry_meta, %{count: 0, source: :error})
+            {:error, _} -> Map.merge(telemetry_meta, %{count: 0, source: :error})
           end
 
         {result, metadata}

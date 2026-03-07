@@ -106,7 +106,7 @@ defmodule SigilGuard.Registry.Cache do
   end
 
   @impl GenServer
-  def handle_call(:patterns, _from, state) do
+  def handle_call(:patterns, _, state) do
     result =
       if state.source == :empty do
         Patterns.built_in()
@@ -117,11 +117,11 @@ defmodule SigilGuard.Registry.Cache do
     {:reply, result, state}
   end
 
-  def handle_call(:rule_count, _from, state) do
+  def handle_call(:rule_count, _, state) do
     {:reply, length(state.patterns), state}
   end
 
-  def handle_call(:source, _from, state) do
+  def handle_call(:source, _, state) do
     {:reply, state.source, state}
   end
 
