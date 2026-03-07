@@ -145,7 +145,7 @@ signed = SigilGuard.Audit.build_chain(events, key)
 
 ```elixir
 config :sigil_guard,
-  backend: :elixir,                        # :elixir | :nif
+  backend: :elixir, # :elixir | :nif
   registry_url: "https://registry.sigil-protocol.org",
   registry_ttl_ms: :timer.hours(1),
   registry_timeout_ms: 5_000,
