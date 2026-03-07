@@ -61,52 +61,9 @@ defmodule SigilGuard.Backend.NIF do
     instead.
     """
 
-    # When Rustler is available (dev/test), use it for
-    # auto-compilation and NIF loading. Otherwise, fall back to
-    # manual loading for environments where Rustler isn't a
-    # dependency (hex users without optional Rustler).
-    if Code.ensure_loaded?(Rustler) do
-      use Rustler,
-        otp_app: :sigil_guard,
-        crate: "sigil_guard_nif"
-    else
-      @on_load :load_nif
-
-      @doc false
-      @spec load_nif() :: :ok
-      def load_nif do
-        nif_paths = [
-          Application.app_dir(
-            :sigil_guard,
-            "priv/native/libsigil_guard_nif"
-          ),
-          Path.join([File.cwd!(), "priv/native/libsigil_guard_nif"]),
-          Application.app_dir(
-            :sigil_guard,
-            "priv/native/sigil_guard_nif"
-          ),
-          Path.join([File.cwd!(), "priv/native/sigil_guard_nif"])
-        ]
-
-        result =
-          Enum.find_value(nif_paths, :not_found, fn path ->
-            case :erlang.load_nif(
-                   String.to_charlist(path),
-                   0
-                 ) do
-              :ok -> :ok
-              {:error, {:reload, _msg}} -> :ok
-              {:error, {:upgrade, _msg}} -> :ok
-              _other -> nil
-            end
-          end)
-
-        case result do
-          :ok -> :ok
-          :not_found -> :ok
-        end
-      end
-    end
+    use Rustler,
+      otp_app: :sigil_guard,
+      crate: "sigil_guard_nif"
 
     # NIF stubs — replaced at load time by Rust implementations
 
