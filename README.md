@@ -58,7 +58,7 @@ def deps do
   [
     {:sigil_guard, github: "futhr/sigil_guard"},
     # Optional: For Rust NIF backend
-    {:rustler, "~> 0.36", runtime: false, optional: true}
+    {:rustler, "~> 0.37", runtime: false, optional: true}
   ]
 end
 ```

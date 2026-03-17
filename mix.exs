@@ -55,7 +55,7 @@ defmodule SigilGuard.MixProject do
       {:telemetry, "~> 1.0"},
 
       # NIF — required for compilation (native/sigil_guard_nif uses Rustler)
-      {:rustler, "~> 0.36", runtime: false},
+      {:rustler, "~> 0.37", runtime: false},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
