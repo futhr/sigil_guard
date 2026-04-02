@@ -137,7 +137,10 @@ defmodule SigilGuard.MixProject do
       lint: ["format --check-formatted", "credo --strict", "dialyzer"],
       "test.cover": ["coveralls"],
       bench: ["run bench/run.exs"],
-      ci: ["setup", "lint", "test.cover"]
+      ci: ["setup", "lint", "test.cover"],
+
+      # Release
+      release: ["git_ops.release"]
     ]
   end
 end
