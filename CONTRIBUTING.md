@@ -50,13 +50,21 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - `test:` test additions or changes
 - `chore:` maintenance tasks
 
+## Releasing
+
+Releases are managed by maintainers using git_ops:
+
+1. Ensure all tests pass: `mix check`
+2. Run `mix release` (alias for `mix git_ops.release`) — updates changelog, bumps version, commits, and tags
+3. Push with tags: `git push --follow-tags`
+4. CI will publish to Hex.pm on the `v*` tag
+
 ## Pull Request Process
 
 1. Ensure your code follows the project style
 2. Update documentation as needed
 3. Add tests for new functionality
-4. Update CHANGELOG.md with your changes
-5. Submit a PR with a clear description
+4. Submit a PR with a clear description
 
 ## Questions?
 
