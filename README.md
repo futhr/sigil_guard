@@ -1,16 +1,16 @@
-<div align="center">
-
 # SigilGuard
 
 **SIGIL Protocol integration for Elixir — with optional Rust NIF backend**
 
-[![CI](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/futhr/sigil_guard/graph/badge.svg?branch=main)](https://codecov.io/gh/futhr/sigil_guard) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg)](https://hex.pm/packages/sigil_guard)
+[![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/sigil_guard)
+[![CI](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/futhr/sigil_guard/branch/main/graph/badge.svg)](https://codecov.io/gh/futhr/sigil_guard)
+[![License](https://img.shields.io/github/license/futhr/sigil_guard.svg)](LICENSE)
 
 [Installation](#installation) |
 [Quick Start](#quick-start) |
 [Documentation](https://github.com/futhr/sigil_guard)
-
-</div>
 
 ---
 
@@ -43,8 +43,6 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 ## Installation
 
-_Note: This project is currently in production evaluation and has not yet been released to Hex. Documentation is available on [GitHub](https://github.com/futhr/sigil_guard)._
-
 ### Requirements
 
 - Elixir ~> 1.17
@@ -56,7 +54,7 @@ Add `sigil_guard` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:sigil_guard, github: "futhr/sigil_guard"},
+    {:sigil_guard, "~> 0.1.0"},
     # Optional: For Rust NIF backend
     {:rustler, "~> 0.37", runtime: false, optional: true}
   ]
