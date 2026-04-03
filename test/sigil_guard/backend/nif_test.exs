@@ -9,8 +9,6 @@ defmodule SigilGuard.Backend.NIFTest do
 
   use ExUnit.Case, async: true
 
-  @moduletag :nif
-
   alias SigilGuard.Backend.NIF, as: NIFBackend
 
   @moduletag :nif
