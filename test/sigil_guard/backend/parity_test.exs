@@ -9,6 +9,8 @@ defmodule SigilGuard.Backend.ParityTest do
 
   use ExUnit.Case, async: true
 
+  @moduletag :nif
+
   alias SigilGuard.Backend.Elixir, as: ElixirBackend
   alias SigilGuard.Backend.NIF, as: NIFBackend
 

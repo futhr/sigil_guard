@@ -9,6 +9,8 @@ defmodule SigilGuard.Backend.NIFTest do
 
   use ExUnit.Case, async: true
 
+  @moduletag :nif
+
   alias SigilGuard.Backend.NIF, as: NIFBackend
 
   describe "scan/2" do
