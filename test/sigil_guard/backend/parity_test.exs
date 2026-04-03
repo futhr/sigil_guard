@@ -14,6 +14,8 @@ defmodule SigilGuard.Backend.ParityTest do
   alias SigilGuard.Backend.Elixir, as: ElixirBackend
   alias SigilGuard.Backend.NIF, as: NIFBackend
 
+  @moduletag :nif
+
   # -- Scanning Parity --
 
   describe "scan parity" do
