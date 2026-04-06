@@ -1,9 +1,9 @@
 name: Publish
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: ["Build precompiled NIFs"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -12,10 +12,13 @@ jobs:
   publish:
     name: Publish to Hex.pm
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
@@ -34,15 +37,6 @@ jobs:
             _build
           key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
 
-      - name: Restore Cargo cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            native/sigil_guard_nif/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-${{ runner.os }}-${{ hashFiles('native/sigil_guard_nif/Cargo.lock') }}
-
       - name: Install dependencies
         run: mix deps.get
 
@@ -50,6 +44,8 @@ jobs:
         run: mix compile
 
       - name: Run tests
+        env:
+          SIGIL_GUARD_BUILD: "1"
         run: mix test
 
       - name: Check formatting

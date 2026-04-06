@@ -11,6 +11,8 @@ defmodule SigilGuard.Backend.NIFTest do
 
   alias SigilGuard.Backend.NIF, as: NIFBackend
 
+  @moduletag :nif
+
   describe "scan/2" do
     test "returns :ok for clean text" do
       assert {:ok, "safe"} = NIFBackend.scan("safe", [])

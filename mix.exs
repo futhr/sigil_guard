@@ -54,8 +54,10 @@ defmodule SigilGuard.MixProject do
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.0"},
 
-      # NIF — required for compilation (native/sigil_guard_nif uses Rustler)
-      {:rustler, "~> 0.37", runtime: false},
+      # NIF — precompiled binaries downloaded at install time
+      {:rustler_precompiled, "~> 0.8"},
+      # Rustler only needed when force-building from source
+      {:rustler, "~> 0.37", optional: true},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

@@ -21,7 +21,6 @@ defmodule SigilGuard.Backend.NIF do
   ## Trade-offs
 
     * **No process isolation** - NIF crash takes down the BEAM
-    * Requires Rust toolchain for compilation
     * More complex deployment than Elixir backend
 
   ## Configuration
@@ -29,15 +28,12 @@ defmodule SigilGuard.Backend.NIF do
       config :sigil_guard,
         backend: :nif
 
-  ## Requirements
+  ## Precompiled Binaries
 
-  The Rustler NIF must be compiled:
+  Precompiled NIF binaries are downloaded automatically for supported
+  platforms. To force a build from source (requires Rust toolchain):
 
-      # Ensure Rust toolchain is installed
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-      # Compile the NIF (happens automatically with mix compile if rustler is available)
-      cd native/sigil_guard_nif && cargo build --release
+      SIGIL_GUARD_BUILD=1 mix deps.compile sigil_guard
 
   """
 
@@ -45,7 +41,7 @@ defmodule SigilGuard.Backend.NIF do
 
   require Logger
 
-  # Native module — loads the Rustler NIF
+  # Native module — loads precompiled NIF or builds from source
   defmodule Native do
     @moduledoc """
     Low-level NIF function stubs for the Rust `sigil_guard_nif`
@@ -61,9 +57,39 @@ defmodule SigilGuard.Backend.NIF do
     instead.
     """
 
-    use Rustler,
-      otp_app: :sigil_guard,
-      crate: "sigil_guard_nif"
+    @force_build System.get_env("SIGIL_GUARD_BUILD") in ["1", "true"]
+    @checksum_file "checksum-Elixir.SigilGuard.Backend.NIF.Native.exs"
+    @has_precompiled (case File.read(@checksum_file) do
+                        {:ok, content} ->
+                          {checksums, _} = Code.eval_string(content)
+                          map_size(checksums) > 0
+
+                        _ ->
+                          false
+                      end)
+
+    if @has_precompiled or @force_build do
+      mix_config = Mix.Project.config()
+      version = mix_config[:version]
+      github_url = mix_config[:package][:links]["GitHub"]
+
+      use RustlerPrecompiled,
+        otp_app: :sigil_guard,
+        crate: "sigil_guard_nif",
+        base_url: "#{github_url}/releases/download/v#{version}",
+        version: version,
+        targets: ~w(
+          aarch64-apple-darwin
+          aarch64-unknown-linux-gnu
+          aarch64-unknown-linux-musl
+          x86_64-apple-darwin
+          x86_64-unknown-linux-gnu
+          x86_64-unknown-linux-musl
+          x86_64-pc-windows-gnu
+          x86_64-pc-windows-msvc
+        ),
+        force_build: @force_build
+    end
 
     # NIF stubs — replaced at load time by Rust implementations
 
