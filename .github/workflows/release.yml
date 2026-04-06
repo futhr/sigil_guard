@@ -31,6 +31,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Add Rust target
+        if: matrix.job.target != '' && !matrix.job.use-cross
+        run: rustup target add ${{ matrix.job.target }}
+
       - name: Build precompiled NIF
         id: build-crate
         uses: philss/rustler-precompiled-action@v1.1.4
