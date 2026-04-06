@@ -9,6 +9,11 @@ description = "Rustler NIF for SigilGuard — uses sigil-protocol crate for prot
 name = "sigil_guard_nif"
 crate-type = ["cdylib"]
 
+[features]
+default = ["nif_version_2_15"]
+nif_version_2_15 = ["rustler/nif_version_2_15"]
+nif_version_2_16 = ["rustler/nif_version_2_16"]
+
 [dependencies]
 rustler = "0.37"
 sigil-protocol = "0.1"
