@@ -98,7 +98,19 @@ defmodule SigilGuard.MixProject do
         "GitHub" => @source_url,
         "SIGIL Protocol" => "https://sigil-protocol.org/"
       },
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
+      files: ~w[
+        lib
+        native/sigil_guard_nif/src
+        native/sigil_guard_nif/Cargo.toml
+        native/sigil_guard_nif/Cargo.lock
+        native/sigil_guard_nif/.cargo
+        checksum-Elixir.SigilGuard.Backend.NIF.Native.exs
+        .formatter.exs
+        mix.exs
+        README.md
+        LICENSE
+        CHANGELOG.md
+      ],
       maintainers: ["Tobias Bohwalli <hi@futhr.io>"]
     ]
   end

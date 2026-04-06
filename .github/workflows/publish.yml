@@ -60,6 +60,9 @@ jobs:
       - name: Generate documentation
         run: mix docs
 
+      - name: Download precompiled NIF checksums
+        run: mix rustler_precompiled.download SigilGuard.Backend.NIF.Native --all --print
+
       - name: Publish to Hex.pm
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
