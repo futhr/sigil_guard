@@ -16,22 +16,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        nif: ["2.15", "2.16"]
+        nif: ["2.15"]
         job:
-          - { target: aarch64-apple-darwin,        os: macos-14 }
-          - { target: x86_64-apple-darwin,         os: macos-13 }
+          - { target: aarch64-apple-darwin,        os: macos-15 }
+          - { target: x86_64-apple-darwin,         os: macos-15 }
           - { target: aarch64-unknown-linux-gnu,   os: ubuntu-22.04, use-cross: true }
           - { target: aarch64-unknown-linux-musl,  os: ubuntu-22.04, use-cross: true }
           - { target: x86_64-unknown-linux-gnu,    os: ubuntu-22.04 }
           - { target: x86_64-unknown-linux-musl,   os: ubuntu-22.04, use-cross: true }
-          - { target: x86_64-pc-windows-gnu,       os: windows-2022 }
-          - { target: x86_64-pc-windows-msvc,      os: windows-2022 }
+          - { target: x86_64-pc-windows-gnu,       os: windows-2025 }
+          - { target: x86_64-pc-windows-msvc,      os: windows-2025 }
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Build precompiled NIF
+        id: build-crate
         uses: philss/rustler-precompiled-action@v1.1.4
         with:
           project-name: sigil_guard_nif
@@ -44,9 +45,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.job.target }}-nif-${{ matrix.nif }}
-          path: |
-            native/sigil_guard_nif/priv/native/*
+          name: ${{ steps.build-crate.outputs.file-name }}
+          path: ${{ steps.build-crate.outputs.file-path }}
           if-no-files-found: error
 
   publish_release:
