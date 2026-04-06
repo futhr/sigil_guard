@@ -5,6 +5,15 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [v0.1.1](https://github.com/futhr/sigil_guard/compare/v0.1.0...v0.1.1) (2026-04-06)
+
+
+
+
+### Bug Fixes:
+
+* add NIF version features and musl/LTO config for precompiled builds by Tobias Bohwalli
+
 ## [v0.1.0](https://github.com/futhr/sigil_guard/compare/v0.1.0...v0.1.0) (2026-04-03)
 
 

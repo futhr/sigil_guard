@@ -54,7 +54,7 @@ Add `sigil_guard` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:sigil_guard, "~> 0.1.0"},
+    {:sigil_guard, "~> 0.1.1"},
     # Optional: For Rust NIF backend
     {:rustler, "~> 0.37", runtime: false, optional: true}
   ]
