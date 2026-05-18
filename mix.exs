@@ -54,6 +54,11 @@ defmodule SigilGuard.MixProject do
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.0"},
 
+      # Security override: decimal < 3.1.0 has a DoS via unbounded
+      # exponent parsing (GHSA-rhv4-8758-jx7v / elixirforum 75261).
+      # Pulled transitively; force >= 3.1.
+      {:decimal, "~> 3.1", override: true},
+
       # NIF — precompiled binaries downloaded at install time
       {:rustler_precompiled, "~> 0.8"},
       # Rustler only needed when force-building from source
