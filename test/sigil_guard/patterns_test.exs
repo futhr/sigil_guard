@@ -1,10 +1,5 @@
 defmodule SigilGuard.PatternsTest do
-  @moduledoc """
-  Tests for `SigilGuard.Patterns`.
-
-  Validates the built-in pattern catalogue: structure, required fields,
-  regex compilation, and detection accuracy for each pattern category.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

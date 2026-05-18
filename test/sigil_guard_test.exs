@@ -1,10 +1,5 @@
 defmodule SigilGuardTest do
-  @moduledoc """
-  Tests for the `SigilGuard` top-level facade.
-
-  Verifies that public API functions correctly delegate to the configured
-  backend, covering scanning, redaction, and policy verdict operations.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

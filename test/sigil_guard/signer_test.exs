@@ -1,10 +1,5 @@
 defmodule SigilGuard.SignerTest do
-  @moduledoc """
-  Tests for `SigilGuard.Signer` and `SigilGuard.Signer.Ed25519`.
-
-  Covers keypair generation, signing, verification round-trips, and the
-  Ed25519 default signer implementation.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

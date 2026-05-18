@@ -1,10 +1,5 @@
 defmodule SigilGuard.IdentityTest do
-  @moduledoc """
-  Tests for `SigilGuard.Identity`.
-
-  Validates trust level comparison, ordering, minimum trust requirements,
-  and the trust level hierarchy (low < medium < high).
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

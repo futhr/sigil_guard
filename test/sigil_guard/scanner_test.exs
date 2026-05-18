@@ -1,11 +1,5 @@
 defmodule SigilGuard.ScannerTest do
-  @moduledoc """
-  Tests for `SigilGuard.Scanner`.
-
-  Exercises scanning and redaction across all built-in pattern categories:
-  AWS keys, API tokens, JWTs, database URIs, bearer tokens, and generic
-  secrets. Also covers custom pattern injection and edge cases.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

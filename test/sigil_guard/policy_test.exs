@@ -1,11 +1,5 @@
 defmodule SigilGuard.PolicyTest do
-  @moduledoc """
-  Tests for `SigilGuard.Policy`.
-
-  Validates risk classification (`classify_risk/2`) and trust-gated policy
-  evaluation (`evaluate/3`) across all risk levels and trust tiers, including
-  custom policy overrides.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

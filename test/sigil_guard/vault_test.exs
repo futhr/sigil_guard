@@ -1,10 +1,5 @@
 defmodule SigilGuard.VaultTest do
-  @moduledoc """
-  Tests for `SigilGuard.Vault` and `SigilGuard.Vault.InMemory`.
-
-  Exercises the vaulting lifecycle: store, retrieve, delete, and list
-  operations on the ETS-backed in-memory vault with AES-256-GCM encryption.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: false
 

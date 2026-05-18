@@ -1,11 +1,5 @@
 defmodule SigilGuard.Backend.ElixirTest do
-  @moduledoc """
-  Tests for `SigilGuard.Backend.Elixir`.
-
-  Verifies that the pure-Elixir backend correctly delegates all
-  `SigilGuard.Backend` callbacks to their respective modules (Scanner,
-  Envelope, Policy, Audit).
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

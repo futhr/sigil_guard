@@ -1,11 +1,5 @@
 defmodule SigilGuard.Registry.CacheTest do
-  @moduledoc """
-  Tests for `SigilGuard.Registry.Cache`.
-
-  Exercises the GenServer TTL cache lifecycle: initial fetch, cache hits,
-  TTL expiry and refresh, fallback to stale data on fetch failure, and
-  source tracking (`:registry`, `:cache`, `:fallback`, `:empty`).
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: false
 

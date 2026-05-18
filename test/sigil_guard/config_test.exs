@@ -1,11 +1,5 @@
 defmodule SigilGuard.ConfigTest do
-  @moduledoc """
-  Tests for `SigilGuard.Config`.
-
-  Verifies that all configuration accessors return correct defaults and
-  respect application environment overrides for backend selection, registry
-  settings, scanner patterns, and cache TTL.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: false
 

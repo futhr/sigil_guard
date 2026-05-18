@@ -1,11 +1,5 @@
 defmodule SigilGuard.BackendTest do
-  @moduledoc """
-  Tests for `SigilGuard.Backend`.
-
-  Verifies backend dispatch: `resolve/0` returns the correct module for
-  each configured backend atom, and `available?/1` correctly detects
-  whether a backend's dependencies are loaded.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: false
 

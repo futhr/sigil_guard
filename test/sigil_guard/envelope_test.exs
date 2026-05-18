@@ -1,11 +1,5 @@
 defmodule SigilGuard.EnvelopeTest do
-  @moduledoc """
-  Tests for `SigilGuard.Envelope`.
-
-  Verifies canonical byte serialization, Ed25519 envelope signing and
-  verification, nonce generation, and tamper detection. Uses the
-  deterministic `SigilGuard.TestSigner` for reproducible assertions.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

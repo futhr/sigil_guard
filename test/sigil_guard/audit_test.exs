@@ -1,10 +1,5 @@
 defmodule SigilGuard.AuditTest do
-  @moduledoc """
-  Tests for `SigilGuard.Audit`.
-
-  Covers audit event creation, HMAC chain building, chain verification,
-  and tamper detection across chains of varying lengths.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

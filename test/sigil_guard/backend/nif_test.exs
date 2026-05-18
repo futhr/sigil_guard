@@ -1,11 +1,5 @@
 defmodule SigilGuard.Backend.NIFTest do
-  @moduledoc """
-  Tests for `SigilGuard.Backend.NIF`.
-
-  Unit tests for the Rust NIF backend covering scanning, envelope
-  operations, policy evaluation, and audit chain verification.
-  The NIF is auto-compiled via Rustler during `mix compile`.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

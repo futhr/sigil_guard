@@ -1,7 +1,5 @@
 defmodule SigilGuard.Identity.BindingTest do
-  @moduledoc """
-  Tests for `SigilGuard.Identity.Binding`.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

@@ -1,11 +1,5 @@
 defmodule SigilGuard.RegistryTest do
-  @moduledoc """
-  Tests for `SigilGuard.Registry`.
-
-  Uses `Bypass` to simulate the SIGIL registry HTTP API, testing pattern
-  bundle fetching, DID resolution, and error handling for network failures
-  and malformed responses.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: false
 

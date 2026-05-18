@@ -1,11 +1,5 @@
 defmodule SigilGuard.Backend.ParityTest do
-  @moduledoc """
-  Cross-backend parity tests.
-
-  Verifies that the Elixir and NIF backends produce identical outputs
-  for all operations. This is the most critical test suite for ensuring
-  interoperability between backends.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 

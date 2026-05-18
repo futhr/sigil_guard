@@ -1,10 +1,5 @@
 defmodule SigilGuard.Audit.EventTypeTest do
-  @moduledoc """
-  Tests for `SigilGuard.Audit.EventType`.
-
-  Validates all 10 event type variants, string serialization/deserialization,
-  and the validation function.
-  """
+  @moduledoc false
 
   use ExUnit.Case, async: true
 
