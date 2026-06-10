@@ -109,13 +109,24 @@ defmodule SigilGuard.Registry do
 
     case Finch.request(request, SigilGuard.Finch, receive_timeout: timeout) do
       {:ok, %Finch.Response{status: 200, body: body}} ->
-        Jason.decode(body)
+        decode_object(body)
 
       {:ok, %Finch.Response{status: status}} ->
         {:error, {:http_error, status}}
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # Every registry endpoint returns a JSON object; a body decoding to an
+  # array or scalar is malformed and previously crashed the telemetry
+  # callback (map_size on a non-map).
+  defp decode_object(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} when is_map(decoded) -> {:ok, decoded}
+      {:ok, _non_object} -> {:error, :invalid_body}
+      {:error, reason} -> {:error, reason}
     end
   end
 end

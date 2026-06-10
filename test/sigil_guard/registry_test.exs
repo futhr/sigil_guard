@@ -55,6 +55,16 @@ defmodule SigilGuard.RegistryTest do
 
       assert {:error, _} = Registry.fetch_bundle(url: url)
     end
+
+    test "returns error for non-object JSON bodies", %{bypass: bypass, url: url} do
+      for body <- [Jason.encode!([1, 2, 3]), Jason.encode!("scalar"), "42"] do
+        Bypass.expect_once(bypass, "GET", "/patterns/bundle", fn conn ->
+          Plug.Conn.resp(conn, 200, body)
+        end)
+
+        assert {:error, :invalid_body} = Registry.fetch_bundle(url: url)
+      end
+    end
   end
 
   describe "resolve_did/2" do
