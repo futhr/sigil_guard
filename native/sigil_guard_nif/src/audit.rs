@@ -52,46 +52,73 @@ fn audit_sign_event<'a>(
 }
 
 /// Verify the integrity of an audit event chain.
+///
+/// Enforces contiguity — each event's `prev_hmac` must equal the actual
+/// predecessor's `hmac` (`nil` for the first event) — before checking
+/// the recomputed HMAC, matching the Elixir backend's `verify_chain/3`.
 #[rustler::nif]
 fn audit_verify_chain<'a>(
     env: Env<'a>,
     events: Vec<Term<'a>>,
     key: rustler::Binary<'a>,
 ) -> NifResult<Term<'a>> {
+    let mut expected_prev: Option<String> = None;
+
     for (index, event) in events.iter().enumerate() {
         let canonical = event_canonical_bytes(env, *event)?;
 
-        // Get prev_hmac from event
+        // The event's claimed predecessor link (nil atom → None)
         let prev_hmac_atom = rustler::types::atom::Atom::from_str(env, "prev_hmac").unwrap();
-        let chain_input: String = match event.map_get(prev_hmac_atom.encode(env)) {
+        let claimed_prev: Option<String> = match event.map_get(prev_hmac_atom.encode(env)) {
             Ok(term) => {
                 if term.is_atom() {
-                    GENESIS_MARKER.to_string()
+                    None
                 } else {
-                    term.decode::<String>()
-                        .unwrap_or_else(|_| GENESIS_MARKER.to_string())
+                    term.decode::<String>().ok()
                 }
             }
-            Err(_) => GENESIS_MARKER.to_string(),
+            Err(_) => None,
         };
 
-        // Compute expected HMAC
+        if claimed_prev != expected_prev {
+            return Ok((atoms::broken(), index).encode(env));
+        }
+
+        // Compute expected HMAC from the verified predecessor link
+        let chain_input = expected_prev.as_deref().unwrap_or(GENESIS_MARKER);
         let mut mac =
             HmacSha256::new_from_slice(key.as_slice()).map_err(|_| rustler::Error::BadArg)?;
         mac.update(canonical.as_bytes());
         mac.update(chain_input.as_bytes());
         let expected = hex_encode(mac.finalize().into_bytes().as_slice());
 
-        // Get actual HMAC from event
+        // Get actual HMAC from event (missing/non-string → broken, not a raise)
         let hmac_atom = rustler::types::atom::Atom::from_str(env, "hmac").unwrap();
-        let actual: String = event.map_get(hmac_atom.encode(env))?.decode()?;
+        let actual: Option<String> = match event.map_get(hmac_atom.encode(env)) {
+            Ok(term) => term.decode::<String>().ok(),
+            Err(_) => None,
+        };
 
-        if expected != actual {
-            return Ok((atoms::broken(), index).encode(env));
+        match actual {
+            Some(actual) if secure_eq(&expected, &actual) => expected_prev = Some(actual),
+            _ => return Ok((atoms::broken(), index).encode(env)),
         }
     }
 
     Ok(atoms::ok().encode(env))
+}
+
+/// Constant-time comparison — mirrors the Elixir backend's secure_compare
+/// so HMAC verification does not leak matching-prefix length via timing.
+fn secure_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+
+    a.bytes()
+        .zip(b.bytes())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
 }
 
 /// Build canonical bytes from an audit event struct.

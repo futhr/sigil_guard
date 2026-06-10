@@ -174,4 +174,72 @@ defmodule SigilGuard.Backend.ParityTest do
       end
     end
   end
+
+  # -- Audit Parity --
+
+  describe "audit parity" do
+    @audit_key :crypto.strong_rand_bytes(32)
+
+    test "audit_sign_event produces identical HMACs" do
+      event = SigilGuard.Audit.new_event("test", "alice", "read_file", "ok")
+
+      genesis_elixir = ElixirBackend.audit_sign_event(event, @audit_key, nil)
+      genesis_nif = NIFBackend.audit_sign_event(event, @audit_key, nil)
+
+      assert genesis_elixir.hmac == genesis_nif.hmac
+      assert genesis_elixir.prev_hmac == genesis_nif.prev_hmac
+
+      linked_elixir = ElixirBackend.audit_sign_event(event, @audit_key, genesis_elixir.hmac)
+      linked_nif = NIFBackend.audit_sign_event(event, @audit_key, genesis_elixir.hmac)
+
+      assert linked_elixir.hmac == linked_nif.hmac
+    end
+
+    test "audit_verify_chain agrees on valid chains" do
+      chain = signed_chain(3)
+
+      assert ElixirBackend.audit_verify_chain(chain, @audit_key) ==
+               NIFBackend.audit_verify_chain(chain, @audit_key)
+
+      assert :ok = NIFBackend.audit_verify_chain(chain, @audit_key)
+    end
+
+    test "audit_verify_chain agrees on tampered chains" do
+      tampered =
+        signed_chain(3)
+        |> List.update_at(1, fn event -> %{event | action: "tampered"} end)
+
+      assert {:broken, 1} = ElixirBackend.audit_verify_chain(tampered, @audit_key)
+      assert {:broken, 1} = NIFBackend.audit_verify_chain(tampered, @audit_key)
+    end
+
+    test "audit_verify_chain agrees on head deletion" do
+      [_ | rest] = signed_chain(3)
+
+      assert {:broken, 0} = ElixirBackend.audit_verify_chain(rest, @audit_key)
+      assert {:broken, 0} = NIFBackend.audit_verify_chain(rest, @audit_key)
+    end
+
+    test "audit_verify_chain agrees on middle deletion" do
+      truncated = List.delete_at(signed_chain(3), 1)
+
+      assert {:broken, 1} = ElixirBackend.audit_verify_chain(truncated, @audit_key)
+      assert {:broken, 1} = NIFBackend.audit_verify_chain(truncated, @audit_key)
+    end
+
+    test "audit_verify_chain agrees on unsigned events" do
+      unsigned_tail =
+        signed_chain(2)
+        |> List.update_at(1, fn event -> %{event | hmac: nil} end)
+
+      assert {:broken, 1} = ElixirBackend.audit_verify_chain(unsigned_tail, @audit_key)
+      assert {:broken, 1} = NIFBackend.audit_verify_chain(unsigned_tail, @audit_key)
+    end
+  end
+
+  defp signed_chain(count) do
+    1..count
+    |> Enum.map(&SigilGuard.Audit.new_event("test", "alice", "action#{&1}", "ok"))
+    |> SigilGuard.Audit.build_chain(@audit_key)
+  end
 end

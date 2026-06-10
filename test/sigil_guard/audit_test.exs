@@ -146,6 +146,65 @@ defmodule SigilGuard.AuditTest do
     test "empty chain is valid" do
       assert :ok = Audit.verify_chain([], @secret_key)
     end
+
+    test "detects deletion of the first event" do
+      events = build_signed_chain(3)
+
+      assert {:broken, 0} = Audit.verify_chain(tl(events), @secret_key)
+    end
+
+    test "detects deletion of a middle event" do
+      events = build_signed_chain(3)
+
+      assert {:broken, 1} = Audit.verify_chain(List.delete_at(events, 1), @secret_key)
+    end
+
+    test "detects reordered events" do
+      [first, second, third] = build_signed_chain(3)
+
+      assert {:broken, 1} = Audit.verify_chain([first, third, second], @secret_key)
+    end
+
+    test "detects a forged self-consistent first event" do
+      # An event whose hmac correctly covers a fabricated prev_hmac used
+      # to verify as a chain head; the genesis link must be enforced.
+      fake_prev = Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
+
+      forged =
+        Audit.new_event("test", "mallory", "action", "ok")
+        |> Audit.sign_event(@secret_key, fake_prev)
+
+      assert {:broken, 0} = Audit.verify_chain([forged], @secret_key)
+    end
+
+    test "detects an unsigned event in the chain" do
+      [first, second] = build_signed_chain(2)
+      unsigned = %{second | hmac: nil}
+
+      assert {:broken, 1} = Audit.verify_chain([first, unsigned], @secret_key)
+    end
+  end
+
+  describe "verify_chain/3 with :prev_hmac anchor" do
+    test "verifies a continuation segment against a stored tip" do
+      [first, second, third] = build_signed_chain(3)
+
+      assert :ok = Audit.verify_chain([second, third], @secret_key, prev_hmac: first.hmac)
+    end
+
+    test "rejects a segment anchored to the wrong tip" do
+      [_first, second, third] = build_signed_chain(3)
+      wrong_tip = Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
+
+      assert {:broken, 0} =
+               Audit.verify_chain([second, third], @secret_key, prev_hmac: wrong_tip)
+    end
+
+    test "nil anchor behaves like genesis verification" do
+      signed = build_signed_chain(2)
+
+      assert :ok = Audit.verify_chain(signed, @secret_key, prev_hmac: nil)
+    end
   end
 
   describe "build_chain/2" do
@@ -268,5 +327,11 @@ defmodule SigilGuard.AuditTest do
       refute Map.has_key?(decoded, "prev_hmac")
       refute Map.has_key?(decoded, "metadata")
     end
+  end
+
+  defp build_signed_chain(count) do
+    1..count
+    |> Enum.map(&Audit.new_event("test", "alice", "action#{&1}", "ok"))
+    |> Audit.build_chain(@secret_key)
   end
 end

@@ -13,8 +13,19 @@ defmodule SigilGuard.Audit do
   1. First event: `HMAC(key, canonical_bytes(event) <> "genesis")`
   2. Subsequent events: `HMAC(key, canonical_bytes(event) <> prev_hmac)`
 
-  Verification walks the chain and recomputes each HMAC. If any event
-  has been modified, the chain breaks at that point.
+  Verification walks the chain, enforcing that each event links to its
+  actual predecessor (the first event's `prev_hmac` must be `nil`, every
+  later event's must equal the previous event's `hmac`) and recomputing
+  each HMAC. Within the verified sequence this detects modification,
+  insertion, deletion, and reordering of events.
+
+  ### What the chain cannot detect
+
+  Truncation of the chain *tail* is undetectable from the events alone:
+  a chain with its last events removed is still a valid chain. To defend
+  against truncation, persist the most recent `hmac` out of band and
+  compare it to the last event's, or verify continuation segments
+  against a stored tip via the `:prev_hmac` option of `verify_chain/3`.
 
   ## Audit Logger Behaviour
 
@@ -128,8 +139,20 @@ defmodule SigilGuard.Audit do
   @doc """
   Verify the integrity of an audit event chain.
 
-  Returns `:ok` if all HMACs are valid, or `{:broken, index}` indicating
-  the first event whose HMAC doesn't match the expected value.
+  Returns `:ok` if the chain is contiguous and every HMAC is valid, or
+  `{:broken, index}` identifying the first event that fails.
+
+  An event fails verification if its `prev_hmac` does not link to its
+  actual predecessor's `hmac` (or to the `:prev_hmac` anchor/genesis for
+  the first event), or if its recomputed HMAC does not match. This
+  detects tampered, deleted, inserted, and reordered events. Truncation
+  of the chain tail cannot be detected — see the module documentation.
+
+  ## Options
+
+    * `:prev_hmac` — verify a segment that continues from a known tip
+      rather than from genesis. Pass the `hmac` of the event immediately
+      preceding the segment (default: `nil`, the chain starts at genesis).
 
   ## Examples
 
@@ -137,22 +160,32 @@ defmodule SigilGuard.Audit do
 
       {:broken, 3} = SigilGuard.Audit.verify_chain(tampered_events, secret_key)
 
+      # Verify a continuation segment against a persisted tip
+      :ok = SigilGuard.Audit.verify_chain(segment, secret_key, prev_hmac: stored_tip)
+
   """
-  @spec verify_chain([t()], binary()) :: :ok | {:broken, non_neg_integer()}
-  def verify_chain(events, key) do
+  @spec verify_chain([t()], binary(), keyword()) :: :ok | {:broken, non_neg_integer()}
+  def verify_chain(events, key, opts \\ []) do
+    anchor = Keyword.get(opts, :prev_hmac)
+
     events
     |> Enum.with_index()
-    |> Enum.reduce_while(:ok, fn {event, index}, :ok ->
-      chain_input = event.prev_hmac || @genesis_marker
+    |> Enum.reduce_while({:ok, anchor}, fn {event, index}, {:ok, expected_prev} ->
       canonical = canonical_bytes(event)
-      expected_hmac = compute_hmac(key, canonical <> chain_input)
+      expected_hmac = compute_hmac(key, canonical <> (expected_prev || @genesis_marker))
 
-      if secure_compare(expected_hmac, event.hmac) do
-        {:cont, :ok}
+      # Contiguity uses plain == — prev_hmac values are public chain
+      # data, not secrets; only the HMAC comparison needs constant time.
+      if event.prev_hmac == expected_prev and secure_compare(expected_hmac, event.hmac) do
+        {:cont, {:ok, event.hmac}}
       else
         {:halt, {:broken, index}}
       end
     end)
+    |> case do
+      {:ok, _} -> :ok
+      broken -> broken
+    end
   end
 
   @doc """
