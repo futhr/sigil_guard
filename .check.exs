@@ -41,11 +41,11 @@
     # Tests
     {:ex_unit, command: "mix test --cover"},
 
-    # NIF integration tests (only if NIF is compiled)
+    # NIF integration tests (only if a NIF binary is present — either
+    # force-built as sigil_guard_nif.so or a precompiled lib*.so variant)
     {:test_nif,
      command: "mix test --include nif",
-     enabled: File.exists?("priv/native/libsigil_guard_nif.so") or
-              File.exists?("priv/native/libsigil_guard_nif.dylib"),
+     enabled: Path.wildcard("priv/native/*sigil_guard_nif*") != [],
      deps: [:ex_unit]}
   ]
 ]

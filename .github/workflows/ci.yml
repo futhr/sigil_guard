@@ -24,6 +24,10 @@ jobs:
             otp: "27"
           - elixir: "1.18"
             otp: "28"
+          - elixir: "1.19"
+            otp: "28"
+          - elixir: "1.20"
+            otp: "29"
 
     steps:
       - uses: actions/checkout@v6
@@ -58,13 +62,20 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      # touch forces the Native module (and thus the cargo build, which
+      # tracks Rust changes itself) to recompile even on a warm _build
+      # cache — the force-built .so lives outside the cache.
       - name: Compile
         env:
           SIGIL_GUARD_BUILD: "1"
-        run: mix compile --warnings-as-errors
+        run: |
+          touch lib/sigil_guard/backend/nif.ex
+          mix compile --warnings-as-errors
 
+      # --include nif runs the NIF and backend-parity suites against the
+      # crate force-built in the compile step above.
       - name: Run tests
-        run: mix test
+        run: mix test --include nif
 
       - name: Generate coverage report
         if: matrix.elixir == '1.18' && matrix.otp == '28'
