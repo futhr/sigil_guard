@@ -64,6 +64,8 @@ defmodule SigilGuard.Policy do
     high: :high
   }
 
+  @default_rate_table :sigil_guard_rates
+
   @risk_order %{
     low: 0,
     medium: 1,
@@ -143,8 +145,19 @@ defmodule SigilGuard.Policy do
 
   Returns `:ok` if within limits, or `{:error, :rate_limited}` if exceeded.
 
-  This is a simple token-bucket check. For production use, implement
-  `SigilGuard.Policy` behaviour with a proper rate limiter backend.
+  This is a fixed-window counter: an identity's first request opens a
+  window, requests within `:window_ms` count against `:max_requests`, and
+  the next request after the window expires opens a fresh one. Two limits
+  follow from that design — suitable for coarse abuse protection, not
+  strict quotas:
+
+    * Check and increment are separate ETS operations, so concurrent
+      callers can slightly exceed `:max_requests` under contention.
+    * Up to `2 × max_requests` can pass in a burst straddling a window
+      boundary, as with any fixed-window scheme.
+
+  For strict guarantees, implement the `SigilGuard.Policy` behaviour with
+  a dedicated rate limiter backend.
 
   ## Options
 
@@ -152,12 +165,16 @@ defmodule SigilGuard.Policy do
     * `:window_ms` — time window in milliseconds (default: 60_000)
     * `:rate_store` — ETS table name for rate tracking (default: `:sigil_guard_rates`)
 
+  The default table is created at application start and lives as long as
+  the application. A custom `:rate_store` table is created on first use
+  and owned by the first calling process — its rate state is lost if that
+  process exits.
   """
   @spec rate_check(String.t(), keyword()) :: :ok | {:error, :rate_limited}
   def rate_check(identity, opts \\ []) do
     max_requests = Keyword.get(opts, :max_requests, 100)
     window_ms = Keyword.get(opts, :window_ms, 60_000)
-    table = Keyword.get(opts, :rate_store, :sigil_guard_rates)
+    table = Keyword.get(opts, :rate_store, @default_rate_table)
 
     now = System.monotonic_time(:millisecond)
 
@@ -174,6 +191,32 @@ defmodule SigilGuard.Policy do
 
       _ ->
         :ets.insert(table, {identity, 1, now})
+        :ok
+    end
+  end
+
+  @doc """
+  Ensure the ETS table used by `rate_check/2` exists.
+
+  The default table is created automatically at application start; call
+  this only to pre-create a custom `:rate_store` table from a process that
+  outlives the callers (the table is owned by the process that creates it).
+
+  Safe to call concurrently — creation races resolve to the existing table.
+  """
+  @spec ensure_rate_table(atom()) :: :ok
+  def ensure_rate_table(table \\ @default_rate_table) do
+    case :ets.whereis(table) do
+      :undefined ->
+        try do
+          :ets.new(table, [:named_table, :public, :set])
+          :ok
+        rescue
+          # Lost a creation race with another process — table exists now.
+          ArgumentError -> :ok
+        end
+
+      _ ->
         :ok
     end
   end
@@ -277,15 +320,5 @@ defmodule SigilGuard.Policy do
         trust_required: required_trust
       }
     )
-  end
-
-  defp ensure_rate_table(table) do
-    case :ets.whereis(table) do
-      :undefined ->
-        :ets.new(table, [:named_table, :public, :set])
-
-      _ ->
-        :ok
-    end
   end
 end

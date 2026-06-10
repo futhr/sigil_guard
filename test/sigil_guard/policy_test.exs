@@ -214,5 +214,64 @@ defmodule SigilGuard.PolicyTest do
 
       assert :ok = Policy.rate_check("bob", max_requests: 3, rate_store: table)
     end
+
+    test "default rate table is owned by the application" do
+      assert :ets.whereis(:sigil_guard_rates) != :undefined
+
+      owner = :ets.info(:sigil_guard_rates, :owner)
+      refute owner == self()
+      assert Process.alive?(owner)
+    end
+
+    test "concurrent first use does not race on table creation" do
+      table = :rate_test_concurrent_create
+      parent = self()
+
+      # Each process stays alive until all checks finish, so the table
+      # (owned by whichever process created it) survives the whole test.
+      tasks =
+        for i <- 1..50 do
+          Task.async(fn ->
+            result = Policy.rate_check("user#{i}", max_requests: 10, rate_store: table)
+            send(parent, {:checked, result})
+
+            receive do
+              :release -> result
+            end
+          end)
+        end
+
+      results =
+        for _ <- tasks do
+          assert_receive {:checked, result}
+          result
+        end
+
+      Enum.each(tasks, &send(&1.pid, :release))
+      Enum.each(tasks, &Task.await/1)
+
+      assert Enum.all?(results, &(&1 == :ok))
+    end
+  end
+
+  describe "ensure_rate_table/1" do
+    test "creates the table on first call and is idempotent" do
+      table = :rate_test_ensure_idempotent
+
+      assert :ok = Policy.ensure_rate_table(table)
+      assert :ok = Policy.ensure_rate_table(table)
+      assert :ets.whereis(table) != :undefined
+    end
+
+    test "is safe under concurrent creation" do
+      table = :rate_test_ensure_concurrent
+
+      results =
+        1..50
+        |> Task.async_stream(fn _ -> Policy.ensure_rate_table(table) end, max_concurrency: 50)
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      assert Enum.all?(results, &(&1 == :ok))
+    end
   end
 end
