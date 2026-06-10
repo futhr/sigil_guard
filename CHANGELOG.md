@@ -5,6 +5,29 @@ See [Conventional Commits](Https://conventionalcommits.org) for commit guideline
 
 <!-- changelog -->
 
+## [v0.2.0](https://github.com/futhr/sigil_guard/compare/v0.1.1...v0.2.0) (2026-06-10)
+
+
+
+
+### Features:
+
+* registry: retry failed bundle fetches before TTL expiry by futhr
+
+### Bug Fixes:
+
+* backend: reject invalid backend configuration with a clear error by futhr
+
+* registry: reject non-object JSON responses by futhr
+
+* envelope: make verify/2 total over adversarial input by futhr
+
+* audit: enforce HMAC chain contiguity in verify_chain by futhr
+
+* policy: own the default rate table and survive creation races by futhr
+
+* use force-build for NIF compilation in CI by Tobias Bohwalli
+
 ## [v0.1.1](https://github.com/futhr/sigil_guard/compare/v0.1.0...v0.1.1) (2026-04-06)
 
 
