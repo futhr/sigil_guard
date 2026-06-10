@@ -189,6 +189,66 @@ defmodule SigilGuard.EnvelopeTest do
     end
   end
 
+  describe "verify/2 with malformed input" do
+    test "returns error for each missing required field" do
+      envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+
+      for field <- ~w(identity verdict timestamp nonce signature) do
+        assert {:error, :missing_field} =
+                 envelope
+                 |> Map.delete(field)
+                 |> Envelope.verify(TestSigner.public_key_b64u()),
+               "expected missing_field when #{field} is absent"
+      end
+    end
+
+    test "returns error for non-string field values" do
+      envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+      corrupted = Map.put(envelope, "signature", nil)
+
+      assert {:error, :missing_field} =
+               Envelope.verify(corrupted, TestSigner.public_key_b64u())
+    end
+
+    test "returns error for non-map envelopes" do
+      assert {:error, :invalid_envelope} =
+               Envelope.verify("not a map", TestSigner.public_key_b64u())
+
+      assert {:error, :invalid_envelope} = Envelope.verify(nil, TestSigner.public_key_b64u())
+      assert {:error, :invalid_envelope} = Envelope.verify(%{}, nil)
+    end
+
+    test "rejects unknown verdict strings" do
+      envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+
+      # Lowercase is the canonical-bytes form, not the envelope form;
+      # it must be rejected on the wire.
+      for bad_verdict <- ["allowed", "ALLOWED", "garbage", ""] do
+        tampered = Map.put(envelope, "verdict", bad_verdict)
+
+        assert {:error, :invalid_verdict} =
+                 Envelope.verify(tampered, TestSigner.public_key_b64u()),
+               "expected invalid_verdict for #{inspect(bad_verdict)}"
+      end
+    end
+
+    test "returns error for wrong-size public key" do
+      envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+      short_key = Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
+
+      assert {:error, :invalid_key} = Envelope.verify(envelope, short_key)
+    end
+
+    test "returns error for wrong-size signature" do
+      envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+      short_sig = Base.url_encode64(:crypto.strong_rand_bytes(10), padding: false)
+      tampered = Map.put(envelope, "signature", short_sig)
+
+      assert {:error, :invalid_signature} =
+               Envelope.verify(tampered, TestSigner.public_key_b64u())
+    end
+  end
+
   describe "generate_timestamp/0" do
     test "returns ISO 8601 format with milliseconds" do
       ts = Envelope.generate_timestamp()

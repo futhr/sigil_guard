@@ -92,29 +92,48 @@ defmodule SigilGuard.Envelope do
   Verify an envelope's signature against a base64url-encoded Ed25519 public key.
 
   Returns `:ok` if the signature is valid, or `{:error, reason}` otherwise.
+  Never raises on malformed input — envelopes arrive over the wire and
+  must be treated as adversarial.
+
+  ## Error reasons
+
+    * `:invalid_envelope` — envelope is not a map, or the key is not a string
+    * `:missing_field` — a required field (`identity`, `verdict`, `timestamp`,
+      `nonce`, `signature`) is absent or not a string
+    * `:invalid_verdict` — verdict is not `"Allowed"`, `"Blocked"`, or `"Scanned"`
+    * `:invalid_base64` — the public key or signature is not valid base64url
+    * `:invalid_key` — the public key does not decode to 32 bytes
+    * `:invalid_signature` — the signature has the wrong size or does not verify
+
+  Verification is stateless, matching the `sigil-protocol` crate: replay
+  protection (tracking seen nonces, enforcing timestamp freshness) is the
+  caller's responsibility.
   """
   @spec verify(t(), String.t()) :: :ok | {:error, term()}
-  def verify(envelope, public_key_b64u) do
-    with {:ok, public_key} <- Base.url_decode64(public_key_b64u, padding: false),
-         {:ok, signature} <- Base.url_decode64(envelope["signature"], padding: false) do
-      identity = envelope["identity"]
-      verdict = parse_verdict(envelope["verdict"])
-      timestamp = envelope["timestamp"]
-      nonce_hex = envelope["nonce"]
-
-      bytes = canonical_bytes(identity, verdict, timestamp, nonce_hex)
+  def verify(envelope, public_key_b64u) when is_map(envelope) and is_binary(public_key_b64u) do
+    with {:ok, fields} <- fetch_fields(envelope),
+         {:ok, verdict} <- parse_verdict(fields.verdict),
+         {:ok, public_key} <- decode_public_key(public_key_b64u),
+         {:ok, signature} <- decode_signature(fields.signature) do
+      bytes = canonical_bytes(fields.identity, verdict, fields.timestamp, fields.nonce)
 
       # :crypto.verify/5 uses OpenSSL's constant-time comparison internally,
       # so this is safe against timing attacks on signature verification.
-      if :crypto.verify(:eddsa, :none, bytes, signature, [public_key, :ed25519]) do
-        :ok
-      else
-        {:error, :invalid_signature}
+      # A 32-byte key that is not a valid curve point makes it raise;
+      # that is a failed verification, same as the NIF backend reports.
+      try do
+        if :crypto.verify(:eddsa, :none, bytes, signature, [public_key, :ed25519]) do
+          :ok
+        else
+          {:error, :invalid_signature}
+        end
+      rescue
+        ErlangError -> {:error, :invalid_signature}
       end
-    else
-      :error -> {:error, :invalid_base64}
     end
   end
+
+  def verify(_envelope, _public_key_b64u), do: {:error, :invalid_envelope}
 
   @doc "Generate an ISO 8601 timestamp with millisecond precision."
   @spec generate_timestamp() :: String.t()
@@ -139,7 +158,42 @@ defmodule SigilGuard.Envelope do
   defp canonical_verdict(:blocked), do: "blocked"
   defp canonical_verdict(:scanned), do: "scanned"
 
-  defp parse_verdict("Allowed"), do: :allowed
-  defp parse_verdict("Blocked"), do: :blocked
-  defp parse_verdict("Scanned"), do: :scanned
+  defp parse_verdict("Allowed"), do: {:ok, :allowed}
+  defp parse_verdict("Blocked"), do: {:ok, :blocked}
+  defp parse_verdict("Scanned"), do: {:ok, :scanned}
+  defp parse_verdict(_), do: {:error, :invalid_verdict}
+
+  # Map.get/2 instead of envelope["..."]: structs satisfy is_map/1 but
+  # do not implement Access, and verify/2 must never raise.
+  defp fetch_fields(envelope) do
+    fields = %{
+      identity: Map.get(envelope, "identity"),
+      verdict: Map.get(envelope, "verdict"),
+      timestamp: Map.get(envelope, "timestamp"),
+      nonce: Map.get(envelope, "nonce"),
+      signature: Map.get(envelope, "signature")
+    }
+
+    if Enum.all?(Map.values(fields), &is_binary/1) do
+      {:ok, fields}
+    else
+      {:error, :missing_field}
+    end
+  end
+
+  defp decode_public_key(public_key_b64u) do
+    case Base.url_decode64(public_key_b64u, padding: false) do
+      {:ok, key} when byte_size(key) == 32 -> {:ok, key}
+      {:ok, _wrong_size} -> {:error, :invalid_key}
+      :error -> {:error, :invalid_base64}
+    end
+  end
+
+  defp decode_signature(signature_b64u) do
+    case Base.url_decode64(signature_b64u, padding: false) do
+      {:ok, signature} when byte_size(signature) == 64 -> {:ok, signature}
+      {:ok, _wrong_size} -> {:error, :invalid_signature}
+      :error -> {:error, :invalid_base64}
+    end
+  end
 end

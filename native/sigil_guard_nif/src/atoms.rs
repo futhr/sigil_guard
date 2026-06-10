@@ -15,6 +15,10 @@ rustler::atoms! {
     broken,
     invalid_signature,
     invalid_base64,
+    invalid_envelope,
+    invalid_key,
+    invalid_verdict,
+    missing_field,
     nif_not_loaded,
     // Audit
     genesis,

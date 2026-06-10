@@ -119,26 +119,55 @@ fn envelope_sign<'a>(
 }
 
 /// Verify an envelope's Ed25519 signature using sigil-protocol's SigilEnvelope.verify().
+///
+/// Total over malformed input — returns {:error, reason} tuples instead
+/// of raising, with the same error atoms as the Elixir backend.
 #[rustler::nif]
 fn envelope_verify<'a>(
     env: Env<'a>,
     envelope: Term<'a>,
     public_key_b64u: String,
 ) -> NifResult<Term<'a>> {
-    // Extract envelope fields
-    let identity: String = envelope.map_get("identity".encode(env))?.decode()?;
-    let verdict_str: String = envelope.map_get("verdict".encode(env))?.decode()?;
-    let timestamp: String = envelope.map_get("timestamp".encode(env))?.decode()?;
-    let nonce_hex: String = envelope.map_get("nonce".encode(env))?.decode()?;
-    let signature_b64u: String = envelope.map_get("signature".encode(env))?.decode()?;
+    if !envelope.is_map() {
+        return Ok((atoms::error(), atoms::invalid_envelope()).encode(env));
+    }
+
+    // Extract envelope fields; absent or non-string → missing_field
+    let fields: Option<(String, String, String, String, String)> = (|| {
+        Some((
+            get_string_field(env, envelope, "identity")?,
+            get_string_field(env, envelope, "verdict")?,
+            get_string_field(env, envelope, "timestamp")?,
+            get_string_field(env, envelope, "nonce")?,
+            get_string_field(env, envelope, "signature")?,
+        ))
+    })();
+
+    let Some((identity, verdict_str, timestamp, nonce_hex, signature_b64u)) = fields else {
+        return Ok((atoms::error(), atoms::missing_field()).encode(env));
+    };
 
     // Parse verdict string to crate Verdict
     let proto_verdict = match verdict_str.as_str() {
         "Allowed" => sigil_protocol::Verdict::Allowed,
         "Blocked" => sigil_protocol::Verdict::Blocked,
         "Scanned" => sigil_protocol::Verdict::Scanned,
-        _ => return Err(rustler::Error::BadArg),
+        _ => return Ok((atoms::error(), atoms::invalid_verdict()).encode(env)),
     };
+
+    // Pre-validate key and signature encoding/size so error reasons
+    // match the Elixir backend exactly.
+    match URL_SAFE_NO_PAD.decode(&public_key_b64u) {
+        Ok(key) if key.len() == 32 => {}
+        Ok(_wrong_size) => return Ok((atoms::error(), atoms::invalid_key()).encode(env)),
+        Err(_) => return Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
+    }
+
+    match URL_SAFE_NO_PAD.decode(&signature_b64u) {
+        Ok(sig) if sig.len() == 64 => {}
+        Ok(_wrong_size) => return Ok((atoms::error(), atoms::invalid_signature()).encode(env)),
+        Err(_) => return Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
+    }
 
     // Construct SigilEnvelope and use the crate's verify method
     let sigil_envelope = SigilEnvelope {
@@ -152,8 +181,15 @@ fn envelope_verify<'a>(
 
     match sigil_envelope.verify(&public_key_b64u) {
         Ok(true) => Ok(atoms::ok().encode(env)),
-        Ok(false) => Ok((atoms::error(), atoms::invalid_signature()).encode(env)),
-        Err(_) => Ok((atoms::error(), atoms::invalid_base64()).encode(env)),
+        Ok(false) | Err(_) => Ok((atoms::error(), atoms::invalid_signature()).encode(env)),
+    }
+}
+
+/// Read a string-valued field from an Elixir map; None if absent or non-string.
+fn get_string_field<'a>(env: Env<'a>, map: Term<'a>, key: &str) -> Option<String> {
+    match map.map_get(key.encode(env)) {
+        Ok(term) => term.decode::<String>().ok(),
+        Err(_) => None,
     }
 }
 

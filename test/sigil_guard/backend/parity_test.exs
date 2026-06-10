@@ -175,6 +175,61 @@ defmodule SigilGuard.Backend.ParityTest do
     end
   end
 
+  # -- Envelope Verify Parity --
+
+  describe "envelope_verify parity on malformed input" do
+    @valid_key Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+
+    test "identical error for missing fields" do
+      for field <- ~w(identity verdict timestamp nonce signature) do
+        broken = Map.delete(parity_envelope(), field)
+
+        assert {:error, :missing_field} = ElixirBackend.envelope_verify(broken, @valid_key)
+        assert {:error, :missing_field} = NIFBackend.envelope_verify(broken, @valid_key)
+      end
+    end
+
+    test "identical error for unknown verdicts" do
+      tampered = Map.put(parity_envelope(), "verdict", "allowed")
+
+      assert {:error, :invalid_verdict} = ElixirBackend.envelope_verify(tampered, @valid_key)
+      assert {:error, :invalid_verdict} = NIFBackend.envelope_verify(tampered, @valid_key)
+    end
+
+    test "identical error for invalid base64 key" do
+      envelope = parity_envelope()
+
+      assert {:error, :invalid_base64} =
+               ElixirBackend.envelope_verify(envelope, "not!valid!b64")
+
+      assert {:error, :invalid_base64} = NIFBackend.envelope_verify(envelope, "not!valid!b64")
+    end
+
+    test "identical error for wrong-size key" do
+      envelope = parity_envelope()
+      short_key = Base.url_encode64(:crypto.strong_rand_bytes(16), padding: false)
+
+      assert {:error, :invalid_key} = ElixirBackend.envelope_verify(envelope, short_key)
+      assert {:error, :invalid_key} = NIFBackend.envelope_verify(envelope, short_key)
+    end
+
+    test "identical error for wrong-size signature" do
+      short_sig = Base.url_encode64(:crypto.strong_rand_bytes(10), padding: false)
+      tampered = Map.put(parity_envelope(), "signature", short_sig)
+
+      assert {:error, :invalid_signature} = ElixirBackend.envelope_verify(tampered, @valid_key)
+      assert {:error, :invalid_signature} = NIFBackend.envelope_verify(tampered, @valid_key)
+    end
+
+    test "identical error for wrong key" do
+      envelope = parity_envelope()
+      other_key = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+
+      assert ElixirBackend.envelope_verify(envelope, other_key) ==
+               NIFBackend.envelope_verify(envelope, other_key)
+    end
+  end
+
   # -- Audit Parity --
 
   describe "audit parity" do
@@ -241,5 +296,13 @@ defmodule SigilGuard.Backend.ParityTest do
     1..count
     |> Enum.map(&SigilGuard.Audit.new_event("test", "alice", "action#{&1}", "ok"))
     |> SigilGuard.Audit.build_chain(@audit_key)
+  end
+
+  defp parity_envelope do
+    SigilGuard.Envelope.sign("did:sigil:parity", :allowed,
+      signer: SigilGuard.TestSigner,
+      timestamp: "2024-06-15T10:30:00.000Z",
+      nonce: "aabbccdd11223344aabbccdd11223344"
+    )
   end
 end
