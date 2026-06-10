@@ -4,6 +4,8 @@ on:
   workflow_run:
     workflows: ["Build precompiled NIFs"]
     types: [completed]
+  # Manual retry without rebuilding the release binaries
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,13 +14,20 @@ jobs:
   publish:
     name: Publish to Hex.pm
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    # Force-build the NIF throughout: the committed checksum file still
+    # describes the previous release's binaries at this point, so a
+    # precompiled-download compile would fail. The download step below
+    # regenerates the checksums for the current release before publish.
+    env:
+      SIGIL_GUARD_BUILD: "1"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_branch || github.ref_name }}
 
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
@@ -44,9 +53,7 @@ jobs:
         run: mix compile
 
       - name: Run tests
-        env:
-          SIGIL_GUARD_BUILD: "1"
-        run: mix test
+        run: mix test --include nif
 
       - name: Check formatting
         run: mix format --check-formatted
