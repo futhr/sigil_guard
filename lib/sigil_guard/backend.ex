@@ -95,8 +95,8 @@ defmodule SigilGuard.Backend do
   Returns the backend implementation module based on configuration.
 
   Accepts `:elixir`, `:nif`, or a custom module implementing this
-  behaviour. Any other value raises `ArgumentError` — failing loudly at
-  the call site beats an `UndefinedFunctionError` deep inside a scan.
+  behaviour. Any other value raises `ArgumentError` immediately, rather
+  than failing later with `UndefinedFunctionError` mid-operation.
 
   ## Examples
 
