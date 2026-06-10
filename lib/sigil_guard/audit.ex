@@ -168,21 +168,23 @@ defmodule SigilGuard.Audit do
   def verify_chain(events, key, opts \\ []) do
     anchor = Keyword.get(opts, :prev_hmac)
 
-    events
-    |> Enum.with_index()
-    |> Enum.reduce_while({:ok, anchor}, fn {event, index}, {:ok, expected_prev} ->
-      canonical = canonical_bytes(event)
-      expected_hmac = compute_hmac(key, canonical <> (expected_prev || @genesis_marker))
+    result =
+      events
+      |> Enum.with_index()
+      |> Enum.reduce_while({:ok, anchor}, fn {event, index}, {:ok, expected_prev} ->
+        canonical = canonical_bytes(event)
+        expected_hmac = compute_hmac(key, canonical <> (expected_prev || @genesis_marker))
 
-      # Contiguity uses plain == — prev_hmac values are public chain
-      # data, not secrets; only the HMAC comparison needs constant time.
-      if event.prev_hmac == expected_prev and secure_compare(expected_hmac, event.hmac) do
-        {:cont, {:ok, event.hmac}}
-      else
-        {:halt, {:broken, index}}
-      end
-    end)
-    |> case do
+        # Contiguity uses plain == — prev_hmac values are public chain
+        # data, not secrets; only the HMAC comparison needs constant time.
+        if event.prev_hmac == expected_prev and secure_compare(expected_hmac, event.hmac) do
+          {:cont, {:ok, event.hmac}}
+        else
+          {:halt, {:broken, index}}
+        end
+      end)
+
+    case result do
       {:ok, _} -> :ok
       broken -> broken
     end

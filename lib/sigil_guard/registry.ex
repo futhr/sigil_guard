@@ -125,7 +125,7 @@ defmodule SigilGuard.Registry do
   defp decode_object(body) do
     case Jason.decode(body) do
       {:ok, decoded} when is_map(decoded) -> {:ok, decoded}
-      {:ok, _non_object} -> {:error, :invalid_body}
+      {:ok, _} -> {:error, :invalid_body}
       {:error, reason} -> {:error, reason}
     end
   end

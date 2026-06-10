@@ -193,7 +193,7 @@ defmodule SigilGuard.AuditTest do
     end
 
     test "rejects a segment anchored to the wrong tip" do
-      [_first, second, third] = build_signed_chain(3)
+      [_, second, third] = build_signed_chain(3)
       wrong_tip = Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
 
       assert {:broken, 0} =

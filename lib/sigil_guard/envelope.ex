@@ -133,7 +133,7 @@ defmodule SigilGuard.Envelope do
     end
   end
 
-  def verify(_envelope, _public_key_b64u), do: {:error, :invalid_envelope}
+  def verify(_, _), do: {:error, :invalid_envelope}
 
   @doc "Generate an ISO 8601 timestamp with millisecond precision."
   @spec generate_timestamp() :: String.t()
@@ -183,16 +183,18 @@ defmodule SigilGuard.Envelope do
 
   defp decode_public_key(public_key_b64u) do
     case Base.url_decode64(public_key_b64u, padding: false) do
+      # Ed25519 public keys are exactly 32 bytes
       {:ok, key} when byte_size(key) == 32 -> {:ok, key}
-      {:ok, _wrong_size} -> {:error, :invalid_key}
+      {:ok, _} -> {:error, :invalid_key}
       :error -> {:error, :invalid_base64}
     end
   end
 
   defp decode_signature(signature_b64u) do
     case Base.url_decode64(signature_b64u, padding: false) do
+      # Ed25519 signatures are exactly 64 bytes
       {:ok, signature} when byte_size(signature) == 64 -> {:ok, signature}
-      {:ok, _wrong_size} -> {:error, :invalid_signature}
+      {:ok, _} -> {:error, :invalid_signature}
       :error -> {:error, :invalid_base64}
     end
   end
