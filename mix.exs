@@ -60,9 +60,9 @@ defmodule SigilGuard.MixProject do
       {:decimal, "~> 3.1", override: true},
 
       # NIF — precompiled binaries downloaded at install time
-      {:rustler_precompiled, "~> 0.8"},
+      {:rustler_precompiled, "~> 0.9"},
       # Rustler only needed when force-building from source
-      {:rustler, "~> 0.37", optional: true},
+      {:rustler, "~> 0.38", optional: true},
 
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

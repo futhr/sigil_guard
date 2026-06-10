@@ -15,7 +15,7 @@ nif_version_2_15 = []
 nif_version_2_16 = []
 
 [dependencies]
-rustler = "0.37"
+rustler = "0.38"
 sigil-protocol = "0.1"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 serde = { version = "1", features = ["derive"] }
