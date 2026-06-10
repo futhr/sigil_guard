@@ -39,8 +39,6 @@ defmodule SigilGuard.Backend.NIF do
 
   @behaviour SigilGuard.Backend
 
-  require Logger
-
   # Native module — loads precompiled NIF or builds from source
   defmodule Native do
     @moduledoc """
