@@ -136,6 +136,47 @@ defmodule SigilGuard.MixProject do
         Performance: ~r/benchmarks/,
         Reference: ~r/CHANGELOG|CONTRIBUTING|AGENTS|LICENSE/
       ],
+      groups_for_modules: [
+        "Core API": [
+          SigilGuard,
+          SigilGuard.Scanner,
+          SigilGuard.Envelope,
+          SigilGuard.Policy,
+          SigilGuard.Identity,
+          SigilGuard.Identity.Binding,
+          SigilGuard.Patterns
+        ],
+        Audit: [
+          SigilGuard.Audit,
+          SigilGuard.Audit.Action,
+          SigilGuard.Audit.Actor,
+          SigilGuard.Audit.EventType,
+          SigilGuard.Audit.ExecutionResult,
+          SigilGuard.Audit.Logger
+        ],
+        "Signing & Vault": [
+          SigilGuard.Signer,
+          SigilGuard.Signer.Ed25519,
+          SigilGuard.Vault,
+          SigilGuard.Vault.Entry,
+          SigilGuard.Vault.InMemory
+        ],
+        Registry: [
+          SigilGuard.Registry,
+          SigilGuard.Registry.Cache
+        ],
+        Backends: [
+          SigilGuard.Backend,
+          SigilGuard.Backend.Elixir,
+          SigilGuard.Backend.NIF,
+          SigilGuard.Backend.NIF.Native
+        ],
+        Runtime: [
+          SigilGuard.Application,
+          SigilGuard.Config,
+          SigilGuard.Telemetry
+        ]
+      ],
       source_ref: "v#{@version}",
       source_url: @source_url,
       formatters: ["html"]
