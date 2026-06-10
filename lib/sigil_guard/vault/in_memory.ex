@@ -3,7 +3,10 @@ defmodule SigilGuard.Vault.InMemory do
   ETS-backed in-memory vault using AES-256-GCM encryption.
 
   Suitable for development, testing, and single-node deployments.
-  Data is lost on process/node restart.
+  Entries live in a private ETS table owned by the vault process and
+  are lost when it stops — **no entry survives a restart, with or
+  without a configured master key**. For durable secrets, implement
+  `SigilGuard.Vault` against persistent storage.
 
   ## Usage
 
@@ -19,15 +22,21 @@ defmodule SigilGuard.Vault.InMemory do
   ## Encryption
 
   Each entry is encrypted with AES-256-GCM using a per-entry random IV.
-  The encryption key is derived from a master key (configurable or auto-generated).
-
-  Configure the master key:
+  The key is taken from the `:master_key` start option, then the
+  `:vault_master_key` application env (base64-encoded 32 bytes), and
+  otherwise randomly generated at startup:
 
       config :sigil_guard, :vault_master_key, "base64-encoded-32-byte-key"
 
-  If not configured, a random key is generated on startup (entries won't
-  survive restarts).
+  A configured key gives you stable key material across restarts; it
+  does not make the (in-memory) entries themselves persistent.
 
+  ## Process Model
+
+  `start_link/1` registers a singleton GenServer under
+  `#{inspect(__MODULE__)}` — one vault per node. Supervise it in your
+  application's tree; the `SigilGuard.Vault` callbacks exit if it is
+  not running.
   """
 
   @behaviour SigilGuard.Vault

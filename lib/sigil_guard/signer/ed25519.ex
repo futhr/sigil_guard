@@ -2,20 +2,30 @@ defmodule SigilGuard.Signer.Ed25519 do
   @moduledoc """
   Default Ed25519 signer using OTP `:crypto`.
 
-  Holds a keypair in process state. For production use, consider implementing
-  `SigilGuard.Signer` with an HSM or KMS backend instead.
+  For production use, consider implementing `SigilGuard.Signer` with an
+  HSM or KMS backend instead.
 
   ## Usage
 
-      {pub, priv} = SigilGuard.Signer.generate_keypair()
-      signer = SigilGuard.Signer.Ed25519.new(priv)
-      signature = signer.sign.(message)
+  Process-free, passing the signer struct explicitly:
 
-  Or use as a module-based signer via `start_link/1`:
+      {_pub, priv} = SigilGuard.Signer.generate_keypair()
+      signer = SigilGuard.Signer.Ed25519.new(priv)
+      signature = SigilGuard.Signer.Ed25519.sign_with(signer, message)
+
+  Or as a module-based signer (the form `SigilGuard.Envelope.sign/3`
+  expects in its `:signer` option) via `start_link/1`:
 
       {:ok, _pid} = SigilGuard.Signer.Ed25519.start_link(private_key: priv)
       signature = SigilGuard.Signer.Ed25519.sign(message)
 
+  ## Process Model
+
+  `start_link/1` registers a singleton Agent under `#{inspect(__MODULE__)}`
+  holding the keypair — one keypair per node. Supervise it in your
+  application's tree; `sign/1` and `public_key/0` exit if it is not
+  running. For multiple keypairs in one node, use `new/1` + `sign_with/2`
+  or implement `SigilGuard.Signer` in your own module.
   """
 
   @behaviour SigilGuard.Signer
