@@ -11,6 +11,7 @@ defmodule SigilGuard.ConfigTest do
     original_url = Application.get_env(:sigil_guard, :registry_url)
     original_ttl = Application.get_env(:sigil_guard, :registry_ttl_ms)
     original_timeout = Application.get_env(:sigil_guard, :registry_timeout_ms)
+    original_retry = Application.get_env(:sigil_guard, :registry_retry_ms)
     original_enabled = Application.get_env(:sigil_guard, :registry_enabled)
 
     on_exit(fn ->
@@ -33,6 +34,10 @@ defmodule SigilGuard.ConfigTest do
       if original_timeout,
         do: Application.put_env(:sigil_guard, :registry_timeout_ms, original_timeout),
         else: Application.delete_env(:sigil_guard, :registry_timeout_ms)
+
+      if original_retry,
+        do: Application.put_env(:sigil_guard, :registry_retry_ms, original_retry),
+        else: Application.delete_env(:sigil_guard, :registry_retry_ms)
 
       if original_enabled,
         do: Application.put_env(:sigil_guard, :registry_enabled, original_enabled),
@@ -99,6 +104,18 @@ defmodule SigilGuard.ConfigTest do
     test "returns configured timeout" do
       Application.put_env(:sigil_guard, :registry_timeout_ms, 10_000)
       assert Config.registry_timeout_ms() == 10_000
+    end
+  end
+
+  describe "registry_retry_ms/0" do
+    test "returns default retry interval (1 minute)" do
+      Application.delete_env(:sigil_guard, :registry_retry_ms)
+      assert Config.registry_retry_ms() == :timer.minutes(1)
+    end
+
+    test "returns configured retry interval" do
+      Application.put_env(:sigil_guard, :registry_retry_ms, 15_000)
+      assert Config.registry_retry_ms() == 15_000
     end
   end
 

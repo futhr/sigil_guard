@@ -18,6 +18,10 @@ defmodule SigilGuard.Config do
     * `:registry_timeout_ms` — HTTP timeout for registry requests.
       Default: `5_000` (5 seconds, matching Rust reference)
 
+    * `:registry_retry_ms` — Retry interval after a failed registry fetch,
+      so the cache does not wait a full TTL with stale data.
+      Default: `60_000` (1 minute)
+
     * `:registry_enabled` — Whether to start the registry cache on application boot.
       Default: `false`
 
@@ -35,6 +39,7 @@ defmodule SigilGuard.Config do
   @default_registry_url "https://registry.sigil-protocol.org"
   @default_ttl_ms :timer.hours(1)
   @default_timeout_ms 5_000
+  @default_retry_ms :timer.minutes(1)
 
   @doc "Return the configured SIGIL registry base URL."
   @spec registry_url() :: String.t()
@@ -52,6 +57,12 @@ defmodule SigilGuard.Config do
   @spec registry_timeout_ms() :: non_neg_integer()
   def registry_timeout_ms do
     Application.get_env(:sigil_guard, :registry_timeout_ms, @default_timeout_ms)
+  end
+
+  @doc "Return the retry interval in milliseconds after a failed registry fetch."
+  @spec registry_retry_ms() :: non_neg_integer()
+  def registry_retry_ms do
+    Application.get_env(:sigil_guard, :registry_retry_ms, @default_retry_ms)
   end
 
   @doc "Return whether the registry cache is enabled on boot."

@@ -3,24 +3,37 @@ defmodule SigilGuard.Registry.Cache do
   GenServer-based TTL cache for SIGIL registry data.
 
   Fetches pattern bundles on startup and refreshes them periodically based
-  on the configured TTL. On fetch failure, retains the last known good bundle
-  and tracks the data source for observability.
+  on the configured TTL. On fetch failure, retains the last known good
+  bundle, tracks the data source for observability, and retries after
+  `:registry_retry_ms` instead of waiting out the full TTL.
 
   ## Source Tracking
 
   The cache tracks where its current data came from:
 
     * `:registry` — freshly fetched from the SIGIL registry
-    * `:cache` — using cached data within TTL window
-    * `:fallback` — fetch failed, using last known good data
-    * `:empty` — no data available (initial state or never fetched successfully)
+    * `:fallback` — last fetch failed; serving built-in patterns (if no
+      fetch ever succeeded) or the last known good bundle
+    * `:empty` — no data available (initial state, before the first fetch)
 
   ## Configuration
 
       config :sigil_guard,
         registry_enabled: true,
-        registry_ttl_ms: 3_600_000,  # 1 hour
+        registry_ttl_ms: 3_600_000,     # 1 hour
+        registry_retry_ms: 60_000,      # retry failed fetches after 1 minute
         registry_url: "https://registry.sigil-protocol.org"
+
+  ## Process Model
+
+  The cache is a singleton registered under `#{inspect(__MODULE__)}` —
+  one instance per node, supervised by SigilGuard's application when
+  `registry_enabled: true` or by the host application otherwise.
+
+  Fetches run synchronously inside the server loop: while a fetch is in
+  flight, `patterns/0`, `rule_count/0`, and `source/0` queue for up to
+  `:registry_timeout_ms`. Keep that timeout below the callers' own
+  `GenServer.call` timeout (5 seconds by default).
 
   ## Observability
 
@@ -38,7 +51,7 @@ defmodule SigilGuard.Registry.Cache do
   require Logger
 
   @typedoc "Where the current cached data originated."
-  @type source :: :registry | :cache | :fallback | :empty
+  @type source :: :registry | :fallback | :empty
 
   @typedoc "Internal GenServer state."
   @type state :: %{
@@ -46,7 +59,8 @@ defmodule SigilGuard.Registry.Cache do
           raw_bundle: map() | nil,
           source: source(),
           fetched_at: integer() | nil,
-          ttl_ms: non_neg_integer()
+          ttl_ms: non_neg_integer(),
+          retry_ms: non_neg_integer()
         }
 
   # -- Client API --
@@ -89,14 +103,13 @@ defmodule SigilGuard.Registry.Cache do
 
   @impl GenServer
   def init(opts) do
-    ttl_ms = Keyword.get(opts, :ttl_ms, Config.registry_ttl_ms())
-
     state = %{
       patterns: [],
       raw_bundle: nil,
       source: :empty,
       fetched_at: nil,
-      ttl_ms: ttl_ms
+      ttl_ms: Keyword.get(opts, :ttl_ms, Config.registry_ttl_ms()),
+      retry_ms: Keyword.get(opts, :retry_ms, Config.registry_retry_ms())
     }
 
     # Fetch on startup (async to not block supervisor)
@@ -133,7 +146,7 @@ defmodule SigilGuard.Registry.Cache do
   @impl GenServer
   def handle_info(:fetch, state) do
     new_state = do_fetch(state)
-    schedule_refresh(new_state.ttl_ms)
+    schedule_refresh(refresh_interval(new_state))
     {:noreply, new_state}
   end
 
@@ -186,7 +199,12 @@ defmodule SigilGuard.Registry.Cache do
     %{state | source: :fallback}
   end
 
-  defp schedule_refresh(ttl_ms) do
-    Process.send_after(self(), :fetch, ttl_ms)
+  # Refresh after the TTL on success; retry sooner on failure so the
+  # cache does not serve stale data for a full TTL after one bad fetch.
+  defp refresh_interval(%{source: :registry, ttl_ms: ttl_ms}), do: ttl_ms
+  defp refresh_interval(%{ttl_ms: ttl_ms, retry_ms: retry_ms}), do: min(retry_ms, ttl_ms)
+
+  defp schedule_refresh(interval_ms) do
+    Process.send_after(self(), :fetch, interval_ms)
   end
 end

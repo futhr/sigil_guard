@@ -176,6 +176,39 @@ defmodule SigilGuard.Registry.CacheTest do
     end
   end
 
+  describe "failure retry" do
+    test "retries a failed fetch after retry_ms instead of waiting the TTL", %{bypass: bypass} do
+      call_count = :counters.new(1, [:atomics])
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        :counters.add(call_count, 1, 1)
+
+        if :counters.get(call_count, 1) == 1 do
+          Plug.Conn.resp(conn, 500, "error")
+        else
+          bundle = %{
+            "patterns" => [
+              %{"name" => "late", "regex" => "LATE", "category" => "t", "severity" => "low"}
+            ]
+          }
+
+          Plug.Conn.resp(conn, 200, Jason.encode!(bundle))
+        end
+      end)
+
+      start_supervised!({Cache, ttl_ms: 600_000, retry_ms: 150})
+      Process.sleep(100)
+
+      # First fetch failed; retry has not fired yet
+      assert Cache.source() == :fallback
+
+      # The retry fires at retry_ms (150ms), far before the 10-minute TTL
+      Process.sleep(200)
+      assert Cache.source() == :registry
+      assert "late" in Enum.map(Cache.patterns(), & &1.name)
+    end
+  end
+
   describe "refresh/0" do
     test "forces a re-fetch", %{bypass: bypass} do
       call_count = :counters.new(1, [:atomics])

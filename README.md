@@ -147,6 +147,7 @@ config :sigil_guard,
   registry_url: "https://registry.sigil-protocol.org",
   registry_ttl_ms: :timer.hours(1),
   registry_timeout_ms: 5_000,
+  registry_retry_ms: :timer.minutes(1),
   registry_enabled: false,
   scanner_patterns: :built_in
 ```
@@ -159,6 +160,7 @@ config :sigil_guard,
 | `registry_url` | `String.t()` | `"https://registry.sigil-protocol.org"` | SIGIL registry URL |
 | `registry_ttl_ms` | `integer()` | `3_600_000` | Registry cache TTL in ms |
 | `registry_timeout_ms` | `integer()` | `5_000` | Registry HTTP timeout in ms |
+| `registry_retry_ms` | `integer()` | `60_000` | Retry interval after a failed registry fetch in ms |
 | `registry_enabled` | `boolean()` | `false` | Enable registry fetching |
 | `scanner_patterns` | `atom()` | `:built_in` | Pattern source (`:built_in` or `:registry`) |
 
