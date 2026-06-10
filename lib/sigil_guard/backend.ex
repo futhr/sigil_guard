@@ -94,6 +94,10 @@ defmodule SigilGuard.Backend do
   @doc """
   Returns the backend implementation module based on configuration.
 
+  Accepts `:elixir`, `:nif`, or a custom module implementing this
+  behaviour. Any other value raises `ArgumentError` — failing loudly at
+  the call site beats an `UndefinedFunctionError` deep inside a scan.
+
   ## Examples
 
       iex> SigilGuard.Backend.impl()
@@ -103,9 +107,26 @@ defmodule SigilGuard.Backend do
   @spec impl() :: backend_module()
   def impl do
     case Application.get_env(:sigil_guard, :backend, :elixir) do
-      :elixir -> SigilGuard.Backend.Elixir
-      :nif -> SigilGuard.Backend.NIF
-      module when is_atom(module) -> module
+      :elixir ->
+        SigilGuard.Backend.Elixir
+
+      :nif ->
+        SigilGuard.Backend.NIF
+
+      module when is_atom(module) ->
+        if Code.ensure_loaded?(module) and function_exported?(module, :scan, 2) do
+          module
+        else
+          raise ArgumentError,
+                "configured :sigil_guard backend #{inspect(module)} is not a module " <>
+                  "implementing the SigilGuard.Backend behaviour; " <>
+                  "expected :elixir, :nif, or a backend module"
+        end
+
+      other ->
+        raise ArgumentError,
+              "invalid :sigil_guard backend #{inspect(other)}; " <>
+                "expected :elixir, :nif, or a module implementing SigilGuard.Backend"
     end
   end
 

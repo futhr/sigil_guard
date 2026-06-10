@@ -28,6 +28,24 @@ defmodule SigilGuard.BackendTest do
       Application.put_env(:sigil_guard, :backend, SigilGuard.Backend.Elixir)
       assert Backend.impl() == SigilGuard.Backend.Elixir
     end
+
+    test "raises for an atom that is not a backend module" do
+      Application.put_env(:sigil_guard, :backend, :bogus)
+
+      assert_raise ArgumentError, ~r/not a module implementing/, fn -> Backend.impl() end
+    end
+
+    test "raises for a module without the behaviour functions" do
+      Application.put_env(:sigil_guard, :backend, String)
+
+      assert_raise ArgumentError, ~r/not a module implementing/, fn -> Backend.impl() end
+    end
+
+    test "raises for non-atom values" do
+      Application.put_env(:sigil_guard, :backend, "elixir")
+
+      assert_raise ArgumentError, ~r/invalid :sigil_guard backend/, fn -> Backend.impl() end
+    end
   end
 
   describe "available?/1" do
