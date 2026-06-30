@@ -10,6 +10,7 @@ defmodule SigilGuard.MCP.Gateway do
 
   alias SigilGuard.Context
   alias SigilGuard.Decision
+  alias SigilGuard.Envelope
   alias SigilGuard.Runtime
 
   @known_context_keys Map.keys(%Context{})
@@ -45,6 +46,61 @@ defmodule SigilGuard.MCP.Gateway do
       {:ok, decision}
     else
       {:error, response_for_decision(decision, request_id(request), opts), decision}
+    end
+  end
+
+  @doc """
+  Guard a signed MCP tool request before execution.
+
+  This verifies `_sigil` metadata before the regular runtime gate. `_sigil`
+  may be placed on the request itself or inside JSON-RPC `params`.
+
+  Options:
+
+    * `:public_keys` - map of envelope identity to Ed25519 public key.
+    * `:public_key_b64u` - fallback public key for any identity.
+    * `:max_skew_ms`, `:replay`, `:replay_ttl_ms`, `:profile` - passed to
+      `SigilGuard.Envelope.verify/3`.
+  """
+  @spec guard_signed_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
+  def guard_signed_request(request, context \\ %{}, opts \\ []) do
+    case verify_request_envelope(request, opts) do
+      {:ok, claims} ->
+        guard_request(request, signed_context(context, claims.identity), opts)
+
+      {:error, reason} ->
+        envelope_decision(request, context, reason)
+    end
+  end
+
+  @doc """
+  Guard a signed MCP tool request and return either an allow decision or JSON-RPC error.
+  """
+  @spec guarded_signed_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_signed_request(request, context \\ %{}, opts \\ []) do
+    decision = guard_signed_request(request, context, opts)
+
+    if executable?(decision) do
+      {:ok, decision}
+    else
+      {:error, response_for_decision(decision, request_id(request), opts), decision}
+    end
+  end
+
+  @doc """
+  Verify `_sigil` metadata on an MCP request.
+
+  Returns signed identity claims without running the runtime gate.
+  """
+  @spec verify_request_envelope(term(), keyword()) ::
+          {:ok, %{identity: String.t(), envelope: map()}} | {:error, atom()}
+  def verify_request_envelope(request, opts \\ []) do
+    with {:ok, envelope} <- request_envelope(request),
+         {:ok, identity} <- envelope_identity(envelope),
+         {:ok, public_key_b64u} <- envelope_public_key(identity, opts),
+         :ok <- Envelope.verify(envelope, public_key_b64u, opts) do
+      {:ok, %{identity: identity, envelope: envelope}}
     end
   end
 
@@ -138,6 +194,13 @@ defmodule SigilGuard.MCP.Gateway do
     |> context_overrides()
     |> then(&Map.merge(defaults, &1))
     |> Context.new()
+  end
+
+  defp signed_context(context, identity) do
+    context
+    |> context_overrides()
+    |> Map.put_new(:identity, identity)
+    |> Map.put_new(:actor, identity)
   end
 
   defp context_overrides(%Context{} = context), do: Map.from_struct(context)
@@ -275,6 +338,82 @@ defmodule SigilGuard.MCP.Gateway do
   defp first_payload_term(payload, paths) when is_map(payload) do
     Enum.find_value(paths, &get_in(payload, &1))
   end
+
+  defp request_envelope(payload) when is_map(payload) do
+    case first_payload_term(payload, envelope_paths()) do
+      envelope when is_map(envelope) -> {:ok, envelope}
+      _ -> {:error, :missing_envelope}
+    end
+  end
+
+  defp request_envelope(_), do: {:error, :missing_envelope}
+
+  defp envelope_paths do
+    [
+      [:_sigil],
+      ["_sigil"],
+      [:params, :_sigil],
+      [:params, "_sigil"],
+      ["params", :_sigil],
+      ["params", "_sigil"]
+    ]
+  end
+
+  defp envelope_identity(%{} = envelope) do
+    case Map.get(envelope, "identity") || Map.get(envelope, :identity) do
+      identity when is_binary(identity) -> {:ok, identity}
+      _ -> {:error, :missing_identity}
+    end
+  end
+
+  defp envelope_public_key(identity, opts) do
+    public_keys = Keyword.get(opts, :public_keys, %{})
+
+    case public_keys[identity] || Keyword.get(opts, :public_key_b64u) do
+      public_key_b64u when is_binary(public_key_b64u) -> {:ok, public_key_b64u}
+      _ -> {:error, :unknown_identity}
+    end
+  end
+
+  defp envelope_decision(request, context, reason) do
+    context = request_context(request, context)
+    content_hash = hash_text(text_payload(request))
+
+    %Decision{
+      verdict: :blocked,
+      action: :block,
+      reason: "MCP request envelope verification failed: #{format_reason(reason)}",
+      phase: context.phase,
+      risk_level: :high,
+      trust_level: context.trust_level,
+      content_hash: content_hash,
+      audit_metadata: %{
+        phase: context.phase,
+        actor: context.actor,
+        identity: context.identity,
+        origin: context.origin,
+        sink: context.sink,
+        tool: context.tool,
+        mcp_server: context.mcp_server,
+        trust_zone: context.trust_zone,
+        trust_level: context.trust_level,
+        risk_level: :high,
+        verdict: :blocked,
+        action: :block,
+        envelope_status: :invalid,
+        envelope_reason: reason,
+        content_hash: content_hash
+      }
+    }
+  end
+
+  defp hash_text(text) do
+    :sha256
+    |> :crypto.hash(text)
+    |> Base.encode16(case: :lower)
+  end
+
+  defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
 
   defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result}, _) do
     %{"jsonrpc" => "2.0", "id" => id, "result" => result}

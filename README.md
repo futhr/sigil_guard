@@ -133,6 +133,21 @@ request = %{
 :blocked = decision.verdict
 -32_001 = error_response["error"]["code"]
 
+envelope = SigilGuard.Envelope.sign("did:sigil:agent", :allowed, signer: MySigner)
+signed_request = put_in(request, ["params", "_sigil"], envelope)
+public_key_b64u = MySigner.public_key_b64u()
+
+{:ok, signed_decision} =
+  SigilGuard.MCP.Gateway.guarded_signed_request(
+    signed_request,
+    [trust_level: :high],
+    public_keys: %{"did:sigil:agent" => public_key_b64u},
+    max_skew_ms: 300_000,
+    replay: true
+  )
+
+"did:sigil:agent" = signed_decision.audit_metadata.identity
+
 {:ok, safe_response, _decision} =
   SigilGuard.MCP.Gateway.guarded_result(
     %{"id" => 1, "content" => [%{"type" => "text", "text" => "token=supersecretvalue123"}]},

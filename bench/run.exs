@@ -56,6 +56,7 @@ defmodule SigilGuard.Bench do
       %{}
       |> Map.merge(scanner_scenarios())
       |> Map.merge(runtime_gate_scenarios())
+      |> Map.merge(mcp_gateway_scenarios())
       |> Map.merge(runtime_stream_scenarios())
       |> Map.merge(confirmation_scenarios())
       |> Map.merge(registry_bundle_scenarios())
@@ -169,6 +170,37 @@ defmodule SigilGuard.Bench do
         {_stream, _decision, final} = SigilGuard.Runtime.Stream.finish(stream)
 
         first <> second <> final
+      end
+    }
+  end
+
+  defp mcp_gateway_scenarios do
+    identity = "did:sigil:bench-mcp"
+    public_keys = %{identity => SigilGuard.BenchSigner.public_key_b64u()}
+
+    envelope =
+      SigilGuard.Envelope.sign(identity, :allowed,
+        signer: SigilGuard.BenchSigner,
+        timestamp: "2026-06-30T12:00:00.000Z",
+        nonce: "11111111111111111111111111111111"
+      )
+
+    request = %{
+      "jsonrpc" => "2.0",
+      "id" => 1,
+      "method" => "tools/call",
+      "params" => %{
+        "name" => "read_file",
+        "arguments" => %{"path" => "README.md"},
+        "_sigil" => envelope
+      }
+    }
+
+    %{
+      "mcp gateway / signed request" => fn ->
+        SigilGuard.MCP.Gateway.guard_signed_request(request, [trust_level: :high],
+          public_keys: public_keys
+        )
       end
     }
   end
