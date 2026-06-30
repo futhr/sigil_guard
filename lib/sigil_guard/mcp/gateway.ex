@@ -13,6 +13,9 @@ defmodule SigilGuard.MCP.Gateway do
   alias SigilGuard.Runtime
 
   @known_context_keys Map.keys(%Context{})
+  @blocked_code -32_001
+  @confirm_code -32_002
+  @quarantine_code -32_003
 
   @doc """
   Guard an MCP tool request before execution.
@@ -28,6 +31,24 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
+  Guard an MCP tool request and return either an allow decision or JSON-RPC error.
+
+  This helper is intended for gateway adapters that need a wire-shaped response
+  rather than only a `%SigilGuard.Decision{}`.
+  """
+  @spec guarded_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_request(request, context \\ %{}, opts \\ []) do
+    decision = guard_request(request, context, opts)
+
+    if executable?(decision) do
+      {:ok, decision}
+    else
+      {:error, response_for_decision(decision, request_id(request), opts), decision}
+    end
+  end
+
+  @doc """
   Guard an MCP tool result before model ingestion.
   """
   @spec guard_result(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
@@ -38,6 +59,30 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
+  Guard an MCP tool result and return a safe MCP-shaped result or JSON-RPC error.
+
+  Redacted results are returned as JSON-RPC result objects containing sanitized
+  text. Blocked, quarantined, or confirmation-required results become JSON-RPC
+  errors with audit-safe metadata only.
+  """
+  @spec guarded_result(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, map(), Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_result(result, context \\ %{}, opts \\ []) do
+    decision = guard_result(result, context, opts)
+
+    case decision.action do
+      :allow ->
+        {:ok, jsonrpc_result(result, request_id(result)), decision}
+
+      :redact ->
+        {:ok, sanitized_result(result, decision, request_id(result)), decision}
+
+      _ ->
+        {:error, response_for_decision(decision, request_id(result), opts), decision}
+    end
+  end
+
+  @doc """
   Start a chunk-safe stream sanitizer for MCP tool results.
   """
   @spec stream_result(Context.t() | map() | keyword(), keyword()) :: Runtime.Stream.t()
@@ -45,6 +90,21 @@ defmodule SigilGuard.MCP.Gateway do
     %{}
     |> result_context(context)
     |> Runtime.Stream.new(opts)
+  end
+
+  @doc """
+  Convert a runtime decision into an audit-safe JSON-RPC response.
+
+  The response intentionally omits raw payload text. Metadata includes hashes,
+  counts, indicator identifiers, and confirmation digests when available.
+  """
+  @spec response_for_decision(Decision.t(), term(), keyword()) :: map()
+  def response_for_decision(%Decision{} = decision, id \\ nil, opts \\ []) do
+    if decision.verdict == :allowed and decision.action in [:allow, :redact] do
+      sanitized_result(%{}, decision, id)
+    else
+      jsonrpc_error(id, error_code(decision), error_message(decision), error_data(decision, opts))
+    end
   end
 
   defp request_context(request, context) do
@@ -159,8 +219,6 @@ defmodule SigilGuard.MCP.Gateway do
     first_payload_value(payload, [
       [:action],
       ["action"],
-      [:method],
-      ["method"],
       [:tool],
       ["tool"],
       [:name],
@@ -168,7 +226,9 @@ defmodule SigilGuard.MCP.Gateway do
       [:params, :name],
       [:params, "name"],
       ["params", :name],
-      ["params", "name"]
+      ["params", "name"],
+      [:method],
+      ["method"]
     ])
   end
 
@@ -197,4 +257,95 @@ defmodule SigilGuard.MCP.Gateway do
       _ -> nil
     end
   end
+
+  defp executable?(%Decision{verdict: :allowed, action: action}), do: action in [:allow, :redact]
+  defp executable?(%Decision{}), do: false
+
+  defp request_id(payload) when is_map(payload) do
+    first_payload_term(payload, [
+      [:id],
+      ["id"],
+      [:request_id],
+      ["request_id"]
+    ])
+  end
+
+  defp request_id(_), do: nil
+
+  defp first_payload_term(payload, paths) when is_map(payload) do
+    Enum.find_value(paths, &get_in(payload, &1))
+  end
+
+  defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result}, _) do
+    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  end
+
+  defp jsonrpc_result(%{jsonrpc: _, id: id, result: result}, _) do
+    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  end
+
+  defp jsonrpc_result(result, id) do
+    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  end
+
+  defp sanitized_result(result, %Decision{} = decision, id) do
+    result
+    |> jsonrpc_result(id)
+    |> put_in(["result"], sanitized_payload(decision))
+  end
+
+  defp sanitized_payload(%Decision{sanitized_text: text}) when is_binary(text) do
+    %{
+      "content" => [
+        %{"type" => "text", "text" => text}
+      ]
+    }
+  end
+
+  defp sanitized_payload(%Decision{}), do: %{"content" => []}
+
+  defp jsonrpc_error(id, code, message, data) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "error" => %{
+        "code" => code,
+        "message" => message,
+        "data" => data
+      }
+    }
+  end
+
+  defp error_code(%Decision{action: :quarantine}), do: @quarantine_code
+  defp error_code(%Decision{verdict: {:confirm, _}}), do: @confirm_code
+  defp error_code(%Decision{}), do: @blocked_code
+
+  defp error_message(%Decision{action: :quarantine}), do: "SigilGuard quarantined MCP content"
+  defp error_message(%Decision{verdict: {:confirm, _}}), do: "SigilGuard requires confirmation"
+  defp error_message(%Decision{}), do: "SigilGuard blocked MCP content"
+
+  defp error_data(%Decision{} = decision, opts) do
+    base = %{
+      "status" => error_status(decision),
+      "action" => Atom.to_string(decision.action),
+      "reason" => decision.reason,
+      "phase" => Atom.to_string(decision.phase),
+      "risk_level" => Atom.to_string(decision.risk_level),
+      "trust_level" => Atom.to_string(decision.trust_level),
+      "hit_count" => length(decision.hits),
+      "indicator_ids" => Enum.map(decision.indicators, &Atom.to_string(&1.id)),
+      "content_hash" => decision.content_hash,
+      "action_digest" => decision.audit_metadata[:action_digest]
+    }
+
+    if Keyword.get(opts, :include_sanitized, false) and is_binary(decision.sanitized_text) do
+      Map.put(base, "sanitized_text", decision.sanitized_text)
+    else
+      base
+    end
+  end
+
+  defp error_status(%Decision{action: :quarantine}), do: "quarantined"
+  defp error_status(%Decision{verdict: {:confirm, _}}), do: "confirmation_required"
+  defp error_status(%Decision{}), do: "blocked"
 end

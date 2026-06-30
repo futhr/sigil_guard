@@ -246,7 +246,7 @@ request = %{
   "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
 }
 
-decision = SigilGuard.MCP.Gateway.guard_request(request, trust_level: :high)
+{:ok, decision} = SigilGuard.MCP.Gateway.guarded_request(request, trust_level: :high)
 :allowed = decision.verdict
 ```
 

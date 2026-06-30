@@ -127,8 +127,20 @@ request = %{
   }
 }
 
-decision = SigilGuard.MCP.Gateway.guard_request(request, trust_level: :high)
+{:error, error_response, decision} =
+  SigilGuard.MCP.Gateway.guarded_request(request, trust_level: :high)
+
 :blocked = decision.verdict
+-32_001 = error_response["error"]["code"]
+
+{:ok, safe_response, _decision} =
+  SigilGuard.MCP.Gateway.guarded_result(
+    %{"id" => 1, "content" => [%{"type" => "text", "text" => "token=supersecretvalue123"}]},
+    trust_level: :medium
+  )
+
+[%{"text" => sanitized_text}] = safe_response["result"]["content"]
+true = String.contains?(sanitized_text, "[SECRET]")
 
 stream =
   SigilGuard.MCP.Gateway.stream_result(
