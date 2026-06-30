@@ -2,17 +2,14 @@ defmodule SigilGuard.Backend do
   @moduledoc """
   Behaviour for SigilGuard processing backends.
 
-  All backends must implement this behaviour to be used
-  interchangeably by the SigilGuard API. This enables swapping
-  between different processing strategies:
-
-    * `:elixir` - Pure Elixir using OTP `:crypto` (default, safe)
-    * `:nif` - Rust NIF reimplementing SIGIL protocol operations (fastest)
+  SigilGuard now ships a single native Elixir implementation. The behaviour
+  remains as an extension point for applications that need a custom scanner,
+  signer, policy, or audit implementation behind the public facade.
 
   ## Configuration
 
       config :sigil_guard,
-        backend: :elixir  # :elixir | :nif
+        backend: :elixir
 
   ## Example
 
@@ -30,10 +27,10 @@ defmodule SigilGuard.Backend do
   alias SigilGuard.Policy
 
   @typedoc "Backend module types"
-  @type backend_module :: SigilGuard.Backend.Elixir | SigilGuard.Backend.NIF
+  @type backend_module :: SigilGuard.Backend.Elixir | module()
 
   @typedoc "Backend configuration atoms"
-  @type backend_type :: :elixir | :nif
+  @type backend_type :: :elixir
 
   # -- Scanning --
 
@@ -94,8 +91,9 @@ defmodule SigilGuard.Backend do
   @doc """
   Returns the backend implementation module based on configuration.
 
-  Accepts `:elixir`, `:nif`, or a custom module implementing this
-  behaviour. Any other value raises `ArgumentError` immediately, rather
+  Accepts `:elixir` or a custom module implementing this behaviour. The
+  previous `:nif` backend has been removed from the native Elixir line.
+  Any other value raises `ArgumentError` immediately, rather
   than failing later with `UndefinedFunctionError` mid-operation.
 
   ## Examples
@@ -111,7 +109,9 @@ defmodule SigilGuard.Backend do
         SigilGuard.Backend.Elixir
 
       :nif ->
-        SigilGuard.Backend.NIF
+        raise ArgumentError,
+              "configured :sigil_guard backend :nif has been removed; " <>
+                "SigilGuard now runs on the native Elixir backend"
 
       module when is_atom(module) ->
         if Code.ensure_loaded?(module) and function_exported?(module, :scan, 2) do
@@ -120,13 +120,13 @@ defmodule SigilGuard.Backend do
           raise ArgumentError,
                 "configured :sigil_guard backend #{inspect(module)} is not a module " <>
                   "implementing the SigilGuard.Backend behaviour; " <>
-                  "expected :elixir, :nif, or a backend module"
+                  "expected :elixir or a backend module"
         end
 
       other ->
         raise ArgumentError,
               "invalid :sigil_guard backend #{inspect(other)}; " <>
-                "expected :elixir, :nif, or a module implementing SigilGuard.Backend"
+                "expected :elixir or a module implementing SigilGuard.Backend"
     end
   end
 
@@ -139,19 +139,13 @@ defmodule SigilGuard.Backend do
       true
 
   """
-  @spec available?(backend_type()) :: boolean()
+  @spec available?(atom()) :: boolean()
   def available?(:elixir), do: true
-
-  def available?(:nif) do
-    Code.ensure_loaded?(SigilGuard.Backend.NIF.Native) and
-      function_exported?(SigilGuard.Backend.NIF.Native, :scan, 2)
-  end
+  def available?(_), do: false
 
   @doc """
   Returns a list of all available backends on this system.
   """
-  @spec available_backends() :: [backend_type()]
-  def available_backends do
-    Enum.filter([:elixir, :nif], &available?/1)
-  end
+  @spec available_backends() :: [backend_type(), ...]
+  def available_backends, do: [:elixir]
 end

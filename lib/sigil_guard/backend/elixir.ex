@@ -12,21 +12,13 @@ defmodule SigilGuard.Backend.Elixir do
 
   ## When to Use
 
-  Choose this backend when:
-
-    * You want zero external build dependencies (no Rust toolchain needed)
-    * Deployment simplicity is more important than raw throughput
-    * You are running in environments where NIF compilation is impractical
-      (e.g., Nerves, restricted CI, Fly.io without multi-stage builds)
-
-  For higher throughput on scanning and cryptographic operations, consider
-  the `SigilGuard.Backend.NIF` backend which wraps the Rust
-  `sigil-protocol` reference implementation.
+  This is the only built-in backend. It keeps deployment simple, avoids
+  native crash risk, and uses OTP `:crypto` plus BEAM regex/ETS primitives.
 
   ## Configuration
 
       config :sigil_guard,
-        backend: :elixir  # default
+        backend: :elixir
 
   ## Example
 

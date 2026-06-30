@@ -16,10 +16,10 @@ defmodule SigilGuard do
   Configure the processing backend in your application config:
 
       config :sigil_guard,
-        backend: :elixir  # or :nif
+        backend: :elixir
 
-  The `:elixir` backend (default) uses pure OTP `:crypto`.
-  The `:nif` backend reimplements SIGIL protocol operations in Rust for performance.
+  The built-in backend is native Elixir and uses OTP `:crypto`, Regex, ETS,
+  Finch, and ordinary OTP supervision.
 
   ## Quick Start
 
@@ -43,7 +43,7 @@ defmodule SigilGuard do
 
   See individual module documentation for detailed usage:
 
-  - `SigilGuard.Backend` — Backend behaviour and selection
+  - `SigilGuard.Backend` — Native backend behaviour and selection
   - `SigilGuard.Scanner` — Sensitivity scanning engine
   - `SigilGuard.Patterns` — Pattern compilation and management
   - `SigilGuard.Envelope` — SIGIL envelope signing and verification

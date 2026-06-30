@@ -51,7 +51,7 @@ defmodule SigilGuard.Backend.ElixirTest do
         ElixirBackend.envelope_sign("did:sigil:alice", :allowed, signer: SigilGuard.TestSigner)
 
       assert envelope["identity"] == "did:sigil:alice"
-      assert envelope["verdict"] == "Allowed"
+      assert envelope["verdict"] == "allowed"
       assert is_binary(envelope["signature"])
     end
   end

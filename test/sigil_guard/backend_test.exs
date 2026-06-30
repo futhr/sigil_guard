@@ -19,9 +19,10 @@ defmodule SigilGuard.BackendTest do
       assert Backend.impl() == SigilGuard.Backend.Elixir
     end
 
-    test "returns NIF backend when configured" do
+    test "raises when removed NIF backend is configured" do
       Application.put_env(:sigil_guard, :backend, :nif)
-      assert Backend.impl() == SigilGuard.Backend.NIF
+
+      assert_raise ArgumentError, ~r/backend :nif has been removed/, fn -> Backend.impl() end
     end
 
     test "accepts custom module" do
@@ -53,15 +54,14 @@ defmodule SigilGuard.BackendTest do
       assert Backend.available?(:elixir)
     end
 
-    test "nif backend availability depends on compilation" do
-      # NIF is not compiled in test by default
-      assert is_boolean(Backend.available?(:nif))
+    test "nif backend is not available" do
+      refute Backend.available?(:nif)
     end
   end
 
   describe "available_backends/0" do
-    test "always includes :elixir" do
-      assert :elixir in Backend.available_backends()
+    test "returns only the native Elixir backend" do
+      assert Backend.available_backends() == [:elixir]
     end
   end
 

@@ -54,11 +54,6 @@ defmodule SigilGuard.MixProject do
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.0"},
 
-      # NIF — precompiled binaries downloaded at install time
-      {:rustler_precompiled, "~> 0.9"},
-      # Rustler only needed when force-building from source
-      {:rustler, "~> 0.38", optional: true},
-
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -87,7 +82,7 @@ defmodule SigilGuard.MixProject do
 
   defp description do
     "SIGIL Protocol integration for Elixir — sensitivity scanning, envelope signing, " <>
-      "policy enforcement, tamper-evident auditing, and registry client with optional Rust NIF backend."
+      "policy enforcement, tamper-evident auditing, and registry client with a native Elixir runtime."
   end
 
   defp package do
@@ -100,11 +95,6 @@ defmodule SigilGuard.MixProject do
       },
       files: ~w[
         lib
-        native/sigil_guard_nif/src
-        native/sigil_guard_nif/Cargo.toml
-        native/sigil_guard_nif/Cargo.lock
-        native/sigil_guard_nif/.cargo
-        checksum-Elixir.SigilGuard.Backend.NIF.Native.exs
         .formatter.exs
         mix.exs
         README.md
@@ -139,7 +129,8 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Policy,
           SigilGuard.Identity,
           SigilGuard.Identity.Binding,
-          SigilGuard.Patterns
+          SigilGuard.Patterns,
+          SigilGuard.Profile
         ],
         Audit: [
           SigilGuard.Audit,
@@ -160,15 +151,14 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Registry,
           SigilGuard.Registry.Cache
         ],
-        Backends: [
+        Backend: [
           SigilGuard.Backend,
-          SigilGuard.Backend.Elixir,
-          SigilGuard.Backend.NIF,
-          SigilGuard.Backend.NIF.Native
+          SigilGuard.Backend.Elixir
         ],
         Runtime: [
           SigilGuard.Application,
           SigilGuard.Config,
+          SigilGuard.ReplayStore,
           SigilGuard.Telemetry
         ]
       ],

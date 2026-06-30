@@ -1,1 +1,1 @@
-ExUnit.start(exclude: [:nif])
+ExUnit.start()
