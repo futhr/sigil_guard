@@ -4,6 +4,8 @@ defmodule SigilGuard.Registry do
 
   Fetches pattern bundles, resolves DIDs, and retrieves policy definitions
   from a SIGIL registry server. Uses Finch for HTTP with configurable timeouts.
+  DID resolution is profile-aware and normalizes the live response shapes seen
+  across SigilGuard legacy registries, reference profiles, and draft spec examples.
 
   ## Configuration
 
@@ -22,9 +24,17 @@ defmodule SigilGuard.Registry do
   """
 
   alias SigilGuard.Config
+  alias SigilGuard.Profile
   alias SigilGuard.Telemetry
 
   @type fetch_result :: {:ok, map()} | {:error, term()}
+  @type resolved_key :: %{
+          did: String.t(),
+          status: String.t() | nil,
+          raw_public_key: binary(),
+          public_key_b64u: String.t(),
+          source_format: atom()
+        }
 
   @doc """
   Fetch the pattern bundle from the registry.
@@ -48,21 +58,45 @@ defmodule SigilGuard.Registry do
   @doc """
   Resolve a DID (Decentralized Identifier) via the registry.
 
-  Returns the DID document with public keys and service endpoints.
+  Returns the upstream DID response. Use `resolve_key/2` when you need
+  normalized Ed25519 key material for envelope verification.
 
   ## Options
 
     * `:url` — override registry base URL
     * `:timeout` — override request timeout in milliseconds
+    * `:profile` — compatibility profile controlling endpoint order
 
   """
   @spec resolve_did(String.t(), keyword()) :: fetch_result()
   def resolve_did(did, opts \\ []) do
     url = Keyword.get(opts, :url, Config.registry_url())
     timeout = Keyword.get(opts, :timeout, Config.registry_timeout_ms())
-    encoded_did = URI.encode_www_form(did)
 
-    request_json("#{url}/identities/#{encoded_did}", timeout, %{endpoint: "identities"})
+    profile =
+      opts
+      |> Keyword.get_lazy(:profile, &Config.protocol_profile/0)
+      |> Profile.normalize!()
+
+    profile
+    |> Profile.registry_identity_endpoints()
+    |> request_first_success(url, did, timeout)
+  end
+
+  @doc """
+  Resolve a DID and normalize supported registry key response shapes.
+
+  Supports:
+
+    * Flat `"public_key"` strings
+    * Draft-spec JWK-like `"public_key": {"kty": "OKP", "crv": "Ed25519", "x": "..."}`
+    * Legacy DID documents with `"publicKey": [%{"publicKeyBase64" => "..."}]`
+  """
+  @spec resolve_key(String.t(), keyword()) :: {:ok, resolved_key()} | {:error, term()}
+  def resolve_key(did, opts \\ []) do
+    with {:ok, response} <- resolve_did(did, opts) do
+      normalize_resolved_key(response)
+    end
   end
 
   @doc """
@@ -104,6 +138,21 @@ defmodule SigilGuard.Registry do
     )
   end
 
+  defp request_first_success([], _, _, _), do: {:error, :not_found}
+
+  defp request_first_success([endpoint | rest], url, did, timeout) do
+    full_url = "#{url}/#{endpoint_path(endpoint, did)}"
+
+    case request_json(full_url, timeout, %{endpoint: Atom.to_string(endpoint)}) do
+      {:ok, body} -> {:ok, body}
+      {:error, _} when rest != [] -> request_first_success(rest, url, did, timeout)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp endpoint_path(:resolve, did), do: "resolve/#{URI.encode_www_form(did)}"
+  defp endpoint_path(:identities, did), do: "identities/#{URI.encode_www_form(did)}"
+
   defp do_request(url, timeout) do
     request = Finch.build(:get, url, [{"accept", "application/json"}])
 
@@ -127,6 +176,86 @@ defmodule SigilGuard.Registry do
       {:ok, decoded} when is_map(decoded) -> {:ok, decoded}
       {:ok, _} -> {:error, :invalid_body}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp normalize_resolved_key(
+         %{"public_key" => %{"kty" => "OKP", "crv" => "Ed25519", "x" => key}} = body
+       ) do
+    did = Map.get(body, "did") || Map.get(body, "id")
+    build_resolved_key(did, Map.get(body, "status"), key, :jwk_okp_x)
+  end
+
+  defp normalize_resolved_key(%{"public_key" => key} = body) when is_binary(key) do
+    did = Map.get(body, "did") || Map.get(body, "id")
+    build_resolved_key(did, Map.get(body, "status"), key, :flat_public_key)
+  end
+
+  defp normalize_resolved_key(%{"publicKey" => keys} = body) when is_list(keys) do
+    case Enum.find_value(keys, &did_doc_public_key/1) do
+      nil ->
+        {:error, :missing_public_key}
+
+      {key, source_format} ->
+        did = Map.get(body, "id") || Map.get(body, "did")
+        build_resolved_key(did, Map.get(body, "status"), key, source_format)
+    end
+  end
+
+  defp normalize_resolved_key(_), do: {:error, :missing_public_key}
+
+  defp did_doc_public_key(%{"publicKeyBase64" => key}) when is_binary(key) do
+    {key, :did_doc_publicKeyBase64}
+  end
+
+  defp did_doc_public_key(%{"publicKeyBase64Url" => key}) when is_binary(key) do
+    {key, :did_doc_publicKeyBase64Url}
+  end
+
+  defp did_doc_public_key(_), do: nil
+
+  defp build_resolved_key(did, status, encoded_key, source_format) when is_binary(did) do
+    with {:ok, raw_key} <- decode_public_key(encoded_key) do
+      {:ok,
+       %{
+         did: did,
+         status: status,
+         raw_public_key: raw_key,
+         public_key_b64u: Base.url_encode64(raw_key, padding: false),
+         source_format: source_format
+       }}
+    end
+  end
+
+  defp build_resolved_key(_, _, _, _), do: {:error, :missing_did}
+
+  defp decode_public_key(encoded_key) do
+    decoded =
+      decode_base64url(encoded_key) ||
+        decode_base64(encoded_key)
+
+    case decoded do
+      key when is_binary(key) and byte_size(key) == 32 -> {:ok, key}
+      key when is_binary(key) -> {:error, :invalid_key}
+      nil -> {:error, :invalid_base64}
+    end
+  end
+
+  defp decode_base64url(value) do
+    with :error <- Base.url_decode64(value, padding: false),
+         :error <- Base.url_decode64(value, padding: true) do
+      nil
+    else
+      {:ok, decoded} -> decoded
+    end
+  end
+
+  defp decode_base64(value) do
+    with :error <- Base.decode64(value, padding: false),
+         :error <- Base.decode64(value, padding: true) do
+      nil
+    else
+      {:ok, decoded} -> decoded
     end
   end
 end
