@@ -44,7 +44,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 | **Confirmation Tokens** | Short-lived approval grants bound to payload and boundary context |
 | **Envelope Sign/Verify** | Ed25519 canonical envelope signing with explicit protocol profiles |
 | **Policy Engine** | Risk classification and trust-level gating |
-| **Audit Chain** | HMAC-SHA256 event chain with signed checkpoint exports |
+| **Audit Chain** | HMAC-SHA256 event chain with signed checkpoint exports and external anchor records |
 | **Secure Vault** | AES-256-GCM encrypted secret storage |
 | **Registry Client** | REST client with TTL cache, signed bundle provenance, quarantine, endpoint fallback, and key normalization |
 | **Replay Protection** | Optional nonce replay and timestamp-skew checks for envelopes |
@@ -236,6 +236,14 @@ signed = SigilGuard.Audit.build_chain(events, key)
 
 signed_checkpoint =
   SigilGuard.Audit.Checkpoint.sign(checkpoint, MyAuditSigner, issuer: "did:web:ops")
+
+anchor =
+  SigilGuard.Audit.Anchor.create(signed_checkpoint,
+    storage: "s3-object-lock",
+    uri: "s3://audit-lock/checkpoints/001.json"
+  )
+
+{:ok, _verified_anchor} = SigilGuard.Audit.Anchor.verify(anchor, signed_checkpoint)
 ```
 
 ### Secure Vaulting
@@ -339,6 +347,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Policy          Risk classification and trust gating
     +-- SigilGuard.Audit           Tamper-evident audit chain
     |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
+    |   +-- Audit.Anchor           External WORM/append-only anchor records
     +-- SigilGuard.Identity        Trust level hierarchy
     +-- SigilGuard.Signer          Cryptographic signing behaviour
     +-- SigilGuard.Vault           Encrypted storage behaviour

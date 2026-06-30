@@ -51,6 +51,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Policy          Risk classification and trust gating
     +-- SigilGuard.Audit           Tamper-evident audit chain
     |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
+    |   +-- Audit.Anchor           External WORM/append-only anchor records
     |   +-- Audit.Logger           Audit logger behaviour
     +-- SigilGuard.Identity        Trust level hierarchy
     +-- SigilGuard.Signer          Cryptographic signing behaviour
@@ -87,6 +88,7 @@ SigilGuard (Main API)
 | `lib/sigil_guard/policy.ex` | Risk classification and trust gating |
 | `lib/sigil_guard/audit.ex` | HMAC-SHA256 chain integrity |
 | `lib/sigil_guard/audit/checkpoint.ex` | Merkle checkpoint export, signing, and verification |
+| `lib/sigil_guard/audit/anchor.ex` | External WORM/append-only anchor records |
 | `lib/sigil_guard/identity.ex` | Trust level hierarchy |
 | `lib/sigil_guard/vault.ex` | Encrypted storage behaviour |
 | `lib/sigil_guard/registry.ex` | SIGIL registry REST client |
