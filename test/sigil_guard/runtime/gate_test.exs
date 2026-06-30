@@ -163,6 +163,8 @@ defmodule SigilGuard.Runtime.GateTest do
       on_exit(fn -> :telemetry.detach(handler_id) end)
 
       Gate.evaluate("api_key=sk_live_abcdef1234567890abcd",
+        actor: "did:sigil:agent",
+        identity: "did:sigil:agent",
         phase: :tool_request,
         sink: :external,
         tool: "send_webhook",
@@ -173,6 +175,8 @@ defmodule SigilGuard.Runtime.GateTest do
                       %{verdict: :blocked} = metadata}
 
       assert metadata.hit_count >= 1
+      assert metadata.actor == "did:sigil:agent"
+      assert metadata.identity == "did:sigil:agent"
       refute inspect(metadata) =~ "sk_live"
     end
   end

@@ -8,6 +8,7 @@ defmodule SigilGuard.TelemetryTest do
   describe "events/0" do
     test "lists known SigilGuard telemetry events" do
       assert [:sigil_guard, :runtime, :gate] in Telemetry.events()
+      assert [:sigil_guard, :mcp, :request] in Telemetry.events()
       assert [:sigil_guard, :scan, :stop] in Telemetry.events()
       assert [:sigil_guard, :audit, :logged] in Telemetry.events()
     end
@@ -21,6 +22,8 @@ defmodule SigilGuard.TelemetryTest do
           %{system_time: 123},
           %{
             phase: :tool_request,
+            actor: "did:sigil:agent",
+            identity: "did:sigil:agent",
             origin: :model,
             sink: :external,
             tool: "send_webhook",
@@ -31,6 +34,8 @@ defmodule SigilGuard.TelemetryTest do
             action: :block,
             hit_count: 1,
             indicator_ids: [:ignore_instructions],
+            envelope_status: :invalid,
+            envelope_reason: :invalid_signature,
             content_hash: "abc123"
           }
         )
@@ -39,9 +44,13 @@ defmodule SigilGuard.TelemetryTest do
       assert attributes["sigil.component"] == "runtime"
       assert attributes["sigil.operation"] == "gate"
       assert attributes["sigil.security.phase"] == "tool_request"
+      assert attributes["sigil.actor"] == "did:sigil:agent"
+      assert attributes["sigil.identity"] == "did:sigil:agent"
       assert attributes["sigil.security.verdict"] == "blocked"
       assert attributes["sigil.security.hit_count"] == 1
       assert attributes["sigil.security.indicator_ids"] == ["ignore_instructions"]
+      assert attributes["sigil.envelope.status"] == "invalid"
+      assert attributes["sigil.envelope.reason"] == "invalid_signature"
       assert attributes["sigil.security.content_hash"] == "abc123"
       refute Map.has_key?(attributes, "match")
     end

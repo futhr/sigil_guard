@@ -12,6 +12,7 @@ defmodule SigilGuard.MCP.Gateway do
   alias SigilGuard.Decision
   alias SigilGuard.Envelope
   alias SigilGuard.Runtime
+  alias SigilGuard.Telemetry
 
   @known_context_keys Map.keys(%Context{})
   @blocked_code -32_001
@@ -66,7 +67,9 @@ defmodule SigilGuard.MCP.Gateway do
   def guard_signed_request(request, context \\ %{}, opts \\ []) do
     case verify_request_envelope(request, opts) do
       {:ok, claims} ->
-        guard_request(request, signed_context(context, claims.identity), opts)
+        decision = guard_request(request, signed_context(context, claims.identity), opts)
+        emit_signed_request(decision, :valid, nil)
+        decision
 
       {:error, reason} ->
         envelope_decision(request, context, reason)
@@ -379,7 +382,7 @@ defmodule SigilGuard.MCP.Gateway do
     context = request_context(request, context)
     content_hash = hash_text(text_payload(request))
 
-    %Decision{
+    decision = %Decision{
       verdict: :blocked,
       action: :block,
       reason: "MCP request envelope verification failed: #{format_reason(reason)}",
@@ -405,6 +408,9 @@ defmodule SigilGuard.MCP.Gateway do
         content_hash: content_hash
       }
     }
+
+    emit_signed_request(decision, :invalid, reason)
+    decision
   end
 
   defp hash_text(text) do
@@ -414,6 +420,38 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+
+  defp emit_signed_request(%Decision{} = decision, envelope_status, envelope_reason) do
+    metadata =
+      decision.audit_metadata
+      |> Map.take([
+        :phase,
+        :actor,
+        :identity,
+        :origin,
+        :sink,
+        :tool,
+        :mcp_server,
+        :resource_uri,
+        :trust_zone,
+        :trust_level,
+        :risk_level,
+        :verdict,
+        :action,
+        :hit_count,
+        :indicator_count,
+        :indicator_ids,
+        :content_hash,
+        :action_digest,
+        :repo_policy_verdict,
+        :repo_policy_rules,
+        :repo_unmatched_paths
+      ])
+      |> Map.put(:envelope_status, envelope_status)
+      |> Map.put(:envelope_reason, envelope_reason)
+
+    Telemetry.emit([:sigil_guard, :mcp, :request], %{system_time: System.system_time()}, metadata)
+  end
 
   defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result}, _) do
     %{"jsonrpc" => "2.0", "id" => id, "result" => result}

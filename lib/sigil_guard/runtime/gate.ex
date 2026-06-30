@@ -349,6 +349,8 @@ defmodule SigilGuard.Runtime.Gate do
       %{system_time: System.system_time()},
       Map.take(decision.audit_metadata, [
         :phase,
+        :actor,
+        :identity,
         :origin,
         :sink,
         :tool,

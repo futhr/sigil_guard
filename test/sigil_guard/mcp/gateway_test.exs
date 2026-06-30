@@ -165,6 +165,54 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.reason =~ "invalid_signature"
       assert decision.audit_metadata.envelope_reason == :invalid_signature
     end
+
+    test "emits MCP telemetry for verified signed requests" do
+      ref = attach_mcp_telemetry()
+
+      request =
+        "did:sigil:agent"
+        |> Envelope.sign(:allowed, signer: TestSigner)
+        |> signed_request()
+
+      decision =
+        Gateway.guard_signed_request(request, [trust_level: :high], public_keys: public_keys())
+
+      assert decision.verdict == :allowed
+
+      assert_receive {^ref, [:sigil_guard, :mcp, :request], %{system_time: _}, metadata}
+
+      assert metadata.envelope_status == :valid
+      assert metadata.envelope_reason == nil
+      assert metadata.identity == "did:sigil:agent"
+      assert metadata.actor == "did:sigil:agent"
+      assert metadata.verdict == :allowed
+      assert metadata.action == :allow
+    end
+
+    test "emits MCP telemetry for invalid signed requests without raw payload leakage" do
+      ref = attach_mcp_telemetry()
+
+      request =
+        unsigned_request(%{
+          "params" => %{
+            "name" => "send_webhook",
+            "arguments" => %{"body" => "AWS_KEY=AKIAIOSFODNN7EXAMPLE"}
+          }
+        })
+
+      decision =
+        Gateway.guard_signed_request(request, [trust_level: :high], public_keys: public_keys())
+
+      assert decision.verdict == :blocked
+
+      assert_receive {^ref, [:sigil_guard, :mcp, :request], %{system_time: _}, metadata}
+
+      assert metadata.envelope_status == :invalid
+      assert metadata.envelope_reason == :missing_envelope
+      assert metadata.tool == "send_webhook"
+      assert metadata.content_hash == decision.content_hash
+      refute inspect(metadata) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
   end
 
   describe "guarded_signed_request/3" do
@@ -349,5 +397,23 @@ defmodule SigilGuard.MCP.GatewayTest do
 
   defp public_keys do
     %{"did:sigil:agent" => TestSigner.public_key_b64u()}
+  end
+
+  defp attach_mcp_telemetry do
+    parent = self()
+    ref = make_ref()
+    handler_id = "mcp-gateway-test-#{System.unique_integer()}"
+
+    :telemetry.attach(
+      handler_id,
+      [:sigil_guard, :mcp, :request],
+      fn event, measurements, metadata, _ ->
+        send(parent, {ref, event, measurements, metadata})
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+    ref
   end
 end

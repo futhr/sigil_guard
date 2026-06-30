@@ -47,11 +47,20 @@ defmodule SigilGuard.Telemetry do
     * `[:sigil_guard, :runtime, :gate]`
       Measurements: `%{system_time: integer}`
       Metadata: `%{phase: atom, origin: atom, sink: atom, tool: String.t() | nil,
-      trust_zone: atom, trust_level: atom, risk_level: atom, verdict: atom,
-      action: atom, hit_count: integer, indicator_count: integer,
-      indicator_ids: [atom], content_hash: String.t(), action_digest: String.t() | nil,
+      actor: String.t() | nil, identity: String.t() | nil, trust_zone: atom,
+      trust_level: atom, risk_level: atom, verdict: atom, action: atom,
+      hit_count: integer, indicator_count: integer, indicator_ids: [atom],
+      content_hash: String.t(), action_digest: String.t() | nil,
       repo_policy_verdict: atom, repo_policy_rules: [String.t()],
       repo_unmatched_paths: [String.t()]}`
+
+    * `[:sigil_guard, :mcp, :request]`
+      Measurements: `%{system_time: integer}`
+      Metadata: `%{phase: atom, origin: atom, sink: atom, tool: String.t() | nil,
+      actor: String.t() | nil, identity: String.t() | nil, trust_zone: atom,
+      trust_level: atom, risk_level: atom, verdict: atom, action: atom,
+      envelope_status: :valid | :invalid, envelope_reason: atom | nil,
+      content_hash: String.t()}`
 
     * `[:sigil_guard, :audit, :logged]`
       Measurements: `%{system_time: integer}`
@@ -71,6 +80,7 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :registry, :fetch, :exception],
     [:sigil_guard, :policy, :decision],
     [:sigil_guard, :runtime, :gate],
+    [:sigil_guard, :mcp, :request],
     [:sigil_guard, :audit, :logged]
   ]
 
@@ -81,8 +91,11 @@ defmodule SigilGuard.Telemetry do
     content_hash: "sigil.security.content_hash",
     count: "sigil.registry.count",
     endpoint: "sigil.registry.endpoint",
+    envelope_reason: "sigil.envelope.reason",
+    envelope_status: "sigil.envelope.status",
     event_type: "sigil.audit.event_type",
     hit_count: "sigil.security.hit_count",
+    identity: "sigil.identity",
     indicator_count: "sigil.security.indicator_count",
     indicator_ids: "sigil.security.indicator_ids",
     mcp_server: "sigil.mcp.server",
