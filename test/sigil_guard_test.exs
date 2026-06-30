@@ -25,6 +25,20 @@ defmodule SigilGuardTest do
     end
   end
 
+  describe "guard/3" do
+    test "returns a runtime decision from the public facade" do
+      decision =
+        SigilGuard.guard("safe tool output",
+          phase: :tool_result,
+          sink: :model,
+          trust_level: :medium
+        )
+
+      assert decision.verdict == :allowed
+      assert decision.action == :allow
+    end
+  end
+
   describe "policy_verdict/3" do
     test "allows low-risk actions for medium trust users" do
       assert :allowed = SigilGuard.policy_verdict("read_file", :medium)

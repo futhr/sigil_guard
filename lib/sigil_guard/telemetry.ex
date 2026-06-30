@@ -36,6 +36,12 @@ defmodule SigilGuard.Telemetry do
       Measurements: `%{system_time: integer}`
       Metadata: `%{action: String.t(), risk_level: atom, verdict: atom, trust_required: atom}`
 
+    * `[:sigil_guard, :runtime, :gate]`
+      Measurements: `%{system_time: integer}`
+      Metadata: `%{phase: atom, origin: atom, sink: atom, tool: String.t() | nil,
+      trust_zone: atom, trust_level: atom, risk_level: atom, verdict: atom,
+      action: atom, hit_count: integer, indicator_count: integer}`
+
     * `[:sigil_guard, :audit, :logged]`
       Measurements: `%{system_time: integer}`
       Metadata: `%{event_type: String.t(), actor: String.t()}`

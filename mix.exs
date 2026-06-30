@@ -127,10 +127,16 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Scanner,
           SigilGuard.Envelope,
           SigilGuard.Policy,
+          SigilGuard.Context,
+          SigilGuard.Decision,
           SigilGuard.Identity,
           SigilGuard.Identity.Binding,
           SigilGuard.Patterns,
-          SigilGuard.Profile
+          SigilGuard.Profile,
+          SigilGuard.Quarantine
+        ],
+        "Runtime Gate": [
+          SigilGuard.Runtime.Gate
         ],
         Audit: [
           SigilGuard.Audit,

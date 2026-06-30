@@ -1,6 +1,6 @@
 # SigilGuard
 
-**SIGIL Protocol integration for Elixir — native OTP implementation**
+**SIGIL Protocol integration for Elixir**
 
 [![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg)](https://hex.pm/packages/sigil_guard)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/sigil_guard)
@@ -20,6 +20,7 @@ SigilGuard provides a high-level Elixir API for the [SIGIL Protocol](https://sig
 securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use SigilGuard for:
 
 - **Sensitivity Scanning** — Detect and redact credentials, API keys, PII in text
+- **Runtime Gate** — Boundary-aware decisions for tool input, tool output, and external sinks
 - **Envelope Signing** — Ed25519 signed `_sigil` metadata for MCP JSON-RPC
 - **Policy Enforcement** — Risk-classified trust gating for tool call authorization
 - **Tamper-Evident Audit** — HMAC-SHA256 chain integrity for immutable audit logs
@@ -32,6 +33,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 | Feature | Description |
 |---------|-------------|
 | **Sensitivity Scanner** | Regex-based detection of secrets, credentials, PII |
+| **Runtime Gate** | Source-to-sink guard combining scanning, quarantine indicators, and policy |
 | **Envelope Sign/Verify** | Ed25519 canonical envelope signing with explicit protocol profiles |
 | **Policy Engine** | Risk classification and trust-level gating |
 | **Audit Chain** | HMAC-SHA256 tamper-evident event chain |
@@ -71,6 +73,40 @@ end
 
 Built-in patterns detect: AWS keys, API keys, bearer tokens, database URIs,
 private key headers, and generic secrets/passwords.
+
+### Runtime Gate
+
+```elixir
+# Block sensitive content leaving the runtime by default
+decision =
+  SigilGuard.guard("AWS_KEY=AKIAIOSFODNN7EXAMPLE",
+    phase: :tool_request,
+    origin: :model,
+    sink: :external,
+    tool: "send_webhook",
+    trust_level: :high
+  )
+
+:blocked = decision.verdict
+:block = decision.action
+
+# Redact sensitive content before model ingestion
+decision =
+  SigilGuard.guard("token=supersecretvalue123",
+    phase: :inbound_user,
+    origin: :user,
+    sink: :model,
+    trust_level: :medium
+  )
+
+:allowed = decision.verdict
+:redact = decision.action
+"token=[SECRET]" = decision.sanitized_text
+```
+
+The gate is transport-agnostic: MCP servers, agents, and gateways can call it
+before tool execution, after tool results, and before outbound writes without
+pulling a specific MCP adapter into SigilGuard core.
 
 ### Envelope Signing
 
@@ -203,6 +239,7 @@ SigilGuard (Main API)
     |
     +-- SigilGuard.Scanner         Sensitivity scanning engine
     +-- SigilGuard.Patterns        Pattern compilation and management
+    +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
     +-- SigilGuard.Policy          Risk classification and trust gating
     +-- SigilGuard.Audit           Tamper-evident audit chain

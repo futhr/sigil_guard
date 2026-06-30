@@ -5,6 +5,7 @@ Guidance for AI agents working with SigilGuard.
 ## Project Overview
 
 SigilGuard is a native Elixir library providing SIGIL Protocol integration for MCP security. It uses OTP `:crypto`, Regex, ETS, Finch, and explicit protocol compatibility profiles.
+Phase-2 runtime work adds boundary-aware source-to-sink decisions around tool requests, tool results, model ingestion, and external sinks.
 
 ## Architecture
 
@@ -35,6 +36,10 @@ SigilGuard (Main API)
     |
     +-- SigilGuard.Scanner         Sensitivity scanning engine
     +-- SigilGuard.Patterns        Pattern compilation and management
+    +-- SigilGuard.Context         Boundary/provenance metadata
+    +-- SigilGuard.Decision        Runtime gate decision struct
+    +-- SigilGuard.Quarantine      Prompt-injection/tool-poisoning indicators
+    +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
     +-- SigilGuard.Profile         Protocol compatibility profiles
     +-- SigilGuard.ReplayStore     ETS nonce replay protection
@@ -60,6 +65,10 @@ SigilGuard (Main API)
 | `lib/sigil_guard/backend.ex` | Backend behaviour definition and selection |
 | `lib/sigil_guard/backend/elixir.ex` | Pure Elixir backend implementation |
 | `lib/sigil_guard/scanner.ex` | Regex-based sensitivity scanning |
+| `lib/sigil_guard/context.ex` | Boundary/provenance metadata |
+| `lib/sigil_guard/decision.ex` | Runtime gate decision struct |
+| `lib/sigil_guard/quarantine.ex` | Prompt-injection and tool-poisoning indicators |
+| `lib/sigil_guard/runtime/gate.ex` | Source-to-sink runtime gate |
 | `lib/sigil_guard/envelope.ex` | SIGIL envelope sign/verify |
 | `lib/sigil_guard/profile.ex` | Protocol compatibility profile definitions |
 | `lib/sigil_guard/replay_store.ex` | ETS-backed nonce replay cache |
@@ -134,6 +143,7 @@ test/
 | `[:sigil_guard, :registry, :fetch, :start]` | `system_time` | `url` |
 | `[:sigil_guard, :registry, :fetch, :stop]` | `duration` | `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
+| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor` |
 
 ## Configuration
@@ -183,6 +193,21 @@ envelope = SigilGuard.Envelope.sign("did:sigil:abc", :allowed, signer: MySigner)
 ```elixir
 :allowed = SigilGuard.policy_verdict("read_file", :medium)
 :blocked = SigilGuard.policy_verdict("delete_database", :low)
+```
+
+### Runtime Gate
+
+```elixir
+decision = SigilGuard.guard("AWS_KEY=AKIAIOSFODNN7EXAMPLE",
+  phase: :tool_request,
+  origin: :model,
+  sink: :external,
+  tool: "send_webhook",
+  trust_level: :high
+)
+
+:blocked = decision.verdict
+:block = decision.action
 ```
 
 ## References

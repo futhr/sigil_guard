@@ -47,6 +47,7 @@ defmodule SigilGuard do
   - `SigilGuard.Scanner` — Sensitivity scanning engine
   - `SigilGuard.Patterns` — Pattern compilation and management
   - `SigilGuard.Envelope` — SIGIL envelope signing and verification
+  - `SigilGuard.Runtime.Gate` — Boundary-aware tool/runtime decisions
   - `SigilGuard.Policy` — Risk classification and trust gating
   - `SigilGuard.Audit` — Tamper-evident audit chain
   - `SigilGuard.Vault` — Secure secret storage
@@ -61,6 +62,7 @@ defmodule SigilGuard do
   alias SigilGuard.Identity
   alias SigilGuard.Patterns
   alias SigilGuard.Policy
+  alias SigilGuard.Runtime
 
   # -- Scanning --
 
@@ -110,6 +112,34 @@ defmodule SigilGuard do
   """
   @spec scan_and_redact(String.t(), keyword()) :: String.t()
   def scan_and_redact(text, opts \\ []), do: Backend.impl().scan_and_redact(text, opts)
+
+  # -- Runtime Gate --
+
+  @doc """
+  Evaluate a boundary-aware runtime decision.
+
+  This is the phase-2 entrypoint for MCP/tool-call security. It combines
+  scanning, quarantine indicators, source-to-sink rules, and policy
+  evaluation into a `%SigilGuard.Decision{}`.
+
+  ## Examples
+
+      iex> decision =
+      ...>   SigilGuard.guard("safe text", %{
+      ...>     phase: :tool_result,
+      ...>     sink: :model,
+      ...>     trust_level: :medium
+      ...>   })
+      ...>
+      ...> decision.verdict
+      :allowed
+
+  """
+  @spec guard(term(), SigilGuard.Context.t() | map() | keyword(), keyword()) ::
+          SigilGuard.Decision.t()
+  def guard(payload, context \\ %SigilGuard.Context{}, opts \\ []) do
+    Runtime.Gate.evaluate(payload, context, opts)
+  end
 
   # -- Policy --
 
