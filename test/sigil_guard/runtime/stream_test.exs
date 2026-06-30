@@ -40,6 +40,8 @@ defmodule SigilGuard.Runtime.StreamTest do
       assert first_decision.verdict == :allowed
       assert second_decision.verdict == :allowed
       assert final_decision.verdict == :allowed
+      refute first =~ "AKIAIOS"
+      refute second =~ "AKIAIOSFODNN7EXAMPLE"
       assert output =~ "[AWS_KEY]"
       refute output =~ "AKIAIOSFODNN7EXAMPLE"
     end

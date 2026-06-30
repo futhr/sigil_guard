@@ -69,9 +69,10 @@ defmodule SigilGuard.Runtime.Stream do
     decision = Gate.evaluate(combined, stream.context, stream.opts)
 
     if Decision.allowed?(decision) do
-      hits = scan_hits(combined, stream.opts)
-      {emittable, pending} = split_emittable(combined, hits, stream.window_bytes)
-      emitted = sanitize_allowed(emittable, hits, byte_size(emittable), decision, stream.opts)
+      {emittable, pending} = split_emittable(combined, decision.hits, stream.window_bytes)
+
+      emitted =
+        sanitize_allowed(emittable, decision.hits, byte_size(emittable), decision, stream.opts)
 
       {%{stream | pending: pending, decision: decision}, decision, emitted}
     else
@@ -95,15 +96,6 @@ defmodule SigilGuard.Runtime.Stream do
     emitted = if Decision.allowed?(decision), do: decision.sanitized_text || "", else: ""
 
     {%{stream | pending: "", decision: decision}, decision, emitted}
-  end
-
-  defp scan_hits("", _), do: []
-
-  defp scan_hits(text, opts) do
-    case Scanner.scan(text, opts) do
-      {:ok, _} -> []
-      {:hit, hits} -> hits
-    end
   end
 
   defp split_emittable(text, hits, window_bytes) do
