@@ -1,3 +1,22 @@
+defmodule SigilGuard.ScannerPipelineTestStub do
+  @moduledoc false
+
+  @spec scan(String.t(), [map()], keyword()) :: [map()]
+  def scan(_, _, _) do
+    [
+      %{
+        name: "stub",
+        category: "test",
+        severity: :low,
+        match: "x",
+        offset: 0,
+        length: 1,
+        replacement_hint: nil
+      }
+    ]
+  end
+end
+
 defmodule SigilGuard.Scanner.PipelineTest do
   @moduledoc false
 
@@ -73,24 +92,5 @@ defmodule SigilGuard.Scanner.PipelineTest do
       assert [%{match: "xxx", offset: 1, length: 3, pattern: ^pattern}] =
                Pipeline.regex_candidates(" xxx ", [pattern])
     end
-  end
-end
-
-defmodule SigilGuard.ScannerPipelineTestStub do
-  @moduledoc false
-
-  @spec scan(String.t(), [map()], keyword()) :: [map()]
-  def scan(_, _, _) do
-    [
-      %{
-        name: "stub",
-        category: "test",
-        severity: :low,
-        match: "x",
-        offset: 0,
-        length: 1,
-        replacement_hint: nil
-      }
-    ]
   end
 end
