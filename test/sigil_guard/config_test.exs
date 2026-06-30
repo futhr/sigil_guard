@@ -14,6 +14,8 @@ defmodule SigilGuard.ConfigTest do
     original_timeout = Application.get_env(:sigil_guard, :registry_timeout_ms)
     original_retry = Application.get_env(:sigil_guard, :registry_retry_ms)
     original_enabled = Application.get_env(:sigil_guard, :registry_enabled)
+    original_require_signed = Application.get_env(:sigil_guard, :registry_require_signed_bundles)
+    original_bundle_keys = Application.get_env(:sigil_guard, :registry_bundle_public_keys)
 
     on_exit(fn ->
       if original_patterns,
@@ -47,6 +49,19 @@ defmodule SigilGuard.ConfigTest do
       if original_enabled,
         do: Application.put_env(:sigil_guard, :registry_enabled, original_enabled),
         else: Application.delete_env(:sigil_guard, :registry_enabled)
+
+      if original_require_signed,
+        do:
+          Application.put_env(
+            :sigil_guard,
+            :registry_require_signed_bundles,
+            original_require_signed
+          ),
+        else: Application.delete_env(:sigil_guard, :registry_require_signed_bundles)
+
+      if original_bundle_keys,
+        do: Application.put_env(:sigil_guard, :registry_bundle_public_keys, original_bundle_keys),
+        else: Application.delete_env(:sigil_guard, :registry_bundle_public_keys)
     end)
 
     :ok
@@ -153,6 +168,31 @@ defmodule SigilGuard.ConfigTest do
     test "returns configured value" do
       Application.put_env(:sigil_guard, :registry_enabled, true)
       assert Config.registry_enabled?()
+    end
+  end
+
+  describe "registry_require_signed_bundles?/0" do
+    test "defaults to false" do
+      Application.delete_env(:sigil_guard, :registry_require_signed_bundles)
+      refute Config.registry_require_signed_bundles?()
+    end
+
+    test "returns configured value" do
+      Application.put_env(:sigil_guard, :registry_require_signed_bundles, true)
+      assert Config.registry_require_signed_bundles?()
+    end
+  end
+
+  describe "registry_bundle_public_keys/0" do
+    test "defaults to empty map" do
+      Application.delete_env(:sigil_guard, :registry_bundle_public_keys)
+      assert Config.registry_bundle_public_keys() == %{}
+    end
+
+    test "returns configured issuer keys" do
+      keys = %{"did:sigil:registry" => "pub"}
+      Application.put_env(:sigil_guard, :registry_bundle_public_keys, keys)
+      assert Config.registry_bundle_public_keys() == keys
     end
   end
 end

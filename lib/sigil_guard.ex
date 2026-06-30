@@ -57,6 +57,7 @@ defmodule SigilGuard do
   - `SigilGuard.Identity` — Trust level hierarchy
   - `SigilGuard.Signer` — Cryptographic signing behaviour
   - `SigilGuard.Registry` — SIGIL registry REST client
+  - `SigilGuard.Registry.Bundle` — Signed registry bundle provenance checks
   - `SigilGuard.Registry.Cache` — Registry data caching
 
   """

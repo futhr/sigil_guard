@@ -7,6 +7,10 @@ defmodule SigilGuard.Registry do
   DID resolution is profile-aware and normalizes the live response shapes seen
   across SigilGuard legacy registries, reference profiles, and draft spec examples.
 
+  `fetch_bundle/1` intentionally returns raw registry JSON. Use
+  `SigilGuard.Registry.Bundle.verify/2` or `SigilGuard.Registry.Cache` when
+  registry pattern bundles must pass signed provenance checks before loading.
+
   ## Configuration
 
   Set these in your application config:
@@ -14,12 +18,18 @@ defmodule SigilGuard.Registry do
       config :sigil_guard,
         registry_url: "https://registry.sigil-protocol.org",
         registry_timeout_ms: 5_000,
+        registry_require_signed_bundles: true,
+        registry_bundle_public_keys: %{"did:sigil:registry" => "..."},
         registry_enabled: true
 
   ## Usage
 
       {:ok, bundle} = SigilGuard.Registry.fetch_bundle()
-      {:ok, patterns} = SigilGuard.Patterns.parse_bundle(bundle)
+      {:ok, verified} = SigilGuard.Registry.Bundle.verify(bundle, public_keys: keys)
+      {:ok, patterns} = SigilGuard.Patterns.parse_bundle(verified.bundle)
+
+      # Or use the cache, which verifies and quarantines before serving patterns.
+      SigilGuard.Registry.Cache.status()
 
   """
 

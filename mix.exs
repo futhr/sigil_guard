@@ -160,6 +160,7 @@ defmodule SigilGuard.MixProject do
         ],
         Registry: [
           SigilGuard.Registry,
+          SigilGuard.Registry.Bundle,
           SigilGuard.Registry.Cache
         ],
         Backend: [

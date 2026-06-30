@@ -14,6 +14,8 @@ defmodule SigilGuard.Registry.Cache do
     * `:registry` — freshly fetched from the SIGIL registry
     * `:fallback` — last fetch failed; serving built-in patterns (if no
       fetch ever succeeded) or the last known good bundle
+    * `:quarantine` — fetched bundle failed provenance verification; serving
+      built-ins or the last known good bundle
     * `:empty` — no data available (initial state, before the first fetch)
 
   ## Configuration
@@ -22,6 +24,8 @@ defmodule SigilGuard.Registry.Cache do
         registry_enabled: true,
         registry_ttl_ms: 3_600_000,     # 1 hour
         registry_retry_ms: 60_000,      # retry failed fetches after 1 minute
+        registry_require_signed_bundles: false,
+        registry_bundle_public_keys: %{},
         registry_url: "https://registry.sigil-protocol.org"
 
   ## Process Model
@@ -39,6 +43,7 @@ defmodule SigilGuard.Registry.Cache do
 
       SigilGuard.Registry.Cache.rule_count()  #=> 42
       SigilGuard.Registry.Cache.source()      #=> :registry
+      SigilGuard.Registry.Cache.status()      #=> %{source: :registry, ...}
 
   """
 
@@ -47,11 +52,12 @@ defmodule SigilGuard.Registry.Cache do
   alias SigilGuard.Config
   alias SigilGuard.Patterns
   alias SigilGuard.Registry
+  alias SigilGuard.Registry.Bundle
 
   require Logger
 
   @typedoc "Where the current cached data originated."
-  @type source :: :registry | :fallback | :empty
+  @type source :: :registry | :fallback | :quarantine | :empty
 
   @typedoc "Internal GenServer state."
   @type state :: %{
@@ -60,7 +66,22 @@ defmodule SigilGuard.Registry.Cache do
           source: source(),
           fetched_at: integer() | nil,
           ttl_ms: non_neg_integer(),
-          retry_ms: non_neg_integer()
+          retry_ms: non_neg_integer(),
+          require_signed_bundles: boolean(),
+          bundle_public_keys: %{optional(String.t()) => String.t()},
+          bundle_provenance: map() | nil,
+          bundle_digest: String.t() | nil,
+          quarantine: Bundle.quarantine() | nil
+        }
+
+  @typedoc "Observable cache status, including provenance and quarantine details."
+  @type status :: %{
+          source: source(),
+          rule_count: non_neg_integer(),
+          fetched_at: integer() | nil,
+          bundle_digest: String.t() | nil,
+          bundle_provenance: map() | nil,
+          quarantine: Bundle.quarantine() | nil
         }
 
   # -- Client API --
@@ -93,6 +114,12 @@ defmodule SigilGuard.Registry.Cache do
     GenServer.call(__MODULE__, :source)
   end
 
+  @doc "Return cache status, including bundle provenance and quarantine metadata."
+  @spec status() :: status()
+  def status do
+    GenServer.call(__MODULE__, :status)
+  end
+
   @doc "Force a refresh of the cached patterns from the registry."
   @spec refresh() :: :ok
   def refresh do
@@ -109,7 +136,14 @@ defmodule SigilGuard.Registry.Cache do
       source: :empty,
       fetched_at: nil,
       ttl_ms: Keyword.get(opts, :ttl_ms, Config.registry_ttl_ms()),
-      retry_ms: Keyword.get(opts, :retry_ms, Config.registry_retry_ms())
+      retry_ms: Keyword.get(opts, :retry_ms, Config.registry_retry_ms()),
+      require_signed_bundles:
+        Keyword.get(opts, :require_signed_bundles, Config.registry_require_signed_bundles?()),
+      bundle_public_keys:
+        Keyword.get(opts, :bundle_public_keys, Config.registry_bundle_public_keys()),
+      bundle_provenance: nil,
+      bundle_digest: nil,
+      quarantine: nil
     }
 
     # Fetch on startup (async to not block supervisor)
@@ -138,6 +172,19 @@ defmodule SigilGuard.Registry.Cache do
     {:reply, state.source, state}
   end
 
+  def handle_call(:status, _, state) do
+    status = %{
+      source: state.source,
+      rule_count: length(state.patterns),
+      fetched_at: state.fetched_at,
+      bundle_digest: state.bundle_digest,
+      bundle_provenance: state.bundle_provenance,
+      quarantine: state.quarantine
+    }
+
+    {:reply, status, state}
+  end
+
   @impl GenServer
   def handle_cast(:refresh, state) do
     {:noreply, do_fetch(state)}
@@ -155,36 +202,62 @@ defmodule SigilGuard.Registry.Cache do
   defp do_fetch(state) do
     case Registry.fetch_bundle() do
       {:ok, bundle} ->
-        case Patterns.parse_bundle(bundle) do
-          {:ok, raw_patterns} ->
-            compiled = Patterns.compile(raw_patterns)
-            merged = Patterns.merge(Patterns.built_in(), compiled)
-            reg_count = length(compiled)
-            total_count = length(merged)
-
-            msg =
-              "[SigilGuard.Registry.Cache] Fetched #{reg_count} registry patterns, #{total_count} total after merge"
-
-            Logger.info(msg)
-
-            %{
-              state
-              | patterns: merged,
-                raw_bundle: bundle,
-                source: :registry,
-                fetched_at: System.monotonic_time(:millisecond)
-            }
-
-          {:error, reason} ->
-            Logger.warning(
-              "[SigilGuard.Registry.Cache] Invalid bundle format: #{inspect(reason)}"
-            )
-
-            fallback(state)
-        end
+        ingest_bundle(bundle, state)
 
       {:error, reason} ->
         Logger.warning("[SigilGuard.Registry.Cache] Fetch failed: #{inspect(reason)}")
+        fallback(state)
+    end
+  end
+
+  defp ingest_bundle(bundle, state) do
+    case verify_bundle(bundle, state) do
+      {:ok, verified} ->
+        load_verified_bundle(verified, state)
+
+      {:quarantine, quarantine} ->
+        Logger.warning(
+          "[SigilGuard.Registry.Cache] Quarantined registry bundle: #{inspect(quarantine.reason)}"
+        )
+
+        quarantine(state, quarantine)
+    end
+  end
+
+  defp verify_bundle(bundle, state) do
+    Bundle.verify(bundle,
+      public_keys: state.bundle_public_keys,
+      require_signature: state.require_signed_bundles
+    )
+  end
+
+  defp load_verified_bundle(verified, state) do
+    case Patterns.parse_bundle(verified.bundle) do
+      {:ok, raw_patterns} ->
+        compiled = Patterns.compile(raw_patterns)
+        merged = Patterns.merge(Patterns.built_in(), compiled)
+        reg_count = length(compiled)
+        total_count = length(merged)
+
+        msg =
+          "[SigilGuard.Registry.Cache] Fetched #{reg_count} registry patterns, #{total_count} total after merge"
+
+        Logger.info(msg)
+
+        %{
+          state
+          | patterns: merged,
+            raw_bundle: verified.bundle,
+            source: :registry,
+            fetched_at: System.monotonic_time(:millisecond),
+            bundle_provenance: verified.provenance,
+            bundle_digest: verified.digest,
+            quarantine: nil
+        }
+
+      {:error, reason} ->
+        Logger.warning("[SigilGuard.Registry.Cache] Invalid bundle format: #{inspect(reason)}")
+
         fallback(state)
     end
   end
@@ -197,6 +270,14 @@ defmodule SigilGuard.Registry.Cache do
   defp fallback(state) do
     # Keep existing patterns, mark as fallback
     %{state | source: :fallback}
+  end
+
+  defp quarantine(%{source: :empty} = state, quarantine) do
+    %{state | patterns: Patterns.built_in(), source: :quarantine, quarantine: quarantine}
+  end
+
+  defp quarantine(state, quarantine) do
+    %{state | source: :quarantine, quarantine: quarantine}
   end
 
   # Refresh after the TTL on success; retry sooner on failure so the

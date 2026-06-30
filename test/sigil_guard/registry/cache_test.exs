@@ -3,9 +3,12 @@ defmodule SigilGuard.Registry.CacheTest do
 
   use ExUnit.Case, async: false
 
+  alias SigilGuard.Registry.Bundle
   alias SigilGuard.Registry.Cache
+  alias SigilGuard.TestSigner
 
   @moduletag :capture_log
+  @registry_issuer "did:sigil:registry"
 
   setup do
     bypass = Bypass.open()
@@ -80,6 +83,127 @@ defmodule SigilGuard.Registry.CacheTest do
       Process.sleep(100)
 
       assert Cache.source() == :registry
+    end
+  end
+
+  describe "bundle provenance" do
+    test "loads signed bundles when signatures are required", %{bypass: bypass} do
+      bundle =
+        registry_bundle([
+          %{"name" => "signed", "regex" => "SIGNED", "category" => "t", "severity" => "low"}
+        ])
+
+      signed = signed_bundle(bundle)
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(signed))
+      end)
+
+      start_supervised!(
+        {Cache,
+         ttl_ms: 600_000,
+         require_signed_bundles: true,
+         bundle_public_keys: %{@registry_issuer => TestSigner.public_key_b64u()}}
+      )
+
+      Process.sleep(100)
+
+      assert Cache.source() == :registry
+      assert "signed" in pattern_names()
+
+      status = Cache.status()
+      assert status.bundle_provenance["issuer"] == @registry_issuer
+      assert is_binary(status.bundle_digest)
+      assert status.quarantine == nil
+    end
+
+    test "quarantines unsigned bundles when signatures are required", %{bypass: bypass} do
+      bundle =
+        registry_bundle([
+          %{"name" => "unsigned", "regex" => "UNSIGNED", "category" => "t", "severity" => "low"}
+        ])
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(bundle))
+      end)
+
+      start_supervised!(
+        {Cache,
+         ttl_ms: 600_000,
+         require_signed_bundles: true,
+         bundle_public_keys: %{@registry_issuer => TestSigner.public_key_b64u()}}
+      )
+
+      Process.sleep(100)
+
+      assert Cache.source() == :quarantine
+      refute "unsigned" in pattern_names()
+      assert "aws_access_key" in pattern_names()
+
+      status = Cache.status()
+      assert status.quarantine.reason == :unsigned_bundle
+    end
+
+    test "quarantines tampered bundles and retains the previous known-good patterns", %{
+      bypass: bypass
+    } do
+      call_count = :counters.new(1, [:atomics])
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        :counters.add(call_count, 1, 1)
+
+        bundle =
+          case :counters.get(call_count, 1) do
+            1 ->
+              registry_bundle([
+                %{"name" => "initial", "regex" => "INIT", "category" => "t", "severity" => "low"}
+              ])
+              |> signed_bundle()
+
+            _ ->
+              registry_bundle([
+                %{
+                  "name" => "tampered",
+                  "regex" => "TAMPERED",
+                  "category" => "t",
+                  "severity" => "high"
+                }
+              ])
+              |> signed_bundle()
+              |> put_in(["patterns"], [
+                %{
+                  "name" => "evil",
+                  "regex" => "EVIL",
+                  "category" => "t",
+                  "severity" => "critical"
+                }
+              ])
+          end
+
+        Plug.Conn.resp(conn, 200, Jason.encode!(bundle))
+      end)
+
+      start_supervised!(
+        {Cache,
+         ttl_ms: 600_000,
+         require_signed_bundles: true,
+         bundle_public_keys: %{@registry_issuer => TestSigner.public_key_b64u()}}
+      )
+
+      Process.sleep(100)
+
+      assert Cache.source() == :registry
+      assert "initial" in pattern_names()
+
+      Cache.refresh()
+      Process.sleep(100)
+
+      assert Cache.source() == :quarantine
+      assert "initial" in pattern_names()
+      refute "evil" in pattern_names()
+
+      status = Cache.status()
+      assert status.quarantine.reason == :digest_mismatch
     end
   end
 
@@ -231,5 +355,19 @@ defmodule SigilGuard.Registry.CacheTest do
 
       assert :counters.get(call_count, 1) >= 2
     end
+  end
+
+  defp registry_bundle(patterns), do: %{"patterns" => patterns}
+
+  defp signed_bundle(bundle) do
+    Bundle.sign(bundle, TestSigner,
+      issuer: @registry_issuer,
+      issued_at: "2026-06-30T12:00:00.000Z"
+    )
+  end
+
+  defp pattern_names do
+    Cache.patterns()
+    |> Enum.map(& &1.name)
   end
 end

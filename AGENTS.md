@@ -55,6 +55,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Vault           Vault behaviour and utilities
     |   +-- Vault.InMemory         ETS-based in-memory vault
     +-- SigilGuard.Registry        SIGIL registry REST client
+    |   +-- Registry.Bundle        Signed bundle provenance checks
     |   +-- Registry.Cache         TTL cache for registry data
     +-- SigilGuard.Config          Configuration access
     +-- SigilGuard.Telemetry       Telemetry event definitions
@@ -83,6 +84,8 @@ SigilGuard (Main API)
 | `lib/sigil_guard/identity.ex` | Trust level hierarchy |
 | `lib/sigil_guard/vault.ex` | Encrypted storage behaviour |
 | `lib/sigil_guard/registry.ex` | SIGIL registry REST client |
+| `lib/sigil_guard/registry/bundle.ex` | Signed pattern bundle provenance verification |
+| `lib/sigil_guard/registry/cache.ex` | Registry TTL cache with provenance quarantine |
 | `lib/sigil_guard/config.ex` | Configuration access |
 | `lib/sigil_guard/telemetry.ex` | Telemetry events and helpers |
 
@@ -134,8 +137,11 @@ test/
 |   +-- policy_test.exs        # Policy evaluation tests
 |   +-- audit_test.exs         # Audit chain tests
 |   +-- backend_test.exs       # Backend dispatch tests
+|   +-- registry/
+|   |   +-- bundle_test.exs    # Registry provenance tests
+|   |   +-- cache_test.exs     # Registry cache/quarantine tests
 |   +-- backend/
-|       +-- elixir_test.exs    # Elixir backend tests
+|   |   +-- elixir_test.exs    # Elixir backend tests
 +-- support/
     +-- test_signer.ex         # Deterministic test signer
 ```
@@ -161,7 +167,10 @@ config :sigil_guard,
   registry_url: "https://registry.sigil-protocol.org",
   registry_ttl_ms: :timer.hours(1),
   registry_timeout_ms: 5_000,
+  registry_retry_ms: :timer.minutes(1),
   registry_enabled: false,
+  registry_require_signed_bundles: false,
+  registry_bundle_public_keys: %{},
   scanner_patterns: :built_in
 ```
 

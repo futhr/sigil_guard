@@ -58,6 +58,7 @@ defmodule SigilGuard.Bench do
       |> Map.merge(runtime_gate_scenarios())
       |> Map.merge(runtime_stream_scenarios())
       |> Map.merge(confirmation_scenarios())
+      |> Map.merge(registry_bundle_scenarios())
       |> Map.merge(envelope_scenarios())
       |> Map.merge(policy_scenarios())
       |> Map.merge(audit_scenarios())
@@ -195,6 +196,52 @@ defmodule SigilGuard.Bench do
       end,
       "confirmation / verify token" => fn ->
         SigilGuard.Confirmation.verify(token, payload, context, key, now: now)
+      end
+    }
+  end
+
+  defp registry_bundle_scenarios do
+    issuer = "did:sigil:bench-registry"
+
+    bundle = %{
+      "generated_at" => "2026-06-30T12:00:00Z",
+      "patterns" =>
+        for i <- 1..10 do
+          %{
+            "name" => "bench_pattern_#{i}",
+            "regex" => "BENCH_#{i}_[A-Z0-9]+",
+            "category" => "benchmark",
+            "severity" => "low"
+          }
+        end
+    }
+
+    signed =
+      SigilGuard.Registry.Bundle.sign(bundle, SigilGuard.BenchSigner,
+        issuer: issuer,
+        issued_at: "2026-06-30T12:00:00.000Z"
+      )
+
+    public_keys = %{issuer => SigilGuard.BenchSigner.public_key_b64u()}
+
+    %{
+      "registry bundle / canonical_bytes" => fn ->
+        SigilGuard.Registry.Bundle.canonical_bytes(bundle)
+      end,
+      "registry bundle / digest" => fn ->
+        SigilGuard.Registry.Bundle.digest(bundle)
+      end,
+      "registry bundle / sign" => fn ->
+        SigilGuard.Registry.Bundle.sign(bundle, SigilGuard.BenchSigner,
+          issuer: issuer,
+          issued_at: "2026-06-30T12:00:00.000Z"
+        )
+      end,
+      "registry bundle / verify signed" => fn ->
+        SigilGuard.Registry.Bundle.verify(signed,
+          public_keys: public_keys,
+          require_signature: true
+        )
       end
     }
   end

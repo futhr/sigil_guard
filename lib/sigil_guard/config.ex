@@ -30,6 +30,14 @@ defmodule SigilGuard.Config do
     * `:registry_enabled` — Whether to start the registry cache on application boot.
       Default: `false`
 
+    * `:registry_require_signed_bundles` — Whether registry pattern bundles
+      must carry valid Ed25519 provenance before loading.
+      Default: `false`
+
+    * `:registry_bundle_public_keys` — Map of registry bundle issuer to
+      base64/base64url Ed25519 public key.
+      Default: `%{}`
+
     * `:scanner_patterns` — Pattern source: `:built_in` or `:registry`.
       Default: `:built_in`
 
@@ -83,6 +91,18 @@ defmodule SigilGuard.Config do
   @spec registry_enabled?() :: boolean()
   def registry_enabled? do
     Application.get_env(:sigil_guard, :registry_enabled, false)
+  end
+
+  @doc "Return whether registry bundles must be signed before loading."
+  @spec registry_require_signed_bundles?() :: boolean()
+  def registry_require_signed_bundles? do
+    Application.get_env(:sigil_guard, :registry_require_signed_bundles, false)
+  end
+
+  @doc "Return trusted public keys for signed registry bundles."
+  @spec registry_bundle_public_keys() :: %{optional(String.t()) => String.t()}
+  def registry_bundle_public_keys do
+    Application.get_env(:sigil_guard, :registry_bundle_public_keys, %{})
   end
 
   @doc "Return the configured pattern source (`:built_in` or `:registry`)."

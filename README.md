@@ -27,7 +27,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 - **Envelope Signing** — Ed25519 signed `_sigil` metadata for MCP JSON-RPC
 - **Policy Enforcement** — Risk-classified trust gating for tool call authorization
 - **Tamper-Evident Audit** — HMAC-SHA256 chain integrity for immutable audit logs
-- **Registry Client** — Fetch patterns and policies from the SIGIL registry
+- **Registry Client** — Fetch signed pattern bundles with provenance quarantine support
 
 ---
 
@@ -44,7 +44,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 | **Policy Engine** | Risk classification and trust-level gating |
 | **Audit Chain** | HMAC-SHA256 tamper-evident event chain |
 | **Secure Vault** | AES-256-GCM encrypted secret storage |
-| **Registry Client** | REST client with TTL cache, endpoint fallback, and key normalization |
+| **Registry Client** | REST client with TTL cache, signed bundle provenance, quarantine, endpoint fallback, and key normalization |
 | **Replay Protection** | Optional nonce replay and timestamp-skew checks for envelopes |
 | **Telemetry** | Built-in observability events |
 
@@ -227,6 +227,8 @@ config :sigil_guard,
   registry_timeout_ms: 5_000,
   registry_retry_ms: :timer.minutes(1),
   registry_enabled: false,
+  registry_require_signed_bundles: false,
+  registry_bundle_public_keys: %{},
   scanner_patterns: :built_in
 ```
 
@@ -241,6 +243,8 @@ config :sigil_guard,
 | `registry_timeout_ms` | `integer()` | `5_000` | Registry HTTP timeout in ms |
 | `registry_retry_ms` | `integer()` | `60_000` | Retry interval after a failed registry fetch in ms |
 | `registry_enabled` | `boolean()` | `false` | Enable registry fetching |
+| `registry_require_signed_bundles` | `boolean()` | `false` | Require Ed25519 provenance on registry pattern bundles |
+| `registry_bundle_public_keys` | `map()` | `%{}` | Trusted registry bundle issuer keys, keyed by issuer DID |
 | `scanner_patterns` | `atom()` | `:built_in` | Pattern source (`:built_in` or `:registry`) |
 
 ### Backend Selection
@@ -304,6 +308,8 @@ SigilGuard (Main API)
     +-- SigilGuard.Signer          Cryptographic signing behaviour
     +-- SigilGuard.Vault           Encrypted storage behaviour
     +-- SigilGuard.Registry        SIGIL registry REST client
+    |   +-- Registry.Bundle        Signed bundle provenance checks
+    |   +-- Registry.Cache         TTL cache with quarantine status
     +-- SigilGuard.Config          Configuration access
     +-- SigilGuard.Telemetry       Telemetry event definitions
 ```
