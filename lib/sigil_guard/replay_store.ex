@@ -1,11 +1,11 @@
 defmodule SigilGuard.ReplayStore do
   @moduledoc """
-  ETS-backed replay protection for signed SIGIL envelopes.
+  ETS-backed replay protection for signed SIGIL envelopes and confirmation tokens.
 
   The store records `{identity, nonce}` pairs for a bounded TTL. It is kept
   separate from signature verification so callers can choose stateless
-  verification for compatibility tests and enable replay protection at MCP or
-  API trust boundaries.
+  verification for compatibility tests and enable replay protection at MCP,
+  approval, or API trust boundaries.
   """
 
   @table :sigil_guard_replay

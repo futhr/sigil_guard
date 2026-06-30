@@ -47,7 +47,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 | **Audit Chain** | HMAC-SHA256 event chain with signed checkpoint export packages and external anchor records |
 | **Secure Vault** | AES-256-GCM encrypted secret storage |
 | **Registry Client** | REST client with TTL cache, signed bundle provenance, quarantine, endpoint fallback, and key normalization |
-| **Replay Protection** | Optional nonce replay and timestamp-skew checks for envelopes |
+| **Replay Protection** | Optional nonce replay checks for envelopes and single-use confirmation tokens |
 | **Telemetry** | Built-in observability events |
 
 ---
@@ -182,14 +182,18 @@ decision = SigilGuard.guard(payload, context)
     ttl_ms: 300_000
   )
 
-{:ok, claims} = SigilGuard.Confirmation.verify(token, payload, context, secret_key)
+{:ok, claims} =
+  SigilGuard.Confirmation.verify(token, payload, context, secret_key,
+    consume: true
+  )
+
 claims["action_digest"] == decision.audit_metadata.action_digest
 ```
 
 Confirmation tokens are local runtime grants. They do not contain raw payload
 text and cannot be replayed for a different payload, tool, actor, sink, or trust
-boundary. Persist and consume `claims["nonce"]` if a workflow needs single-use
-approval semantics.
+boundary. Pass `consume: true` during verification to reject a second use of
+the same token nonce until expiry.
 
 ### Envelope Signing
 

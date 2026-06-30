@@ -8,13 +8,14 @@ defmodule SigilGuard.Confirmation do
   digest of the exact payload and boundary context, so it cannot be reused for
   a different tool call, tool result, sink, actor, or trust boundary.
 
-  Tokens are stateless. They prevent cross-action replay by binding to the
-  action digest and expiry, but callers that need single-use semantics should
-  persist and consume the token nonce.
+  Tokens are stateless by default. They prevent cross-action replay by binding
+  to the action digest and expiry. Pass `consume: true` to `verify/5` or
+  `valid?/5` to enforce single-use semantics with `SigilGuard.ReplayStore`.
   """
 
   alias SigilGuard.Context
   alias SigilGuard.Decision
+  alias SigilGuard.ReplayStore
 
   @version 1
   @token_type "sigil_guard.confirmation.v1"
@@ -83,6 +84,10 @@ defmodule SigilGuard.Confirmation do
   Verify a confirmation token against the expected payload and context.
 
   Returns `{:ok, claims}` for a valid token or `{:error, reason}`.
+
+  Pass `consume: true` to record the token nonce in `SigilGuard.ReplayStore`
+  until the token expires and reject a second verification with
+  `{:error, :replay_detected}`.
   """
   @spec verify(String.t(), term(), Context.t() | map() | keyword(), binary(), keyword()) ::
           {:ok, claims()} | {:error, term()}
@@ -94,7 +99,8 @@ defmodule SigilGuard.Confirmation do
          :ok <- verify_signature(claims, signature, key),
          :ok <- validate_claims(claims),
          :ok <- validate_expiry(claims, opts),
-         :ok <- validate_digest(claims, payload, context) do
+         :ok <- validate_digest(claims, payload, context),
+         :ok <- maybe_consume_nonce(claims, opts) do
       {:ok, claims}
     end
   end
@@ -103,6 +109,9 @@ defmodule SigilGuard.Confirmation do
 
   @doc """
   Return true when `token` verifies for the given payload and context.
+
+  When `consume: true` is passed, a successful call consumes the token nonce in
+  the same way as `verify/5`.
   """
   @spec valid?(String.t(), term(), Context.t() | map() | keyword(), binary(), keyword()) ::
           boolean()
@@ -205,6 +214,32 @@ defmodule SigilGuard.Confirmation do
     expected = action_digest(payload, context)
 
     if secure_compare(expected, digest), do: :ok, else: {:error, :digest_mismatch}
+  end
+
+  defp maybe_consume_nonce(claims, opts) do
+    if Keyword.get(opts, :consume, false) do
+      consume_nonce(claims, opts)
+    else
+      :ok
+    end
+  end
+
+  defp consume_nonce(%{"actor" => actor, "nonce" => nonce} = claims, opts) do
+    with {:ok, ttl_ms} <- replay_ttl_ms(claims, opts) do
+      ReplayStore.check_and_put("confirmation:" <> actor, nonce, ttl_ms)
+    end
+  end
+
+  defp replay_ttl_ms(%{"expires_at" => expires_at}, opts) do
+    now = Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:millisecond) end)
+
+    case DateTime.from_iso8601(expires_at) do
+      {:ok, expires_at_dt, _} ->
+        {:ok, max(DateTime.diff(expires_at_dt, now, :millisecond), 1)}
+
+      _ ->
+        {:error, :invalid_token}
+    end
   end
 
   defp validate_key(key) when is_binary(key) and byte_size(key) >= @min_key_bytes, do: :ok

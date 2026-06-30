@@ -265,7 +265,8 @@ context = [phase: :tool_result, sink: :model, trust_level: :high]
 decision = SigilGuard.guard(payload, context)
 
 {:ok, token} = SigilGuard.Confirmation.issue(payload, context, decision, secret_key)
-{:ok, claims} = SigilGuard.Confirmation.verify(token, payload, context, secret_key)
+{:ok, claims} =
+  SigilGuard.Confirmation.verify(token, payload, context, secret_key, consume: true)
 ```
 
 ## References
