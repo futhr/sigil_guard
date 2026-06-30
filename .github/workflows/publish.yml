@@ -1,10 +1,9 @@
 name: Publish
 
 on:
-  workflow_run:
-    workflows: ["Build precompiled NIFs"]
-    types: [completed]
-  # Manual retry without rebuilding the release binaries
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -14,29 +13,16 @@ jobs:
   publish:
     name: Publish to Hex.pm
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-
-    # Force-build the NIF throughout: the committed checksum file still
-    # describes the previous release's binaries at this point, so a
-    # precompiled-download compile would fail. The download step below
-    # regenerates the checksums for the current release before publish.
-    env:
-      SIGIL_GUARD_BUILD: "1"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref_name }}
 
       - name: Setup Elixir
         uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.18"
           otp-version: "28"
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
 
       - name: Restore deps cache
         uses: actions/cache@v5
@@ -53,7 +39,7 @@ jobs:
         run: mix compile
 
       - name: Run tests
-        run: mix test --include nif
+        run: mix test
 
       - name: Check formatting
         run: mix format --check-formatted
@@ -66,9 +52,6 @@ jobs:
 
       - name: Generate documentation
         run: mix docs
-
-      - name: Download precompiled NIF checksums
-        run: mix rustler_precompiled.download SigilGuard.Backend.NIF.Native --all --print
 
       - name: Publish to Hex.pm
         env:

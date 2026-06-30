@@ -38,9 +38,6 @@ jobs:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Restore deps cache
         uses: actions/cache@v5
         with:
@@ -50,32 +47,14 @@ jobs:
           key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
 
-      - name: Restore Cargo cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            native/sigil_guard_nif/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-${{ runner.os }}-${{ hashFiles('native/sigil_guard_nif/Cargo.lock') }}
-
       - name: Install dependencies
         run: mix deps.get
 
-      # touch forces the Native module (and thus the cargo build, which
-      # tracks Rust changes itself) to recompile even on a warm _build
-      # cache — the force-built .so lives outside the cache.
       - name: Compile
-        env:
-          SIGIL_GUARD_BUILD: "1"
-        run: |
-          touch lib/sigil_guard/backend/nif.ex
-          mix compile --warnings-as-errors
+        run: mix compile --warnings-as-errors
 
-      # --include nif runs the NIF and backend-parity suites against the
-      # crate force-built in the compile step above.
       - name: Run tests
-        run: mix test --include nif
+        run: mix test
 
       - name: Generate coverage report
         if: matrix.elixir == '1.18' && matrix.otp == '28'
@@ -100,9 +79,6 @@ jobs:
           elixir-version: "1.18"
           otp-version: "28"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Restore deps cache
         uses: actions/cache@v5
         with:
@@ -110,15 +86,6 @@ jobs:
             deps
             _build
           key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
-
-      - name: Restore Cargo cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            native/sigil_guard_nif/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-${{ runner.os }}-${{ hashFiles('native/sigil_guard_nif/Cargo.lock') }}
 
       - name: Install dependencies
         run: mix deps.get
@@ -148,9 +115,6 @@ jobs:
           elixir-version: "1.18"
           otp-version: "28"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Restore deps cache
         uses: actions/cache@v5
         with:
@@ -169,15 +133,6 @@ jobs:
       - name: Remove stale PLTs
         if: steps.plt-cache.outputs.cache-hit != 'true'
         run: rm -rf priv/plts
-
-      - name: Restore Cargo cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            native/sigil_guard_nif/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-${{ runner.os }}-${{ hashFiles('native/sigil_guard_nif/Cargo.lock') }}
 
       - name: Install dependencies
         run: mix deps.get
@@ -201,9 +156,6 @@ jobs:
           elixir-version: "1.18"
           otp-version: "28"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Restore deps cache
         uses: actions/cache@v5
         with:
@@ -211,15 +163,6 @@ jobs:
             deps
             _build
           key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
-
-      - name: Restore Cargo cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            native/sigil_guard_nif/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-${{ runner.os }}-${{ hashFiles('native/sigil_guard_nif/Cargo.lock') }}
 
       - name: Install dependencies
         run: mix deps.get

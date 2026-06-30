@@ -1,5 +1,5 @@
 %{
-  ignore_paths: [~r/backend\/nif\.ex/],
+  ignore_paths: [],
   ignore_for_refs: [],
   exception_moduledoc: true,
   failed: true,

@@ -1,7 +1,6 @@
 [
   parallel: true,
   skipped: true,
-
   tools: [
     # Dependencies
     {:deps_get, command: "mix deps.get"},
@@ -12,21 +11,9 @@
     # Formatting
     {:formatter, command: "mix format --check-formatted"},
 
-    # Rust format check (only if native Rust code exists and cargo installed)
-    {:rust_fmt,
-     command: "cargo fmt --check",
-     cd: "native/sigil_guard_nif",
-     enabled: File.dir?("native/sigil_guard_nif") and System.find_executable("cargo") != nil},
-
     # Static analysis
     {:credo, command: "mix credo --strict"},
     {:sobelow, command: "mix sobelow --config --compact"},
-
-    # Rust clippy linting (only if native Rust code exists and cargo installed)
-    {:rust_clippy,
-     command: "cargo clippy --lib -- -D warnings",
-     cd: "native/sigil_guard_nif",
-     enabled: File.dir?("native/sigil_guard_nif") and System.find_executable("cargo") != nil},
 
     # Security and dependencies
     {:mix_audit, command: "mix deps.audit"},
@@ -39,13 +26,6 @@
     {:ex_doc, command: "mix docs"},
 
     # Tests
-    {:ex_unit, command: "mix test --cover"},
-
-    # NIF integration tests (only if a NIF binary is present — either
-    # force-built as sigil_guard_nif.so or a precompiled lib*.so variant)
-    {:test_nif,
-     command: "mix test --include nif",
-     enabled: Path.wildcard("priv/native/*sigil_guard_nif*") != [],
-     deps: [:ex_unit]}
+    {:ex_unit, command: "mix test --cover"}
   ]
 ]
