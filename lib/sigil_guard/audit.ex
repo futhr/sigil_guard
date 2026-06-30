@@ -26,6 +26,9 @@ defmodule SigilGuard.Audit do
   against truncation, persist the most recent `hmac` out of band and
   compare it to the last event's, or verify continuation segments
   against a stored tip via the `:prev_hmac` option of `verify_chain/3`.
+  For portable truncation evidence, export signed Merkle checkpoints with
+  `SigilGuard.Audit.Checkpoint` and anchor their digest in external
+  append-only or WORM storage.
 
   ## Audit Logger Behaviour
 

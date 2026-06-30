@@ -26,7 +26,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 - **Confirmation Tokens** — HMAC-signed approvals bound to exact action digests
 - **Envelope Signing** — Ed25519 signed `_sigil` metadata for MCP JSON-RPC
 - **Policy Enforcement** — Risk-classified trust gating for tool call authorization
-- **Tamper-Evident Audit** — HMAC-SHA256 chain integrity for immutable audit logs
+- **Tamper-Evident Audit** — HMAC chains plus signed Merkle checkpoints for external anchoring
 - **Registry Client** — Fetch signed pattern bundles with provenance quarantine support
 
 ---
@@ -42,7 +42,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 | **Confirmation Tokens** | Short-lived approval grants bound to payload and boundary context |
 | **Envelope Sign/Verify** | Ed25519 canonical envelope signing with explicit protocol profiles |
 | **Policy Engine** | Risk classification and trust-level gating |
-| **Audit Chain** | HMAC-SHA256 tamper-evident event chain |
+| **Audit Chain** | HMAC-SHA256 event chain with signed checkpoint exports |
 | **Secure Vault** | AES-256-GCM encrypted secret storage |
 | **Registry Client** | REST client with TTL cache, signed bundle provenance, quarantine, endpoint fallback, and key normalization |
 | **Replay Protection** | Optional nonce replay and timestamp-skew checks for envelopes |
@@ -204,6 +204,15 @@ events = [
 
 signed = SigilGuard.Audit.build_chain(events, key)
 :ok = SigilGuard.Audit.verify_chain(signed, key)
+
+{:ok, checkpoint} =
+  SigilGuard.Audit.Checkpoint.create(signed,
+    chain_id: "prod-audit",
+    anchor: %{"type" => "worm", "uri" => "s3://audit-lock/checkpoints/001.json"}
+  )
+
+signed_checkpoint =
+  SigilGuard.Audit.Checkpoint.sign(checkpoint, MyAuditSigner, issuer: "did:web:ops")
 ```
 
 ### Secure Vaulting
@@ -305,6 +314,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
     +-- SigilGuard.Policy          Risk classification and trust gating
     +-- SigilGuard.Audit           Tamper-evident audit chain
+    |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
     +-- SigilGuard.Identity        Trust level hierarchy
     +-- SigilGuard.Signer          Cryptographic signing behaviour
     +-- SigilGuard.Vault           Encrypted storage behaviour

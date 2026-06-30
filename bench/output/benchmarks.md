@@ -2,7 +2,7 @@ Benchmark
 
 # SigilGuard Performance Benchmarks
 
-Run on: 2026-06-30 18:30:44.759122Z
+Run on: 2026-06-30 18:42:14.684370Z
 Backend: native Elixir
 
 
@@ -67,245 +67,281 @@ Run Time
 
   <tr>
     <td style="white-space: nowrap">policy / elixir evaluate</td>
-    <td style="white-space: nowrap; text-align: right">4222.96 K</td>
-    <td style="white-space: nowrap; text-align: right">0.24 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;2226.30%</td>
+    <td style="white-space: nowrap; text-align: right">3610.08 K</td>
+    <td style="white-space: nowrap; text-align: right">0.28 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1731.69%</td>
     <td style="white-space: nowrap; text-align: right">0.21 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">0.33 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">0.38 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">policy / elixir classify_risk</td>
-    <td style="white-space: nowrap; text-align: right">3540.70 K</td>
-    <td style="white-space: nowrap; text-align: right">0.28 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;1036.82%</td>
+    <td style="white-space: nowrap; text-align: right">3430.05 K</td>
+    <td style="white-space: nowrap; text-align: right">0.29 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;1100.01%</td>
     <td style="white-space: nowrap; text-align: right">0.25 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">0.42 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">0.46 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">envelope / elixir canonical_bytes</td>
-    <td style="white-space: nowrap; text-align: right">1269.39 K</td>
-    <td style="white-space: nowrap; text-align: right">0.79 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;695.83%</td>
-    <td style="white-space: nowrap; text-align: right">0.63 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">1.83 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1256.31 K</td>
+    <td style="white-space: nowrap; text-align: right">0.80 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;673.12%</td>
+    <td style="white-space: nowrap; text-align: right">0.67 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">1.17 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">confirmation / action_digest</td>
-    <td style="white-space: nowrap; text-align: right">216.60 K</td>
-    <td style="white-space: nowrap; text-align: right">4.62 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;108.40%</td>
-    <td style="white-space: nowrap; text-align: right">4.25 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">8.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">211.02 K</td>
+    <td style="white-space: nowrap; text-align: right">4.74 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;115.77%</td>
+    <td style="white-space: nowrap; text-align: right">4.29 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">8.96 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan clean</td>
-    <td style="white-space: nowrap; text-align: right">99.61 K</td>
-    <td style="white-space: nowrap; text-align: right">10.04 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;83.03%</td>
-    <td style="white-space: nowrap; text-align: right">9.33 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">19.38 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">103.35 K</td>
+    <td style="white-space: nowrap; text-align: right">9.68 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;117.89%</td>
+    <td style="white-space: nowrap; text-align: right">8.63 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">17.79 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / canonical_bytes</td>
-    <td style="white-space: nowrap; text-align: right">96.66 K</td>
-    <td style="white-space: nowrap; text-align: right">10.35 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;29.08%</td>
-    <td style="white-space: nowrap; text-align: right">9.83 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">21.08 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">95.60 K</td>
+    <td style="white-space: nowrap; text-align: right">10.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;31.57%</td>
+    <td style="white-space: nowrap; text-align: right">9.92 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">24.33 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / digest</td>
-    <td style="white-space: nowrap; text-align: right">90.12 K</td>
-    <td style="white-space: nowrap; text-align: right">11.10 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;31.82%</td>
-    <td style="white-space: nowrap; text-align: right">10.50 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">22.54 &micro;s</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">scanner / elixir scan mixed regex-only</td>
-    <td style="white-space: nowrap; text-align: right">85.76 K</td>
-    <td style="white-space: nowrap; text-align: right">11.66 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;58.42%</td>
-    <td style="white-space: nowrap; text-align: right">11.04 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">23.13 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">88.18 K</td>
+    <td style="white-space: nowrap; text-align: right">11.34 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;31.65%</td>
+    <td style="white-space: nowrap; text-align: right">10.66 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">25.16 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan secret</td>
-    <td style="white-space: nowrap; text-align: right">85.08 K</td>
-    <td style="white-space: nowrap; text-align: right">11.75 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;50.64%</td>
-    <td style="white-space: nowrap; text-align: right">11 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">29.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">87.25 K</td>
+    <td style="white-space: nowrap; text-align: right">11.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;58.50%</td>
+    <td style="white-space: nowrap; text-align: right">10.79 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">27.42 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">scanner / elixir scan mixed regex-only</td>
+    <td style="white-space: nowrap; text-align: right">85.91 K</td>
+    <td style="white-space: nowrap; text-align: right">11.64 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;82.95%</td>
+    <td style="white-space: nowrap; text-align: right">10.79 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">24.17 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">confirmation / issue token</td>
-    <td style="white-space: nowrap; text-align: right">81.72 K</td>
-    <td style="white-space: nowrap; text-align: right">12.24 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;32.58%</td>
-    <td style="white-space: nowrap; text-align: right">11.38 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">32.25 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">79.80 K</td>
+    <td style="white-space: nowrap; text-align: right">12.53 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;41.45%</td>
+    <td style="white-space: nowrap; text-align: right">11.42 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">23.58 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">confirmation / verify token</td>
-    <td style="white-space: nowrap; text-align: right">74.80 K</td>
-    <td style="white-space: nowrap; text-align: right">13.37 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;24.45%</td>
-    <td style="white-space: nowrap; text-align: right">12.67 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">23.42 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">72.48 K</td>
+    <td style="white-space: nowrap; text-align: right">13.80 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;24.91%</td>
+    <td style="white-space: nowrap; text-align: right">12.96 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">23.04 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime gate / clean tool result</td>
-    <td style="white-space: nowrap; text-align: right">64.13 K</td>
-    <td style="white-space: nowrap; text-align: right">15.59 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;50.04%</td>
-    <td style="white-space: nowrap; text-align: right">14.04 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">50.00 &micro;s</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">runtime gate / sensitive external block</td>
-    <td style="white-space: nowrap; text-align: right">57.19 K</td>
-    <td style="white-space: nowrap; text-align: right">17.49 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;42.56%</td>
-    <td style="white-space: nowrap; text-align: right">15.63 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">45.54 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">56.16 K</td>
+    <td style="white-space: nowrap; text-align: right">17.81 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;56.50%</td>
+    <td style="white-space: nowrap; text-align: right">16 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">58.54 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir build_chain 10</td>
-    <td style="white-space: nowrap; text-align: right">51.89 K</td>
-    <td style="white-space: nowrap; text-align: right">19.27 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;31.72%</td>
-    <td style="white-space: nowrap; text-align: right">18.13 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">41.33 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">50.88 K</td>
+    <td style="white-space: nowrap; text-align: right">19.65 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;21.41%</td>
+    <td style="white-space: nowrap; text-align: right">18.88 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">33.21 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">runtime gate / sensitive external block</td>
+    <td style="white-space: nowrap; text-align: right">46.61 K</td>
+    <td style="white-space: nowrap; text-align: right">21.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;44.47%</td>
+    <td style="white-space: nowrap; text-align: right">18.04 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">55.75 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime gate / sensitive model redact</td>
-    <td style="white-space: nowrap; text-align: right">44.94 K</td>
-    <td style="white-space: nowrap; text-align: right">22.25 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;42.76%</td>
-    <td style="white-space: nowrap; text-align: right">20.33 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">58.42 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">42.43 K</td>
+    <td style="white-space: nowrap; text-align: right">23.57 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;33.30%</td>
+    <td style="white-space: nowrap; text-align: right">21.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">57.00 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir verify_chain 10</td>
-    <td style="white-space: nowrap; text-align: right">40.55 K</td>
-    <td style="white-space: nowrap; text-align: right">24.66 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;23.78%</td>
-    <td style="white-space: nowrap; text-align: right">24 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">59.38 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">40.92 K</td>
+    <td style="white-space: nowrap; text-align: right">24.44 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;21.81%</td>
+    <td style="white-space: nowrap; text-align: right">23.38 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">45.08 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan mixed</td>
-    <td style="white-space: nowrap; text-align: right">36.18 K</td>
-    <td style="white-space: nowrap; text-align: right">27.64 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;15.76%</td>
-    <td style="white-space: nowrap; text-align: right">26.96 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">39.17 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">37.40 K</td>
+    <td style="white-space: nowrap; text-align: right">26.73 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;15.73%</td>
+    <td style="white-space: nowrap; text-align: right">26.25 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">37.92 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan_and_redact</td>
-    <td style="white-space: nowrap; text-align: right">35.52 K</td>
-    <td style="white-space: nowrap; text-align: right">28.15 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;16.12%</td>
-    <td style="white-space: nowrap; text-align: right">27.37 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">39.46 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">36.04 K</td>
+    <td style="white-space: nowrap; text-align: right">27.75 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;16.59%</td>
+    <td style="white-space: nowrap; text-align: right">27.21 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">39.42 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime gate / quarantine tool result</td>
-    <td style="white-space: nowrap; text-align: right">33.24 K</td>
-    <td style="white-space: nowrap; text-align: right">30.08 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;19.78%</td>
-    <td style="white-space: nowrap; text-align: right">28.71 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">58.87 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">28.94 K</td>
+    <td style="white-space: nowrap; text-align: right">34.55 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;22.38%</td>
+    <td style="white-space: nowrap; text-align: right">32.83 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">62.71 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / merkle_root 100</td>
+    <td style="white-space: nowrap; text-align: right">26.76 K</td>
+    <td style="white-space: nowrap; text-align: right">37.36 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;27.22%</td>
+    <td style="white-space: nowrap; text-align: right">34.04 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">74.58 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / create 100</td>
+    <td style="white-space: nowrap; text-align: right">22.76 K</td>
+    <td style="white-space: nowrap; text-align: right">43.93 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;25.50%</td>
+    <td style="white-space: nowrap; text-align: right">41 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">82.83 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">envelope / elixir verify</td>
-    <td style="white-space: nowrap; text-align: right">23.04 K</td>
-    <td style="white-space: nowrap; text-align: right">43.41 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;10.45%</td>
-    <td style="white-space: nowrap; text-align: right">42.92 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">55.58 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">22.44 K</td>
+    <td style="white-space: nowrap; text-align: right">44.56 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;12.89%</td>
+    <td style="white-space: nowrap; text-align: right">43.37 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">59.83 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">envelope / elixir sign</td>
-    <td style="white-space: nowrap; text-align: right">19.27 K</td>
-    <td style="white-space: nowrap; text-align: right">51.90 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;11.44%</td>
-    <td style="white-space: nowrap; text-align: right">51.67 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">68.13 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">18.20 K</td>
+    <td style="white-space: nowrap; text-align: right">54.96 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;12.17%</td>
+    <td style="white-space: nowrap; text-align: right">53.71 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">72.82 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / sign 100</td>
+    <td style="white-space: nowrap; text-align: right">15.83 K</td>
+    <td style="white-space: nowrap; text-align: right">63.18 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;11.55%</td>
+    <td style="white-space: nowrap; text-align: right">61.75 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">80.33 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / verify signed</td>
-    <td style="white-space: nowrap; text-align: right">15.58 K</td>
-    <td style="white-space: nowrap; text-align: right">64.20 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;10.23%</td>
-    <td style="white-space: nowrap; text-align: right">63.71 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">81.91 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">14.82 K</td>
+    <td style="white-space: nowrap; text-align: right">67.48 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;10.85%</td>
+    <td style="white-space: nowrap; text-align: right">66.42 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">86.43 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / sign</td>
-    <td style="white-space: nowrap; text-align: right">13.06 K</td>
-    <td style="white-space: nowrap; text-align: right">76.58 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;12.21%</td>
-    <td style="white-space: nowrap; text-align: right">74.92 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">97.58 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">13.16 K</td>
+    <td style="white-space: nowrap; text-align: right">75.99 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;10.46%</td>
+    <td style="white-space: nowrap; text-align: right">75.00 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">94.54 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime stream / split secret redact</td>
-    <td style="white-space: nowrap; text-align: right">10.95 K</td>
-    <td style="white-space: nowrap; text-align: right">91.29 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;13.39%</td>
-    <td style="white-space: nowrap; text-align: right">88.33 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">125.99 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">10.58 K</td>
+    <td style="white-space: nowrap; text-align: right">94.50 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;13.89%</td>
+    <td style="white-space: nowrap; text-align: right">93.54 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">128.80 &micro;s</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / verify signed 100</td>
+    <td style="white-space: nowrap; text-align: right">9.00 K</td>
+    <td style="white-space: nowrap; text-align: right">111.06 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;10.68%</td>
+    <td style="white-space: nowrap; text-align: right">109.96 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">148.57 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan large</td>
-    <td style="white-space: nowrap; text-align: right">8.51 K</td>
-    <td style="white-space: nowrap; text-align: right">117.46 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;8.96%</td>
-    <td style="white-space: nowrap; text-align: right">116.29 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">143.66 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">8.81 K</td>
+    <td style="white-space: nowrap; text-align: right">113.57 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;8.23%</td>
+    <td style="white-space: nowrap; text-align: right">112.96 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">141.33 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir build_chain 100</td>
-    <td style="white-space: nowrap; text-align: right">5.19 K</td>
-    <td style="white-space: nowrap; text-align: right">192.75 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;12.20%</td>
-    <td style="white-space: nowrap; text-align: right">189.67 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">292.70 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">4.95 K</td>
+    <td style="white-space: nowrap; text-align: right">202.00 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;12.67%</td>
+    <td style="white-space: nowrap; text-align: right">200.96 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">284.37 &micro;s</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir verify_chain 100</td>
-    <td style="white-space: nowrap; text-align: right">4.01 K</td>
-    <td style="white-space: nowrap; text-align: right">249.41 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">&plusmn;9.59%</td>
-    <td style="white-space: nowrap; text-align: right">250.04 &micro;s</td>
-    <td style="white-space: nowrap; text-align: right">320.22 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">4.25 K</td>
+    <td style="white-space: nowrap; text-align: right">235.26 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">&plusmn;8.75%</td>
+    <td style="white-space: nowrap; text-align: right">231.96 &micro;s</td>
+    <td style="white-space: nowrap; text-align: right">293.46 &micro;s</td>
   </tr>
 
 </table>
@@ -320,164 +356,188 @@ Run Time Comparison
     <th style="text-align: right">Slower</th>
   <tr>
     <td style="white-space: nowrap">policy / elixir evaluate</td>
-    <td style="white-space: nowrap;text-align: right">4222.96 K</td>
+    <td style="white-space: nowrap;text-align: right">3610.08 K</td>
     <td>&nbsp;</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">policy / elixir classify_risk</td>
-    <td style="white-space: nowrap; text-align: right">3540.70 K</td>
-    <td style="white-space: nowrap; text-align: right">1.19x</td>
+    <td style="white-space: nowrap; text-align: right">3430.05 K</td>
+    <td style="white-space: nowrap; text-align: right">1.05x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">envelope / elixir canonical_bytes</td>
-    <td style="white-space: nowrap; text-align: right">1269.39 K</td>
-    <td style="white-space: nowrap; text-align: right">3.33x</td>
+    <td style="white-space: nowrap; text-align: right">1256.31 K</td>
+    <td style="white-space: nowrap; text-align: right">2.87x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">confirmation / action_digest</td>
-    <td style="white-space: nowrap; text-align: right">216.60 K</td>
-    <td style="white-space: nowrap; text-align: right">19.5x</td>
+    <td style="white-space: nowrap; text-align: right">211.02 K</td>
+    <td style="white-space: nowrap; text-align: right">17.11x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan clean</td>
-    <td style="white-space: nowrap; text-align: right">99.61 K</td>
-    <td style="white-space: nowrap; text-align: right">42.39x</td>
+    <td style="white-space: nowrap; text-align: right">103.35 K</td>
+    <td style="white-space: nowrap; text-align: right">34.93x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / canonical_bytes</td>
-    <td style="white-space: nowrap; text-align: right">96.66 K</td>
-    <td style="white-space: nowrap; text-align: right">43.69x</td>
+    <td style="white-space: nowrap; text-align: right">95.60 K</td>
+    <td style="white-space: nowrap; text-align: right">37.76x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / digest</td>
-    <td style="white-space: nowrap; text-align: right">90.12 K</td>
-    <td style="white-space: nowrap; text-align: right">46.86x</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">scanner / elixir scan mixed regex-only</td>
-    <td style="white-space: nowrap; text-align: right">85.76 K</td>
-    <td style="white-space: nowrap; text-align: right">49.24x</td>
+    <td style="white-space: nowrap; text-align: right">88.18 K</td>
+    <td style="white-space: nowrap; text-align: right">40.94x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan secret</td>
-    <td style="white-space: nowrap; text-align: right">85.08 K</td>
-    <td style="white-space: nowrap; text-align: right">49.63x</td>
+    <td style="white-space: nowrap; text-align: right">87.25 K</td>
+    <td style="white-space: nowrap; text-align: right">41.37x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">scanner / elixir scan mixed regex-only</td>
+    <td style="white-space: nowrap; text-align: right">85.91 K</td>
+    <td style="white-space: nowrap; text-align: right">42.02x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">confirmation / issue token</td>
-    <td style="white-space: nowrap; text-align: right">81.72 K</td>
-    <td style="white-space: nowrap; text-align: right">51.68x</td>
+    <td style="white-space: nowrap; text-align: right">79.80 K</td>
+    <td style="white-space: nowrap; text-align: right">45.24x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">confirmation / verify token</td>
-    <td style="white-space: nowrap; text-align: right">74.80 K</td>
-    <td style="white-space: nowrap; text-align: right">56.45x</td>
+    <td style="white-space: nowrap; text-align: right">72.48 K</td>
+    <td style="white-space: nowrap; text-align: right">49.81x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime gate / clean tool result</td>
-    <td style="white-space: nowrap; text-align: right">64.13 K</td>
-    <td style="white-space: nowrap; text-align: right">65.85x</td>
-  </tr>
-
-  <tr>
-    <td style="white-space: nowrap">runtime gate / sensitive external block</td>
-    <td style="white-space: nowrap; text-align: right">57.19 K</td>
-    <td style="white-space: nowrap; text-align: right">73.84x</td>
+    <td style="white-space: nowrap; text-align: right">56.16 K</td>
+    <td style="white-space: nowrap; text-align: right">64.28x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir build_chain 10</td>
-    <td style="white-space: nowrap; text-align: right">51.89 K</td>
-    <td style="white-space: nowrap; text-align: right">81.38x</td>
+    <td style="white-space: nowrap; text-align: right">50.88 K</td>
+    <td style="white-space: nowrap; text-align: right">70.96x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">runtime gate / sensitive external block</td>
+    <td style="white-space: nowrap; text-align: right">46.61 K</td>
+    <td style="white-space: nowrap; text-align: right">77.46x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime gate / sensitive model redact</td>
-    <td style="white-space: nowrap; text-align: right">44.94 K</td>
-    <td style="white-space: nowrap; text-align: right">93.97x</td>
+    <td style="white-space: nowrap; text-align: right">42.43 K</td>
+    <td style="white-space: nowrap; text-align: right">85.09x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir verify_chain 10</td>
-    <td style="white-space: nowrap; text-align: right">40.55 K</td>
-    <td style="white-space: nowrap; text-align: right">104.15x</td>
+    <td style="white-space: nowrap; text-align: right">40.92 K</td>
+    <td style="white-space: nowrap; text-align: right">88.22x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan mixed</td>
-    <td style="white-space: nowrap; text-align: right">36.18 K</td>
-    <td style="white-space: nowrap; text-align: right">116.71x</td>
+    <td style="white-space: nowrap; text-align: right">37.40 K</td>
+    <td style="white-space: nowrap; text-align: right">96.51x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan_and_redact</td>
-    <td style="white-space: nowrap; text-align: right">35.52 K</td>
-    <td style="white-space: nowrap; text-align: right">118.89x</td>
+    <td style="white-space: nowrap; text-align: right">36.04 K</td>
+    <td style="white-space: nowrap; text-align: right">100.18x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime gate / quarantine tool result</td>
-    <td style="white-space: nowrap; text-align: right">33.24 K</td>
-    <td style="white-space: nowrap; text-align: right">127.04x</td>
+    <td style="white-space: nowrap; text-align: right">28.94 K</td>
+    <td style="white-space: nowrap; text-align: right">124.74x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / merkle_root 100</td>
+    <td style="white-space: nowrap; text-align: right">26.76 K</td>
+    <td style="white-space: nowrap; text-align: right">134.89x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / create 100</td>
+    <td style="white-space: nowrap; text-align: right">22.76 K</td>
+    <td style="white-space: nowrap; text-align: right">158.59x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">envelope / elixir verify</td>
-    <td style="white-space: nowrap; text-align: right">23.04 K</td>
-    <td style="white-space: nowrap; text-align: right">183.32x</td>
+    <td style="white-space: nowrap; text-align: right">22.44 K</td>
+    <td style="white-space: nowrap; text-align: right">160.87x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">envelope / elixir sign</td>
-    <td style="white-space: nowrap; text-align: right">19.27 K</td>
-    <td style="white-space: nowrap; text-align: right">219.18x</td>
+    <td style="white-space: nowrap; text-align: right">18.20 K</td>
+    <td style="white-space: nowrap; text-align: right">198.4x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / sign 100</td>
+    <td style="white-space: nowrap; text-align: right">15.83 K</td>
+    <td style="white-space: nowrap; text-align: right">228.07x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / verify signed</td>
-    <td style="white-space: nowrap; text-align: right">15.58 K</td>
-    <td style="white-space: nowrap; text-align: right">271.11x</td>
+    <td style="white-space: nowrap; text-align: right">14.82 K</td>
+    <td style="white-space: nowrap; text-align: right">243.59x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">registry bundle / sign</td>
-    <td style="white-space: nowrap; text-align: right">13.06 K</td>
-    <td style="white-space: nowrap; text-align: right">323.38x</td>
+    <td style="white-space: nowrap; text-align: right">13.16 K</td>
+    <td style="white-space: nowrap; text-align: right">274.32x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">runtime stream / split secret redact</td>
-    <td style="white-space: nowrap; text-align: right">10.95 K</td>
-    <td style="white-space: nowrap; text-align: right">385.52x</td>
+    <td style="white-space: nowrap; text-align: right">10.58 K</td>
+    <td style="white-space: nowrap; text-align: right">341.17x</td>
+  </tr>
+
+  <tr>
+    <td style="white-space: nowrap">audit checkpoint / verify signed 100</td>
+    <td style="white-space: nowrap; text-align: right">9.00 K</td>
+    <td style="white-space: nowrap; text-align: right">400.94x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">scanner / elixir scan large</td>
-    <td style="white-space: nowrap; text-align: right">8.51 K</td>
-    <td style="white-space: nowrap; text-align: right">496.04x</td>
+    <td style="white-space: nowrap; text-align: right">8.81 K</td>
+    <td style="white-space: nowrap; text-align: right">410.0x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir build_chain 100</td>
-    <td style="white-space: nowrap; text-align: right">5.19 K</td>
-    <td style="white-space: nowrap; text-align: right">813.96x</td>
+    <td style="white-space: nowrap; text-align: right">4.95 K</td>
+    <td style="white-space: nowrap; text-align: right">729.23x</td>
   </tr>
 
   <tr>
     <td style="white-space: nowrap">audit / elixir verify_chain 100</td>
-    <td style="white-space: nowrap; text-align: right">4.01 K</td>
-    <td style="white-space: nowrap; text-align: right">1053.26x</td>
+    <td style="white-space: nowrap; text-align: right">4.25 K</td>
+    <td style="white-space: nowrap; text-align: right">849.29x</td>
   </tr>
 
 </table>
@@ -528,14 +588,14 @@ Memory Usage
     <td>147.0x</td>
   </tr>
     <tr>
-    <td style="white-space: nowrap">scanner / elixir scan mixed regex-only</td>
-    <td style="white-space: nowrap">5.79 KB</td>
-    <td>30.88x</td>
-  </tr>
-    <tr>
     <td style="white-space: nowrap">scanner / elixir scan secret</td>
     <td style="white-space: nowrap">7.77 KB</td>
     <td>41.42x</td>
+  </tr>
+    <tr>
+    <td style="white-space: nowrap">scanner / elixir scan mixed regex-only</td>
+    <td style="white-space: nowrap">5.79 KB</td>
+    <td>30.88x</td>
   </tr>
     <tr>
     <td style="white-space: nowrap">confirmation / issue token</td>
@@ -553,14 +613,14 @@ Memory Usage
     <td>58.83x</td>
   </tr>
     <tr>
-    <td style="white-space: nowrap">runtime gate / sensitive external block</td>
-    <td style="white-space: nowrap">14.19 KB</td>
-    <td>75.67x</td>
-  </tr>
-    <tr>
     <td style="white-space: nowrap">audit / elixir build_chain 10</td>
     <td style="white-space: nowrap">17.23 KB</td>
     <td>91.92x</td>
+  </tr>
+    <tr>
+    <td style="white-space: nowrap">runtime gate / sensitive external block</td>
+    <td style="white-space: nowrap">14.19 KB</td>
+    <td>75.67x</td>
   </tr>
     <tr>
     <td style="white-space: nowrap">runtime gate / sensitive model redact</td>
@@ -588,14 +648,29 @@ Memory Usage
     <td>162.17x</td>
   </tr>
     <tr>
+    <td style="white-space: nowrap">audit checkpoint / merkle_root 100</td>
+    <td style="white-space: nowrap">40.66 KB</td>
+    <td>216.88x</td>
+  </tr>
+    <tr>
+    <td style="white-space: nowrap">audit checkpoint / create 100</td>
+    <td style="white-space: nowrap">40.95 KB</td>
+    <td>218.42x</td>
+  </tr>
+    <tr>
     <td style="white-space: nowrap">envelope / elixir verify</td>
     <td style="white-space: nowrap">2.05 KB</td>
     <td>10.96x</td>
   </tr>
     <tr>
     <td style="white-space: nowrap">envelope / elixir sign</td>
-    <td style="white-space: nowrap">2.75 KB</td>
-    <td>14.65x</td>
+    <td style="white-space: nowrap">2.76 KB</td>
+    <td>14.72x</td>
+  </tr>
+    <tr>
+    <td style="white-space: nowrap">audit checkpoint / sign 100</td>
+    <td style="white-space: nowrap">18.01 KB</td>
+    <td>96.04x</td>
   </tr>
     <tr>
     <td style="white-space: nowrap">registry bundle / verify signed</td>
@@ -611,6 +686,11 @@ Memory Usage
     <td style="white-space: nowrap">runtime stream / split secret redact</td>
     <td style="white-space: nowrap">54 KB</td>
     <td>288.0x</td>
+  </tr>
+    <tr>
+    <td style="white-space: nowrap">audit checkpoint / verify signed 100</td>
+    <td style="white-space: nowrap">74.30 KB</td>
+    <td>396.25x</td>
   </tr>
     <tr>
     <td style="white-space: nowrap">scanner / elixir scan large</td>

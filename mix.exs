@@ -148,6 +148,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Audit,
           SigilGuard.Audit.Action,
           SigilGuard.Audit.Actor,
+          SigilGuard.Audit.Checkpoint,
           SigilGuard.Audit.EventType,
           SigilGuard.Audit.ExecutionResult,
           SigilGuard.Audit.Logger

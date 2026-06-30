@@ -300,6 +300,22 @@ defmodule SigilGuard.Bench do
     chain_10 = SigilGuard.Audit.build_chain(events_10, key)
     chain_100 = SigilGuard.Audit.build_chain(events_100, key)
 
+    {:ok, checkpoint_100} =
+      SigilGuard.Audit.Checkpoint.create(chain_100,
+        chain_id: "bench-chain",
+        generated_at: "2026-06-30T12:00:00.000Z"
+      )
+
+    signed_checkpoint_100 =
+      SigilGuard.Audit.Checkpoint.sign(checkpoint_100, SigilGuard.BenchSigner,
+        issuer: "did:sigil:bench-audit",
+        issued_at: "2026-06-30T12:00:00.000Z"
+      )
+
+    audit_public_keys = %{
+      "did:sigil:bench-audit" => SigilGuard.BenchSigner.public_key_b64u()
+    }
+
     %{
       "audit / elixir build_chain 10" => fn -> SigilGuard.Audit.build_chain(events_10, key) end,
       "audit / elixir build_chain 100" => fn -> SigilGuard.Audit.build_chain(events_100, key) end,
@@ -308,6 +324,27 @@ defmodule SigilGuard.Bench do
       end,
       "audit / elixir verify_chain 100" => fn ->
         SigilGuard.Backend.Elixir.audit_verify_chain(chain_100, key)
+      end,
+      "audit checkpoint / merkle_root 100" => fn ->
+        SigilGuard.Audit.Checkpoint.merkle_root(chain_100)
+      end,
+      "audit checkpoint / create 100" => fn ->
+        SigilGuard.Audit.Checkpoint.create(chain_100,
+          chain_id: "bench-chain",
+          generated_at: "2026-06-30T12:00:00.000Z"
+        )
+      end,
+      "audit checkpoint / sign 100" => fn ->
+        SigilGuard.Audit.Checkpoint.sign(checkpoint_100, SigilGuard.BenchSigner,
+          issuer: "did:sigil:bench-audit",
+          issued_at: "2026-06-30T12:00:00.000Z"
+        )
+      end,
+      "audit checkpoint / verify signed 100" => fn ->
+        SigilGuard.Audit.Checkpoint.verify(signed_checkpoint_100, chain_100,
+          public_keys: audit_public_keys,
+          require_signature: true
+        )
       end
     }
   end
