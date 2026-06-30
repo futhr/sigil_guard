@@ -61,6 +61,7 @@ defmodule SigilGuard.Bench do
       |> Map.merge(registry_bundle_scenarios())
       |> Map.merge(envelope_scenarios())
       |> Map.merge(policy_scenarios())
+      |> Map.merge(repo_policy_scenarios())
       |> Map.merge(audit_scenarios())
 
     Benchee.run(
@@ -284,6 +285,73 @@ defmodule SigilGuard.Bench do
       end,
       "policy / elixir evaluate" => fn ->
         SigilGuard.Backend.Elixir.evaluate_policy("write_file", :medium, [])
+      end
+    }
+  end
+
+  defp repo_policy_scenarios do
+    text = """
+    default require_approval
+    allow agent:did:web:codex action:modify README.md docs/**
+    require_approval agent:* config/** .github/**
+    block agent:* priv/secrets/**
+    """
+
+    raw_policy = %{
+      rules: [
+        %{
+          id: "docs",
+          decision: :allow,
+          agents: ["did:web:codex"],
+          actions: ["modify"],
+          paths: ["README.md", "docs/**"]
+        },
+        %{
+          id: "config-review",
+          decision: :require_approval,
+          agents: ["*"],
+          actions: ["*"],
+          paths: ["config/**", ".github/**"]
+        },
+        %{
+          id: "secrets",
+          decision: :block,
+          agents: ["*"],
+          actions: ["*"],
+          paths: ["priv/secrets/**"]
+        }
+      ]
+    }
+
+    {:ok, policy} = SigilGuard.RepoPolicy.compile(raw_policy)
+
+    %{
+      "repo policy / parse" => fn ->
+        SigilGuard.RepoPolicy.parse(text)
+      end,
+      "repo policy / compile" => fn ->
+        SigilGuard.RepoPolicy.compile(raw_policy)
+      end,
+      "repo policy / evaluate allow" => fn ->
+        SigilGuard.RepoPolicy.evaluate(policy,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["README.md", "docs/usage.md"]
+        )
+      end,
+      "repo policy / evaluate approval" => fn ->
+        SigilGuard.RepoPolicy.evaluate(policy,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["config/runtime.exs"]
+        )
+      end,
+      "repo policy / evaluate block" => fn ->
+        SigilGuard.RepoPolicy.evaluate(policy,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["priv/secrets/prod.key"]
+        )
       end
     }
   end

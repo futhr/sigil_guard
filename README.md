@@ -21,6 +21,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 - **Sensitivity Scanning** — Detect and redact credentials with staged validation/enrichment
 - **Runtime Gate** — Boundary-aware decisions for tool input, tool output, and external sinks
+- **Repo Policy Kernel** — deterministic allow/approval/block decisions for changed paths
 - **MCP Gateway Helpers** — Guard MCP-shaped tool requests and results without adapter lock-in
 - **Streaming Sanitization** — Hold back chunk tails so split secrets are not emitted early
 - **Confirmation Tokens** — HMAC-signed approvals bound to exact action digests
@@ -37,6 +38,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 |---------|-------------|
 | **Sensitivity Scanner** | Staged regex, validation, confidence, and signal enrichment for secrets and credentials |
 | **Runtime Gate** | Source-to-sink guard combining scanning, quarantine indicators, and policy |
+| **Repo Policy** | Deterministic agent/action/path rules for repo changes |
 | **MCP Gateway** | Transport-agnostic guards for MCP request/result maps |
 | **Streaming Sanitizer** | Chunk-safe output sanitizer for tool-result streams |
 | **Confirmation Tokens** | Short-lived approval grants bound to payload and boundary context |
@@ -192,6 +194,27 @@ envelope = SigilGuard.Envelope.sign("did:sigil:alice", :allowed,
 Trust levels: `:low < :medium < :high`
 Risk levels: `:low < :medium < :high`
 
+### Repo Policy
+
+```elixir
+{:ok, repo_policy} =
+  SigilGuard.RepoPolicy.parse("""
+  default require_approval
+  allow agent:did:web:codex action:modify README.md docs/**
+  require_approval agent:* config/** .github/**
+  block agent:* priv/secrets/**
+  """)
+
+decision =
+  SigilGuard.RepoPolicy.evaluate(repo_policy,
+    agent: "did:web:codex",
+    action: "modify",
+    changed_paths: ["README.md"]
+  )
+
+:allow = decision.verdict
+```
+
 ### Tamper-Evident Audit
 
 ```elixir
@@ -309,6 +332,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Patterns        Pattern compilation and management
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization
+    +-- SigilGuard.RepoPolicy      deterministic repo policy kernel
     +-- SigilGuard.MCP.Gateway     MCP-shaped guard helpers
     +-- SigilGuard.Confirmation    Action-bound approval tokens
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
@@ -348,7 +372,7 @@ SigilGuard emits telemetry events for observability:
 | `[:sigil_guard, :scan, :start\|:stop]` | `duration` | `hit_count`, `patterns_checked`, `pipeline`, `scanner_validate` |
 | `[:sigil_guard, :registry, :fetch, :start\|:stop]` | `duration` | `url`, `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
-| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest` |
+| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 
 Use `SigilGuard.Telemetry.otel_attributes/3` or `attach_otel_forwarder/3` to

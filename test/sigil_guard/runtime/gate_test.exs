@@ -87,6 +87,65 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.reason =~ "Untrusted tool requests"
     end
 
+    test "applies repo policy to repo-change contexts" do
+      {:ok, repo_policy} =
+        SigilGuard.RepoPolicy.compile(%{
+          rules: [
+            %{
+              id: "docs",
+              decision: :allow,
+              agents: ["did:web:codex"],
+              actions: ["modify"],
+              paths: ["README.md", "docs/**"]
+            },
+            %{
+              id: "config-review",
+              decision: :require_approval,
+              agents: ["*"],
+              actions: ["*"],
+              paths: ["config/**"]
+            }
+          ]
+        })
+
+      allowed =
+        Gate.evaluate(
+          %{changed_paths: ["README.md"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      review =
+        Gate.evaluate(
+          %{changed_paths: ["config/runtime.exs"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert allowed.verdict == :allowed
+      assert allowed.audit_metadata.repo_policy_verdict == :allow
+      assert allowed.audit_metadata.repo_policy_rules == ["docs"]
+
+      assert {:confirm, reason} = review.verdict
+      assert reason =~ "requires approval"
+      assert review.audit_metadata.repo_policy_verdict == :require_approval
+      assert review.audit_metadata.repo_policy_rules == ["config-review"]
+    end
+
     test "emits redacted runtime telemetry" do
       ref = make_ref()
       parent = self()

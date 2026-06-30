@@ -1,0 +1,673 @@
+defmodule SigilGuard.RepoPolicy do
+  @moduledoc """
+  Deterministic repo-level policy kernel for agent-authored changes.
+
+  This module adds an repo-level policy layer to SigilGuard: it evaluates an
+  agent identity, action, and changed file paths against ordered path rules and
+  returns one of three governance decisions:
+
+    * `:allow`
+    * `:require_approval`
+    * `:block`
+
+  Policies are data, not code. A policy can be compiled from maps, keyword
+  lists, or a small line-oriented format:
+
+      default require_approval
+      allow agent:did:web:codex action:modify README.md docs/**
+      require_approval agent:* config/** .github/**
+      block agent:* priv/secrets/**
+
+  Matching is intentionally deterministic and conservative:
+
+    * changed paths must be safe relative paths; absolute paths and `..` are
+      blocked before rule matching
+    * rules only match exact agents/actions or `*`
+    * path globs support `*`, `?`, and `**`
+    * `:block` beats `:require_approval`, which beats `:allow`
+    * if any path is unmatched, the policy default applies
+
+  This is not a replacement for human code review. It is a deterministic
+  preflight boundary that makes repo modification authority explicit.
+  """
+
+  alias SigilGuard.RepoPolicy.Decision
+
+  @version 1
+  @default_decision :require_approval
+  @decisions [:allow, :require_approval, :block]
+  @decision_rank %{allow: 0, require_approval: 1, block: 2}
+  @atom_fields %{
+    "action" => :action,
+    "actions" => :actions,
+    "actor" => :actor,
+    "agent" => :agent,
+    "agents" => :agents,
+    "changed_files" => :changed_files,
+    "changed_paths" => :changed_paths,
+    "decision" => :decision,
+    "default" => :default,
+    "files" => :files,
+    "id" => :id,
+    "identity" => :identity,
+    "message" => :message,
+    "path" => :path,
+    "paths" => :paths,
+    "rules" => :rules
+  }
+
+  @type verdict :: Decision.verdict()
+
+  @type rule :: %{
+          id: String.t(),
+          decision: verdict(),
+          agents: [String.t()],
+          actions: [String.t()],
+          paths: [String.t()],
+          message: String.t() | nil,
+          index: non_neg_integer()
+        }
+
+  @type t :: %__MODULE__{
+          version: pos_integer(),
+          default: verdict(),
+          rules: [rule()]
+        }
+
+  defstruct version: @version, default: @default_decision, rules: []
+
+  @doc """
+  Compile a raw repo policy map or keyword list.
+
+  Rule fields accept atom or string keys:
+
+    * `:id` - stable rule identifier. Defaults to `"rule_<index>"`.
+    * `:decision` - `:allow`, `:require_approval`, or `:block`.
+    * `:agents` - exact agent identifiers or `"*"`.
+    * `:actions` - exact action names or `"*"`.
+    * `:paths` - safe relative path globs.
+    * `:message` - optional operator-facing reason.
+  """
+  @spec compile(t() | map() | keyword()) :: {:ok, t()} | {:error, atom() | {atom(), term()}}
+  def compile(%__MODULE__{} = policy), do: {:ok, policy}
+
+  def compile(raw) when is_list(raw) do
+    raw
+    |> Map.new()
+    |> compile()
+  end
+
+  def compile(raw) when is_map(raw) do
+    with {:ok, default} <- normalize_decision(field(raw, "default") || @default_decision),
+         {:ok, rules} <- compile_rules(field(raw, "rules") || []) do
+      {:ok, %__MODULE__{default: default, rules: rules}}
+    end
+  end
+
+  def compile(_), do: {:error, :invalid_policy}
+
+  @doc """
+  Parse a line-oriented policy document and compile it.
+
+  Supported lines:
+
+      default require_approval
+      allow agent:did:web:codex action:modify docs/**
+      block agent:* priv/secrets/**
+
+  Lines starting with `#` and blank lines are ignored.
+  """
+  @spec parse(String.t()) :: {:ok, t()} | {:error, atom() | {atom(), term()}}
+  def parse(text) when is_binary(text) do
+    result =
+      text
+      |> String.split("\n")
+      |> Enum.with_index(1)
+      |> Enum.reduce_while({:ok, %{default: @default_decision, rules: []}}, &parse_line/2)
+
+    case result do
+      {:ok, policy} -> compile(%{policy | rules: Enum.reverse(policy.rules)})
+      error -> error
+    end
+  end
+
+  @doc """
+  Evaluate a compiled policy against a repo-change context.
+
+  Context fields accept atom or string keys:
+
+    * `:agent`, `:identity`, or `:actor`
+    * `:action`
+    * `:changed_paths`, `:changed_files`, `:files`, or `:paths`
+  """
+  @spec evaluate(t(), map() | keyword()) :: Decision.t()
+  def evaluate(%__MODULE__{} = policy, context) do
+    context = context_map(context)
+    agent = first_string(context, ~w(agent identity actor))
+    action = first_string(context, ~w(action)) || "modify"
+
+    case normalize_changed_paths(changed_paths(context)) do
+      {:ok, paths} -> evaluate_paths(policy, agent, action, paths)
+      {:error, reason} -> invalid_path_decision(agent, action, reason)
+    end
+  end
+
+  @doc """
+  Return canonical bytes for a compiled policy.
+  """
+  @spec canonical_bytes(t()) :: binary()
+  def canonical_bytes(%__MODULE__{} = policy) do
+    policy
+    |> canonical_map()
+    |> canonical_iodata()
+    |> IO.iodata_to_binary()
+  end
+
+  @doc """
+  Return a lowercase SHA-256 digest of a compiled policy.
+  """
+  @spec digest(t()) :: String.t()
+  def digest(%__MODULE__{} = policy) do
+    policy
+    |> canonical_bytes()
+    |> sha256_hex()
+  end
+
+  defp compile_rules(rules) when is_list(rules) do
+    result =
+      rules
+      |> Enum.with_index()
+      |> Enum.reduce_while({:ok, []}, fn {rule, index}, {:ok, acc} ->
+        case compile_rule(rule, index) do
+          {:ok, compiled} -> {:cont, {:ok, [compiled | acc]}}
+          {:error, reason} -> {:halt, {:error, {reason, index}}}
+        end
+      end)
+
+    case result do
+      {:ok, compiled} -> {:ok, Enum.reverse(compiled)}
+      error -> error
+    end
+  end
+
+  defp compile_rules(_), do: {:error, :invalid_rules}
+
+  defp compile_rule(raw, index) when is_list(raw) do
+    raw
+    |> Map.new()
+    |> compile_rule(index)
+  end
+
+  defp compile_rule(raw, index) when is_map(raw) do
+    with {:ok, decision} <- normalize_decision(field(raw, "decision")),
+         {:ok, agents} <- normalize_matchers(field(raw, "agents") || field(raw, "agent") || ["*"]),
+         {:ok, actions} <-
+           normalize_matchers(field(raw, "actions") || field(raw, "action") || ["*"]),
+         {:ok, paths} <- normalize_patterns(field(raw, "paths") || field(raw, "path")),
+         {:ok, id} <- normalize_id(field(raw, "id"), index) do
+      {:ok,
+       %{
+         id: id,
+         decision: decision,
+         agents: agents,
+         actions: actions,
+         paths: paths,
+         message: optional_string(field(raw, "message")),
+         index: index
+       }}
+    end
+  end
+
+  defp compile_rule(_, _), do: {:error, :invalid_rule}
+
+  defp parse_line({line, line_no}, {:ok, policy}) do
+    line =
+      line
+      |> strip_comment()
+      |> String.trim()
+
+    cond do
+      line == "" ->
+        {:cont, {:ok, policy}}
+
+      String.starts_with?(line, "default ") ->
+        parse_default(line, policy)
+
+      true ->
+        parse_rule(line, line_no, policy)
+    end
+  end
+
+  defp parse_line(_, error), do: {:halt, error}
+
+  defp parse_default(line, policy) do
+    [_, decision | _] = String.split(line)
+
+    case normalize_decision(decision) do
+      {:ok, normalized} -> {:cont, {:ok, %{policy | default: normalized}}}
+      {:error, reason} -> {:halt, {:error, reason}}
+    end
+  end
+
+  defp parse_rule(line, line_no, policy) do
+    [decision | tokens] = String.split(line)
+
+    {fields, paths} =
+      Enum.reduce(tokens, {%{}, []}, fn token, {fields, paths} ->
+        cond do
+          String.starts_with?(token, "agent:") ->
+            {Map.put(fields, :agents, split_csv(String.replace_prefix(token, "agent:", ""))),
+             paths}
+
+          String.starts_with?(token, "action:") ->
+            {Map.put(fields, :actions, split_csv(String.replace_prefix(token, "action:", ""))),
+             paths}
+
+          true ->
+            {fields, [token | paths]}
+        end
+      end)
+
+    rule =
+      fields
+      |> Map.put(:decision, decision)
+      |> Map.put(:paths, Enum.reverse(paths))
+      |> Map.put(:id, "line_#{line_no}")
+
+    {:cont, {:ok, %{policy | rules: [rule | policy.rules]}}}
+  end
+
+  defp strip_comment(line) do
+    line
+    |> String.split("#", parts: 2)
+    |> hd()
+  end
+
+  defp split_csv(value) do
+    value
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+  end
+
+  defp evaluate_paths(policy, agent, action, paths) do
+    matches = matching_rules(policy.rules, agent, action, paths)
+    unmatched = unmatched_paths(paths, matches)
+    strongest = strongest_decision(matches)
+    verdict = final_verdict(strongest, unmatched, policy.default)
+
+    build_decision(%{
+      verdict: verdict,
+      reason: reason(verdict, matches, unmatched, policy.default),
+      agent: agent,
+      action: action,
+      changed_paths: paths,
+      matched_rule_ids: matched_rule_ids(matches),
+      unmatched_paths: unmatched
+    })
+  end
+
+  defp matching_rules(rules, agent, action, paths) do
+    for rule <- rules,
+        path <- paths,
+        rule_matches?(rule, agent, action, path),
+        do: {rule, path}
+  end
+
+  defp unmatched_paths(paths, matches) do
+    matched_paths =
+      matches
+      |> Enum.map(&elem(&1, 1))
+      |> MapSet.new()
+
+    Enum.reject(paths, &MapSet.member?(matched_paths, &1))
+  end
+
+  defp strongest_decision([]), do: nil
+
+  defp strongest_decision(matches) do
+    matches
+    |> Enum.map(fn {rule, _} -> rule.decision end)
+    |> Enum.max_by(&Map.fetch!(@decision_rank, &1))
+  end
+
+  defp final_verdict(:block, _, _), do: :block
+  defp final_verdict(:require_approval, _, _), do: :require_approval
+  defp final_verdict(_, [_ | _], default), do: default
+  defp final_verdict(:allow, [], _), do: :allow
+  defp final_verdict(nil, [], default), do: default
+
+  defp reason(:block, matches, _, _) do
+    "Repo policy blocked by #{rule_summary(matches)}"
+  end
+
+  defp reason(:require_approval, _, unmatched, _) when unmatched != [] do
+    "Repo policy requires approval for unmatched paths"
+  end
+
+  defp reason(:require_approval, matches, _, _) do
+    "Repo policy requires approval by #{rule_summary(matches)}"
+  end
+
+  defp reason(:allow, _, [], _), do: "Repo policy allowed all changed paths"
+
+  defp reason(:allow, _, unmatched, :allow) when unmatched != [] do
+    "Repo policy default allowed unmatched paths"
+  end
+
+  defp rule_summary(matches) do
+    matches
+    |> matched_rule_ids()
+    |> Enum.join(", ")
+  end
+
+  defp matched_rule_ids(matches) do
+    matches
+    |> Enum.map(fn {rule, _} -> {rule.index, rule.id} end)
+    |> Enum.uniq()
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.map(&elem(&1, 1))
+  end
+
+  defp rule_matches?(rule, agent, action, path) do
+    matcher_matches?(rule.agents, agent) and
+      matcher_matches?(rule.actions, action) and
+      Enum.any?(rule.paths, &path_matches?(&1, path))
+  end
+
+  defp matcher_matches?(matchers, nil), do: "*" in matchers
+  defp matcher_matches?(matchers, value), do: "*" in matchers or value in matchers
+
+  defp path_matches?(pattern, path) do
+    match_segments?(String.split(pattern, "/", trim: true), String.split(path, "/", trim: true))
+  end
+
+  defp match_segments?([], []), do: true
+  defp match_segments?([], _), do: false
+  defp match_segments?(["**"], _), do: true
+
+  defp match_segments?(["**" | pattern_rest] = pattern, path) do
+    match_segments?(pattern_rest, path) or
+      case path do
+        [] -> false
+        [_ | path_rest] -> match_segments?(pattern, path_rest)
+      end
+  end
+
+  defp match_segments?([pattern_segment | pattern_rest], [path_segment | path_rest]) do
+    segment_matches?(pattern_segment, path_segment) and match_segments?(pattern_rest, path_rest)
+  end
+
+  defp match_segments?(_, _), do: false
+
+  defp segment_matches?(pattern, segment) do
+    pattern =
+      pattern
+      |> Regex.escape()
+      |> String.replace("\\*", ".*")
+      |> String.replace("\\?", ".")
+
+    Regex.match?(Regex.compile!("^#{pattern}$"), segment)
+  end
+
+  defp normalize_decision(value) when value in @decisions, do: {:ok, value}
+  defp normalize_decision(:allowed), do: {:ok, :allow}
+  defp normalize_decision(:blocked), do: {:ok, :block}
+  defp normalize_decision(:confirm), do: {:ok, :require_approval}
+
+  defp normalize_decision(value) when is_binary(value) do
+    case String.downcase(value) do
+      "allow" -> {:ok, :allow}
+      "allowed" -> {:ok, :allow}
+      "block" -> {:ok, :block}
+      "blocked" -> {:ok, :block}
+      "require_approval" -> {:ok, :require_approval}
+      "require-approval" -> {:ok, :require_approval}
+      "confirm" -> {:ok, :require_approval}
+      _ -> {:error, :invalid_decision}
+    end
+  end
+
+  defp normalize_decision(_), do: {:error, :invalid_decision}
+
+  defp normalize_matchers(value) when is_binary(value), do: normalize_matchers([value])
+
+  defp normalize_matchers(values) when is_list(values) do
+    normalized =
+      values
+      |> Enum.map(&to_matcher/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    if normalized == [], do: {:error, :invalid_matchers}, else: {:ok, normalized}
+  end
+
+  defp normalize_matchers(_), do: {:error, :invalid_matchers}
+
+  defp to_matcher(value) when is_atom(value), do: Atom.to_string(value)
+  defp to_matcher(value) when is_binary(value), do: String.trim(value)
+  defp to_matcher(_), do: nil
+
+  defp normalize_patterns(value) when is_binary(value), do: normalize_patterns([value])
+
+  defp normalize_patterns(values) when is_list(values) do
+    result =
+      Enum.reduce_while(values, {:ok, []}, fn pattern, {:ok, acc} ->
+        case normalize_pattern(pattern) do
+          {:ok, normalized} -> {:cont, {:ok, [normalized | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, []} -> {:error, :missing_paths}
+      {:ok, patterns} -> {:ok, Enum.reverse(patterns)}
+      error -> error
+    end
+  end
+
+  defp normalize_patterns(_), do: {:error, :missing_paths}
+
+  defp normalize_pattern(pattern) when is_binary(pattern) do
+    pattern = String.trim(pattern)
+
+    cond do
+      pattern == "" -> {:error, :invalid_path_pattern}
+      absolute_path?(pattern) -> {:error, :absolute_path_pattern}
+      traversal_path?(pattern) -> {:error, :path_traversal_pattern}
+      String.ends_with?(pattern, "/") -> {:ok, normalize_separators(pattern) <> "**"}
+      true -> {:ok, normalize_separators(pattern)}
+    end
+  end
+
+  defp normalize_pattern(_), do: {:error, :invalid_path_pattern}
+
+  defp normalize_changed_paths(paths) when is_list(paths) do
+    result =
+      Enum.reduce_while(paths, {:ok, []}, fn path, {:ok, acc} ->
+        case normalize_changed_path(path) do
+          {:ok, normalized} -> {:cont, {:ok, [normalized | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, normalized} ->
+        normalized =
+          normalized
+          |> Enum.reverse()
+          |> Enum.uniq()
+
+        {:ok, normalized}
+
+      error ->
+        error
+    end
+  end
+
+  defp normalize_changed_paths(_), do: {:error, :invalid_changed_paths}
+
+  defp normalize_changed_path(path) when is_binary(path) do
+    path = normalize_separators(String.trim(path))
+
+    cond do
+      path == "" -> {:error, :invalid_changed_path}
+      absolute_path?(path) -> {:error, :absolute_changed_path}
+      traversal_path?(path) -> {:error, :path_traversal}
+      true -> {:ok, collapse_relative(path)}
+    end
+  end
+
+  defp normalize_changed_path(_), do: {:error, :invalid_changed_path}
+
+  defp normalize_separators(path), do: String.replace(path, "\\", "/")
+
+  defp absolute_path?(path), do: String.starts_with?(path, "/")
+
+  defp traversal_path?(path) do
+    path
+    |> String.split("/", trim: true)
+    |> Enum.any?(&(&1 == ".."))
+  end
+
+  defp collapse_relative(path) do
+    segments =
+      path
+      |> String.split("/", trim: true)
+      |> Enum.reject(&(&1 == "."))
+
+    case segments do
+      [] -> "."
+      segments -> Enum.join(segments, "/")
+    end
+  end
+
+  defp normalize_id(nil, index), do: {:ok, "rule_#{index}"}
+  defp normalize_id(value, _) when is_atom(value), do: {:ok, Atom.to_string(value)}
+  defp normalize_id(value, _) when is_binary(value) and value != "", do: {:ok, value}
+  defp normalize_id(_, _), do: {:error, :invalid_rule_id}
+
+  defp optional_string(nil), do: nil
+  defp optional_string(value) when is_atom(value), do: Atom.to_string(value)
+  defp optional_string(value) when is_binary(value), do: value
+  defp optional_string(_), do: nil
+
+  defp changed_paths(context) do
+    first_present(~w(changed_paths changed_files files paths), context) || []
+  end
+
+  defp context_map(context) when is_list(context), do: Map.new(context)
+  defp context_map(context) when is_map(context), do: context
+  defp context_map(_), do: %{}
+
+  defp first_string(map, keys) do
+    value = first_present(keys, map)
+
+    case value do
+      value when is_atom(value) -> Atom.to_string(value)
+      value when is_binary(value) -> value
+      _ -> nil
+    end
+  end
+
+  defp first_present(keys, map) when is_list(keys) and is_map(map) do
+    Enum.find_value(keys, fn key -> field(map, key) end)
+  end
+
+  defp field(map, key) when is_map(map) do
+    Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+  end
+
+  defp invalid_path_decision(agent, action, reason) do
+    build_decision(%{
+      verdict: :block,
+      reason: "Repo policy blocked invalid changed path: #{reason}",
+      agent: agent,
+      action: action,
+      changed_paths: [],
+      matched_rule_ids: [],
+      unmatched_paths: []
+    })
+  end
+
+  defp build_decision(attrs) do
+    %Decision{
+      verdict: attrs.verdict,
+      reason: attrs.reason,
+      agent: attrs.agent,
+      action: attrs.action,
+      changed_paths: attrs.changed_paths,
+      matched_rule_ids: attrs.matched_rule_ids,
+      unmatched_paths: attrs.unmatched_paths,
+      digest: decision_digest(attrs)
+    }
+  end
+
+  defp decision_digest(attrs) do
+    %{
+      "verdict" => attrs.verdict,
+      "reason" => attrs.reason,
+      "agent" => attrs.agent,
+      "action" => attrs.action,
+      "changed_paths" => attrs.changed_paths,
+      "matched_rule_ids" => attrs.matched_rule_ids,
+      "unmatched_paths" => attrs.unmatched_paths
+    }
+    |> canonical_iodata()
+    |> IO.iodata_to_binary()
+    |> sha256_hex()
+  end
+
+  defp canonical_map(%__MODULE__{} = policy) do
+    %{
+      "version" => policy.version,
+      "default" => policy.default,
+      "rules" =>
+        Enum.map(policy.rules, fn rule ->
+          %{
+            "id" => rule.id,
+            "decision" => rule.decision,
+            "agents" => rule.agents,
+            "actions" => rule.actions,
+            "paths" => rule.paths,
+            "message" => rule.message,
+            "index" => rule.index
+          }
+        end)
+    }
+  end
+
+  defp canonical_iodata(value) when is_map(value) do
+    parts =
+      value
+      |> Enum.map(fn {key, item} -> {canonical_key(key), item} end)
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.map(fn {key, item} -> [Jason.encode!(key), ?:, canonical_iodata(item)] end)
+      |> Enum.intersperse(",")
+
+    [?{, parts, ?}]
+  end
+
+  defp canonical_iodata(value) when is_list(value) do
+    parts =
+      value
+      |> Enum.map(&canonical_iodata/1)
+      |> Enum.intersperse(",")
+
+    [?[, parts, ?]]
+  end
+
+  defp canonical_iodata(value)
+       when is_atom(value) and not is_boolean(value) and not is_nil(value) do
+    value
+    |> Atom.to_string()
+    |> Jason.encode!()
+  end
+
+  defp canonical_iodata(value), do: Jason.encode!(value)
+
+  defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp canonical_key(key) when is_binary(key), do: key
+  defp canonical_key(key), do: to_string(key)
+
+  defp sha256_hex(data), do: Base.encode16(:crypto.hash(:sha256, data), case: :lower)
+end

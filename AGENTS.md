@@ -42,6 +42,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Quarantine      Prompt-injection/tool-poisoning indicators
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization
+    +-- SigilGuard.RepoPolicy      deterministic repo policy kernel
     +-- SigilGuard.MCP.Gateway     MCP-shaped guard helpers
     +-- SigilGuard.Confirmation    Action-bound approval tokens
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
@@ -77,6 +78,7 @@ SigilGuard (Main API)
 | `lib/sigil_guard/quarantine.ex` | Prompt-injection and tool-poisoning indicators |
 | `lib/sigil_guard/runtime/gate.ex` | Source-to-sink runtime gate |
 | `lib/sigil_guard/runtime/stream.ex` | Chunk-safe streaming sanitizer |
+| `lib/sigil_guard/repo_policy.ex` | Deterministic repo path policy evaluator |
 | `lib/sigil_guard/mcp/gateway.ex` | MCP-shaped request/result guard helpers |
 | `lib/sigil_guard/confirmation.ex` | HMAC-signed confirmation tokens bound to action digests |
 | `lib/sigil_guard/envelope.ex` | SIGIL envelope sign/verify |
@@ -161,7 +163,7 @@ test/
 | `[:sigil_guard, :registry, :fetch, :start]` | `system_time` | `url` |
 | `[:sigil_guard, :registry, :fetch, :stop]` | `duration` | `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
-| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest` |
+| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 
 `SigilGuard.Telemetry.otel_attributes/3` and `attach_otel_forwarder/3` provide

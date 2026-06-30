@@ -22,6 +22,8 @@ defmodule SigilGuard.Runtime.Gate do
   alias SigilGuard.Decision
   alias SigilGuard.Policy
   alias SigilGuard.Quarantine
+  alias SigilGuard.RepoPolicy
+  alias SigilGuard.RepoPolicy.Decision, as: RepoDecision
   alias SigilGuard.Scanner
   alias SigilGuard.Telemetry
 
@@ -48,7 +50,17 @@ defmodule SigilGuard.Runtime.Gate do
     action = Context.action_name(context, payload)
     hits = scan_hits(text, opts)
     quarantine = Quarantine.inspect(text, context, opts)
-    risk = risk_level(action, context, hits, quarantine, opts)
+    repo_policy = repo_policy_decision(payload, context, action, opts)
+
+    risk =
+      risk_level(%{
+        action: action,
+        context: context,
+        hits: hits,
+        quarantine: quarantine,
+        repo_policy: repo_policy,
+        opts: opts
+      })
 
     policy_verdict =
       Policy.evaluate(action, context.trust_level, Keyword.put(opts, :risk_level, risk))
@@ -60,6 +72,7 @@ defmodule SigilGuard.Runtime.Gate do
         context: context,
         hits: hits,
         quarantine: quarantine,
+        repo_policy: repo_policy,
         risk: risk,
         policy_verdict: policy_verdict,
         opts: opts
@@ -78,17 +91,87 @@ defmodule SigilGuard.Runtime.Gate do
     end
   end
 
-  defp risk_level(action, context, hits, quarantine, opts) do
-    Keyword.get_lazy(opts, :risk_level, fn ->
+  defp risk_level(state) do
+    Keyword.get_lazy(state.opts, :risk_level, fn ->
       cond do
-        quarantine.verdict == :blocked -> :high
-        quarantine.verdict == :suspicious -> :medium
-        Enum.any?(hits, &(&1.severity == :high)) and external_sink?(context.sink) -> :high
-        hits != [] -> :medium
-        true -> Policy.classify_risk(action, opts)
+        repo_policy_verdict(state.repo_policy) == :block ->
+          :high
+
+        repo_policy_verdict(state.repo_policy) == :require_approval ->
+          :medium
+
+        state.quarantine.verdict == :blocked ->
+          :high
+
+        state.quarantine.verdict == :suspicious ->
+          :medium
+
+        Enum.any?(state.hits, &(&1.severity == :high)) and external_sink?(state.context.sink) ->
+          :high
+
+        state.hits != [] ->
+          :medium
+
+        true ->
+          Policy.classify_risk(state.action, state.opts)
       end
     end)
   end
+
+  defp repo_policy_decision(_, %Context{phase: phase}, _, _) when phase != :repo_change, do: nil
+
+  defp repo_policy_decision(payload, context, action, opts) do
+    case Keyword.fetch(opts, :repo_policy) do
+      {:ok, raw_policy} ->
+        case RepoPolicy.compile(raw_policy) do
+          {:ok, policy} ->
+            RepoPolicy.evaluate(policy, repo_policy_context(payload, context, action))
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      :error ->
+        nil
+    end
+  end
+
+  defp repo_policy_context(payload, context, action) do
+    %{
+      agent: context.identity || context.actor,
+      action: action,
+      changed_paths: changed_paths(payload, context)
+    }
+  end
+
+  defp changed_paths(payload, context) do
+    first_list(context.metadata, [
+      :changed_paths,
+      "changed_paths",
+      :changed_files,
+      "changed_files"
+    ]) ||
+      first_list(payload, [
+        :changed_paths,
+        "changed_paths",
+        :changed_files,
+        "changed_files",
+        :files,
+        "files"
+      ]) ||
+      []
+  end
+
+  defp first_list(map, keys) when is_map(map) do
+    Enum.find_value(keys, fn key ->
+      case Map.get(map, key) do
+        value when is_list(value) -> value
+        _ -> nil
+      end
+    end)
+  end
+
+  defp first_list(_, _), do: nil
 
   defp decide(state) do
     source_sink = source_sink_verdict(state)
@@ -108,6 +191,24 @@ defmodule SigilGuard.Runtime.Gate do
       content_hash: state.quarantine.content_hash,
       audit_metadata: audit_metadata(state, verdict, action)
     }
+  end
+
+  defp source_sink_verdict(%{
+         repo_policy: %RepoDecision{verdict: :block} = decision
+       }) do
+    {:blocked, :block, decision.reason}
+  end
+
+  defp source_sink_verdict(%{
+         repo_policy: %RepoDecision{verdict: :require_approval} = decision
+       }) do
+    {:confirm, :require_approval, decision.reason}
+  end
+
+  defp source_sink_verdict(%{
+         repo_policy: {:error, reason}
+       }) do
+    {:blocked, :block, "Repo policy could not be compiled: #{inspect(reason)}"}
   end
 
   defp source_sink_verdict(%{
@@ -201,6 +302,7 @@ defmodule SigilGuard.Runtime.Gate do
       content_hash: state.quarantine.content_hash,
       action_digest: action_digest(state, verdict)
     }
+    |> put_repo_policy_metadata(state.repo_policy)
   end
 
   defp action_digest(state, {:confirm, _}) do
@@ -217,6 +319,29 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp audit_verdict({:confirm, _}), do: :confirm
   defp audit_verdict(verdict), do: verdict
+
+  defp repo_policy_verdict(%RepoDecision{verdict: verdict}), do: verdict
+  defp repo_policy_verdict({:error, _}), do: :block
+  defp repo_policy_verdict(_), do: nil
+
+  defp put_repo_policy_metadata(metadata, %RepoDecision{} = decision) do
+    Map.merge(metadata, %{
+      repo_policy_verdict: decision.verdict,
+      repo_policy_rules: decision.matched_rule_ids,
+      repo_unmatched_paths: decision.unmatched_paths
+    })
+  end
+
+  defp put_repo_policy_metadata(metadata, {:error, reason}) do
+    Map.merge(metadata, %{
+      repo_policy_verdict: :block,
+      repo_policy_rules: [],
+      repo_unmatched_paths: [],
+      repo_policy_error: inspect(reason)
+    })
+  end
+
+  defp put_repo_policy_metadata(metadata, _), do: metadata
 
   defp emit_decision(%Decision{} = decision) do
     Telemetry.emit(
@@ -238,7 +363,11 @@ defmodule SigilGuard.Runtime.Gate do
         :indicator_count,
         :indicator_ids,
         :content_hash,
-        :action_digest
+        :action_digest,
+        :repo_policy_verdict,
+        :repo_policy_rules,
+        :repo_unmatched_paths,
+        :repo_policy_error
       ])
     )
   end

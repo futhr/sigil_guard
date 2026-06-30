@@ -49,7 +49,9 @@ defmodule SigilGuard.Telemetry do
       Metadata: `%{phase: atom, origin: atom, sink: atom, tool: String.t() | nil,
       trust_zone: atom, trust_level: atom, risk_level: atom, verdict: atom,
       action: atom, hit_count: integer, indicator_count: integer,
-      indicator_ids: [atom], content_hash: String.t(), action_digest: String.t() | nil}`
+      indicator_ids: [atom], content_hash: String.t(), action_digest: String.t() | nil,
+      repo_policy_verdict: atom, repo_policy_rules: [String.t()],
+      repo_unmatched_paths: [String.t()]}`
 
     * `[:sigil_guard, :audit, :logged]`
       Measurements: `%{system_time: integer}`
@@ -90,6 +92,10 @@ defmodule SigilGuard.Telemetry do
     pipeline: "sigil.scanner.pipeline",
     result: "sigil.audit.result",
     resource_uri: "sigil.resource.uri",
+    repo_policy_error: "sigil.repo_policy.error",
+    repo_policy_rules: "sigil.repo_policy.rules",
+    repo_policy_verdict: "sigil.repo_policy.verdict",
+    repo_unmatched_paths: "sigil.repo_policy.unmatched_paths",
     risk_level: "sigil.security.risk_level",
     scanner_validate: "sigil.scanner.validate",
     sink: "sigil.security.sink",

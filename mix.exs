@@ -135,7 +135,9 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Identity.Binding,
           SigilGuard.Patterns,
           SigilGuard.Profile,
-          SigilGuard.Quarantine
+          SigilGuard.Quarantine,
+          SigilGuard.RepoPolicy,
+          SigilGuard.RepoPolicy.Decision
         ],
         "Runtime Gate": [
           SigilGuard.Runtime.Gate,
