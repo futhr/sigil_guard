@@ -63,21 +63,25 @@ defmodule SigilGuard.Registry.Bundle do
 
     * `:issuer` - required issuer identifier, usually a DID.
     * `:issued_at` - optional ISO 8601 timestamp, defaults to current UTC time.
+    * `:expires_at` - optional ISO 8601 timestamp after which verifiers quarantine the bundle.
   """
   @spec sign(map(), module(), keyword()) :: map()
   def sign(bundle, signer, opts) when is_map(bundle) do
     issuer = Keyword.fetch!(opts, :issuer)
     issued_at = Keyword.get_lazy(opts, :issued_at, &timestamp/0)
+    expires_at = Keyword.get(opts, :expires_at)
     unsigned = unsigned_bundle(bundle)
     signature = signer.sign(canonical_bytes(unsigned))
 
-    provenance = %{
-      "issuer" => issuer,
-      "issued_at" => issued_at,
-      "algorithm" => @signature_algorithm,
-      "digest" => digest(unsigned),
-      "signature" => Base.url_encode64(signature, padding: false)
-    }
+    provenance =
+      %{
+        "issuer" => issuer,
+        "issued_at" => issued_at,
+        "algorithm" => @signature_algorithm,
+        "digest" => digest(unsigned),
+        "signature" => Base.url_encode64(signature, padding: false)
+      }
+      |> put_optional("expires_at", expires_at)
 
     Map.put(unsigned, "provenance", provenance)
   end
@@ -90,6 +94,9 @@ defmodule SigilGuard.Registry.Bundle do
     * `:public_keys` - map of issuer to base64/base64url Ed25519 public key.
     * `:public_key_b64u` - fallback public key for any issuer.
     * `:require_signature` - quarantine unsigned bundles when true.
+    * `:max_age_seconds` - quarantine signed bundles older than this many seconds.
+    * `:clock_skew_seconds` - allowed future `issued_at` skew, defaults to 60.
+    * `:now` - verification clock as a `DateTime` or ISO 8601 timestamp, defaults to current UTC time.
   """
   @spec verify(map(), keyword()) :: {:ok, verified()} | {:quarantine, quarantine()}
   def verify(bundle, opts \\ [])
@@ -122,6 +129,7 @@ defmodule SigilGuard.Registry.Bundle do
   defp verify_signed(bundle, provenance, opts) do
     with {:ok, fields} <- provenance_fields(provenance),
          :ok <- validate_digest(bundle, fields.digest),
+         :ok <- validate_time_bounds(fields, opts),
          {:ok, public_key} <- public_key(fields.issuer, opts),
          {:ok, signature} <- decode_signature(fields.signature),
          :ok <- verify_signature(bundle, signature, public_key) do
@@ -143,7 +151,9 @@ defmodule SigilGuard.Registry.Bundle do
       issuer: provenance["issuer"] || provenance[:issuer],
       algorithm: provenance["algorithm"] || provenance[:algorithm],
       digest: provenance["digest"] || provenance[:digest],
-      signature: provenance["signature"] || provenance[:signature]
+      signature: provenance["signature"] || provenance[:signature],
+      issued_at: provenance["issued_at"] || provenance[:issued_at],
+      expires_at: provenance["expires_at"] || provenance[:expires_at]
     }
 
     with :ok <- require_binary(fields.issuer, :missing_issuer),
@@ -163,6 +173,78 @@ defmodule SigilGuard.Registry.Bundle do
 
   defp validate_digest(bundle, claimed_digest) do
     if secure_compare(digest(bundle), claimed_digest), do: :ok, else: {:error, :digest_mismatch}
+  end
+
+  defp validate_time_bounds(fields, opts) do
+    with {:ok, issued_at} <- optional_datetime(fields.issued_at, :invalid_issued_at),
+         {:ok, expires_at} <- optional_datetime(fields.expires_at, :invalid_expires_at),
+         {:ok, now} <- verification_now(opts),
+         {:ok, bounds} <- time_bounds(opts),
+         :ok <- validate_expiration(expires_at, now),
+         :ok <- validate_issued_at(issued_at, now, bounds.clock_skew_seconds) do
+      validate_max_age(issued_at, now, bounds.max_age_seconds)
+    end
+  end
+
+  defp time_bounds(opts) do
+    max_age_seconds = Keyword.get(opts, :max_age_seconds)
+    clock_skew_seconds = Keyword.get(opts, :clock_skew_seconds, 60)
+
+    cond do
+      not valid_seconds?(max_age_seconds, true) -> {:error, :invalid_max_age}
+      not valid_seconds?(clock_skew_seconds, false) -> {:error, :invalid_clock_skew}
+      true -> {:ok, %{max_age_seconds: max_age_seconds, clock_skew_seconds: clock_skew_seconds}}
+    end
+  end
+
+  defp valid_seconds?(nil, true), do: true
+  defp valid_seconds?(value, _), do: is_integer(value) and value >= 0
+
+  defp validate_expiration(nil, _), do: :ok
+
+  defp validate_expiration(expires_at, now) do
+    if DateTime.compare(expires_at, now) == :gt, do: :ok, else: {:error, :expired_bundle}
+  end
+
+  defp validate_issued_at(nil, _, _), do: :ok
+
+  defp validate_issued_at(issued_at, now, clock_skew_seconds) do
+    if DateTime.diff(issued_at, now, :second) > clock_skew_seconds do
+      {:error, :future_issued_at}
+    else
+      :ok
+    end
+  end
+
+  defp validate_max_age(nil, _, nil), do: :ok
+  defp validate_max_age(nil, _, _), do: {:error, :missing_issued_at}
+  defp validate_max_age(_, _, nil), do: :ok
+
+  defp validate_max_age(issued_at, now, max_age_seconds) do
+    if DateTime.diff(now, issued_at, :second) > max_age_seconds do
+      {:error, :stale_bundle}
+    else
+      :ok
+    end
+  end
+
+  defp optional_datetime(nil, _), do: {:ok, nil}
+
+  defp optional_datetime(value, reason) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, datetime, _} -> {:ok, datetime}
+      {:error, _} -> {:error, reason}
+    end
+  end
+
+  defp optional_datetime(_, reason), do: {:error, reason}
+
+  defp verification_now(opts) do
+    case Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:second) end) do
+      %DateTime{} = now -> {:ok, now}
+      value when is_binary(value) -> optional_datetime(value, :invalid_now)
+      _ -> {:error, :invalid_now}
+    end
   end
 
   defp public_key(issuer, opts) do
@@ -233,6 +315,9 @@ defmodule SigilGuard.Registry.Bundle do
   defp unsigned_bundle(bundle) do
     Map.drop(bundle, @metadata_keys ++ @metadata_atom_keys)
   end
+
+  defp put_optional(map, _, nil), do: map
+  defp put_optional(map, key, value), do: Map.put(map, key, value)
 
   defp quarantine(reason, bundle, provenance) do
     {:quarantine, quarantine_map(reason, bundle, provenance)}
