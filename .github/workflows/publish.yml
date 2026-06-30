@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   publish:
@@ -52,6 +55,30 @@ jobs:
 
       - name: Generate documentation
         run: mix docs
+
+      - name: Build release artifacts
+        run: |
+          mkdir -p dist
+          mix hex.build --output "dist/sigil_guard-${GITHUB_REF_NAME}.tar"
+          mix sigil_guard.sbom --output "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigil_guard-${{ github.ref_name }}-release-artifacts
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Attest release package provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/sigil_guard-${{ github.ref_name }}.tar
+
+      - name: Attest release package SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/sigil_guard-${{ github.ref_name }}.tar
+          sbom-path: dist/sigil_guard-${{ github.ref_name }}.spdx.json
 
       - name: Publish to Hex.pm
         env:

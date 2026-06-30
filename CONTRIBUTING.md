@@ -50,6 +50,11 @@ Releases are managed by maintainers using git_ops:
 3. Push with tags: `git push --follow-tags`
 4. CI will publish to Hex.pm on the `v*` tag
 
+The publish workflow builds a release tarball preview, generates an SPDX SBOM
+with `mix sigil_guard.sbom`, uploads both as workflow artifacts, and creates
+GitHub artifact attestations for package provenance and SBOM linkage before
+publishing.
+
 ## Pull Request Process
 
 1. Ensure your code follows the project style

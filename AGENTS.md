@@ -127,7 +127,7 @@ Do not add `Co-Authored-By` or any AI/Claude attribution to commit messages.
 
 1. `mix git_ops.release` — updates changelog, bumps version in mix.exs and README.md, commits, and tags
 2. `git push --follow-tags` — pushes commit and tag
-3. CI (`publish.yml`) triggers on `v*` tag → runs checks → `mix hex.publish`
+3. CI (`publish.yml`) triggers on `v*` tag → runs checks, builds release artifacts, generates `mix sigil_guard.sbom`, attests package provenance/SBOM, then publishes to Hex.pm
 
 ## Testing
 
