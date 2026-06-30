@@ -1,0 +1,73 @@
+{
+  "generated_by": {
+    "canonical_source": "sigil_protocol::sigil_envelope::SigilEnvelope::canonical_bytes",
+    "crate": "sigil-protocol",
+    "crate_version": "0.1.5",
+    "language": "rust",
+    "seed_hex": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+    "signature_source": "ed25519-dalek SigningKey::sign"
+  },
+  "public_key_b64u": "GX9rI-FshTLGq8g4-s1ep4m-DHaykgM0A5v6iz02jWE",
+  "schema": "sigil_guard.envelope_golden_vectors.v1",
+  "vectors": [
+    {
+      "canonical_json": "{\"identity\":\"did:sigil:parent_01\",\"nonce\":\"000102030405060708090a0b0c0d0e0f\",\"timestamp\":\"2026-06-30T12:00:00.000Z\",\"verdict\":\"allowed\"}",
+      "case": "rust_allowed_reference_0_1_5",
+      "envelope": {
+        "identity": "did:sigil:parent_01",
+        "nonce": "000102030405060708090a0b0c0d0e0f",
+        "signature": "7_uWJKat2pW1t8KPKkkdOrTNH8rSGlyHMN3z_VCJV33_GvwX9iIObqCIFbZnKPBOF4l7ZeebFzk9xAiTYyOHBQ",
+        "timestamp": "2026-06-30T12:00:00.000Z",
+        "verdict": "allowed"
+      },
+      "identity": "did:sigil:parent_01",
+      "nonce": "000102030405060708090a0b0c0d0e0f",
+      "reason": null,
+      "signature_b64u": "7_uWJKat2pW1t8KPKkkdOrTNH8rSGlyHMN3z_VCJV33_GvwX9iIObqCIFbZnKPBOF4l7ZeebFzk9xAiTYyOHBQ",
+      "strict_profile_result": "ok",
+      "timestamp": "2026-06-30T12:00:00.000Z",
+      "verdict": "allowed",
+      "verify_result": "ok"
+    },
+    {
+      "canonical_json": "{\"identity\":\"did:sigil:scanner_01\",\"nonce\":\"101112131415161718191a1b1c1d1e1f\",\"timestamp\":\"2026-06-30T12:00:01.000Z\",\"verdict\":\"scanned\"}",
+      "case": "rust_scanned_reference_0_1_5",
+      "envelope": {
+        "identity": "did:sigil:scanner_01",
+        "nonce": "101112131415161718191a1b1c1d1e1f",
+        "reason": "payload inspected",
+        "signature": "hAEBIyYK9gB5vVQ_-0m_e5iaUI1JONw7IayvCKfImGDhsHAkj0iQjdw9CWbWb5ob2azbyopQHv_ZqhRT-JhcBg",
+        "timestamp": "2026-06-30T12:00:01.000Z",
+        "verdict": "scanned"
+      },
+      "identity": "did:sigil:scanner_01",
+      "nonce": "101112131415161718191a1b1c1d1e1f",
+      "reason": "payload inspected",
+      "signature_b64u": "hAEBIyYK9gB5vVQ_-0m_e5iaUI1JONw7IayvCKfImGDhsHAkj0iQjdw9CWbWb5ob2azbyopQHv_ZqhRT-JhcBg",
+      "strict_profile_result": "ok",
+      "timestamp": "2026-06-30T12:00:01.000Z",
+      "verdict": "scanned",
+      "verify_result": "ok"
+    },
+    {
+      "canonical_json": "{\"identity\":\"did:sigil:policy_01\",\"nonce\":\"202122232425262728292a2b2c2d2e2f\",\"timestamp\":\"2026-06-30T12:00:02.000Z\",\"verdict\":\"blocked\"}",
+      "case": "rust_blocked_reference_0_1_5",
+      "envelope": {
+        "identity": "did:sigil:policy_01",
+        "nonce": "202122232425262728292a2b2c2d2e2f",
+        "reason": "policy denied",
+        "signature": "d4NIbhQki7GFl43mNWWuWQJjtzpkfMKx_7bqLOveptu2MvaY31CkHq01sVqcxWzSWVTrr8w3F92MiXYgyFJHBA",
+        "timestamp": "2026-06-30T12:00:02.000Z",
+        "verdict": "blocked"
+      },
+      "identity": "did:sigil:policy_01",
+      "nonce": "202122232425262728292a2b2c2d2e2f",
+      "reason": "policy denied",
+      "signature_b64u": "d4NIbhQki7GFl43mNWWuWQJjtzpkfMKx_7bqLOveptu2MvaY31CkHq01sVqcxWzSWVTrr8w3F92MiXYgyFJHBA",
+      "strict_profile_result": "ok",
+      "timestamp": "2026-06-30T12:00:02.000Z",
+      "verdict": "blocked",
+      "verify_result": "ok"
+    }
+  ]
+}

@@ -132,7 +132,7 @@ Do not add `Co-Authored-By` or any AI/Claude attribution to commit messages.
 ## Testing
 
 - **Unit tests** - Test pure Elixir logic and protocol compatibility profiles
-- **Golden behavior tests** - Verify canonical bytes, envelope wire profiles, registry normalization, and replay checks
+- **Golden behavior tests** - Verify canonical bytes, Rust-generated envelope vectors, wire profiles, registry normalization, and replay checks
 
 Test structure:
 ```

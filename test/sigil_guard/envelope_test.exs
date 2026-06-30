@@ -1,10 +1,35 @@
+defmodule SigilGuard.RustGoldenVectorSigner do
+  @moduledoc false
+
+  @behaviour SigilGuard.Signer
+
+  @seed :binary.copy(<<0x2A>>, 32)
+
+  @impl SigilGuard.Signer
+  def sign(message), do: :crypto.sign(:eddsa, :none, message, [@seed, :ed25519])
+
+  @impl SigilGuard.Signer
+  def public_key do
+    {public_key, _} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    public_key
+  end
+end
+
 defmodule SigilGuard.EnvelopeTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
 
   alias SigilGuard.Envelope
+  alias SigilGuard.RustGoldenVectorSigner
   alias SigilGuard.TestSigner
+
+  @rust_vectors_path Path.expand(
+                       "../fixtures/envelope_golden_vectors.sigil_protocol_0_1_5.json",
+                       __DIR__
+                     )
+
+  @external_resource @rust_vectors_path
 
   describe "canonical_bytes/4" do
     test "produces deterministic JSON with lexicographic key order" do
@@ -281,6 +306,57 @@ defmodule SigilGuard.EnvelopeTest do
     end
   end
 
+  describe "Rust-generated golden vectors" do
+    test "fixture records external generator provenance" do
+      fixture = rust_vectors()
+
+      assert fixture["schema"] == "sigil_guard.envelope_golden_vectors.v1"
+      assert fixture["generated_by"]["language"] == "rust"
+      assert fixture["generated_by"]["crate"] == "sigil-protocol"
+      assert fixture["generated_by"]["crate_version"] == "0.1.5"
+      assert fixture["public_key_b64u"] == public_key_b64u(RustGoldenVectorSigner)
+    end
+
+    test "canonical bytes match the Rust sigil-protocol crate" do
+      for vector <- rust_vectors()["vectors"] do
+        assert Envelope.canonical_bytes(
+                 vector["identity"],
+                 verdict_atom(vector["verdict"]),
+                 vector["timestamp"],
+                 vector["nonce"]
+               ) == vector["canonical_json"],
+               "canonical bytes mismatch for #{vector["case"]}"
+      end
+    end
+
+    test "verifies Rust-generated envelopes in compatibility and strict profiles" do
+      public_key_b64u = rust_vectors()["public_key_b64u"]
+
+      for vector <- rust_vectors()["vectors"] do
+        assert :ok = Envelope.verify(vector["envelope"], public_key_b64u),
+               "default verification mismatch for #{vector["case"]}"
+
+        assert :ok =
+                 Envelope.verify(vector["envelope"], public_key_b64u,
+                   profile: :sigil_spec_draft_2026_02
+                 ),
+               "strict verification mismatch for #{vector["case"]}"
+      end
+    end
+
+    test "Elixir signing reproduces Rust-generated signatures" do
+      for vector <- rust_vectors()["vectors"] do
+        assert Envelope.sign(vector["identity"], verdict_atom(vector["verdict"]),
+                 signer: RustGoldenVectorSigner,
+                 reason: vector["reason"],
+                 timestamp: vector["timestamp"],
+                 nonce: vector["nonce"]
+               ) == vector["envelope"],
+               "signature mismatch for #{vector["case"]}"
+      end
+    end
+  end
+
   describe "verify/2 with malformed input" do
     test "returns error for each missing required field" do
       envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
@@ -361,5 +437,20 @@ defmodule SigilGuard.EnvelopeTest do
 
       assert length(Enum.uniq(nonces)) == 100
     end
+  end
+
+  defp rust_vectors do
+    @rust_vectors_path
+    |> File.read!()
+    |> Jason.decode!()
+  end
+
+  defp verdict_atom("allowed"), do: :allowed
+  defp verdict_atom("blocked"), do: :blocked
+  defp verdict_atom("scanned"), do: :scanned
+
+  defp public_key_b64u(signer) do
+    signer.public_key()
+    |> Base.url_encode64(padding: false)
   end
 end

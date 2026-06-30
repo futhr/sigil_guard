@@ -391,6 +391,9 @@ mix docs             # Generate documentation
 mix bench            # Run benchmarks
 ```
 
+Envelope compatibility is covered by checked-in Rust-generated golden vectors
+from `sigil-protocol` 0.1.5 in `test/fixtures/`.
+
 ---
 
 ## Performance
