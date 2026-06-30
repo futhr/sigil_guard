@@ -36,6 +36,10 @@ defmodule SigilGuard.TelemetryTest do
             indicator_ids: [:ignore_instructions],
             envelope_status: :invalid,
             envelope_reason: :invalid_signature,
+            confirmation_status: :invalid,
+            confirmation_reason: :digest_mismatch,
+            confirmation_actor: "did:sigil:agent",
+            confirmation_nonce_hash: "nonce-hash",
             content_hash: "abc123"
           }
         )
@@ -51,6 +55,10 @@ defmodule SigilGuard.TelemetryTest do
       assert attributes["sigil.security.indicator_ids"] == ["ignore_instructions"]
       assert attributes["sigil.envelope.status"] == "invalid"
       assert attributes["sigil.envelope.reason"] == "invalid_signature"
+      assert attributes["sigil.confirmation.status"] == "invalid"
+      assert attributes["sigil.confirmation.reason"] == "digest_mismatch"
+      assert attributes["sigil.confirmation.actor"] == "did:sigil:agent"
+      assert attributes["sigil.confirmation.nonce_hash"] == "nonce-hash"
       assert attributes["sigil.security.content_hash"] == "abc123"
       refute Map.has_key?(attributes, "match")
     end

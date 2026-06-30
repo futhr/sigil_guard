@@ -60,6 +60,9 @@ defmodule SigilGuard.Telemetry do
       actor: String.t() | nil, identity: String.t() | nil, trust_zone: atom,
       trust_level: atom, risk_level: atom, verdict: atom, action: atom,
       envelope_status: :valid | :invalid, envelope_reason: atom | nil,
+      confirmation_status: :accepted | :invalid | nil,
+      confirmation_reason: atom | nil, confirmation_actor: String.t() | nil,
+      confirmation_nonce_hash: String.t() | nil,
       content_hash: String.t()}`
 
     * `[:sigil_guard, :audit, :logged]`
@@ -88,6 +91,12 @@ defmodule SigilGuard.Telemetry do
     action: "sigil.security.action",
     action_digest: "sigil.security.action_digest",
     actor: "sigil.actor",
+    confirmation_actor: "sigil.confirmation.actor",
+    confirmation_expires_at: "sigil.confirmation.expires_at",
+    confirmation_issued_at: "sigil.confirmation.issued_at",
+    confirmation_nonce_hash: "sigil.confirmation.nonce_hash",
+    confirmation_reason: "sigil.confirmation.reason",
+    confirmation_status: "sigil.confirmation.status",
     content_hash: "sigil.security.content_hash",
     count: "sigil.registry.count",
     endpoint: "sigil.registry.endpoint",

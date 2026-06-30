@@ -85,6 +85,33 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
+  Issue an action-bound confirmation token for a signed MCP request.
+
+  `_sigil` is verified first, then the token is bound to the signed identity
+  as both actor and identity in the gateway context. This prevents a token
+  issued for an unsigned or spoofed context from approving a signed request.
+  """
+  @spec issue_signed_confirmation_token(
+          term(),
+          Context.t() | map() | keyword(),
+          Decision.t(),
+          binary(),
+          keyword()
+        ) ::
+          {:ok, String.t()} | {:error, term()}
+  def issue_signed_confirmation_token(request, context, %Decision{} = decision, key, opts \\ []) do
+    with {:ok, claims} <- verify_request_envelope(request, opts) do
+      issue_confirmation_token(
+        request,
+        signed_context(context, claims.identity),
+        decision,
+        key,
+        opts
+      )
+    end
+  end
+
+  @doc """
   Guard an MCP tool request and honor an optional confirmation token.
 
   If the request does not require confirmation, this behaves like
@@ -109,6 +136,47 @@ defmodule SigilGuard.MCP.Gateway do
           {:ok, Decision.t()} | {:error, map(), Decision.t()}
   def guarded_confirmed_request(request, context \\ %{}, opts \\ []) do
     decision = guard_confirmed_request(request, context, opts)
+
+    if executable?(decision) do
+      {:ok, decision}
+    else
+      {:error, response_for_decision(decision, request_id(request), opts), decision}
+    end
+  end
+
+  @doc """
+  Guard a signed MCP tool request and honor an optional confirmation token.
+
+  Envelope verification runs before confirmation verification. A valid
+  confirmation token must be bound to the normalized request payload and to
+  the signed envelope identity.
+  """
+  @spec guard_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          Decision.t()
+  def guard_signed_confirmed_request(request, context \\ %{}, opts \\ []) do
+    case verify_request_envelope(request, opts) do
+      {:ok, claims} ->
+        signed = signed_context(context, claims.identity)
+        decision = guard_request(request, signed, opts)
+
+        confirmed =
+          maybe_apply_confirmation(decision, request, request_context(request, signed), opts)
+
+        emit_signed_request(confirmed, :valid, nil)
+        confirmed
+
+      {:error, reason} ->
+        envelope_decision(request, context, reason)
+    end
+  end
+
+  @doc """
+  Guard a signed, possibly confirmed MCP request and return either an allow decision or JSON-RPC error.
+  """
+  @spec guarded_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_signed_confirmed_request(request, context \\ %{}, opts \\ []) do
+    decision = guard_signed_confirmed_request(request, context, opts)
 
     if executable?(decision) do
       {:ok, decision}
@@ -269,8 +337,8 @@ defmodule SigilGuard.MCP.Gateway do
   defp signed_context(context, identity) do
     context
     |> context_overrides()
-    |> Map.put_new(:identity, identity)
-    |> Map.put_new(:actor, identity)
+    |> Map.put(:identity, identity)
+    |> Map.put(:actor, identity)
   end
 
   defp context_overrides(%Context{} = context), do: Map.from_struct(context)
@@ -661,6 +729,12 @@ defmodule SigilGuard.MCP.Gateway do
         :indicator_ids,
         :content_hash,
         :action_digest,
+        :confirmation_status,
+        :confirmation_reason,
+        :confirmation_actor,
+        :confirmation_nonce_hash,
+        :confirmation_issued_at,
+        :confirmation_expires_at,
         :repo_policy_verdict,
         :repo_policy_rules,
         :repo_unmatched_paths

@@ -133,8 +133,13 @@ request = %{
 :blocked = decision.verdict
 -32_001 = error_response["error"]["code"]
 
+signed_request = %{
+  "method" => "tools/call",
+  "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+}
+
 envelope = SigilGuard.Envelope.sign("did:sigil:agent", :allowed, signer: MySigner)
-signed_request = put_in(request, ["params", "_sigil"], envelope)
+signed_request = put_in(signed_request, ["params", "_sigil"], envelope)
 public_key_b64u = MySigner.public_key_b64u()
 
 {:ok, signed_decision} =
@@ -180,6 +185,38 @@ confirmed_request =
 
 :allowed = confirmed_decision.verdict
 
+signed_confirm_request = put_in(confirm_request, ["params", "_sigil"], envelope)
+
+{:error, _response, signed_confirm_decision} =
+  SigilGuard.MCP.Gateway.guarded_signed_confirmed_request(
+    signed_confirm_request,
+    [trust_level: :medium],
+    public_keys: %{"did:sigil:agent" => public_key_b64u},
+    confirmation_key: secret_key
+  )
+
+{:ok, signed_confirmation_token} =
+  SigilGuard.MCP.Gateway.issue_signed_confirmation_token(
+    signed_confirm_request,
+    [trust_level: :medium],
+    signed_confirm_decision,
+    secret_key,
+    public_keys: %{"did:sigil:agent" => public_key_b64u}
+  )
+
+signed_confirmed_request =
+  put_in(signed_confirm_request, ["params", "_sigil_confirmation"], signed_confirmation_token)
+
+{:ok, signed_confirmed_decision} =
+  SigilGuard.MCP.Gateway.guarded_signed_confirmed_request(
+    signed_confirmed_request,
+    [trust_level: :medium],
+    public_keys: %{"did:sigil:agent" => public_key_b64u},
+    confirmation_key: secret_key
+  )
+
+"did:sigil:agent" = signed_confirmed_decision.audit_metadata.confirmation_actor
+
 {:ok, safe_response, _decision} =
   SigilGuard.MCP.Gateway.guarded_result(
     %{"id" => 1, "content" => [%{"type" => "text", "text" => "token=supersecretvalue123"}]},
@@ -199,6 +236,9 @@ stream =
 {_stream, _decision, chunk2} = SigilGuard.Runtime.Stream.finish(stream)
 sanitized_output = chunk1 <> chunk2
 ```
+
+When envelope replay checks are enabled, a confirmed retry must carry a fresh
+`_sigil` envelope nonce/signature as well as the `_sigil_confirmation` token.
 
 ### Confirmation Tokens
 
@@ -463,7 +503,7 @@ SigilGuard emits telemetry events for observability:
 | `[:sigil_guard, :registry, :fetch, :start\|:stop]` | `duration` | `url`, `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
 | `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
-| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `content_hash` |
+| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `confirmation_status`, `confirmation_reason`, `confirmation_actor`, `confirmation_nonce_hash`, `content_hash` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 
 Use `SigilGuard.Telemetry.otel_attributes/3` or `attach_otel_forwarder/3` to

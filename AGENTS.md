@@ -172,7 +172,7 @@ test/
 | `[:sigil_guard, :registry, :fetch, :stop]` | `duration` | `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
 | `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
-| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `content_hash` |
+| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `confirmation_status`, `confirmation_reason`, `confirmation_actor`, `confirmation_nonce_hash`, `content_hash` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 
 `SigilGuard.Telemetry.otel_attributes/3` and `attach_otel_forwarder/3` provide
@@ -280,6 +280,27 @@ confirmed_request = put_in(confirm_request, ["params", "_sigil_confirmation"], t
   SigilGuard.MCP.Gateway.guarded_confirmed_request(confirmed_request,
     trust_level: :medium,
     confirmation_key: secret_key
+  )
+
+envelope = SigilGuard.Envelope.sign("did:sigil:agent", :allowed, signer: MySigner)
+signed_confirm_request = put_in(confirm_request, ["params", "_sigil"], envelope)
+public_key_b64u = MySigner.public_key_b64u()
+
+{:error, _response, signed_confirm_decision} =
+  SigilGuard.MCP.Gateway.guarded_signed_confirmed_request(
+    signed_confirm_request,
+    [trust_level: :medium],
+    public_keys: %{"did:sigil:agent" => public_key_b64u},
+    confirmation_key: secret_key
+  )
+
+{:ok, signed_token} =
+  SigilGuard.MCP.Gateway.issue_signed_confirmation_token(
+    signed_confirm_request,
+    [trust_level: :medium],
+    signed_confirm_decision,
+    secret_key,
+    public_keys: %{"did:sigil:agent" => public_key_b64u}
   )
 ```
 

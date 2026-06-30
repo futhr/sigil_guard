@@ -134,6 +134,58 @@ defmodule SigilGuard.MCP.GatewayTest do
     end
   end
 
+  describe "issue_signed_confirmation_token/5" do
+    test "issues tokens bound to the verified envelope identity" do
+      request = signed_confirmable_request()
+
+      decision =
+        Gateway.guard_signed_confirmed_request(request, [trust_level: :medium],
+          public_keys: public_keys()
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.audit_metadata.identity == "did:sigil:agent"
+
+      assert {:ok, token} =
+               Gateway.issue_signed_confirmation_token(
+                 request,
+                 [trust_level: :medium],
+                 decision,
+                 @confirmation_key,
+                 public_keys: public_keys(),
+                 now: @now,
+                 nonce: "signed-confirm-nonce"
+               )
+
+      assert {:ok, confirmed} =
+               request
+               |> put_in(["params", "_sigil_confirmation"], token)
+               |> Gateway.guarded_signed_confirmed_request([trust_level: :medium],
+                 public_keys: public_keys(),
+                 confirmation_key: @confirmation_key,
+                 now: @now
+               )
+
+      assert confirmed.verdict == :allowed
+      assert confirmed.audit_metadata.identity == "did:sigil:agent"
+      assert confirmed.audit_metadata.actor == "did:sigil:agent"
+      assert confirmed.audit_metadata.confirmation_actor == "did:sigil:agent"
+    end
+
+    test "rejects token issuance when the request envelope is invalid" do
+      decision = Gateway.guard_request(confirmable_request(), trust_level: :medium)
+
+      assert {:error, :missing_envelope} =
+               Gateway.issue_signed_confirmation_token(
+                 confirmable_request(),
+                 [trust_level: :medium],
+                 decision,
+                 @confirmation_key,
+                 public_keys: public_keys()
+               )
+    end
+  end
+
   describe "guard_confirmed_request/3" do
     test "returns the original confirmation decision when no token is supplied" do
       request = confirmable_request()
@@ -406,6 +458,200 @@ defmodule SigilGuard.MCP.GatewayTest do
     end
   end
 
+  describe "guard_signed_confirmed_request/3" do
+    test "requires a valid envelope before checking confirmation tokens" do
+      token = issue_request_token(confirmable_request())
+
+      decision =
+        confirmable_request()
+        |> put_in(["params", "_sigil_confirmation"], token)
+        |> Gateway.guard_signed_confirmed_request([trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.reason =~ "missing_envelope"
+      assert decision.audit_metadata.envelope_status == :invalid
+      refute Map.has_key?(decision.audit_metadata, :confirmation_status)
+    end
+
+    test "returns confirm-required for signed requests without confirmation tokens" do
+      decision =
+        Gateway.guard_signed_confirmed_request(
+          signed_confirmable_request(),
+          [trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.audit_metadata.identity == "did:sigil:agent"
+      assert decision.audit_metadata.actor == "did:sigil:agent"
+      assert decision.audit_metadata.action_digest
+    end
+
+    test "accepts signed confirmation tokens and consumes them once" do
+      request = signed_confirmable_request()
+      token = issue_signed_request_token(request)
+      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], token)
+
+      decision =
+        Gateway.guard_signed_confirmed_request(confirmed_request, [trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :allowed
+      assert decision.action == :allow
+      assert decision.audit_metadata.identity == "did:sigil:agent"
+      assert decision.audit_metadata.actor == "did:sigil:agent"
+      assert decision.audit_metadata.confirmation_status == :accepted
+      assert decision.audit_metadata.confirmation_actor == "did:sigil:agent"
+      refute inspect(decision.audit_metadata) =~ token
+
+      replay =
+        Gateway.guard_signed_confirmed_request(confirmed_request, [trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert replay.verdict == :blocked
+      assert replay.audit_metadata.confirmation_status == :invalid
+      assert replay.audit_metadata.confirmation_reason == :replay_detected
+    end
+
+    test "rejects unsigned-context tokens for signed requests" do
+      request = signed_confirmable_request()
+      unsigned_token = issue_request_token(request)
+      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], unsigned_token)
+
+      decision =
+        Gateway.guard_signed_confirmed_request(confirmed_request, [trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.reason =~ "digest_mismatch"
+      assert decision.audit_metadata.confirmation_reason == :digest_mismatch
+      refute inspect(decision.audit_metadata) =~ unsigned_token
+      refute inspect(decision.audit_metadata) =~ "tenant-a"
+    end
+
+    test "signed envelope identity overrides caller-supplied actor and identity" do
+      decision =
+        Gateway.guard_signed_confirmed_request(
+          signed_confirmable_request(),
+          [trust_level: :medium, actor: "spoofed", identity: "spoofed"],
+          public_keys: public_keys()
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.audit_metadata.identity == "did:sigil:agent"
+      assert decision.audit_metadata.actor == "did:sigil:agent"
+    end
+
+    test "emits MCP telemetry for accepted signed confirmations" do
+      request = signed_confirmable_request()
+      token = issue_signed_request_token(request)
+      ref = attach_mcp_telemetry()
+
+      decision =
+        request
+        |> put_in(["params", "_sigil_confirmation"], token)
+        |> Gateway.guard_signed_confirmed_request([trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :allowed
+
+      assert_receive {^ref, [:sigil_guard, :mcp, :request], %{system_time: _}, metadata}
+
+      assert metadata.envelope_status == :valid
+      assert metadata.envelope_reason == nil
+      assert metadata.confirmation_status == :accepted
+      assert metadata.confirmation_actor == "did:sigil:agent"
+      assert metadata.confirmation_nonce_hash
+      assert metadata.identity == "did:sigil:agent"
+      refute inspect(metadata) =~ token
+      refute inspect(metadata) =~ "tenant-a"
+    end
+
+    test "emits MCP telemetry for rejected signed confirmations" do
+      ref = attach_mcp_telemetry()
+      request = signed_confirmable_request()
+      unsigned_token = issue_request_token(request)
+
+      decision =
+        request
+        |> put_in(["params", "_sigil_confirmation"], unsigned_token)
+        |> Gateway.guard_signed_confirmed_request([trust_level: :medium],
+          public_keys: public_keys(),
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :blocked
+
+      assert_receive {^ref, [:sigil_guard, :mcp, :request], %{system_time: _}, metadata}
+
+      assert metadata.envelope_status == :valid
+      assert metadata.confirmation_status == :invalid
+      assert metadata.confirmation_reason == :digest_mismatch
+      assert metadata.identity == "did:sigil:agent"
+      refute inspect(metadata) =~ unsigned_token
+      refute inspect(metadata) =~ "tenant-a"
+    end
+  end
+
+  describe "guarded_signed_confirmed_request/3" do
+    test "returns ok for signed confirmed executable requests" do
+      request = signed_confirmable_request()
+      token = issue_signed_request_token(request)
+
+      assert {:ok, decision} =
+               request
+               |> put_in(["params", "_sigil_confirmation"], token)
+               |> Gateway.guarded_signed_confirmed_request([trust_level: :medium],
+                 public_keys: public_keys(),
+                 confirmation_key: @confirmation_key,
+                 now: @now
+               )
+
+      assert decision.verdict == :allowed
+      refute Map.has_key?(decision.audit_metadata, :envelope_status)
+      assert decision.audit_metadata.confirmation_status == :accepted
+    end
+
+    test "returns JSON-RPC errors for invalid signed confirmations without raw leakage" do
+      request =
+        signed_confirmable_request()
+        |> put_in(["params", "_sigil_confirmation"], "not.a.valid.token")
+
+      assert {:error, response, decision} =
+               Gateway.guarded_signed_confirmed_request(request, [trust_level: :medium],
+                 public_keys: public_keys(),
+                 confirmation_key: @confirmation_key,
+                 now: @now
+               )
+
+      assert decision.verdict == :blocked
+      assert response["error"]["code"] == -32_001
+      assert response["error"]["data"]["confirmation_status"] == "invalid"
+      assert response["error"]["data"]["confirmation_reason"] == "invalid_token"
+      refute inspect(response) =~ "tenant-a"
+      refute inspect(response) =~ "not.a.valid.token"
+    end
+  end
+
   describe "guard_result/3" do
     test "redacts sensitive MCP result content before model ingestion" do
       result = %{
@@ -585,8 +831,34 @@ defmodule SigilGuard.MCP.GatewayTest do
     token
   end
 
-  defp signed_request(envelope) do
-    request = unsigned_request()
+  defp issue_signed_request_token(request) do
+    decision =
+      Gateway.guard_signed_confirmed_request(request, [trust_level: :medium],
+        public_keys: public_keys()
+      )
+
+    assert {:ok, token} =
+             Gateway.issue_signed_confirmation_token(
+               request,
+               [trust_level: :medium],
+               decision,
+               @confirmation_key,
+               public_keys: public_keys(),
+               now: @now,
+               nonce: "signed-gateway-confirm-nonce",
+               ttl_ms: 300_000
+             )
+
+    token
+  end
+
+  defp signed_confirmable_request do
+    "did:sigil:agent"
+    |> Envelope.sign(:allowed, signer: TestSigner)
+    |> signed_request(confirmable_request())
+  end
+
+  defp signed_request(envelope, request \\ unsigned_request()) do
     update_in(request, ["params"], &Map.put(&1, "_sigil", envelope))
   end
 

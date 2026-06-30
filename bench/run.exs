@@ -226,6 +226,33 @@ defmodule SigilGuard.Bench do
     confirmed_request =
       put_in(confirmable_request, ["params", "_sigil_confirmation"], confirmation_token)
 
+    signed_confirmable_request = put_in(confirmable_request, ["params", "_sigil"], envelope)
+
+    signed_confirm_decision =
+      SigilGuard.MCP.Gateway.guard_signed_confirmed_request(
+        signed_confirmable_request,
+        [trust_level: :medium],
+        public_keys: public_keys
+      )
+
+    {:ok, signed_confirmation_token} =
+      SigilGuard.MCP.Gateway.issue_signed_confirmation_token(
+        signed_confirmable_request,
+        [trust_level: :medium],
+        signed_confirm_decision,
+        confirmation_key,
+        public_keys: public_keys,
+        now: now,
+        nonce: "bench-signed-confirmation-nonce"
+      )
+
+    signed_confirmed_request =
+      put_in(
+        signed_confirmable_request,
+        ["params", "_sigil_confirmation"],
+        signed_confirmation_token
+      )
+
     %{
       "mcp gateway / signed request" => fn ->
         SigilGuard.MCP.Gateway.guard_signed_request(request, [trust_level: :high],
@@ -234,6 +261,16 @@ defmodule SigilGuard.Bench do
       end,
       "mcp gateway / confirmed request" => fn ->
         SigilGuard.MCP.Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
+          confirmation_key: confirmation_key,
+          now: now,
+          consume_confirmation: false
+        )
+      end,
+      "mcp gateway / signed confirmed request" => fn ->
+        SigilGuard.MCP.Gateway.guard_signed_confirmed_request(
+          signed_confirmed_request,
+          [trust_level: :medium],
+          public_keys: public_keys,
           confirmation_key: confirmation_key,
           now: now,
           consume_confirmation: false
