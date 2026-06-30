@@ -50,6 +50,7 @@ defmodule SigilGuard do
   - `SigilGuard.Runtime.Gate` — Boundary-aware tool/runtime decisions
   - `SigilGuard.Runtime.Stream` — Chunk-safe streaming sanitization
   - `SigilGuard.MCP.Gateway` — MCP-shaped request/result guard helpers
+  - `SigilGuard.Confirmation` — Action-bound approval tokens
   - `SigilGuard.Policy` — Risk classification and trust gating
   - `SigilGuard.Audit` — Tamper-evident audit chain
   - `SigilGuard.Vault` — Secure secret storage

@@ -17,6 +17,7 @@ defmodule SigilGuard.Runtime.Gate do
   package.
   """
 
+  alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.Policy
@@ -197,9 +198,16 @@ defmodule SigilGuard.Runtime.Gate do
       hit_count: length(state.hits),
       indicator_count: length(state.quarantine.indicators),
       indicator_ids: Enum.map(state.quarantine.indicators, & &1.id),
-      content_hash: state.quarantine.content_hash
+      content_hash: state.quarantine.content_hash,
+      action_digest: action_digest(state, verdict)
     }
   end
+
+  defp action_digest(state, {:confirm, _}) do
+    Confirmation.action_digest(state.payload, state.context)
+  end
+
+  defp action_digest(_, _), do: nil
 
   defp action_from_payload(payload) when is_map(payload) do
     payload[:tool] || payload["tool"] || payload[:action] || payload["action"]

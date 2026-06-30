@@ -127,6 +127,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Scanner,
           SigilGuard.Envelope,
           SigilGuard.Policy,
+          SigilGuard.Confirmation,
           SigilGuard.Context,
           SigilGuard.Decision,
           SigilGuard.Identity,
