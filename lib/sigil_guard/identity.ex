@@ -3,7 +3,6 @@ defmodule SigilGuard.Identity do
   Identity provider behaviour and trust levels for the SIGIL protocol.
 
   Trust levels form a monotonic hierarchy — higher levels subsume lower ones.
-  Matches the `sigil-protocol` Rust crate's `TrustLevel` enum (v0.1.5).
 
   ## Trust Level Hierarchy
 

@@ -6,8 +6,6 @@ defmodule SigilGuard.Policy do
   sufficient to proceed. Supports configurable risk mappings, confirmation
   flow for borderline cases, and rate limiting.
 
-  Matches the `sigil-protocol` Rust crate's `RiskLevel` enum (v0.1.5).
-
   ## Risk Level Hierarchy
 
       :low < :medium < :high

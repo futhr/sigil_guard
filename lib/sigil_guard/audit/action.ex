@@ -2,7 +2,7 @@ defmodule SigilGuard.Audit.Action do
   @moduledoc """
   Typed action information for audit events.
 
-  Matches the `Action` struct from the `sigil-protocol` Rust crate (v0.1.5).
+  Tracks the SIGIL protocol action shape used in audit events.
 
   ## Fields
 

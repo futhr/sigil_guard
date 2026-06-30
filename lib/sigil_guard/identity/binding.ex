@@ -2,7 +2,7 @@ defmodule SigilGuard.Identity.Binding do
   @moduledoc """
   Identity binding linking a provider credential to a trust level.
 
-  Matches the `IdentityBinding` struct from the `sigil-protocol` Rust crate (v0.1.5).
+  Tracks the SIGIL protocol identity-binding shape used for trust assertions.
 
   ## Fields
 

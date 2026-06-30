@@ -20,15 +20,6 @@ mix docs           # Generate documentation
 mix bench          # Run benchmarks
 ```
 
-## Running NIF Tests
-
-NIF tests require a Rust toolchain:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-mix test --include nif       # Run all tests including NIF
-```
-
 ## Code Quality
 
 Before submitting a PR, ensure:

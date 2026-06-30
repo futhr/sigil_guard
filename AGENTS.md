@@ -4,30 +4,26 @@ Guidance for AI agents working with SigilGuard.
 
 ## Project Overview
 
-SigilGuard is an Elixir library providing SIGIL Protocol integration for MCP security. It features a pluggable backend architecture with pure Elixir and Rust NIF backends.
+SigilGuard is a native Elixir library providing SIGIL Protocol integration for MCP security. It uses OTP `:crypto`, Regex, ETS, Finch, and explicit protocol compatibility profiles.
 
 ## Architecture
 
 ```
                       SigilGuard (Public API)
                               |
-                    SigilGuard.Backend (Behaviour)
+                    SigilGuard.Backend.Elixir
                               |
-              +---------------+---------------+
-              |                               |
-              v                               v
-SigilGuard.Backend.Elixir         SigilGuard.Backend.NIF
-              |                               |
-              v                               v
-   OTP :crypto + Regex              Rustler + sigil-protocol
+               OTP :crypto + Regex + ETS + Finch
 ```
 
-### Backend Comparison
+### Compatibility Profiles
 
-| Backend | Isolation | Latency | Status | Use Case |
-|---------|-----------|---------|--------|----------|
-| **Elixir** | Full | Medium | Stable | Default, safe, works everywhere |
-| **NIF** | None | Lowest | Beta | Protocol parity, performance |
+| Profile | Verdict emit | Verdict verify | DID lookup |
+|---------|--------------|----------------|------------|
+| `:auto` | lowercase | lowercase + legacy TitleCase | `/resolve`, then `/identities` |
+| `:legacy_sigil_guard` | TitleCase | lowercase + legacy TitleCase | `/identities`, then `/resolve` |
+| `:sigil_reference_0_1` | lowercase | lowercase + legacy TitleCase | `/resolve`, then `/identities` |
+| `:sigil_spec_draft_2026_02` | lowercase | lowercase only | `/resolve` |
 
 ### Module Overview
 
@@ -36,11 +32,12 @@ SigilGuard (Main API)
     |
     +-- SigilGuard.Backend         Backend behaviour and selection
     |   +-- Backend.Elixir         Pure Elixir backend (default)
-    |   +-- Backend.NIF            Rust NIF backend (optional)
     |
     +-- SigilGuard.Scanner         Sensitivity scanning engine
     +-- SigilGuard.Patterns        Pattern compilation and management
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
+    +-- SigilGuard.Profile         Protocol compatibility profiles
+    +-- SigilGuard.ReplayStore     ETS nonce replay protection
     +-- SigilGuard.Policy          Risk classification and trust gating
     +-- SigilGuard.Audit           Tamper-evident audit chain
     |   +-- Audit.Logger           Audit logger behaviour
@@ -62,9 +59,10 @@ SigilGuard (Main API)
 | `lib/sigil_guard.ex` | Main API module, dispatches to backend |
 | `lib/sigil_guard/backend.ex` | Backend behaviour definition and selection |
 | `lib/sigil_guard/backend/elixir.ex` | Pure Elixir backend implementation |
-| `lib/sigil_guard/backend/nif.ex` | NIF backend (Rustler) |
 | `lib/sigil_guard/scanner.ex` | Regex-based sensitivity scanning |
 | `lib/sigil_guard/envelope.ex` | SIGIL envelope sign/verify |
+| `lib/sigil_guard/profile.ex` | Protocol compatibility profile definitions |
+| `lib/sigil_guard/replay_store.ex` | ETS-backed nonce replay cache |
 | `lib/sigil_guard/policy.ex` | Risk classification and trust gating |
 | `lib/sigil_guard/audit.ex` | HMAC-SHA256 chain integrity |
 | `lib/sigil_guard/identity.ex` | Trust level hierarchy |
@@ -72,14 +70,12 @@ SigilGuard (Main API)
 | `lib/sigil_guard/registry.ex` | SIGIL registry REST client |
 | `lib/sigil_guard/config.ex` | Configuration access |
 | `lib/sigil_guard/telemetry.ex` | Telemetry events and helpers |
-| `native/sigil_guard_nif/` | Rust NIF source code |
 
 ## Development Commands
 
 ```bash
 mix setup                       # Install deps
-mix test                        # Run tests (unit only)
-mix test --include nif          # Run with NIF tests
+mix test                        # Run tests
 mix lint                        # Format + Credo + Dialyzer
 mix check                       # All quality checks
 mix sobelow                     # Security analysis
@@ -111,9 +107,8 @@ Do not add `Co-Authored-By` or any AI/Claude attribution to commit messages.
 
 ## Testing
 
-- **Unit tests** - Run without Rust, test pure Elixir logic
-- **NIF tests** - Tagged `@moduletag :nif`, require Rust toolchain
-- **Parity tests** - Verify Elixir and NIF backends produce identical output
+- **Unit tests** - Test pure Elixir logic and protocol compatibility profiles
+- **Golden behavior tests** - Verify canonical bytes, envelope wire profiles, registry normalization, and replay checks
 
 Test structure:
 ```
@@ -126,11 +121,8 @@ test/
 |   +-- backend_test.exs       # Backend dispatch tests
 |   +-- backend/
 |       +-- elixir_test.exs    # Elixir backend tests
-|       +-- nif_test.exs       # NIF backend tests
-|       +-- parity_test.exs    # Cross-backend parity tests
 +-- support/
     +-- test_signer.ex         # Deterministic test signer
-    +-- nif_case.ex            # NIF test case template
 ```
 
 ## Telemetry Events
@@ -148,7 +140,8 @@ test/
 
 ```elixir
 config :sigil_guard,
-  backend: :elixir,                        # :elixir | :nif
+  backend: :elixir,
+  protocol_profile: :auto,
   registry_url: "https://registry.sigil-protocol.org",
   registry_ttl_ms: :timer.hours(1),
   registry_timeout_ms: 5_000,
@@ -161,7 +154,7 @@ config :sigil_guard,
 ```elixir
 # Check available backends
 SigilGuard.Backend.available_backends()
-#=> [:elixir] or [:elixir, :nif]
+#=> [:elixir]
 
 # Get current backend module
 SigilGuard.Backend.impl()
@@ -182,18 +175,17 @@ redacted = SigilGuard.scan_and_redact("key=AKIAIOSFODNN7EXAMPLE")
 
 ```elixir
 envelope = SigilGuard.Envelope.sign("did:sigil:abc", :allowed, signer: MySigner)
-:ok = SigilGuard.Envelope.verify(envelope, public_key_b64u)
+:ok = SigilGuard.Envelope.verify(envelope, public_key_b64u, replay: true, max_skew_ms: 300_000)
 ```
 
 ### Policy Evaluation
 
 ```elixir
-:allowed = SigilGuard.policy_verdict("read_file", :authenticated)
-:blocked = SigilGuard.policy_verdict("delete_database", :anonymous)
+:allowed = SigilGuard.policy_verdict("read_file", :medium)
+:blocked = SigilGuard.policy_verdict("delete_database", :low)
 ```
 
 ## References
 
 - [SIGIL Protocol](https://sigil-protocol.org/)
 - [SIGIL Registry](https://registry.sigil-protocol.org/)
-- [Rustler](https://github.com/rusterlium/rustler)

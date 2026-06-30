@@ -2,7 +2,7 @@ defmodule SigilGuard.Audit.Actor do
   @moduledoc """
   Typed actor information for audit events.
 
-  Matches the `Actor` struct from the `sigil-protocol` Rust crate (v0.1.5).
+  Tracks the SIGIL protocol actor shape used in audit events.
 
   ## Fields
 

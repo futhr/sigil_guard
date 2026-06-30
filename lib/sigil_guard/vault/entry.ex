@@ -2,7 +2,7 @@ defmodule SigilGuard.Vault.Entry do
   @moduledoc """
   Vault entry representing an encrypted secret.
 
-  Matches the `VaultEntry` struct from the `sigil-protocol` Rust crate (v0.1.5).
+  Tracks the SIGIL protocol vault-entry shape used for encrypted secrets.
 
   ## Fields
 

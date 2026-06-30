@@ -1,6 +1,6 @@
 # SigilGuard
 
-**SIGIL Protocol integration for Elixir — with optional Rust NIF backend**
+**SIGIL Protocol integration for Elixir — native OTP implementation**
 
 [![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg)](https://hex.pm/packages/sigil_guard)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/sigil_guard)
@@ -29,48 +29,29 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 ## Features
 
-| Feature | Description | Backend |
-|---------|-------------|---------|
-| **Sensitivity Scanner** | Regex-based detection of secrets, credentials, PII | Elixir / NIF |
-| **Envelope Sign/Verify** | Ed25519 canonical envelope signing | Elixir / NIF |
-| **Policy Engine** | Risk classification and trust-level gating | Elixir / NIF |
-| **Audit Chain** | HMAC-SHA256 tamper-evident event chain | Elixir / NIF |
-| **Secure Vault** | AES-256-GCM encrypted secret storage | Elixir |
-| **Registry Client** | REST client with TTL cache | Elixir |
-| **Telemetry** | Built-in observability events | Elixir |
+| Feature | Description |
+|---------|-------------|
+| **Sensitivity Scanner** | Regex-based detection of secrets, credentials, PII |
+| **Envelope Sign/Verify** | Ed25519 canonical envelope signing with explicit protocol profiles |
+| **Policy Engine** | Risk classification and trust-level gating |
+| **Audit Chain** | HMAC-SHA256 tamper-evident event chain |
+| **Secure Vault** | AES-256-GCM encrypted secret storage |
+| **Registry Client** | REST client with TTL cache, endpoint fallback, and key normalization |
+| **Replay Protection** | Optional nonce replay and timestamp-skew checks for envelopes |
+| **Telemetry** | Built-in observability events |
 
 ---
 
 ## Installation
-
-### Requirements
-
-- Elixir ~> 1.17
-- Erlang/OTP 27+
-- Rust toolchain (optional, for NIF backend)
 
 Add `sigil_guard` to your dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:sigil_guard, "~> 0.2.0"},
-    # Optional: For Rust NIF backend
-    {:rustler, "~> 0.37", runtime: false, optional: true}
+    {:sigil_guard, "~> 0.2.0"}
   ]
 end
-```
-
-### Optional: Rust NIF Backend
-
-For lower-latency operations and protocol parity with the Rust reference implementation:
-
-```bash
-# Install Rust toolchain
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Configure backend
-config :sigil_guard, backend: :nif
 ```
 
 ---
@@ -102,6 +83,12 @@ envelope = SigilGuard.Envelope.sign("did:sigil:alice", :allowed,
 
 # Verify
 :ok = SigilGuard.Envelope.verify(envelope, public_key_b64u)
+
+# Verify with freshness and replay checks at a trust boundary
+:ok = SigilGuard.Envelope.verify(envelope, public_key_b64u,
+  max_skew_ms: 300_000,
+  replay: true
+)
 ```
 
 ### Policy Enforcement
@@ -143,7 +130,8 @@ signed = SigilGuard.Audit.build_chain(events, key)
 
 ```elixir
 config :sigil_guard,
-  backend: :elixir, # :elixir | :nif
+  backend: :elixir,
+  protocol_profile: :auto,
   registry_url: "https://registry.sigil-protocol.org",
   registry_ttl_ms: :timer.hours(1),
   registry_timeout_ms: 5_000,
@@ -156,7 +144,8 @@ config :sigil_guard,
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `backend` | `atom()` | `:elixir` | Backend implementation (`:elixir` or `:nif`) |
+| `backend` | `atom()` | `:elixir` | Backend implementation. Only native Elixir ships built in. |
+| `protocol_profile` | `atom()` | `:auto` | Compatibility profile: `:auto`, `:legacy_sigil_guard`, `:sigil_reference_0_1`, or `:sigil_spec_draft_2026_02` |
 | `registry_url` | `String.t()` | `"https://registry.sigil-protocol.org"` | SIGIL registry URL |
 | `registry_ttl_ms` | `integer()` | `3_600_000` | Registry cache TTL in ms |
 | `registry_timeout_ms` | `integer()` | `5_000` | Registry HTTP timeout in ms |
@@ -169,7 +158,7 @@ config :sigil_guard,
 ```elixir
 # Check available backends
 SigilGuard.Backend.available_backends()
-#=> [:elixir] or [:elixir, :nif]
+#=> [:elixir]
 
 # Get current backend module
 SigilGuard.Backend.impl()
@@ -178,19 +167,19 @@ SigilGuard.Backend.impl()
 
 ---
 
-## Backends
+## Protocol Profiles
 
-SigilGuard uses a pluggable backend architecture. Protocol operations can run
-in pure Elixir or via a Rust NIF for maximum performance.
+SigilGuard keeps known SIGIL compatibility differences explicit:
 
-| Backend | Isolation | Latency | Status | Use Case |
-|---------|-----------|---------|--------|----------|
-| **Elixir** | Full | Medium | Stable | Default, safe, works everywhere |
-| **NIF** | None | Lowest | Beta | Protocol parity, performance |
+| Profile | Verdict Emit | Verdict Verify | DID Lookup |
+|---------|--------------|----------------|------------|
+| `:auto` | lowercase | lowercase + legacy TitleCase | `/resolve`, then `/identities` |
+| `:legacy_sigil_guard` | TitleCase | lowercase + legacy TitleCase | `/identities`, then `/resolve` |
+| `:sigil_reference_0_1` | lowercase | lowercase + legacy TitleCase | `/resolve`, then `/identities` |
+| `:sigil_spec_draft_2026_02` | lowercase | lowercase only | `/resolve` |
 
-The NIF backend uses the `sigil-protocol` Rust crate for protocol operations
-(envelope signing/verification, canonical bytes) with ed25519-dalek, hmac/sha2,
-and regex for extensions (detailed scanning, audit HMAC chain).
+The default `:auto` profile emits the spec/reference lowercase form while accepting
+legacy envelopes during migration.
 
 ---
 
@@ -199,15 +188,9 @@ and regex for extensions (detailed scanning, audit HMAC chain).
 ```
                       SigilGuard (Public API)
                               |
-                    SigilGuard.Backend (Behaviour)
+                    SigilGuard.Backend.Elixir
                               |
-              +---------------+---------------+
-              |                               |
-              v                               v
-SigilGuard.Backend.Elixir         SigilGuard.Backend.NIF
-              |                               |
-              v                               v
-   OTP :crypto + Regex              Rustler + ed25519-dalek + hmac/sha2
+                  OTP :crypto + Regex + ETS + Finch
 ```
 
 ### Module Overview
@@ -217,7 +200,6 @@ SigilGuard (Main API)
     |
     +-- SigilGuard.Backend         Backend behaviour and selection
     |   +-- Backend.Elixir         Pure Elixir backend (default)
-    |   +-- Backend.NIF            Rust NIF backend (optional)
     |
     +-- SigilGuard.Scanner         Sensitivity scanning engine
     +-- SigilGuard.Patterns        Pattern compilation and management
@@ -263,28 +245,18 @@ SigilGuard emits telemetry events for observability:
 
 ```bash
 mix setup            # Install dependencies
-mix test             # Run tests (unit only)
-mix test.nif         # Run with NIF tests
+mix test             # Run tests
 mix lint             # Format + Credo + Dialyzer
 mix check            # All quality checks
 mix docs             # Generate documentation
 mix bench            # Run benchmarks
 ```
 
-### Running NIF Tests
-
-```bash
-# Ensure Rust toolchain is installed
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-mix test.nif  # Run all tests including NIF
-```
-
 ---
 
 ## Performance
 
-SigilGuard includes benchmarks comparing Elixir and NIF backends:
+SigilGuard includes native Elixir benchmarks:
 
 ```bash
 mix bench
@@ -298,7 +270,6 @@ Results are saved to `bench/output/benchmarks.md`.
 
 - [SIGIL Protocol](https://sigil-protocol.org/)
 - [SIGIL Registry](https://registry.sigil-protocol.org/)
-- [Rustler](https://github.com/rusterlium/rustler)
 
 ---
 

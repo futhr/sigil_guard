@@ -2,7 +2,7 @@ defmodule SigilGuard.Audit.EventType do
   @moduledoc """
   Audit event types defined by the SIGIL protocol.
 
-  These match the `AuditEventType` enum from the `sigil-protocol` Rust crate (v0.1.5).
+  These atoms map to the SIGIL protocol audit event vocabulary.
   Use these atoms as the `type` field when creating audit events for protocol compliance.
 
   ## Event Types

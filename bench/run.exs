@@ -32,9 +32,7 @@ defmodule SigilGuard.Bench do
   @moduledoc """
   Performance benchmark suite for SigilGuard.
 
-  Measures throughput and latency of core operations across backends.
-  When the NIF backend is available, benchmarks compare Elixir vs NIF
-  performance side-by-side.
+  Measures throughput and latency of core native Elixir operations.
 
   ## Running
 
@@ -54,21 +52,11 @@ defmodule SigilGuard.Bench do
     IO.puts("SigilGuard Benchmark Suite")
     IO.puts("=========================\n")
 
-    nif? = nif_available?()
-
-    if nif? do
-      IO.puts("NIF backend: available (comparing both backends)")
-    else
-      IO.puts("NIF backend: not available (Elixir only)")
-    end
-
-    IO.puts("")
-
     scenarios =
       %{}
-      |> Map.merge(scanner_scenarios(nif?))
-      |> Map.merge(envelope_scenarios(nif?))
-      |> Map.merge(policy_scenarios(nif?))
+      |> Map.merge(scanner_scenarios())
+      |> Map.merge(envelope_scenarios())
+      |> Map.merge(policy_scenarios())
       |> Map.merge(audit_scenarios())
 
     Benchee.run(
@@ -84,13 +72,13 @@ defmodule SigilGuard.Bench do
          # SigilGuard Performance Benchmarks
 
          Run on: #{DateTime.utc_now() |> DateTime.to_string()}
-         Backend: #{if nif?, do: "Elixir + NIF", else: "Elixir only"}
+         Backend: native Elixir
          """}
       ]
     )
   end
 
-  defp scanner_scenarios(nif?) do
+  defp scanner_scenarios do
     clean = "This is a completely safe text with no secrets or credentials."
     secret = "My key is AKIAIOSFODNN7EXAMPLE and it should be redacted."
 
@@ -103,7 +91,7 @@ defmodule SigilGuard.Bench do
 
     large = String.duplicate(clean <> " ", 100)
 
-    base = %{
+    %{
       "scanner / elixir scan clean" => fn -> SigilGuard.Backend.Elixir.scan(clean, []) end,
       "scanner / elixir scan secret" => fn -> SigilGuard.Backend.Elixir.scan(secret, []) end,
       "scanner / elixir scan mixed" => fn -> SigilGuard.Backend.Elixir.scan(mixed, []) end,
@@ -112,23 +100,9 @@ defmodule SigilGuard.Bench do
         SigilGuard.Backend.Elixir.scan_and_redact(mixed, [])
       end
     }
-
-    if nif? do
-      Map.merge(base, %{
-        "scanner / nif scan clean" => fn -> SigilGuard.Backend.NIF.scan(clean, []) end,
-        "scanner / nif scan secret" => fn -> SigilGuard.Backend.NIF.scan(secret, []) end,
-        "scanner / nif scan mixed" => fn -> SigilGuard.Backend.NIF.scan(mixed, []) end,
-        "scanner / nif scan large" => fn -> SigilGuard.Backend.NIF.scan(large, []) end,
-        "scanner / nif scan_and_redact" => fn ->
-          SigilGuard.Backend.NIF.scan_and_redact(mixed, [])
-        end
-      })
-    else
-      base
-    end
   end
 
-  defp envelope_scenarios(nif?) do
+  defp envelope_scenarios do
     identity = "did:sigil:bench"
     verdict = :allowed
     ts = "2024-01-01T00:00:00.000Z"
@@ -143,7 +117,7 @@ defmodule SigilGuard.Bench do
 
     pub_key = SigilGuard.BenchSigner.public_key_b64u()
 
-    base = %{
+    %{
       "envelope / elixir canonical_bytes" => fn ->
         SigilGuard.Backend.Elixir.canonical_bytes(identity, verdict, ts, nonce)
       end,
@@ -154,40 +128,17 @@ defmodule SigilGuard.Bench do
         SigilGuard.Backend.Elixir.envelope_verify(envelope, pub_key)
       end
     }
-
-    if nif? do
-      Map.merge(base, %{
-        "envelope / nif canonical_bytes" => fn ->
-          SigilGuard.Backend.NIF.canonical_bytes(identity, verdict, ts, nonce)
-        end
-      })
-    else
-      base
-    end
   end
 
-  defp policy_scenarios(nif?) do
-    base = %{
+  defp policy_scenarios do
+    %{
       "policy / elixir classify_risk" => fn ->
         SigilGuard.Backend.Elixir.classify_risk("read_file", [])
       end,
       "policy / elixir evaluate" => fn ->
-        SigilGuard.Backend.Elixir.evaluate_policy("write_file", :authenticated, [])
+        SigilGuard.Backend.Elixir.evaluate_policy("write_file", :medium, [])
       end
     }
-
-    if nif? do
-      Map.merge(base, %{
-        "policy / nif classify_risk" => fn ->
-          SigilGuard.Backend.NIF.classify_risk("read_file", [])
-        end,
-        "policy / nif evaluate" => fn ->
-          SigilGuard.Backend.NIF.evaluate_policy("write_file", :authenticated, [])
-        end
-      })
-    else
-      base
-    end
   end
 
   defp audit_scenarios do
@@ -214,14 +165,6 @@ defmodule SigilGuard.Bench do
     }
   end
 
-  defp nif_available? do
-    try do
-      SigilGuard.Backend.NIF.Native.classify_risk("test", [])
-      true
-    rescue
-      _ -> false
-    end
-  end
 end
 
 SigilGuard.Bench.run()

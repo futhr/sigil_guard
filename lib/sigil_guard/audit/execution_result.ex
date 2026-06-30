@@ -2,7 +2,7 @@ defmodule SigilGuard.Audit.ExecutionResult do
   @moduledoc """
   Typed execution result for audit events.
 
-  Matches the `ExecutionResult` struct from the `sigil-protocol` Rust crate (v0.1.5).
+  Tracks the SIGIL protocol execution-result shape used in audit events.
 
   ## Fields
 
