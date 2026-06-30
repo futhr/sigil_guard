@@ -124,8 +124,8 @@ defmodule SigilGuard.Audit do
   @spec sign_event(t(), binary(), String.t() | nil) :: t()
   def sign_event(event, key, prev_hmac \\ nil) do
     chain_input = prev_hmac || @genesis_marker
-    canonical = canonical_bytes(event)
-    hmac = compute_hmac(key, canonical <> chain_input)
+    canonical = canonical_iodata(event)
+    hmac = compute_hmac(key, [canonical, chain_input])
 
     Telemetry.emit(
       [:sigil_guard, :audit, :logged],
@@ -172,8 +172,8 @@ defmodule SigilGuard.Audit do
       events
       |> Enum.with_index()
       |> Enum.reduce_while({:ok, anchor}, fn {event, index}, {:ok, expected_prev} ->
-        canonical = canonical_bytes(event)
-        expected_hmac = compute_hmac(key, canonical <> (expected_prev || @genesis_marker))
+        canonical = canonical_iodata(event)
+        expected_hmac = compute_hmac(key, [canonical, expected_prev || @genesis_marker])
 
         # Contiguity uses plain == — prev_hmac values are public chain
         # data, not secrets; only the HMAC comparison needs constant time.
@@ -222,23 +222,28 @@ defmodule SigilGuard.Audit do
   """
   @spec canonical_bytes(t()) :: binary()
   def canonical_bytes(%__MODULE__{} = event) do
-    fields = %{
-      "action" => event.action,
-      "actor" => event.actor,
-      "id" => event.id,
-      "result" => event.result,
-      "timestamp" => event.timestamp,
-      "type" => event.type
-    }
-
-    inner =
-      ~w(action actor id result timestamp type)
-      |> Enum.map_join(",", fn key -> ~s("#{key}":#{Jason.encode!(fields[key])}) end)
-
-    "{#{inner}}"
+    IO.iodata_to_binary(canonical_iodata(event))
   end
 
   # -- Private --
+
+  defp canonical_iodata(%__MODULE__{} = event) do
+    [
+      "{\"action\":",
+      Jason.encode!(event.action),
+      ",\"actor\":",
+      Jason.encode!(event.actor),
+      ",\"id\":",
+      Jason.encode!(event.id),
+      ",\"result\":",
+      Jason.encode!(event.result),
+      ",\"timestamp\":",
+      Jason.encode!(event.timestamp),
+      ",\"type\":",
+      Jason.encode!(event.type),
+      "}"
+    ]
+  end
 
   defp compute_hmac(key, data) do
     Base.encode16(:crypto.mac(:hmac, :sha256, key, data), case: :lower)
@@ -256,16 +261,14 @@ defmodule SigilGuard.Audit do
   # verification. Regular == short-circuits on the first differing
   # byte, leaking information about matching prefix length.
   defp secure_compare(a, b) when byte_size(a) == byte_size(b) do
-    diff =
-      a
-      |> :binary.bin_to_list()
-      |> Enum.zip(:binary.bin_to_list(b))
-      |> Enum.reduce(0, fn {x, y}, acc ->
-        Bitwise.bor(acc, Bitwise.bxor(x, y))
-      end)
-
-    diff == 0
+    secure_compare(a, b, 0)
   end
 
   defp secure_compare(_, _), do: false
+
+  defp secure_compare(<<a, rest_a::binary>>, <<b, rest_b::binary>>, diff) do
+    secure_compare(rest_a, rest_b, Bitwise.bor(diff, Bitwise.bxor(a, b)))
+  end
+
+  defp secure_compare(<<>>, <<>>, diff), do: diff == 0
 end
