@@ -51,6 +51,29 @@ defmodule SigilGuard.Scanner.PipelineTest do
       assert {:ok, "secret=aaaaaaaa"} = Scanner.scan("secret=aaaaaaaa")
     end
 
+    test "rejects placeholder generic secrets in staged mode" do
+      assert {:ok, "secret=changeme12345"} = Scanner.scan("secret=changeme12345")
+
+      assert {:ok, "api_key=abcabcabcabcabcabcabcabc"} =
+               Scanner.scan("api_key=abcabcabcabcabcabcabcabc")
+    end
+
+    test "keeps high-entropy generic secrets in staged mode" do
+      assert {:hit, [hit]} = Scanner.scan("secret=R7v9K2mQ4xZ8pL6n")
+
+      assert hit.name == "generic_secret"
+      assert hit.validated
+      assert :high_entropy in hit.signals
+      assert :assignment_context in hit.signals
+    end
+
+    test "allows local validation thresholds to be tightened" do
+      assert {:ok, "secret=R7v9K2mQ4xZ8pL6n"} =
+               Scanner.scan("secret=R7v9K2mQ4xZ8pL6n",
+                 generic_secret_min_entropy: 4.5
+               )
+    end
+
     test "can keep weak regex candidates when validation is disabled" do
       assert {:hit, [hit]} = Scanner.scan("secret=aaaaaaaa", validate: false)
 

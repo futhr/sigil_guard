@@ -10,7 +10,7 @@ defmodule SigilGuard.Scanner.Pipeline do
   ## Stages
 
     * `:regex` - collect pattern candidates and byte offsets
-    * `:validate` - reject structurally weak generic candidates
+    * `:validate` - reject structurally weak, placeholder, or low-entropy generic candidates
     * `:enrich` - add confidence and non-sensitive signal metadata
     * `:sort` - return hits in source order
 
@@ -44,6 +44,9 @@ defmodule SigilGuard.Scanner.Pipeline do
 
     * `:validate` - set to `false` to keep all regex candidates.
     * `:min_confidence` - discard hits below this score. Defaults to `0.0`.
+    * `:generic_secret_min_length` - generic secret value minimum length. Defaults to `10`.
+    * `:generic_secret_min_entropy` - generic secret Shannon entropy floor. Defaults to `2.8`.
+    * `:token_min_entropy` - bearer/API token Shannon entropy floor. Defaults to `3.0`.
   """
   @spec scan(String.t(), [Patterns.compiled_pattern()], keyword()) :: [Patterns.scan_hit()]
   def scan(text, patterns, opts \\ []) when is_binary(text) and is_list(patterns) do
@@ -88,40 +91,45 @@ defmodule SigilGuard.Scanner.Pipeline do
   end
 
   defp valid_candidate?(candidate, opts) do
-    not Keyword.get(opts, :validate, true) or structurally_valid?(candidate)
+    not Keyword.get(opts, :validate, true) or structurally_valid?(candidate, opts)
   end
 
-  defp structurally_valid?(%{pattern: %{name: "aws_access_key"}, match: match}) do
+  defp structurally_valid?(%{pattern: %{name: "aws_access_key"}, match: match}, _) do
     Regex.match?(~r/\A(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\z/, match)
   end
 
-  defp structurally_valid?(%{pattern: %{name: "bearer_token"}, match: match}) do
+  defp structurally_valid?(%{pattern: %{name: "bearer_token"}, match: match}, opts) do
     match
     |> bearer_value()
-    |> token_like?(20)
+    |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
   end
 
-  defp structurally_valid?(%{pattern: %{name: "database_uri"}, match: match}) do
+  defp structurally_valid?(%{pattern: %{name: "database_uri"}, match: match}, _) do
     String.contains?(match, "://") and String.contains?(match, ":") and
       String.ends_with?(match, "@")
   end
 
-  defp structurally_valid?(%{pattern: %{name: "private_key"}, match: match}) do
+  defp structurally_valid?(%{pattern: %{name: "private_key"}, match: match}, _) do
     String.starts_with?(match, "-----BEGIN ") and String.ends_with?(match, "PRIVATE KEY-----")
   end
 
-  defp structurally_valid?(%{pattern: %{name: "generic_api_key"}, match: match}) do
+  defp structurally_valid?(%{pattern: %{name: "generic_api_key"}, match: match}, opts) do
     match
     |> assignment_value()
-    |> token_like?(20)
+    |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
   end
 
-  defp structurally_valid?(%{pattern: %{name: "generic_secret"}, match: match}) do
+  defp structurally_valid?(%{pattern: %{name: "generic_secret"}, match: match}, opts) do
     value = assignment_value(match)
-    byte_size(value) >= 8 and character_diversity(value) >= 3
+
+    secret_like?(
+      value,
+      Keyword.get(opts, :generic_secret_min_length, 10),
+      Keyword.get(opts, :generic_secret_min_entropy, 2.8)
+    )
   end
 
-  defp structurally_valid?(_), do: true
+  defp structurally_valid?(_, _), do: true
 
   defp enrich_hit(candidate, opts) do
     signals = signals(candidate)
@@ -252,8 +260,35 @@ defmodule SigilGuard.Scanner.Pipeline do
     end
   end
 
-  defp token_like?(value, min_length) do
-    byte_size(value) >= min_length and character_diversity(value) >= 3
+  defp token_like?(value, min_length, min_entropy) do
+    secret_like?(value, min_length, min_entropy)
+  end
+
+  defp secret_like?(value, min_length, min_entropy) do
+    value = String.trim(value)
+
+    byte_size(value) >= min_length and character_diversity(value) >= 4 and
+      shannon_entropy(value) >= min_entropy and not weak_secret_value?(value)
+  end
+
+  defp weak_secret_value?(value) do
+    normalized =
+      value
+      |> String.downcase()
+      |> String.trim(~s('"`))
+
+    placeholder_value?(normalized) or repeated_value?(normalized)
+  end
+
+  defp placeholder_value?(value) do
+    Regex.match?(
+      ~r/\A(?:change[-_]?me|placeholder|dummy|example|sample|test(?:ing)?|password|secret|token|credential|your[-_]?[a-z0-9_-]+)(?:[0-9_-]*)\z/,
+      value
+    )
+  end
+
+  defp repeated_value?(value) do
+    Regex.match?(~r/\A(.{1,4})\1{2,}\z/s, value)
   end
 
   defp character_diversity(""), do: 0
