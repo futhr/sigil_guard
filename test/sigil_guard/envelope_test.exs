@@ -55,10 +55,23 @@ defmodule SigilGuard.EnvelopeTest do
         )
 
       assert envelope["identity"] == "did:sigil:test"
-      assert envelope["verdict"] == "Allowed"
+      assert envelope["verdict"] == "allowed"
       assert envelope["timestamp"] == "2024-01-01T00:00:00.000Z"
       assert envelope["nonce"] == "deadbeef"
       assert is_binary(envelope["signature"])
+    end
+
+    test "can emit legacy title-cased verdicts by profile" do
+      envelope =
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          profile: :legacy_sigil_guard,
+          timestamp: "2024-01-01T00:00:00.000Z",
+          nonce: "deadbeef"
+        )
+
+      assert envelope["verdict"] == "Allowed"
+      assert :ok = Envelope.verify(envelope, TestSigner.public_key_b64u())
     end
 
     test "includes reason when provided" do
@@ -69,6 +82,12 @@ defmodule SigilGuard.EnvelopeTest do
         )
 
       assert envelope["reason"] == "sensitivity hit detected"
+    end
+
+    test "requires a reason for blocked envelopes" do
+      assert_raise ArgumentError, ~r/blocked envelopes require a reason/, fn ->
+        Envelope.sign("did:sigil:test", :blocked, signer: TestSigner)
+      end
     end
 
     test "excludes reason when not provided" do
@@ -184,8 +203,81 @@ defmodule SigilGuard.EnvelopeTest do
           nonce: "aabbccdd11223344"
         )
 
-      assert envelope["verdict"] == "Scanned"
+      assert envelope["verdict"] == "scanned"
       assert :ok = Envelope.verify(envelope, TestSigner.public_key_b64u())
+    end
+
+    test "verifies lowercase wire verdicts by default" do
+      envelope =
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          timestamp: "2024-06-15T10:30:00.000Z",
+          nonce: "aabbccdd11223344"
+        )
+
+      assert envelope["verdict"] == "allowed"
+      assert :ok = Envelope.verify(envelope, TestSigner.public_key_b64u())
+    end
+
+    test "strict spec profile rejects legacy title-cased verdicts" do
+      envelope =
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          profile: :legacy_sigil_guard,
+          timestamp: "2024-06-15T10:30:00.000Z",
+          nonce: "aabbccdd11223344"
+        )
+
+      assert {:error, :invalid_verdict} =
+               Envelope.verify(envelope, TestSigner.public_key_b64u(),
+                 profile: :sigil_spec_draft_2026_02
+               )
+    end
+
+    test "strict spec profile rejects blocked envelopes without reason" do
+      envelope =
+        Envelope.sign("did:sigil:test", :blocked,
+          signer: TestSigner,
+          reason: "policy blocked",
+          timestamp: "2024-06-15T10:30:00.000Z",
+          nonce: "aabbccdd11223344"
+        )
+        |> Map.delete("reason")
+
+      assert {:error, :blocked_reason_required} =
+               Envelope.verify(envelope, TestSigner.public_key_b64u(),
+                 profile: :sigil_spec_draft_2026_02
+               )
+    end
+
+    test "enforces timestamp freshness when requested" do
+      envelope =
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          timestamp: "2024-06-15T10:30:00.000Z",
+          nonce: "aabbccdd11223344"
+        )
+
+      assert {:error, :stale_envelope} =
+               Envelope.verify(envelope, TestSigner.public_key_b64u(), max_skew_ms: 1)
+    end
+
+    test "detects replayed nonces when requested" do
+      SigilGuard.ReplayStore.clear()
+
+      envelope =
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          timestamp: Envelope.generate_timestamp(),
+          nonce: "aabbccdd11223344aabbccdd11223344"
+        )
+
+      opts = [max_skew_ms: 300_000, replay: true]
+
+      assert :ok = Envelope.verify(envelope, TestSigner.public_key_b64u(), opts)
+
+      assert {:error, :replay_detected} =
+               Envelope.verify(envelope, TestSigner.public_key_b64u(), opts)
     end
   end
 
@@ -221,9 +313,7 @@ defmodule SigilGuard.EnvelopeTest do
     test "rejects unknown verdict strings" do
       envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
 
-      # Lowercase is the canonical-bytes form, not the envelope form;
-      # it must be rejected on the wire.
-      for bad_verdict <- ["allowed", "ALLOWED", "garbage", ""] do
+      for bad_verdict <- ["ALLOWED", "garbage", ""] do
         tampered = Map.put(envelope, "verdict", bad_verdict)
 
         assert {:error, :invalid_verdict} =

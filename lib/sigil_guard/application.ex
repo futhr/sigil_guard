@@ -22,6 +22,7 @@ defmodule SigilGuard.Application do
   @impl Application
   def start(_, _) do
     SigilGuard.Policy.ensure_rate_table()
+    SigilGuard.ReplayStore.ensure_table()
 
     children =
       if SigilGuard.Config.registry_enabled?() do

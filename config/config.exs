@@ -2,6 +2,7 @@ import Config
 
 config :sigil_guard,
   backend: :elixir,
+  protocol_profile: :auto,
   registry_url: "https://registry.sigil-protocol.org",
   registry_ttl_ms: :timer.hours(1),
   registry_timeout_ms: 5_000,

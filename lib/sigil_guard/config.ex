@@ -6,8 +6,13 @@ defmodule SigilGuard.Config do
 
   ## Options
 
-    * `:backend` — Processing backend: `:elixir` or `:nif`.
+    * `:backend` — Processing backend. Only `:elixir` is supported.
       Default: `:elixir`
+
+    * `:protocol_profile` — SIGIL compatibility profile:
+      `:auto`, `:legacy_sigil_guard`, `:sigil_reference_0_1`, or
+      `:sigil_spec_draft_2026_02`.
+      Default: `:auto`
 
     * `:registry_url` — Base URL for the SIGIL registry REST API.
       Default: `"https://registry.sigil-protocol.org"`
@@ -16,7 +21,7 @@ defmodule SigilGuard.Config do
       Default: `3_600_000` (1 hour)
 
     * `:registry_timeout_ms` — HTTP timeout for registry requests.
-      Default: `5_000` (5 seconds, matching Rust reference)
+      Default: `5_000` (5 seconds)
 
     * `:registry_retry_ms` — Retry interval after a failed registry fetch,
       so the cache does not wait a full TTL with stale data.
@@ -31,7 +36,7 @@ defmodule SigilGuard.Config do
   """
 
   @doc "Return the configured processing backend."
-  @spec backend() :: :elixir | :nif | module()
+  @spec backend() :: :elixir | module()
   def backend do
     Application.get_env(:sigil_guard, :backend, :elixir)
   end
@@ -40,6 +45,15 @@ defmodule SigilGuard.Config do
   @default_ttl_ms :timer.hours(1)
   @default_timeout_ms 5_000
   @default_retry_ms :timer.minutes(1)
+  @default_protocol_profile :auto
+
+  @doc "Return the configured SIGIL compatibility profile."
+  @spec protocol_profile() :: SigilGuard.Profile.t()
+  def protocol_profile do
+    :sigil_guard
+    |> Application.get_env(:protocol_profile, @default_protocol_profile)
+    |> SigilGuard.Profile.normalize!()
+  end
 
   @doc "Return the configured SIGIL registry base URL."
   @spec registry_url() :: String.t()

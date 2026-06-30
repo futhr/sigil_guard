@@ -8,6 +8,7 @@ defmodule SigilGuard.ConfigTest do
   setup do
     original_patterns = Application.get_env(:sigil_guard, :scanner_patterns)
     original_backend = Application.get_env(:sigil_guard, :backend)
+    original_profile = Application.get_env(:sigil_guard, :protocol_profile)
     original_url = Application.get_env(:sigil_guard, :registry_url)
     original_ttl = Application.get_env(:sigil_guard, :registry_ttl_ms)
     original_timeout = Application.get_env(:sigil_guard, :registry_timeout_ms)
@@ -22,6 +23,10 @@ defmodule SigilGuard.ConfigTest do
       if original_backend,
         do: Application.put_env(:sigil_guard, :backend, original_backend),
         else: Application.delete_env(:sigil_guard, :backend)
+
+      if original_profile,
+        do: Application.put_env(:sigil_guard, :protocol_profile, original_profile),
+        else: Application.delete_env(:sigil_guard, :protocol_profile)
 
       if original_url,
         do: Application.put_env(:sigil_guard, :registry_url, original_url),
@@ -54,8 +59,28 @@ defmodule SigilGuard.ConfigTest do
     end
 
     test "returns configured backend" do
-      Application.put_env(:sigil_guard, :backend, :nif)
-      assert Config.backend() == :nif
+      Application.put_env(:sigil_guard, :backend, SigilGuard.Backend.Elixir)
+      assert Config.backend() == SigilGuard.Backend.Elixir
+    end
+  end
+
+  describe "protocol_profile/0" do
+    test "defaults to :auto" do
+      Application.delete_env(:sigil_guard, :protocol_profile)
+      assert Config.protocol_profile() == :auto
+    end
+
+    test "returns configured profile" do
+      Application.put_env(:sigil_guard, :protocol_profile, :sigil_reference_0_1)
+      assert Config.protocol_profile() == :sigil_reference_0_1
+    end
+
+    test "raises for invalid profile" do
+      Application.put_env(:sigil_guard, :protocol_profile, :bogus)
+
+      assert_raise ArgumentError, ~r/invalid :sigil_guard protocol_profile/, fn ->
+        Config.protocol_profile()
+      end
     end
   end
 
