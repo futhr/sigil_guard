@@ -35,6 +35,7 @@ SigilGuard (Main API)
     |   +-- Backend.Elixir         Pure Elixir backend (default)
     |
     +-- SigilGuard.Scanner         Sensitivity scanning engine
+    |   +-- Scanner.Pipeline       Staged validation/enrichment pipeline
     +-- SigilGuard.Patterns        Pattern compilation and management
     +-- SigilGuard.Context         Boundary/provenance metadata
     +-- SigilGuard.Decision        Runtime gate decision struct
@@ -68,7 +69,8 @@ SigilGuard (Main API)
 | `lib/sigil_guard.ex` | Main API module, dispatches to backend |
 | `lib/sigil_guard/backend.ex` | Backend behaviour definition and selection |
 | `lib/sigil_guard/backend/elixir.ex` | Pure Elixir backend implementation |
-| `lib/sigil_guard/scanner.ex` | Regex-based sensitivity scanning |
+| `lib/sigil_guard/scanner.ex` | Sensitivity scanning facade |
+| `lib/sigil_guard/scanner/pipeline.ex` | Staged scanner validation/enrichment pipeline |
 | `lib/sigil_guard/context.ex` | Boundary/provenance metadata |
 | `lib/sigil_guard/decision.ex` | Runtime gate decision struct |
 | `lib/sigil_guard/quarantine.ex` | Prompt-injection and tool-poisoning indicators |
@@ -133,6 +135,8 @@ Test structure:
 test/
 +-- sigil_guard/
 |   +-- scanner_test.exs       # Scanning tests
+|   +-- scanner/
+|   |   +-- pipeline_test.exs  # Staged scanner pipeline tests
 |   +-- envelope_test.exs      # Envelope sign/verify tests
 |   +-- policy_test.exs        # Policy evaluation tests
 |   +-- audit_test.exs         # Audit chain tests

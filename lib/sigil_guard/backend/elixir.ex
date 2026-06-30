@@ -5,7 +5,7 @@ defmodule SigilGuard.Backend.Elixir do
   This is the default backend requiring no external dependencies beyond
   OTP. It delegates to the existing SigilGuard modules:
 
-    * `SigilGuard.Scanner` — regex-based sensitivity scanning
+    * `SigilGuard.Scanner` — staged deterministic sensitivity scanning
     * `SigilGuard.Envelope` — Ed25519 signing via `:crypto`
     * `SigilGuard.Policy` — risk classification and trust gating
     * `SigilGuard.Audit` — HMAC-SHA256 chain integrity

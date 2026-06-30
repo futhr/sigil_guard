@@ -45,6 +45,7 @@ defmodule SigilGuard do
 
   - `SigilGuard.Backend` — Native backend behaviour and selection
   - `SigilGuard.Scanner` — Sensitivity scanning engine
+  - `SigilGuard.Scanner.Pipeline` — Staged scanner validation/enrichment pipeline
   - `SigilGuard.Patterns` — Pattern compilation and management
   - `SigilGuard.Envelope` — SIGIL envelope signing and verification
   - `SigilGuard.Runtime.Gate` — Boundary-aware tool/runtime decisions

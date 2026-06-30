@@ -19,7 +19,7 @@
 SigilGuard provides a high-level Elixir API for the [SIGIL Protocol](https://sigil-protocol.org/),
 securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use SigilGuard for:
 
-- **Sensitivity Scanning** — Detect and redact credentials, API keys, PII in text
+- **Sensitivity Scanning** — Detect and redact credentials with staged validation/enrichment
 - **Runtime Gate** — Boundary-aware decisions for tool input, tool output, and external sinks
 - **MCP Gateway Helpers** — Guard MCP-shaped tool requests and results without adapter lock-in
 - **Streaming Sanitization** — Hold back chunk tails so split secrets are not emitted early
@@ -35,7 +35,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 | Feature | Description |
 |---------|-------------|
-| **Sensitivity Scanner** | Regex-based detection of secrets, credentials, PII |
+| **Sensitivity Scanner** | Staged regex, validation, confidence, and signal enrichment for secrets and credentials |
 | **Runtime Gate** | Source-to-sink guard combining scanning, quarantine indicators, and policy |
 | **MCP Gateway** | Transport-agnostic guards for MCP request/result maps |
 | **Streaming Sanitizer** | Chunk-safe output sanitizer for tool-result streams |
@@ -296,6 +296,7 @@ SigilGuard (Main API)
     |   +-- Backend.Elixir         Pure Elixir backend (default)
     |
     +-- SigilGuard.Scanner         Sensitivity scanning engine
+    |   +-- Scanner.Pipeline       Staged validation/enrichment pipeline
     +-- SigilGuard.Patterns        Pattern compilation and management
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization

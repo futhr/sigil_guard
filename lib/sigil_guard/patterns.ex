@@ -24,13 +24,17 @@ defmodule SigilGuard.Patterns do
   """
 
   @type scan_hit :: %{
-          name: String.t(),
-          category: String.t(),
-          severity: :low | :medium | :high,
-          match: String.t(),
-          offset: non_neg_integer(),
-          length: non_neg_integer(),
-          replacement_hint: String.t() | nil
+          required(:name) => String.t(),
+          required(:category) => String.t(),
+          required(:severity) => :low | :medium | :high,
+          required(:match) => String.t(),
+          required(:offset) => non_neg_integer(),
+          required(:length) => non_neg_integer(),
+          required(:replacement_hint) => String.t() | nil,
+          optional(:confidence) => float(),
+          optional(:signals) => [atom()],
+          optional(:stage) => atom(),
+          optional(:validated) => boolean()
         }
 
   @type compiled_pattern :: %{

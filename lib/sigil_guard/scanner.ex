@@ -3,15 +3,18 @@ defmodule SigilGuard.Scanner do
   Sensitivity scanning and redaction for text content.
 
   Scans strings for sensitive content (credentials, API keys, PII) using
-  compiled regex patterns and provides redaction with configurable replacement hints.
+  a staged deterministic pipeline over compiled regex patterns. The pipeline
+  validates and enriches regex candidates with confidence and signal metadata,
+  then provides redaction with configurable replacement hints.
 
-  ## Behaviour
+  ## Pipeline Extensions
 
-  Modules implementing `SigilGuard.Scanner.Behaviour` can replace the default
-  regex-based scanner with custom implementations (ML-based, external service, etc.).
+  Pass `pipeline: MyPipeline` to use a module that exports `scan/3`.
+  The module receives `(text, patterns, opts)` and must return scan hits.
   """
 
   alias SigilGuard.Patterns
+  alias SigilGuard.Scanner.Pipeline
   alias SigilGuard.Telemetry
 
   @doc """
@@ -23,6 +26,9 @@ defmodule SigilGuard.Scanner do
   ## Options
 
     * `:patterns` — compiled patterns to use. Defaults to built-in patterns.
+    * `:pipeline` — `:staged` (default), `:regex`, or a module with `scan/3`.
+    * `:validate` — set to `false` to keep all regex candidates in staged mode.
+    * `:min_confidence` — discard staged hits below this score. Defaults to `0.0`.
 
   ## Examples
 
@@ -41,7 +47,7 @@ defmodule SigilGuard.Scanner do
     patterns = Keyword.get_lazy(opts, :patterns, &Patterns.built_in/0)
 
     Telemetry.span([:sigil_guard, :scan], %{patterns_checked: length(patterns)}, fn ->
-      hits = do_scan(text, patterns)
+      hits = do_scan(text, patterns, opts)
 
       result =
         if hits == [] do
@@ -100,22 +106,25 @@ defmodule SigilGuard.Scanner do
     end
   end
 
-  defp do_scan(text, patterns) do
-    Enum.flat_map(patterns, fn pattern ->
-      pattern.regex
-      |> Regex.scan(text, return: :index)
-      |> Enum.map(fn [{offset, length} | _] ->
-        %{
-          name: pattern.name,
-          category: pattern.category,
-          severity: pattern.severity,
-          match: binary_part(text, offset, length),
-          offset: offset,
-          length: length,
-          replacement_hint: pattern.replacement_hint
-        }
-      end)
-    end)
-    |> Enum.sort_by(& &1.offset)
+  defp do_scan(text, patterns, opts) do
+    case Keyword.get(opts, :pipeline, :staged) do
+      :staged ->
+        Pipeline.scan(text, patterns, opts)
+
+      :regex ->
+        Pipeline.regex_scan(text, patterns)
+
+      module when is_atom(module) ->
+        Code.ensure_loaded(module)
+
+        if function_exported?(module, :scan, 3) do
+          module.scan(text, patterns, opts)
+        else
+          raise ArgumentError, "scanner pipeline module must export scan/3"
+        end
+
+      other ->
+        raise ArgumentError, "invalid scanner pipeline #{inspect(other)}"
+    end
   end
 end

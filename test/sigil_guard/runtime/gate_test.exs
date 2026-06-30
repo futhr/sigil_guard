@@ -90,15 +90,18 @@ defmodule SigilGuard.Runtime.GateTest do
     test "emits redacted runtime telemetry" do
       ref = make_ref()
       parent = self()
+      handler_id = "runtime-gate-test-#{System.unique_integer()}"
 
       :telemetry.attach(
-        "runtime-gate-test-#{System.unique_integer()}",
+        handler_id,
         [:sigil_guard, :runtime, :gate],
         fn event, measurements, metadata, _ ->
           send(parent, {ref, event, measurements, metadata})
         end,
         nil
       )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
 
       Gate.evaluate("api_key=sk_live_abcdef1234567890abcd",
         phase: :tool_request,
@@ -107,9 +110,9 @@ defmodule SigilGuard.Runtime.GateTest do
         trust_level: :high
       )
 
-      assert_receive {^ref, [:sigil_guard, :runtime, :gate], %{system_time: _}, metadata}
+      assert_receive {^ref, [:sigil_guard, :runtime, :gate], %{system_time: _},
+                      %{verdict: :blocked} = metadata}
 
-      assert metadata.verdict == :blocked
       assert metadata.hit_count >= 1
       refute inspect(metadata) =~ "sk_live"
     end

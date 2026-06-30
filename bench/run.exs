@@ -99,6 +99,9 @@ defmodule SigilGuard.Bench do
       "scanner / elixir scan clean" => fn -> SigilGuard.Backend.Elixir.scan(clean, []) end,
       "scanner / elixir scan secret" => fn -> SigilGuard.Backend.Elixir.scan(secret, []) end,
       "scanner / elixir scan mixed" => fn -> SigilGuard.Backend.Elixir.scan(mixed, []) end,
+      "scanner / elixir scan mixed regex-only" => fn ->
+        SigilGuard.Backend.Elixir.scan(mixed, pipeline: :regex)
+      end,
       "scanner / elixir scan large" => fn -> SigilGuard.Backend.Elixir.scan(large, []) end,
       "scanner / elixir scan_and_redact" => fn ->
         SigilGuard.Backend.Elixir.scan_and_redact(mixed, [])
