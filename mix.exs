@@ -136,7 +136,11 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Quarantine
         ],
         "Runtime Gate": [
-          SigilGuard.Runtime.Gate
+          SigilGuard.Runtime.Gate,
+          SigilGuard.Runtime.Stream
+        ],
+        "MCP Gateway": [
+          SigilGuard.MCP.Gateway
         ],
         Audit: [
           SigilGuard.Audit,

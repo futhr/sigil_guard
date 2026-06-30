@@ -21,6 +21,8 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 - **Sensitivity Scanning** — Detect and redact credentials, API keys, PII in text
 - **Runtime Gate** — Boundary-aware decisions for tool input, tool output, and external sinks
+- **MCP Gateway Helpers** — Guard MCP-shaped tool requests and results without adapter lock-in
+- **Streaming Sanitization** — Hold back chunk tails so split secrets are not emitted early
 - **Envelope Signing** — Ed25519 signed `_sigil` metadata for MCP JSON-RPC
 - **Policy Enforcement** — Risk-classified trust gating for tool call authorization
 - **Tamper-Evident Audit** — HMAC-SHA256 chain integrity for immutable audit logs
@@ -34,6 +36,8 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 |---------|-------------|
 | **Sensitivity Scanner** | Regex-based detection of secrets, credentials, PII |
 | **Runtime Gate** | Source-to-sink guard combining scanning, quarantine indicators, and policy |
+| **MCP Gateway** | Transport-agnostic guards for MCP request/result maps |
+| **Streaming Sanitizer** | Chunk-safe output sanitizer for tool-result streams |
 | **Envelope Sign/Verify** | Ed25519 canonical envelope signing with explicit protocol profiles |
 | **Policy Engine** | Risk classification and trust-level gating |
 | **Audit Chain** | HMAC-SHA256 tamper-evident event chain |
@@ -107,6 +111,31 @@ decision =
 The gate is transport-agnostic: MCP servers, agents, and gateways can call it
 before tool execution, after tool results, and before outbound writes without
 pulling a specific MCP adapter into SigilGuard core.
+
+### MCP Gateway and Streaming
+
+```elixir
+request = %{
+  "method" => "tools/call",
+  "params" => %{
+    "name" => "send_webhook",
+    "arguments" => %{"body" => "AWS_KEY=AKIAIOSFODNN7EXAMPLE"}
+  }
+}
+
+decision = SigilGuard.MCP.Gateway.guard_request(request, trust_level: :high)
+:blocked = decision.verdict
+
+stream =
+  SigilGuard.MCP.Gateway.stream_result(
+    [tool: "fetch_url", trust_level: :medium],
+    stream_window_bytes: 256
+  )
+
+{stream, _decision, chunk1} = SigilGuard.Runtime.Stream.push(stream, "safe output ")
+{_stream, _decision, chunk2} = SigilGuard.Runtime.Stream.finish(stream)
+sanitized_output = chunk1 <> chunk2
+```
 
 ### Envelope Signing
 
@@ -240,6 +269,8 @@ SigilGuard (Main API)
     +-- SigilGuard.Scanner         Sensitivity scanning engine
     +-- SigilGuard.Patterns        Pattern compilation and management
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
+    +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization
+    +-- SigilGuard.MCP.Gateway     MCP-shaped guard helpers
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
     +-- SigilGuard.Policy          Risk classification and trust gating
     +-- SigilGuard.Audit           Tamper-evident audit chain

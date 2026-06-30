@@ -56,6 +56,7 @@ defmodule SigilGuard.Bench do
       %{}
       |> Map.merge(scanner_scenarios())
       |> Map.merge(runtime_gate_scenarios())
+      |> Map.merge(runtime_stream_scenarios())
       |> Map.merge(envelope_scenarios())
       |> Map.merge(policy_scenarios())
       |> Map.merge(audit_scenarios())
@@ -143,6 +144,25 @@ defmodule SigilGuard.Bench do
           tool: "fetch_url",
           trust_level: :high
         )
+      end
+    }
+  end
+
+  defp runtime_stream_scenarios do
+    prefix = String.duplicate("safe ", 30)
+
+    %{
+      "runtime stream / split secret redact" => fn ->
+        stream =
+          SigilGuard.Runtime.Stream.new([phase: :tool_result, sink: :model, trust_level: :medium],
+            stream_window_bytes: 64
+          )
+
+        {stream, _decision, first} = SigilGuard.Runtime.Stream.push(stream, prefix <> "AKIAIOS")
+        {stream, _decision, second} = SigilGuard.Runtime.Stream.push(stream, "FODNN7EXAMPLE tail")
+        {_stream, _decision, final} = SigilGuard.Runtime.Stream.finish(stream)
+
+        first <> second <> final
       end
     }
   end

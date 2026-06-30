@@ -40,6 +40,8 @@ SigilGuard (Main API)
     +-- SigilGuard.Decision        Runtime gate decision struct
     +-- SigilGuard.Quarantine      Prompt-injection/tool-poisoning indicators
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
+    +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization
+    +-- SigilGuard.MCP.Gateway     MCP-shaped guard helpers
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification
     +-- SigilGuard.Profile         Protocol compatibility profiles
     +-- SigilGuard.ReplayStore     ETS nonce replay protection
@@ -69,6 +71,8 @@ SigilGuard (Main API)
 | `lib/sigil_guard/decision.ex` | Runtime gate decision struct |
 | `lib/sigil_guard/quarantine.ex` | Prompt-injection and tool-poisoning indicators |
 | `lib/sigil_guard/runtime/gate.ex` | Source-to-sink runtime gate |
+| `lib/sigil_guard/runtime/stream.ex` | Chunk-safe streaming sanitizer |
+| `lib/sigil_guard/mcp/gateway.ex` | MCP-shaped request/result guard helpers |
 | `lib/sigil_guard/envelope.ex` | SIGIL envelope sign/verify |
 | `lib/sigil_guard/profile.ex` | Protocol compatibility profile definitions |
 | `lib/sigil_guard/replay_store.ex` | ETS-backed nonce replay cache |
@@ -208,6 +212,18 @@ decision = SigilGuard.guard("AWS_KEY=AKIAIOSFODNN7EXAMPLE",
 
 :blocked = decision.verdict
 :block = decision.action
+```
+
+### MCP Gateway
+
+```elixir
+request = %{
+  "method" => "tools/call",
+  "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+}
+
+decision = SigilGuard.MCP.Gateway.guard_request(request, trust_level: :high)
+:allowed = decision.verdict
 ```
 
 ## References
