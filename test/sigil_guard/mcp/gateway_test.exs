@@ -1,13 +1,23 @@
 defmodule SigilGuard.MCP.GatewayTest do
   @moduledoc false
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias SigilGuard.Decision
   alias SigilGuard.Envelope
   alias SigilGuard.MCP.Gateway
+  alias SigilGuard.ReplayStore
   alias SigilGuard.Runtime.Stream
   alias SigilGuard.TestSigner
+
+  @confirmation_key :crypto.hash(:sha256, "mcp-confirmation-test-key")
+  @now ~U[2026-06-30 12:00:00.000Z]
+
+  setup do
+    ReplayStore.clear()
+    on_exit(&ReplayStore.clear/0)
+    :ok
+  end
 
   describe "guard_request/3" do
     test "allows clean MCP tool calls" do
@@ -40,6 +50,22 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.verdict == :blocked
       assert decision.action == :block
       assert decision.audit_metadata.tool == "send_webhook"
+      assert decision.audit_metadata.hit_count == 1
+      refute inspect(decision.audit_metadata) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
+
+    test "does not strip user arguments that share guard metadata names" do
+      request = %{
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "send_webhook",
+          "arguments" => %{"confirmation_token" => "AKIAIOSFODNN7EXAMPLE"}
+        }
+      }
+
+      decision = Gateway.guard_request(request, trust_level: :high)
+
+      assert decision.verdict == :blocked
       assert decision.audit_metadata.hit_count == 1
       refute inspect(decision.audit_metadata) =~ "AKIAIOSFODNN7EXAMPLE"
     end
@@ -79,6 +105,146 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert response["error"]["data"]["hit_count"] == 1
       assert response["error"]["data"]["content_hash"]
       refute inspect(response) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
+  end
+
+  describe "issue_confirmation_token/5" do
+    test "issues tokens bound to the gateway-normalized request digest" do
+      request = confirmable_request()
+      decision = Gateway.guard_request(request, trust_level: :medium)
+
+      assert {:confirm, _} = decision.verdict
+
+      assert {:ok, token} =
+               Gateway.issue_confirmation_token(
+                 request,
+                 [trust_level: :medium],
+                 decision,
+                 @confirmation_key,
+                 now: @now,
+                 nonce: "gateway-confirm-nonce"
+               )
+
+      [body_b64u, _] = String.split(token, ".", parts: 2)
+      assert {:ok, body} = Base.url_decode64(body_b64u, padding: false)
+      claims = Jason.decode!(body)
+
+      assert claims["action_digest"] == decision.audit_metadata.action_digest
+      refute token =~ "tenant-a"
+    end
+  end
+
+  describe "guard_confirmed_request/3" do
+    test "returns the original confirmation decision when no token is supplied" do
+      request = confirmable_request()
+
+      decision =
+        Gateway.guard_confirmed_request(request, [trust_level: :medium],
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.audit_metadata.action_digest
+    end
+
+    test "accepts a valid request confirmation token and consumes it once" do
+      request = confirmable_request()
+      token = issue_request_token(request)
+      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], token)
+
+      assert %Decision{} =
+               decision =
+               Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
+                 confirmation_key: @confirmation_key,
+                 now: @now
+               )
+
+      assert decision.verdict == :allowed
+      assert decision.action == :allow
+      assert decision.reason == "Confirmation token accepted"
+      assert decision.audit_metadata.confirmation_status == :accepted
+      assert decision.audit_metadata.confirmation_actor == "unknown"
+      assert decision.audit_metadata.confirmation_nonce_hash
+      refute inspect(decision.audit_metadata) =~ token
+
+      replay =
+        Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert replay.verdict == :blocked
+      assert replay.audit_metadata.confirmation_status == :invalid
+      assert replay.audit_metadata.confirmation_reason == :replay_detected
+      refute inspect(replay.audit_metadata) =~ token
+    end
+
+    test "rejects tokens bound to a different request" do
+      request = confirmable_request()
+      token = issue_request_token(put_in(request, ["params", "arguments", "id"], "tenant-b"))
+      confirmed_request = put_in(request, ["params", "confirmation_token"], token)
+
+      decision =
+        Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.reason =~ "digest_mismatch"
+      assert decision.audit_metadata.confirmation_reason == :digest_mismatch
+      refute inspect(decision.audit_metadata) =~ token
+      refute inspect(decision.audit_metadata) =~ "tenant-a"
+    end
+
+    test "blocks invalid confirmation token types" do
+      request = put_in(confirmable_request(), ["params", "_sigil_confirmation"], 123)
+
+      decision =
+        Gateway.guard_confirmed_request(request, [trust_level: :medium],
+          confirmation_key: @confirmation_key
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.confirmation_reason == :invalid_confirmation_token
+    end
+  end
+
+  describe "guarded_confirmed_request/3" do
+    test "returns ok for confirmed executable requests" do
+      request = confirmable_request()
+      token = issue_request_token(request)
+
+      assert {:ok, decision} =
+               request
+               |> put_in(["params", "_sigil_confirmation"], token)
+               |> Gateway.guarded_confirmed_request([trust_level: :medium],
+                 confirmation_key: @confirmation_key,
+                 now: @now
+               )
+
+      assert decision.verdict == :allowed
+      assert decision.audit_metadata.confirmation_status == :accepted
+    end
+
+    test "returns JSON-RPC errors for invalid confirmation tokens without leaking request text" do
+      request =
+        confirmable_request()
+        |> put_in(["params", "_sigil_confirmation"], "not.a.valid.token")
+
+      assert {:error, response, decision} =
+               Gateway.guarded_confirmed_request(request, [trust_level: :medium],
+                 confirmation_key: @confirmation_key,
+                 now: @now
+               )
+
+      assert decision.verdict == :blocked
+      assert response["error"]["code"] == -32_001
+      assert response["error"]["data"]["confirmation_status"] == "invalid"
+      assert response["error"]["data"]["confirmation_reason"] == "invalid_token"
+      refute inspect(response) =~ "tenant-a"
+      refute inspect(response) =~ "not.a.valid.token"
     end
   end
 
@@ -388,6 +554,35 @@ defmodule SigilGuard.MCP.GatewayTest do
       },
       overrides
     )
+  end
+
+  defp confirmable_request do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => 1,
+      "method" => "tools/call",
+      "params" => %{
+        "name" => "delete_database",
+        "arguments" => %{"id" => "tenant-a"}
+      }
+    }
+  end
+
+  defp issue_request_token(request) do
+    decision = Gateway.guard_request(request, trust_level: :medium)
+
+    assert {:ok, token} =
+             Gateway.issue_confirmation_token(
+               request,
+               [trust_level: :medium],
+               decision,
+               @confirmation_key,
+               now: @now,
+               nonce: "gateway-confirm-nonce",
+               ttl_ms: 300_000
+             )
+
+    token
   end
 
   defp signed_request(envelope) do

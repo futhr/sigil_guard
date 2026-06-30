@@ -148,6 +148,38 @@ public_key_b64u = MySigner.public_key_b64u()
 
 "did:sigil:agent" = signed_decision.audit_metadata.identity
 
+confirm_request = %{
+  "method" => "tools/call",
+  "params" => %{"name" => "delete_database", "arguments" => %{"id" => "tenant-a"}}
+}
+
+{:error, confirm_response, confirm_decision} =
+  SigilGuard.MCP.Gateway.guarded_confirmed_request(confirm_request,
+    trust_level: :medium,
+    confirmation_key: secret_key
+  )
+
+"confirmation_required" = confirm_response["error"]["data"]["status"]
+
+{:ok, confirmation_token} =
+  SigilGuard.MCP.Gateway.issue_confirmation_token(
+    confirm_request,
+    [trust_level: :medium],
+    confirm_decision,
+    secret_key
+  )
+
+confirmed_request =
+  put_in(confirm_request, ["params", "_sigil_confirmation"], confirmation_token)
+
+{:ok, confirmed_decision} =
+  SigilGuard.MCP.Gateway.guarded_confirmed_request(confirmed_request,
+    trust_level: :medium,
+    confirmation_key: secret_key
+  )
+
+:allowed = confirmed_decision.verdict
+
 {:ok, safe_response, _decision} =
   SigilGuard.MCP.Gateway.guarded_result(
     %{"id" => 1, "content" => [%{"type" => "text", "text" => "token=supersecretvalue123"}]},

@@ -177,6 +177,8 @@ defmodule SigilGuard.Bench do
   defp mcp_gateway_scenarios do
     identity = "did:sigil:bench-mcp"
     public_keys = %{identity => SigilGuard.BenchSigner.public_key_b64u()}
+    confirmation_key = :crypto.hash(:sha256, "sigil_guard_mcp_confirmation_bench_key")
+    now = ~U[2026-06-30 12:00:00.000Z]
 
     envelope =
       SigilGuard.Envelope.sign(identity, :allowed,
@@ -196,10 +198,45 @@ defmodule SigilGuard.Bench do
       }
     }
 
+    confirmable_request = %{
+      "jsonrpc" => "2.0",
+      "id" => 2,
+      "method" => "tools/call",
+      "params" => %{
+        "name" => "delete_database",
+        "arguments" => %{"id" => "tenant-a"}
+      }
+    }
+
+    confirm_decision =
+      SigilGuard.MCP.Gateway.guard_confirmed_request(confirmable_request,
+        trust_level: :medium
+      )
+
+    {:ok, confirmation_token} =
+      SigilGuard.MCP.Gateway.issue_confirmation_token(
+        confirmable_request,
+        [trust_level: :medium],
+        confirm_decision,
+        confirmation_key,
+        now: now,
+        nonce: "bench-confirmation-nonce"
+      )
+
+    confirmed_request =
+      put_in(confirmable_request, ["params", "_sigil_confirmation"], confirmation_token)
+
     %{
       "mcp gateway / signed request" => fn ->
         SigilGuard.MCP.Gateway.guard_signed_request(request, [trust_level: :high],
           public_keys: public_keys
+        )
+      end,
+      "mcp gateway / confirmed request" => fn ->
+        SigilGuard.MCP.Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
+          confirmation_key: confirmation_key,
+          now: now,
+          consume_confirmation: false
         )
       end
     }

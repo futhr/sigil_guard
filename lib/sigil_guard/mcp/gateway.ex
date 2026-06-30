@@ -8,6 +8,7 @@ defmodule SigilGuard.MCP.Gateway do
   or client package.
   """
 
+  alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.Envelope
@@ -15,6 +16,14 @@ defmodule SigilGuard.MCP.Gateway do
   alias SigilGuard.Telemetry
 
   @known_context_keys Map.keys(%Context{})
+  @guard_metadata_keys [
+    :_sigil,
+    "_sigil",
+    :_sigil_confirmation,
+    "_sigil_confirmation",
+    :confirmation_token,
+    "confirmation_token"
+  ]
   @blocked_code -32_001
   @confirm_code -32_002
   @quarantine_code -32_003
@@ -42,6 +51,64 @@ defmodule SigilGuard.MCP.Gateway do
           {:ok, Decision.t()} | {:error, map(), Decision.t()}
   def guarded_request(request, context \\ %{}, opts \\ []) do
     decision = guard_request(request, context, opts)
+
+    if executable?(decision) do
+      {:ok, decision}
+    else
+      {:error, response_for_decision(decision, request_id(request), opts), decision}
+    end
+  end
+
+  @doc """
+  Issue an action-bound confirmation token for a confirm-required MCP request.
+
+  The token is bound to the same normalized request payload and boundary
+  context used by `guard_request/3`, excluding SigilGuard transport metadata
+  such as `_sigil` and `_sigil_confirmation`.
+  """
+  @spec issue_confirmation_token(
+          term(),
+          Context.t() | map() | keyword(),
+          Decision.t(),
+          binary(),
+          keyword()
+        ) ::
+          {:ok, String.t()} | {:error, term()}
+  def issue_confirmation_token(request, context, %Decision{} = decision, key, opts \\ []) do
+    Confirmation.issue(
+      gate_payload(request),
+      request_context(request, context),
+      decision,
+      key,
+      opts
+    )
+  end
+
+  @doc """
+  Guard an MCP tool request and honor an optional confirmation token.
+
+  If the request does not require confirmation, this behaves like
+  `guard_request/3`. If confirmation is required and a token is supplied via
+  `:confirmation_token`, `_sigil_confirmation`, or `confirmation_token`, the
+  token is verified against the request action digest. Gateway confirmation
+  tokens are consumed by default; pass `consume_confirmation: false` to keep
+  verification stateless.
+  """
+  @spec guard_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          Decision.t()
+  def guard_confirmed_request(request, context \\ %{}, opts \\ []) do
+    decision = guard_request(request, context, opts)
+
+    maybe_apply_confirmation(decision, request, request_context(request, context), opts)
+  end
+
+  @doc """
+  Guard a possibly confirmed MCP request and return either an allow decision or JSON-RPC error.
+  """
+  @spec guarded_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_confirmed_request(request, context \\ %{}, opts \\ []) do
+    decision = guard_confirmed_request(request, context, opts)
 
     if executable?(decision) do
       {:ok, decision}
@@ -231,11 +298,32 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp gate_payload(payload) do
+    payload = strip_guard_metadata(payload)
+
     %{
       tool: tool_name(payload),
       action: action_name(payload),
       text: text_payload(payload)
     }
+  end
+
+  defp strip_guard_metadata(value) when is_map(value) do
+    value
+    |> Map.drop(@guard_metadata_keys)
+    |> strip_params_metadata(:params)
+    |> strip_params_metadata("params")
+  end
+
+  defp strip_guard_metadata(value), do: value
+
+  defp strip_params_metadata(payload, params_key) do
+    case Map.get(payload, params_key) do
+      params when is_map(params) ->
+        Map.put(payload, params_key, Map.drop(params, @guard_metadata_keys))
+
+      _ ->
+        payload
+    end
   end
 
   defp text_payload(payload) do
@@ -327,6 +415,94 @@ defmodule SigilGuard.MCP.Gateway do
   defp executable?(%Decision{verdict: :allowed, action: action}), do: action in [:allow, :redact]
   defp executable?(%Decision{}), do: false
 
+  defp maybe_apply_confirmation(
+         %Decision{verdict: {:confirm, _}} = decision,
+         request,
+         context,
+         opts
+       ) do
+    case confirmation_token(request, opts) do
+      {:ok, token} ->
+        verify_confirmation_token(decision, request, context, token, opts)
+
+      {:error, :missing_confirmation_token} ->
+        decision
+
+      {:error, reason} ->
+        confirmation_failure_decision(decision, reason)
+    end
+  end
+
+  defp maybe_apply_confirmation(%Decision{} = decision, _, _, _), do: decision
+
+  defp verify_confirmation_token(decision, request, context, token, opts) do
+    with {:ok, key} <- confirmation_key(opts),
+         {:ok, claims} <-
+           Confirmation.verify(
+             token,
+             gate_payload(request),
+             context,
+             key,
+             confirmation_opts(opts)
+           ) do
+      confirmed_decision(decision, claims)
+    else
+      {:error, reason} -> confirmation_failure_decision(decision, reason)
+    end
+  end
+
+  defp confirmation_key(opts) do
+    case Keyword.get(opts, :confirmation_key) do
+      key when is_binary(key) -> {:ok, key}
+      _ -> {:error, :missing_confirmation_key}
+    end
+  end
+
+  defp confirmation_opts(opts) do
+    opts
+    |> Keyword.take([:now])
+    |> Keyword.put(:consume, Keyword.get(opts, :consume_confirmation, true))
+  end
+
+  defp confirmed_decision(%Decision{} = decision, claims) do
+    metadata =
+      Map.merge(decision.audit_metadata, %{
+        verdict: :allowed,
+        confirmation_status: :accepted,
+        confirmation_actor: claims["actor"],
+        confirmation_nonce_hash: hash_text(claims["nonce"]),
+        confirmation_issued_at: claims["issued_at"],
+        confirmation_expires_at: claims["expires_at"]
+      })
+
+    %{
+      decision
+      | verdict: :allowed,
+        reason: "Confirmation token accepted",
+        audit_metadata: metadata
+    }
+  end
+
+  defp confirmation_failure_decision(%Decision{} = decision, reason) do
+    metadata =
+      Map.merge(decision.audit_metadata, %{
+        verdict: :blocked,
+        action: :block,
+        risk_level: :high,
+        confirmation_status: :invalid,
+        confirmation_reason: reason
+      })
+
+    %{
+      decision
+      | verdict: :blocked,
+        action: :block,
+        reason: "MCP confirmation verification failed: #{format_reason(reason)}",
+        risk_level: :high,
+        audit_metadata: metadata
+    }
+  end
+
   defp request_id(payload) when is_map(payload) do
     first_payload_term(payload, [
       [:id],
@@ -337,6 +513,48 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp request_id(_), do: nil
+
+  defp confirmation_token_option(opts) do
+    case Keyword.fetch(opts, :confirmation_token) do
+      {:ok, token} when is_binary(token) -> {:ok, token}
+      {:ok, _} -> {:error, :invalid_confirmation_token}
+      :error -> :not_found
+    end
+  end
+
+  defp request_confirmation_token(payload) when is_map(payload) do
+    case first_payload_term(payload, confirmation_token_paths()) do
+      token when is_binary(token) -> {:ok, token}
+      nil -> {:error, :missing_confirmation_token}
+      _ -> {:error, :invalid_confirmation_token}
+    end
+  end
+
+  defp request_confirmation_token(_), do: {:error, :missing_confirmation_token}
+
+  defp confirmation_token(request, opts) do
+    case confirmation_token_option(opts) do
+      :not_found -> request_confirmation_token(request)
+      result -> result
+    end
+  end
+
+  defp confirmation_token_paths do
+    [
+      [:_sigil_confirmation],
+      ["_sigil_confirmation"],
+      [:confirmation_token],
+      ["confirmation_token"],
+      [:params, :_sigil_confirmation],
+      [:params, "_sigil_confirmation"],
+      [:params, :confirmation_token],
+      [:params, "confirmation_token"],
+      ["params", :_sigil_confirmation],
+      ["params", "_sigil_confirmation"],
+      ["params", :confirmation_token],
+      ["params", "confirmation_token"]
+    ]
+  end
 
   defp first_payload_term(payload, paths) when is_map(payload) do
     Enum.find_value(paths, &get_in(payload, &1))
@@ -502,18 +720,23 @@ defmodule SigilGuard.MCP.Gateway do
   defp error_message(%Decision{}), do: "SigilGuard blocked MCP content"
 
   defp error_data(%Decision{} = decision, opts) do
-    base = %{
-      "status" => error_status(decision),
-      "action" => Atom.to_string(decision.action),
-      "reason" => decision.reason,
-      "phase" => Atom.to_string(decision.phase),
-      "risk_level" => Atom.to_string(decision.risk_level),
-      "trust_level" => Atom.to_string(decision.trust_level),
-      "hit_count" => length(decision.hits),
-      "indicator_ids" => Enum.map(decision.indicators, &Atom.to_string(&1.id)),
-      "content_hash" => decision.content_hash,
-      "action_digest" => decision.audit_metadata[:action_digest]
-    }
+    base =
+      %{
+        "status" => error_status(decision),
+        "action" => Atom.to_string(decision.action),
+        "reason" => decision.reason,
+        "phase" => Atom.to_string(decision.phase),
+        "risk_level" => Atom.to_string(decision.risk_level),
+        "trust_level" => Atom.to_string(decision.trust_level),
+        "hit_count" => length(decision.hits),
+        "indicator_ids" => Enum.map(decision.indicators, &Atom.to_string(&1.id)),
+        "content_hash" => decision.content_hash,
+        "action_digest" => decision.audit_metadata[:action_digest],
+        "confirmation_status" => error_value(decision.audit_metadata[:confirmation_status]),
+        "confirmation_reason" => error_value(decision.audit_metadata[:confirmation_reason])
+      }
+      |> Enum.reject(fn {_, value} -> is_nil(value) end)
+      |> Map.new()
 
     if Keyword.get(opts, :include_sanitized, false) and is_binary(decision.sanitized_text) do
       Map.put(base, "sanitized_text", decision.sanitized_text)
@@ -525,4 +748,8 @@ defmodule SigilGuard.MCP.Gateway do
   defp error_status(%Decision{action: :quarantine}), do: "quarantined"
   defp error_status(%Decision{verdict: {:confirm, _}}), do: "confirmation_required"
   defp error_status(%Decision{}), do: "blocked"
+
+  defp error_value(nil), do: nil
+  defp error_value(value) when is_atom(value), do: Atom.to_string(value)
+  defp error_value(value), do: value
 end

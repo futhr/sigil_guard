@@ -255,6 +255,32 @@ request = %{
 
 {:ok, decision} = SigilGuard.MCP.Gateway.guarded_request(request, trust_level: :high)
 :allowed = decision.verdict
+
+confirm_request = %{
+  "method" => "tools/call",
+  "params" => %{"name" => "delete_database", "arguments" => %{"id" => "tenant-a"}}
+}
+
+{:error, _response, confirm_decision} =
+  SigilGuard.MCP.Gateway.guarded_confirmed_request(confirm_request,
+    trust_level: :medium,
+    confirmation_key: secret_key
+  )
+
+{:ok, token} =
+  SigilGuard.MCP.Gateway.issue_confirmation_token(
+    confirm_request,
+    [trust_level: :medium],
+    confirm_decision,
+    secret_key
+  )
+
+confirmed_request = put_in(confirm_request, ["params", "_sigil_confirmation"], token)
+{:ok, confirmed} =
+  SigilGuard.MCP.Gateway.guarded_confirmed_request(confirmed_request,
+    trust_level: :medium,
+    confirmation_key: secret_key
+  )
 ```
 
 ### Confirmation Tokens
