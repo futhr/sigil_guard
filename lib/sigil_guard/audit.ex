@@ -130,7 +130,7 @@ defmodule SigilGuard.Audit do
     Telemetry.emit(
       [:sigil_guard, :audit, :logged],
       %{system_time: System.system_time()},
-      %{event_type: event.type, actor: event.actor}
+      %{event_type: event.type, actor: event.actor, action: event.action, result: event.result}
     )
 
     %{event | hmac: hmac, prev_hmac: prev_hmac}

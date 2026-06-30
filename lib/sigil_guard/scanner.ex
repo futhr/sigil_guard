@@ -45,8 +45,9 @@ defmodule SigilGuard.Scanner do
   @spec scan(String.t(), keyword()) :: {:ok, String.t()} | {:hit, [Patterns.scan_hit()]}
   def scan(text, opts \\ []) do
     patterns = Keyword.get_lazy(opts, :patterns, &Patterns.built_in/0)
+    telemetry_metadata = telemetry_metadata(patterns, opts)
 
-    Telemetry.span([:sigil_guard, :scan], %{patterns_checked: length(patterns)}, fn ->
+    Telemetry.span([:sigil_guard, :scan], telemetry_metadata, fn ->
       hits = do_scan(text, patterns, opts)
 
       result =
@@ -56,7 +57,7 @@ defmodule SigilGuard.Scanner do
           {:hit, hits}
         end
 
-      {result, %{hit_count: length(hits), patterns_checked: length(patterns)}}
+      {result, Map.put(telemetry_metadata, :hit_count, length(hits))}
     end)
   end
 
@@ -127,4 +128,15 @@ defmodule SigilGuard.Scanner do
         raise ArgumentError, "invalid scanner pipeline #{inspect(other)}"
     end
   end
+
+  defp telemetry_metadata(patterns, opts) do
+    %{
+      patterns_checked: length(patterns),
+      pipeline: pipeline_name(Keyword.get(opts, :pipeline, :staged)),
+      scanner_validate: Keyword.get(opts, :validate, true)
+    }
+  end
+
+  defp pipeline_name(module) when is_atom(module), do: module
+  defp pipeline_name(other), do: inspect(other)
 end

@@ -227,13 +227,18 @@ defmodule SigilGuard.Runtime.Gate do
         :origin,
         :sink,
         :tool,
+        :mcp_server,
+        :resource_uri,
         :trust_zone,
         :trust_level,
         :risk_level,
         :verdict,
         :action,
         :hit_count,
-        :indicator_count
+        :indicator_count,
+        :indicator_ids,
+        :content_hash,
+        :action_digest
       ])
     )
   end

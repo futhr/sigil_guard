@@ -154,13 +154,16 @@ test/
 
 | Event | Measurements | Metadata |
 |-------|--------------|----------|
-| `[:sigil_guard, :scan, :start]` | `system_time` | `patterns_checked` |
-| `[:sigil_guard, :scan, :stop]` | `duration` | `hit_count`, `patterns_checked` |
+| `[:sigil_guard, :scan, :start]` | `system_time` | `patterns_checked`, `pipeline`, `scanner_validate` |
+| `[:sigil_guard, :scan, :stop]` | `duration` | `hit_count`, `patterns_checked`, `pipeline`, `scanner_validate` |
 | `[:sigil_guard, :registry, :fetch, :start]` | `system_time` | `url` |
 | `[:sigil_guard, :registry, :fetch, :stop]` | `duration` | `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
-| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count` |
-| `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor` |
+| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest` |
+| `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
+
+`SigilGuard.Telemetry.otel_attributes/3` and `attach_otel_forwarder/3` provide
+OpenTelemetry-style string attributes without adding a hard OTel dependency.
 
 ## Configuration
 
