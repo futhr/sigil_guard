@@ -27,7 +27,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 - **Confirmation Tokens** — HMAC-signed approvals bound to exact action digests
 - **Envelope Signing** — Ed25519 signed `_sigil` metadata for MCP JSON-RPC
 - **Policy Enforcement** — Risk-classified trust gating for tool call authorization
-- **Tamper-Evident Audit** — HMAC chains plus signed Merkle checkpoints for external anchoring
+- **Tamper-Evident Audit** — HMAC chains plus signed Merkle checkpoint exports for external anchoring
 - **Registry Client** — Fetch signed pattern bundles with provenance quarantine support
 
 ---
@@ -44,7 +44,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 | **Confirmation Tokens** | Short-lived approval grants bound to payload and boundary context |
 | **Envelope Sign/Verify** | Ed25519 canonical envelope signing with explicit protocol profiles |
 | **Policy Engine** | Risk classification and trust-level gating |
-| **Audit Chain** | HMAC-SHA256 event chain with signed checkpoint exports and external anchor records |
+| **Audit Chain** | HMAC-SHA256 event chain with signed checkpoint export packages and external anchor records |
 | **Secure Vault** | AES-256-GCM encrypted secret storage |
 | **Registry Client** | REST client with TTL cache, signed bundle provenance, quarantine, endpoint fallback, and key normalization |
 | **Replay Protection** | Optional nonce replay and timestamp-skew checks for envelopes |
@@ -271,6 +271,23 @@ anchor =
   )
 
 {:ok, _verified_anchor} = SigilGuard.Audit.Anchor.verify(anchor, signed_checkpoint)
+
+{:ok, export} =
+  SigilGuard.Audit.Export.create(signed,
+    chain_id: "prod-audit",
+    signer: MyAuditSigner,
+    issuer: "did:web:ops",
+    anchor: [storage: "s3-object-lock", uri: "s3://audit-lock/checkpoints/001.json"]
+  )
+
+public_key_b64u = MyAuditSigner.public_key_b64u()
+
+{:ok, _verified_export} =
+  SigilGuard.Audit.Export.verify(export, signed,
+    public_keys: %{"did:web:ops" => public_key_b64u},
+    require_signature: true,
+    require_anchor: true
+  )
 ```
 
 ### Secure Vaulting
@@ -375,6 +392,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Audit           Tamper-evident audit chain
     |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
     |   +-- Audit.Anchor           External WORM/append-only anchor records
+    |   +-- Audit.Export           Portable signed checkpoint + anchor package
     +-- SigilGuard.Identity        Trust level hierarchy
     +-- SigilGuard.Signer          Cryptographic signing behaviour
     +-- SigilGuard.Vault           Encrypted storage behaviour

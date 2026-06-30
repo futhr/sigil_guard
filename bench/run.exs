@@ -412,6 +412,20 @@ defmodule SigilGuard.Bench do
         issued_at: "2026-06-30T12:00:00.000Z"
       )
 
+    {:ok, export_100} =
+      SigilGuard.Audit.Export.create(chain_100,
+        chain_id: "bench-chain",
+        generated_at: "2026-06-30T12:00:00.000Z",
+        signer: SigilGuard.BenchSigner,
+        issuer: "did:sigil:bench-audit",
+        issued_at: "2026-06-30T12:00:00.000Z",
+        anchor: [
+          anchored_at: "2026-06-30T12:00:01.000Z",
+          storage: "worm",
+          uri: "bench://audit/checkpoints/100"
+        ]
+      )
+
     audit_public_keys = %{
       "did:sigil:bench-audit" => SigilGuard.BenchSigner.public_key_b64u()
     }
@@ -444,6 +458,27 @@ defmodule SigilGuard.Bench do
         SigilGuard.Audit.Checkpoint.verify(signed_checkpoint_100, chain_100,
           public_keys: audit_public_keys,
           require_signature: true
+        )
+      end,
+      "audit export / create signed anchored 100" => fn ->
+        SigilGuard.Audit.Export.create(chain_100,
+          chain_id: "bench-chain",
+          generated_at: "2026-06-30T12:00:00.000Z",
+          signer: SigilGuard.BenchSigner,
+          issuer: "did:sigil:bench-audit",
+          issued_at: "2026-06-30T12:00:00.000Z",
+          anchor: [
+            anchored_at: "2026-06-30T12:00:01.000Z",
+            storage: "worm",
+            uri: "bench://audit/checkpoints/100"
+          ]
+        )
+      end,
+      "audit export / verify signed anchored 100" => fn ->
+        SigilGuard.Audit.Export.verify(export_100, chain_100,
+          public_keys: audit_public_keys,
+          require_signature: true,
+          require_anchor: true
         )
       end
     }

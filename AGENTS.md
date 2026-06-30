@@ -52,6 +52,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Audit           Tamper-evident audit chain
     |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
     |   +-- Audit.Anchor           External WORM/append-only anchor records
+    |   +-- Audit.Export           Portable signed checkpoint + anchor package
     |   +-- Audit.Logger           Audit logger behaviour
     +-- SigilGuard.Identity        Trust level hierarchy
     +-- SigilGuard.Signer          Cryptographic signing behaviour
@@ -89,6 +90,7 @@ SigilGuard (Main API)
 | `lib/sigil_guard/audit.ex` | HMAC-SHA256 chain integrity |
 | `lib/sigil_guard/audit/checkpoint.ex` | Merkle checkpoint export, signing, and verification |
 | `lib/sigil_guard/audit/anchor.ex` | External WORM/append-only anchor records |
+| `lib/sigil_guard/audit/export.ex` | Portable signed checkpoint + anchor export package |
 | `lib/sigil_guard/identity.ex` | Trust level hierarchy |
 | `lib/sigil_guard/vault.ex` | Encrypted storage behaviour |
 | `lib/sigil_guard/registry.ex` | SIGIL registry REST client |
@@ -146,6 +148,10 @@ test/
 |   +-- envelope_test.exs      # Envelope sign/verify tests
 |   +-- policy_test.exs        # Policy evaluation tests
 |   +-- audit_test.exs         # Audit chain tests
+|   +-- audit/
+|   |   +-- checkpoint_test.exs # Signed checkpoint/Merkle tests
+|   |   +-- anchor_test.exs     # External anchor tests
+|   |   +-- export_test.exs     # Portable export package tests
 |   +-- backend_test.exs       # Backend dispatch tests
 |   +-- registry/
 |   |   +-- bundle_test.exs    # Registry provenance tests
@@ -165,7 +171,8 @@ test/
 | `[:sigil_guard, :registry, :fetch, :start]` | `system_time` | `url` |
 | `[:sigil_guard, :registry, :fetch, :stop]` | `duration` | `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
-| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
+| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
+| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `content_hash` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 
 `SigilGuard.Telemetry.otel_attributes/3` and `attach_otel_forwarder/3` provide

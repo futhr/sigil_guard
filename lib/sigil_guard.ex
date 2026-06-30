@@ -2,14 +2,16 @@ defmodule SigilGuard do
   @moduledoc """
   SIGIL Protocol integration for Elixir.
 
-  SigilGuard provides five security layers for MCP (Model Context Protocol)
-  tool calls and AI agent interactions:
+  SigilGuard provides composable security layers for MCP (Model Context
+  Protocol) tool calls and AI agent interactions:
 
   1. **Sensitivity Scanning** — Detect credentials, API keys, and secrets in text
   2. **Envelope Signing** — Ed25519-signed `_sigil` metadata for tamper detection
   3. **Policy Enforcement** — Risk classification with trust-gated access control
   4. **Tamper-Evident Audit** — HMAC-SHA256 chain for immutable audit logs
   5. **Secure Vaulting** — Encrypted storage for sensitive values
+  6. **Runtime Gating** — Boundary-aware MCP/tool request and result decisions
+  7. **Repo Policy** — Deterministic repo path governance
 
   ## Backend Configuration
 
@@ -54,6 +56,7 @@ defmodule SigilGuard do
   - `SigilGuard.Confirmation` — Action-bound approval tokens
   - `SigilGuard.Policy` — Risk classification and trust gating
   - `SigilGuard.Audit` — Tamper-evident audit chain
+  - `SigilGuard.Audit.Export` — Portable signed checkpoint + anchor packages
   - `SigilGuard.Vault` — Secure secret storage
   - `SigilGuard.Identity` — Trust level hierarchy
   - `SigilGuard.Signer` — Cryptographic signing behaviour

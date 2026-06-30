@@ -154,6 +154,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Audit.Checkpoint,
           SigilGuard.Audit.EventType,
           SigilGuard.Audit.ExecutionResult,
+          SigilGuard.Audit.Export,
           SigilGuard.Audit.Logger
         ],
         "Signing & Vault": [
