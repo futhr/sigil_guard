@@ -48,8 +48,10 @@ defmodule SigilGuard.Runtime.Gate do
     context = Context.new(context)
 
     decision =
-      case runtime_inputs(payload, context) do
-        {:ok, text, action} -> evaluate_checked(payload, context, text, action, opts)
+      with :ok <- Context.validate(context),
+           {:ok, text, action} <- runtime_inputs(payload, context) do
+        evaluate_checked(payload, context, text, action, opts)
+      else
         {:error, reason} -> malformed_input_decision(context, reason)
       end
 

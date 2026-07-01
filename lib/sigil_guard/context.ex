@@ -53,6 +53,13 @@ defmodule SigilGuard.Context do
             intended_audience: :internal,
             metadata: %{}
 
+  @phases ~w(inbound_user tool_request tool_result outbound_model repo_change)a
+  @sinks ~w(internal model user tool external network log repo)a
+  @origins ~w(unknown user model tool resource repo registry)a
+  @trust_levels ~w(low medium high)a
+  @trust_zones ~w(trusted semi_trusted untrusted)a
+  @audiences ~w(internal model user tool external network log repo)a
+
   @doc """
   Normalize a context struct, map, or keyword list into `%SigilGuard.Context{}`.
   """
@@ -67,8 +74,35 @@ defmodule SigilGuard.Context do
 
   def new(context) when is_map(context) do
     atom_context = atomize_known_keys(context)
-    struct(__MODULE__, atom_context)
+
+    struct(__MODULE__, normalize_known_values(atom_context))
   end
+
+  @doc """
+  Validate normalized boundary context values.
+
+  Runtime gates use this to fail closed on malformed boundary labels before
+  policy, scanner, or telemetry code can make decisions from invalid values.
+  """
+  @spec validate(t() | map() | keyword()) :: :ok | {:error, atom()}
+  def validate(%__MODULE__{} = context) do
+    with :ok <- require_member(context.phase, @phases, :invalid_phase),
+         :ok <- require_member(context.sink, @sinks, :invalid_sink),
+         :ok <- require_origin(context.origin),
+         :ok <- require_member(context.trust_level, @trust_levels, :invalid_trust_level),
+         :ok <- require_member(context.trust_zone, @trust_zones, :invalid_trust_zone),
+         :ok <- require_audience(context.intended_audience) do
+      require_map(context.metadata, :invalid_metadata)
+    end
+  end
+
+  def validate(context) when is_map(context) or is_list(context) do
+    context
+    |> new()
+    |> validate()
+  end
+
+  def validate(_), do: {:error, :invalid_context}
 
   @doc """
   Return the action string used by policy evaluation.
@@ -181,4 +215,41 @@ defmodule SigilGuard.Context do
   rescue
     ArgumentError -> :error
   end
+
+  defp normalize_known_values(context) do
+    context
+    |> normalize_known_value(:phase, @phases)
+    |> normalize_known_value(:sink, @sinks)
+    |> normalize_known_value(:origin, @origins)
+    |> normalize_known_value(:trust_level, @trust_levels)
+    |> normalize_known_value(:trust_zone, @trust_zones)
+    |> normalize_known_value(:intended_audience, @audiences)
+  end
+
+  defp normalize_known_value(context, key, allowed) do
+    if Map.has_key?(context, key) do
+      Map.update!(context, key, &normalize_enum_value(&1, allowed))
+    else
+      context
+    end
+  end
+
+  defp normalize_enum_value(value, allowed) when is_binary(value) do
+    Enum.find(allowed, value, &(Atom.to_string(&1) == value))
+  end
+
+  defp normalize_enum_value(value, _), do: value
+
+  defp require_member(value, allowed, reason) do
+    if value in allowed, do: :ok, else: {:error, reason}
+  end
+
+  defp require_origin(origin) when is_atom(origin), do: :ok
+  defp require_origin(_), do: {:error, :invalid_origin}
+
+  defp require_audience(audience) when is_atom(audience), do: :ok
+  defp require_audience(_), do: {:error, :invalid_audience}
+
+  defp require_map(value, _) when is_map(value), do: :ok
+  defp require_map(_, reason), do: {:error, reason}
 end
