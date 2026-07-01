@@ -141,24 +141,19 @@ defmodule SigilGuard.Patterns do
   end
 
   defp compile_pattern(raw) when is_map(raw) do
-    case extract_regex_source(raw) do
-      source when is_binary(source) ->
-        case Regex.compile(source) do
-          {:ok, regex} -> build_compiled(raw, regex)
-          {:error, _} -> nil
-        end
-
-      _ ->
-        nil
+    with :ok <- validate_pattern_metadata(raw),
+         source when is_binary(source) <- extract_regex_source(raw),
+         {:ok, regex} <- Regex.compile(source) do
+      build_compiled(raw, regex)
+    else
+      _ -> nil
     end
   end
 
   defp compile_pattern(_), do: nil
 
   defp valid_raw_pattern?(raw) when is_map(raw) do
-    raw
-    |> extract_regex_source()
-    |> is_binary()
+    is_binary(extract_regex_source(raw)) and validate_pattern_metadata(raw) == :ok
   end
 
   defp valid_raw_pattern?(_), do: false
@@ -183,8 +178,39 @@ defmodule SigilGuard.Patterns do
 
   defp extract_severity(raw) do
     case flex_fetch(raw, :severity) do
-      {:ok, severity} -> parse_severity(severity) || :medium
+      {:ok, severity} -> parse_severity(severity)
       :error -> :medium
+    end
+  end
+
+  defp validate_pattern_metadata(raw) do
+    with :ok <- validate_optional_binary(raw, :name),
+         :ok <- validate_optional_binary(raw, :category),
+         :ok <- validate_replacement_hint(raw) do
+      validate_optional_severity(raw)
+    end
+  end
+
+  defp validate_optional_binary(raw, key) do
+    case flex_fetch(raw, key) do
+      {:ok, value} when is_binary(value) -> :ok
+      {:ok, _} -> :error
+      :error -> :ok
+    end
+  end
+
+  defp validate_replacement_hint(raw) do
+    case flex_fetch(raw, :replacement_hint) do
+      {:ok, value} when is_binary(value) or is_nil(value) -> :ok
+      {:ok, _} -> :error
+      :error -> :ok
+    end
+  end
+
+  defp validate_optional_severity(raw) do
+    case flex_fetch(raw, :severity) do
+      {:ok, severity} -> if is_nil(parse_severity(severity)), do: :error, else: :ok
+      :error -> :ok
     end
   end
 

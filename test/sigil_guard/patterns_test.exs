@@ -144,16 +144,14 @@ defmodule SigilGuard.PatternsTest do
       end
     end
 
-    test "defaults severity for unknown string severity" do
+    test "skips patterns with unknown string severity" do
       raw = [%{"name" => "s", "pattern" => "s", "severity" => "extreme"}]
-      assert [pattern] = Patterns.compile(raw)
-      assert pattern.severity == :medium
+      assert [] = Patterns.compile(raw)
     end
 
-    test "defaults severity for unknown atom severity" do
+    test "skips patterns with unknown atom severity" do
       raw = [%{name: "s", pattern: "s", severity: :critical}]
-      assert [pattern] = Patterns.compile(raw)
-      assert pattern.severity == :medium
+      assert [] = Patterns.compile(raw)
     end
 
     test "does not let fallbacks mask explicit malformed pattern fields" do
@@ -176,11 +174,7 @@ defmodule SigilGuard.PatternsTest do
         }
       ]
 
-      assert [pattern] = Patterns.compile(raw)
-      assert pattern.name == "false"
-      assert pattern.category == "false"
-      assert pattern.severity == :medium
-      assert Regex.match?(pattern.regex, "VISIBLE_value")
+      assert [] = Patterns.compile(raw)
     end
   end
 
@@ -214,6 +208,19 @@ defmodule SigilGuard.PatternsTest do
 
       assert {:error, :invalid_pattern_format} =
                Patterns.parse_bundle(%{"patterns" => ["not_a_map"]})
+    end
+
+    test "returns error for explicit malformed pattern metadata" do
+      for pattern <- [
+            %{"name" => false, "regex" => "x"},
+            %{"category" => false, "regex" => "x"},
+            %{"replacement_hint" => false, "regex" => "x"},
+            %{"severity" => "critical", "regex" => "x"},
+            %{"severity" => false, "regex" => "x"}
+          ] do
+        assert {:error, :invalid_pattern_format} =
+                 Patterns.parse_bundle(%{"patterns" => [pattern]})
+      end
     end
 
     test "returns error for non-map input" do
