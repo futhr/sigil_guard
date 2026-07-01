@@ -231,7 +231,7 @@ defmodule SigilGuard.Audit.Checkpoint do
     if field(checkpoint, key) == value, do: :ok, else: {:error, reason}
   end
 
-  defp require_binary(value, _) when is_binary(value), do: :ok
+  defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
   defp require_binary(_, reason), do: {:error, reason}
 
   defp require_integer(value, _) when is_integer(value) and value >= 0, do: :ok
@@ -240,7 +240,7 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp checkpoint_prev_hmac(checkpoint) do
     case field(checkpoint, "prev_hmac") do
       nil -> {:ok, nil}
-      value when is_binary(value) -> {:ok, value}
+      value when is_binary(value) and value != "" -> {:ok, value}
       _ -> {:error, :invalid_prev_hmac}
     end
   end
@@ -384,10 +384,11 @@ defmodule SigilGuard.Audit.Checkpoint do
   end
 
   defp validate_links([], nil), do: :ok
-  defp validate_links([], prev_hmac) when is_binary(prev_hmac), do: :ok
+  defp validate_links([], prev_hmac) when is_binary(prev_hmac) and prev_hmac != "", do: :ok
   defp validate_links([], _), do: {:error, :invalid_prev_hmac}
 
-  defp validate_links([first | rest], prev_hmac) when is_binary(prev_hmac) or is_nil(prev_hmac) do
+  defp validate_links([first | rest], prev_hmac)
+       when is_nil(prev_hmac) or (is_binary(prev_hmac) and prev_hmac != "") do
     if first.prev_hmac == prev_hmac and signed_event?(first) do
       validate_next_links(rest, first.hmac)
     else

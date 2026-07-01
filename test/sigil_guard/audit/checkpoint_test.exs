@@ -112,7 +112,9 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert {:error, :invalid_events} = Checkpoint.create(:bad)
       assert {:error, :invalid_events} = Checkpoint.create(events, :bad)
       assert {:error, :invalid_prev_hmac} = Checkpoint.create([], prev_hmac: 123)
+      assert {:error, :invalid_prev_hmac} = Checkpoint.create([], prev_hmac: "")
       assert {:error, :invalid_prev_hmac} = Checkpoint.create(events, prev_hmac: 123)
+      assert {:error, :invalid_prev_hmac} = Checkpoint.create(events, prev_hmac: "")
     end
   end
 
@@ -260,14 +262,23 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert {:error, :missing_generated_at} =
                Checkpoint.verify(%{checkpoint | "generated_at" => nil}, events)
 
+      assert {:error, :missing_generated_at} =
+               Checkpoint.verify(%{checkpoint | "generated_at" => ""}, events)
+
       assert {:error, :missing_event_count} =
                Checkpoint.verify(%{checkpoint | "event_count" => "1"}, events)
 
       assert {:error, :missing_merkle_root} =
                Checkpoint.verify(%{checkpoint | "merkle_root" => nil}, events)
 
+      assert {:error, :missing_merkle_root} =
+               Checkpoint.verify(%{checkpoint | "merkle_root" => ""}, events)
+
       assert {:error, :invalid_prev_hmac} =
                Checkpoint.verify(%{checkpoint | "prev_hmac" => 123}, events)
+
+      assert {:error, :invalid_prev_hmac} =
+               Checkpoint.verify(%{checkpoint | "prev_hmac" => ""}, events)
     end
 
     test "does not let atom fallbacks mask explicit invalid string fields" do
@@ -296,6 +307,11 @@ defmodule SigilGuard.Audit.CheckpointTest do
           ] do
         tampered = update_in(signed, ["signature"], &Map.delete(&1, field))
         assert {:error, ^reason} = Checkpoint.verify(tampered, events)
+
+        empty = put_in(signed, ["signature", field], "")
+
+        assert {:error, ^reason} =
+                 Checkpoint.verify(empty, events, public_key_b64u: TestSigner.public_key_b64u())
       end
 
       unsupported = put_in(signed, ["signature", "algorithm"], "RSA")
