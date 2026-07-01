@@ -67,20 +67,22 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     dependency_names = dependency_closure(root_dependencies, locks)
     dependencies = dependency_packages(locks, dependency_names)
     dependency_edges = dependency_edges(root_dependencies, dependency_names, locks)
+    dependency_relationships = dependency_relationships(package, dependency_edges)
+    expected_relationships = relationships(package, dependency_edges)
 
     with :ok <- require_equal(document["spdxVersion"], @spdx_version, :invalid_spdx_version),
          :ok <- require_equal(document["dataLicense"], @data_license, :invalid_data_license),
          :ok <- require_equal(document["SPDXID"], "SPDXRef-DOCUMENT", :invalid_document_id),
          :ok <- require_equal(document["name"], document_name(project), :invalid_document_name),
-         :ok <- require_document_namespace(document["documentNamespace"], project),
-         :ok <- require_creation_info(document["creationInfo"]),
+         {:ok, created} <- require_creation_info(document["creationInfo"]),
+         :ok <- require_document_namespace(document["documentNamespace"], project, created),
          :ok <- require_root_package(document["packages"], package),
          :ok <- require_dependency_packages(document["packages"], dependencies),
-         :ok <- require_describes_relationship(document["relationships"], package) do
-      require_dependency_relationships(
-        document["relationships"],
-        dependency_relationships(package, dependency_edges)
-      )
+         :ok <- reject_unexpected_packages(document["packages"], [package | dependencies]),
+         :ok <- require_describes_relationship(document["relationships"], package),
+         :ok <-
+           require_dependency_relationships(document["relationships"], dependency_relationships) do
+      reject_unexpected_relationships(document["relationships"], expected_relationships)
     end
   end
 
@@ -314,33 +316,33 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
   defp require_creation_info(%{"created" => created, "creators" => creators})
        when is_binary(created) and is_list(creators) do
-    if "Tool: mix sigil_guard.sbom" in creators do
-      :ok
-    else
-      {:error, :missing_creator}
+    with :ok <- parse_created_at(created) do
+      if "Tool: mix sigil_guard.sbom" in creators do
+        {:ok, created}
+      else
+        {:error, :missing_creator}
+      end
     end
   end
 
   defp require_creation_info(_), do: {:error, :invalid_creation_info}
 
+  defp parse_created_at(created) do
+    case DateTime.from_iso8601(created) do
+      {:ok, _, _} -> :ok
+      {:error, _} -> {:error, :invalid_creation_info}
+    end
+  end
+
   defp require_root_package(packages, package) when is_list(packages) do
-    if Enum.any?(packages, &root_package?(&1, package)) do
-      :ok
-    else
-      {:error, :missing_root_package}
+    case Enum.find(packages, &same_spdx_id?(&1, package)) do
+      nil -> {:error, :missing_root_package}
+      ^package -> :ok
+      _ -> {:error, :invalid_root_package}
     end
   end
 
   defp require_root_package(_, _), do: {:error, :invalid_packages}
-
-  defp root_package?(candidate, package) when is_map(candidate) do
-    candidate["name"] == package["name"] and
-      candidate["SPDXID"] == package["SPDXID"] and
-      candidate["versionInfo"] == package["versionInfo"] and
-      candidate["externalRefs"] == package["externalRefs"]
-  end
-
-  defp root_package?(_, _), do: false
 
   defp require_dependency_packages(packages, dependencies) when is_list(packages) do
     Enum.reduce_while(dependencies, :ok, fn dependency, :ok ->
@@ -352,6 +354,26 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   end
 
   defp require_dependency_packages(_, _), do: {:error, :invalid_packages}
+
+  defp reject_unexpected_packages(packages, expected) when is_list(packages) do
+    expected_ids = MapSet.new(expected, & &1["SPDXID"])
+
+    cond do
+      not Enum.all?(packages, &is_map/1) ->
+        {:error, :invalid_packages}
+
+      length(packages) != length(expected) ->
+        {:error, :unexpected_package}
+
+      Enum.any?(packages, &(&1["SPDXID"] not in expected_ids)) ->
+        {:error, :unexpected_package}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp reject_unexpected_packages(_, _), do: {:error, :invalid_packages}
 
   defp dependency_package_status(packages, dependency) do
     cond do
@@ -401,21 +423,38 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
   defp require_dependency_relationships(_, _), do: {:error, :invalid_relationships}
 
+  defp reject_unexpected_relationships(relationships, expected) when is_list(relationships) do
+    cond do
+      not Enum.all?(relationships, &is_map/1) ->
+        {:error, :invalid_relationships}
+
+      length(relationships) != length(expected) ->
+        {:error, :unexpected_relationship}
+
+      MapSet.new(relationships) != MapSet.new(expected) ->
+        {:error, :unexpected_relationship}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp reject_unexpected_relationships(_, _), do: {:error, :invalid_relationships}
+
   defp require_equal(actual, expected, _) when actual == expected, do: :ok
   defp require_equal(_, _, reason), do: {:error, reason}
 
-  defp require_document_namespace(namespace, project) when is_binary(namespace) do
-    prefix = document_namespace_prefix(project)
-    suffix = String.replace_prefix(namespace, prefix, "")
+  defp require_document_namespace(namespace, project, created_at) when is_binary(namespace) do
+    expected = document_namespace(project, git_revision(), created_at)
 
-    if suffix != namespace and suffix =~ ~r/^[a-f0-9]{64}$/ do
+    if namespace == expected do
       :ok
     else
       {:error, :invalid_document_namespace}
     end
   end
 
-  defp require_document_namespace(_, _), do: {:error, :invalid_document_namespace}
+  defp require_document_namespace(_, _, _), do: {:error, :invalid_document_namespace}
 
   defp lock_entries do
     Mix.Dep.Lock.read()

@@ -58,45 +58,69 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
   describe "verify_document/1" do
     test "accepts the generated SPDX document shape for the current project" do
-      sbom = Sbom.generate(created_at: @created_at, git_revision: @git_revision)
+      sbom = verifiable_sbom()
 
       assert :ok = Sbom.verify_document(sbom)
     end
 
     test "rejects invalid SPDX metadata" do
       sbom =
-        [created_at: @created_at, git_revision: @git_revision]
-        |> Sbom.generate()
+        verifiable_sbom()
         |> Map.put("spdxVersion", "SPDX-2.2")
 
       assert {:error, :invalid_spdx_version} = Sbom.verify_document(sbom)
 
       assert {:error, :invalid_document_name} =
-               [created_at: @created_at, git_revision: @git_revision]
-               |> Sbom.generate()
+               verifiable_sbom()
                |> Map.put("name", "tampered")
                |> Sbom.verify_document()
 
       assert {:error, :invalid_document_namespace} =
-               [created_at: @created_at, git_revision: @git_revision]
-               |> Sbom.generate()
+               verifiable_sbom()
                |> Map.put("documentNamespace", "https://example.invalid/sbom/tampered")
+               |> Sbom.verify_document()
+
+      assert {:error, :invalid_document_namespace} =
+               verifiable_sbom()
+               |> Map.update!("documentNamespace", fn namespace ->
+                 Regex.replace(~r/[a-f0-9]{64}\z/, namespace, String.duplicate("b", 64))
+               end)
+               |> Sbom.verify_document()
+
+      assert {:error, :invalid_creation_info} =
+               verifiable_sbom()
+               |> put_in(["creationInfo", "created"], "not-a-timestamp")
                |> Sbom.verify_document()
     end
 
     test "rejects documents without the expected root package" do
       sbom =
-        [created_at: @created_at, git_revision: @git_revision]
-        |> Sbom.generate()
+        verifiable_sbom()
         |> Map.put("packages", [])
 
       assert {:error, :missing_root_package} = Sbom.verify_document(sbom)
     end
 
+    test "rejects tampered root package metadata" do
+      for {field, value} <- [
+            {"downloadLocation", "https://evil.example/source"},
+            {"licenseDeclared", "NOASSERTION"},
+            {"licenseConcluded", "NOASSERTION"},
+            {"supplier", "Organization: Other"},
+            {"filesAnalyzed", true}
+          ] do
+        sbom =
+          verifiable_sbom()
+          |> update_root_package(field, value)
+
+        assert {:error, :invalid_root_package} = Sbom.verify_document(sbom),
+               "expected invalid root package after tampering #{field}"
+      end
+    end
+
     test "rejects documents without the root DESCRIBES relationship" do
       sbom =
-        [created_at: @created_at, git_revision: @git_revision]
-        |> Sbom.generate()
+        verifiable_sbom()
         |> Map.put("relationships", [])
 
       assert {:error, :missing_describes_relationship} = Sbom.verify_document(sbom)
@@ -104,8 +128,7 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
     test "rejects tampered dependency packages" do
       sbom =
-        [created_at: @created_at, git_revision: @git_revision]
-        |> Sbom.generate()
+        verifiable_sbom()
         |> update_in(["packages"], fn packages ->
           Enum.map(packages, fn
             %{"name" => "jason"} = package -> %{package | "versionInfo" => "9.9.9"}
@@ -118,8 +141,7 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
     test "rejects missing dependency packages" do
       sbom =
-        [created_at: @created_at, git_revision: @git_revision]
-        |> Sbom.generate()
+        verifiable_sbom()
         |> update_in(["packages"], fn packages ->
           Enum.reject(packages, &(&1["name"] == "jason"))
         end)
@@ -127,10 +149,26 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
       assert {:error, :missing_dependency_package} = Sbom.verify_document(sbom)
     end
 
+    test "rejects unexpected packages" do
+      sbom =
+        verifiable_sbom()
+        |> update_in(["packages"], fn packages ->
+          [
+            %{
+              "name" => "shadow",
+              "SPDXID" => "SPDXRef-Package-shadow",
+              "versionInfo" => "9.9.9"
+            }
+            | packages
+          ]
+        end)
+
+      assert {:error, :unexpected_package} = Sbom.verify_document(sbom)
+    end
+
     test "rejects missing dependency relationships" do
       sbom =
-        [created_at: @created_at, git_revision: @git_revision]
-        |> Sbom.generate()
+        verifiable_sbom()
         |> update_in(["relationships"], fn relationships ->
           Enum.reject(relationships, fn relationship ->
             relationship["spdxElementId"] == "SPDXRef-Package-sigil-guard" and
@@ -141,12 +179,29 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
       assert {:error, :missing_dependency_relationship} = Sbom.verify_document(sbom)
     end
+
+    test "rejects unexpected relationships" do
+      sbom =
+        verifiable_sbom()
+        |> update_in(["relationships"], fn relationships ->
+          [
+            %{
+              "spdxElementId" => "SPDXRef-Package-sigil-guard",
+              "relationshipType" => "DEPENDS_ON",
+              "relatedSpdxElement" => "SPDXRef-Package-shadow"
+            }
+            | relationships
+          ]
+        end)
+
+      assert {:error, :unexpected_relationship} = Sbom.verify_document(sbom)
+    end
   end
 
   describe "verify_file/1" do
     test "accepts valid JSON SPDX files" do
       output = tmp_path("valid")
-      sbom = Sbom.generate(created_at: @created_at, git_revision: @git_revision)
+      sbom = verifiable_sbom()
 
       File.write!(output, Jason.encode!(sbom))
 
@@ -202,6 +257,19 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
     end)
     |> Enum.map(& &1["relatedSpdxElement"])
     |> MapSet.new()
+  end
+
+  defp verifiable_sbom do
+    Sbom.generate(created_at: @created_at)
+  end
+
+  defp update_root_package(sbom, field, value) do
+    update_in(sbom, ["packages"], fn packages ->
+      Enum.map(packages, fn
+        %{"name" => "sigil_guard"} = package -> Map.put(package, field, value)
+        package -> package
+      end)
+    end)
   end
 
   defp tmp_path(label) do
