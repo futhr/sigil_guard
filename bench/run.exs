@@ -539,6 +539,13 @@ defmodule SigilGuard.Bench do
         issued_at: "2026-06-30T12:00:00.000Z"
       )
 
+    anchor_100 =
+      SigilGuard.Audit.Anchor.create(signed_checkpoint_100,
+        anchored_at: "2026-06-30T12:00:01.000Z",
+        storage: "local_file",
+        uri: "file://bench/anchors/100"
+      )
+
     {:ok, export_100} =
       SigilGuard.Audit.Export.create(chain_100,
         chain_id: "bench-chain",
@@ -556,6 +563,19 @@ defmodule SigilGuard.Bench do
     audit_public_keys = %{
       "did:sigil:bench-audit" => SigilGuard.BenchSigner.public_key_b64u()
     }
+
+    anchor_store_path =
+      System.tmp_dir!()
+      |> Path.join("sigil_guard_bench_anchor_store.jsonl")
+
+    File.rm(anchor_store_path)
+
+    {:ok, anchor_receipt} =
+      SigilGuard.Audit.Anchor.Store.put(
+        SigilGuard.Audit.Anchor.Store.LocalFile,
+        anchor_100,
+        path: anchor_store_path
+      )
 
     %{
       "audit / elixir build_chain 10" => fn -> SigilGuard.Audit.build_chain(events_10, key) end,
@@ -585,6 +605,32 @@ defmodule SigilGuard.Bench do
         SigilGuard.Audit.Checkpoint.verify(signed_checkpoint_100, chain_100,
           public_keys: audit_public_keys,
           require_signature: true
+        )
+      end,
+      "audit anchor / create 100 checkpoint" => fn ->
+        SigilGuard.Audit.Anchor.create(signed_checkpoint_100,
+          anchored_at: "2026-06-30T12:00:01.000Z",
+          storage: "local_file",
+          uri: "file://bench/anchors/100"
+        )
+      end,
+      "audit anchor / digest 100 checkpoint" => fn ->
+        SigilGuard.Audit.Anchor.digest(anchor_100)
+      end,
+      "audit anchor / verify 100 checkpoint" => fn ->
+        SigilGuard.Audit.Anchor.verify(anchor_100, signed_checkpoint_100)
+      end,
+      "audit anchor store / local fetch" => fn ->
+        SigilGuard.Audit.Anchor.Store.fetch(
+          SigilGuard.Audit.Anchor.Store.LocalFile,
+          anchor_receipt
+        )
+      end,
+      "audit anchor store / local verify" => fn ->
+        SigilGuard.Audit.Anchor.Store.verify(
+          SigilGuard.Audit.Anchor.Store.LocalFile,
+          anchor_receipt,
+          signed_checkpoint_100
         )
       end,
       "audit export / create signed anchored 100" => fn ->
