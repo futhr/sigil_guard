@@ -94,22 +94,26 @@ defmodule SigilGuard.Policy do
   """
   @spec evaluate(String.t(), Identity.trust_level(), keyword()) :: verdict()
   def evaluate(action, trust_level, opts \\ []) do
-    risk = Keyword.get_lazy(opts, :risk_level, fn -> classify_risk(action, opts) end)
-    thresholds = Keyword.get(opts, :trust_thresholds, @default_trust_thresholds)
-    required_trust = Map.get(thresholds, risk, :medium)
+    with {:ok, risk} <- effective_risk(action, opts),
+         {:ok, required_trust} <- required_trust(risk, opts),
+         :ok <- validate_trust_level(trust_level) do
+      emit_decision(action, risk, trust_level, required_trust)
 
-    emit_decision(action, risk, trust_level, required_trust)
+      cond do
+        Identity.sufficient_trust?(trust_level, required_trust) ->
+          :allowed
 
-    cond do
-      Identity.sufficient_trust?(trust_level, required_trust) ->
-        :allowed
+        one_level_below?(trust_level, required_trust) ->
+          {:confirm,
+           "Action '#{action}' (risk: #{risk}) requires #{required_trust} trust, " <>
+             "but caller has #{trust_level}. Manual confirmation allowed."}
 
-      one_level_below?(trust_level, required_trust) ->
-        {:confirm,
-         "Action '#{action}' (risk: #{risk}) requires #{required_trust} trust, " <>
-           "but caller has #{trust_level}. Manual confirmation allowed."}
-
-      true ->
+        true ->
+          :blocked
+      end
+    else
+      {:error, reason} ->
+        emit_decision(action, :invalid, trust_level, nil, reason)
         :blocked
     end
   end
@@ -132,9 +136,10 @@ defmodule SigilGuard.Policy do
   def classify_risk(action, opts \\ []) do
     mappings = Keyword.get(opts, :risk_mappings, %{})
 
-    case Map.get(mappings, action) do
-      nil -> classify_by_prefix(action)
-      level -> level
+    case mapped_risk(action, mappings) do
+      {:ok, nil} -> classify_by_prefix(action)
+      {:ok, level} -> normalize_risk_level(level)
+      {:error, _} -> :high
     end
   end
 
@@ -293,11 +298,70 @@ defmodule SigilGuard.Policy do
     {"search_", :low}
   ]
 
-  defp classify_by_prefix(action) do
+  defp effective_risk(action, opts) do
+    case Keyword.fetch(opts, :risk_level) do
+      {:ok, risk} ->
+        validate_risk_level(risk)
+
+      :error ->
+        with {:ok, risk} <- classified_risk(action, opts) do
+          validate_risk_level(risk)
+        end
+    end
+  end
+
+  defp classified_risk(action, opts) do
+    mappings = Keyword.get(opts, :risk_mappings, %{})
+
+    case mapped_risk(action, mappings) do
+      {:ok, nil} -> {:ok, classify_by_prefix(action)}
+      {:ok, level} -> {:ok, level}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp mapped_risk(action, mappings) when is_map(mappings) do
+    {:ok, Map.get(mappings, action)}
+  end
+
+  defp mapped_risk(_, _), do: {:error, :invalid_risk_mappings}
+
+  defp classify_by_prefix(action) when is_binary(action) do
     Enum.find_value(@prefix_risk_mappings, :medium, fn {prefix, level} ->
       if String.starts_with?(action, prefix), do: level
     end)
   end
+
+  defp classify_by_prefix(_), do: :high
+
+  defp normalize_risk_level(level) when level in [:low, :medium, :high], do: level
+  defp normalize_risk_level(_), do: :high
+
+  defp required_trust(risk, opts) do
+    thresholds = Keyword.get(opts, :trust_thresholds, @default_trust_thresholds)
+
+    with {:ok, thresholds} <- normalize_trust_thresholds(thresholds) do
+      trust = Map.fetch!(thresholds, risk)
+      {:ok, trust}
+    end
+  end
+
+  defp normalize_trust_thresholds(thresholds) when is_map(thresholds) do
+    merged = Map.merge(@default_trust_thresholds, Map.take(thresholds, risk_levels()))
+
+    case Enum.find(merged, fn {_, trust} -> trust not in Identity.trust_levels() end) do
+      nil -> {:ok, merged}
+      _ -> {:error, :invalid_trust_thresholds}
+    end
+  end
+
+  defp normalize_trust_thresholds(_), do: {:error, :invalid_trust_thresholds}
+
+  defp validate_risk_level(level) when level in [:low, :medium, :high], do: {:ok, level}
+  defp validate_risk_level(_), do: {:error, :invalid_risk_level}
+
+  defp validate_trust_level(level) when level in [:low, :medium, :high], do: :ok
+  defp validate_trust_level(_), do: {:error, :invalid_trust_level}
 
   defp one_level_below?(actual, required) do
     trust_levels = Identity.trust_levels()
@@ -307,7 +371,7 @@ defmodule SigilGuard.Policy do
     actual_idx != nil and required_idx != nil and required_idx - actual_idx == 1
   end
 
-  defp emit_decision(action, risk, trust_level, required_trust) do
+  defp emit_decision(action, risk, trust_level, required_trust, error_reason \\ nil) do
     SigilGuard.Telemetry.emit(
       [:sigil_guard, :policy, :decision],
       %{system_time: System.system_time()},
@@ -315,7 +379,8 @@ defmodule SigilGuard.Policy do
         action: action,
         risk_level: risk,
         trust_level: trust_level,
-        trust_required: required_trust
+        trust_required: required_trust,
+        error_reason: error_reason
       }
     )
   end

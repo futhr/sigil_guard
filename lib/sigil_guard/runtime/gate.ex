@@ -28,6 +28,7 @@ defmodule SigilGuard.Runtime.Gate do
   alias SigilGuard.Telemetry
 
   @external_sinks ~w(external network log repo tool)a
+  @risk_levels ~w(low medium high)a
 
   @doc """
   Evaluate whether a payload can cross the labeled boundary.
@@ -82,7 +83,11 @@ defmodule SigilGuard.Runtime.Gate do
       })
 
     policy_verdict =
-      Policy.evaluate(action, context.trust_level, Keyword.put(opts, :risk_level, risk))
+      if invalid_policy_risk_options?(action, opts) do
+        :blocked
+      else
+        Policy.evaluate(action, context.trust_level, Keyword.put(opts, :risk_level, risk))
+      end
 
     decide(%{
       payload: payload,
@@ -152,30 +157,64 @@ defmodule SigilGuard.Runtime.Gate do
   end
 
   defp risk_level(state) do
-    Keyword.get_lazy(state.opts, :risk_level, fn ->
-      cond do
-        repo_policy_verdict(state.repo_policy) == :block ->
-          :high
+    state.opts
+    |> Keyword.get_lazy(:risk_level, fn -> inferred_risk_level(state) end)
+    |> normalize_risk_level()
+  end
 
-        repo_policy_verdict(state.repo_policy) == :require_approval ->
-          :medium
+  defp inferred_risk_level(state) do
+    cond do
+      repo_policy_verdict(state.repo_policy) == :block ->
+        :high
 
-        state.quarantine.verdict == :blocked ->
-          :high
+      repo_policy_verdict(state.repo_policy) == :require_approval ->
+        :medium
 
-        state.quarantine.verdict == :suspicious ->
-          :medium
+      state.quarantine.verdict == :blocked ->
+        :high
 
-        Enum.any?(state.hits, &(&1.severity == :high)) and external_sink?(state.context.sink) ->
-          :high
+      state.quarantine.verdict == :suspicious ->
+        :medium
 
-        state.hits != [] ->
-          :medium
+      Enum.any?(state.hits, &(&1.severity == :high)) and external_sink?(state.context.sink) ->
+        :high
 
-        true ->
-          Policy.classify_risk(state.action, state.opts)
-      end
-    end)
+      state.hits != [] ->
+        :medium
+
+      true ->
+        Policy.classify_risk(state.action, state.opts)
+    end
+  end
+
+  defp normalize_risk_level(risk) when risk in @risk_levels, do: risk
+  defp normalize_risk_level(_), do: :high
+
+  defp invalid_policy_risk_options?(action, opts) do
+    invalid_risk_override?(opts) or invalid_risk_mappings?(action, opts)
+  end
+
+  defp invalid_risk_override?(opts) do
+    case Keyword.fetch(opts, :risk_level) do
+      {:ok, risk} -> risk not in @risk_levels
+      :error -> false
+    end
+  end
+
+  defp invalid_risk_mappings?(action, opts) do
+    case Keyword.fetch(opts, :risk_mappings) do
+      {:ok, mappings} when is_map(mappings) ->
+        case Map.fetch(mappings, action) do
+          {:ok, risk} -> risk not in @risk_levels
+          :error -> false
+        end
+
+      {:ok, _} ->
+        true
+
+      :error ->
+        false
+    end
   end
 
   defp repo_policy_decision(_, %Context{phase: phase}, _, _) when phase != :repo_change, do: nil

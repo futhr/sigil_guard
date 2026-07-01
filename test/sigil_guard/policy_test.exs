@@ -39,6 +39,10 @@ defmodule SigilGuard.PolicyTest do
       assert :blocked = Policy.evaluate("innocent_action", :low, risk_level: :high)
     end
 
+    test "blocks invalid risk_level overrides instead of treating them as medium" do
+      assert :blocked = Policy.evaluate("innocent_action", :high, risk_level: :critical)
+    end
+
     test "accepts custom trust_thresholds" do
       thresholds = %{
         low: :low,
@@ -50,9 +54,19 @@ defmodule SigilGuard.PolicyTest do
                Policy.evaluate("delete_database", :low, trust_thresholds: thresholds)
     end
 
+    test "blocks invalid trust thresholds instead of falling back" do
+      assert :blocked =
+               Policy.evaluate("read_file", :high, trust_thresholds: %{low: :owner})
+    end
+
     test "accepts custom risk_mappings" do
       mappings = %{"safe_delete" => :low}
       assert :allowed = Policy.evaluate("safe_delete", :low, risk_mappings: mappings)
+    end
+
+    test "blocks invalid risk mappings instead of falling back to prefixes" do
+      assert :blocked =
+               Policy.evaluate("read_file", :high, risk_mappings: %{"read_file" => :critical})
     end
   end
 
@@ -120,6 +134,11 @@ defmodule SigilGuard.PolicyTest do
     test "uses custom risk_mappings" do
       mappings = %{"custom_action" => :high}
       assert :high = Policy.classify_risk("custom_action", risk_mappings: mappings)
+    end
+
+    test "treats invalid risk mappings as high risk for compatibility callers" do
+      assert :high = Policy.classify_risk("read_file", risk_mappings: %{"read_file" => :critical})
+      assert :high = Policy.classify_risk("read_file", risk_mappings: :invalid)
     end
   end
 

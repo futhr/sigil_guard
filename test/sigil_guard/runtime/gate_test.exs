@@ -427,6 +427,48 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.reason == "Policy blocked this action"
     end
 
+    test "fails closed on malformed risk policy options" do
+      decision =
+        Gate.evaluate(
+          "safe",
+          [
+            phase: :tool_request,
+            origin: :model,
+            sink: :tool,
+            action: "read_file",
+            trust_level: :high
+          ],
+          risk_level: :critical
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason == "Policy blocked this action"
+      assert decision.risk_level == :high
+      assert decision.audit_metadata.risk_level == :high
+    end
+
+    test "fails closed on malformed risk mappings" do
+      decision =
+        Gate.evaluate(
+          "safe",
+          [
+            phase: :tool_request,
+            origin: :model,
+            sink: :tool,
+            action: "read_file",
+            trust_level: :high
+          ],
+          risk_mappings: %{"read_file" => :critical}
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason == "Policy blocked this action"
+      assert decision.risk_level == :high
+      assert decision.audit_metadata.risk_level == :high
+    end
+
     test "requires confirmation for medium quarantine indicators in tool output" do
       decision =
         Gate.evaluate("The tool result mentions a system prompt.",
