@@ -134,8 +134,9 @@ defmodule SigilGuard.Audit.Checkpoint do
   """
   @spec digest(t()) :: String.t()
   def digest(checkpoint) when is_map(checkpoint) do
-    hash = :crypto.hash(:sha256, canonical_bytes(checkpoint))
-    Base.encode16(hash, case: :lower)
+    checkpoint
+    |> canonical_bytes()
+    |> digest_canonical_bytes()
   end
 
   @doc """
@@ -180,12 +181,14 @@ defmodule SigilGuard.Audit.Checkpoint do
          {:ok, prev_hmac} <- checkpoint_prev_hmac(checkpoint),
          :ok <- validate_links(events, prev_hmac),
          :ok <- verify_event_summary(checkpoint, events),
-         {:ok, signature_status} <- verify_signature_status(checkpoint, opts) do
+         {:ok, canonical} <- checkpoint_canonical_bytes(checkpoint),
+         digest = digest_canonical_bytes(canonical),
+         {:ok, signature_status} <- verify_signature_status(checkpoint, opts, canonical, digest) do
       {:ok,
        %{
          checkpoint: unsigned_checkpoint(checkpoint),
          status: signature_status.status,
-         digest: digest(checkpoint),
+         digest: digest,
          issuer: signature_status.issuer
        }}
     end
@@ -290,10 +293,14 @@ defmodule SigilGuard.Audit.Checkpoint do
       field(checkpoint, "last_hmac") == event_field(last_event, :hmac)
   end
 
-  defp verify_signature_status(checkpoint, opts) do
+  defp checkpoint_canonical_bytes(checkpoint) do
+    {:ok, canonical_bytes(checkpoint)}
+  end
+
+  defp verify_signature_status(checkpoint, opts, canonical, digest) do
     case field(checkpoint, "signature") do
       nil -> verify_unsigned(opts)
-      signature when is_map(signature) -> verify_signed(checkpoint, signature, opts)
+      signature when is_map(signature) -> verify_signed(signature, opts, canonical, digest)
       _ -> {:error, :invalid_signature_metadata}
     end
   end
@@ -306,12 +313,12 @@ defmodule SigilGuard.Audit.Checkpoint do
     end
   end
 
-  defp verify_signed(checkpoint, signature, opts) do
+  defp verify_signed(signature, opts, canonical, digest) do
     with {:ok, fields} <- signature_fields(signature),
-         :ok <- validate_signature_digest(checkpoint, fields.digest),
+         :ok <- validate_signature_digest(digest, fields.digest),
          {:ok, public_key} <- public_key(fields.issuer, opts),
          {:ok, decoded_signature} <- decode_signature(fields.signature),
-         :ok <- verify_ed25519(checkpoint, decoded_signature, public_key) do
+         :ok <- verify_ed25519(canonical, decoded_signature, public_key) do
       {:ok, %{status: :verified, issuer: fields.issuer}}
     end
   end
@@ -333,8 +340,8 @@ defmodule SigilGuard.Audit.Checkpoint do
     end
   end
 
-  defp validate_signature_digest(checkpoint, claimed_digest) do
-    if secure_compare(digest(checkpoint), claimed_digest) do
+  defp validate_signature_digest(digest, claimed_digest) do
+    if secure_compare(digest, claimed_digest) do
       :ok
     else
       {:error, :digest_mismatch}
@@ -393,8 +400,8 @@ defmodule SigilGuard.Audit.Checkpoint do
     end
   end
 
-  defp verify_ed25519(checkpoint, signature, public_key) do
-    if :crypto.verify(:eddsa, :none, canonical_bytes(checkpoint), signature, [
+  defp verify_ed25519(canonical, signature, public_key) do
+    if :crypto.verify(:eddsa, :none, canonical, signature, [
          public_key,
          :ed25519
        ]) do
@@ -527,6 +534,12 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
   defp canonical_key(key) when is_binary(key), do: key
   defp canonical_key(key), do: to_string(key)
+
+  defp digest_canonical_bytes(canonical) do
+    canonical
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
 
   defp field(map, key) when is_map(map) do
     case Map.fetch(map, key) do
