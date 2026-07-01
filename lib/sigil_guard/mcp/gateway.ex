@@ -965,6 +965,7 @@ defmodule SigilGuard.MCP.Gateway do
         :indicator_ids,
         :content_hash,
         :action_digest,
+        :action_digest_error,
         :confirmation_status,
         :confirmation_reason,
         :confirmation_actor,

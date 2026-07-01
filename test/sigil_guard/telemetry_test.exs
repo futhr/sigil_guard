@@ -46,6 +46,8 @@ defmodule SigilGuard.TelemetryTest do
             risk_level: :high,
             verdict: :blocked,
             action: :block,
+            action_digest: "digest123",
+            action_digest_error: :invalid_payload,
             hit_count: 1,
             indicator_ids: [:ignore_instructions],
             envelope_status: :invalid,
@@ -67,6 +69,8 @@ defmodule SigilGuard.TelemetryTest do
       assert attributes["sigil.actor"] == "did:sigil:agent"
       assert attributes["sigil.identity"] == "did:sigil:agent"
       assert attributes["sigil.security.verdict"] == "blocked"
+      assert attributes["sigil.security.action_digest"] == "digest123"
+      assert attributes["sigil.security.action_digest_error"] == "invalid_payload"
       assert attributes["sigil.security.hit_count"] == 1
       assert attributes["sigil.security.indicator_ids"] == ["ignore_instructions"]
       assert attributes["sigil.envelope.status"] == "invalid"

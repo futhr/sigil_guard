@@ -618,7 +618,7 @@ SigilGuard emits telemetry events for observability:
 | `[:sigil_guard, :registry, :fetch, :start\|:stop]` | `duration` | `url`, `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
 | `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `action_digest_error`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
-| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `confirmation_status`, `confirmation_reason`, `confirmation_actor`, `confirmation_nonce_hash`, `content_hash` |
+| `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `action_digest`, `action_digest_error`, `confirmation_status`, `confirmation_reason`, `confirmation_actor`, `confirmation_nonce_hash`, `content_hash` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 
 Use `SigilGuard.Telemetry.otel_attributes/3` or `attach_otel_forwarder/3` to
