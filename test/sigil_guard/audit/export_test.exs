@@ -98,6 +98,20 @@ defmodule SigilGuard.Audit.ExportTest do
                  generated_at: @generated_at,
                  anchor: "bad"
                )
+
+      for {anchor_opts, reason} <- [
+            {[anchored_at: ""], :missing_anchored_at},
+            {[storage: ""], :missing_storage},
+            {[uri: false], :invalid_uri},
+            {[worm: "true"], :invalid_worm},
+            {[metadata: "bad"], :invalid_metadata}
+          ] do
+        assert {:error, ^reason} =
+                 Export.create(build_signed_chain(1),
+                   generated_at: @generated_at,
+                   anchor: anchor_opts
+                 )
+      end
     end
 
     test "returns an error when signing is requested without an issuer" do

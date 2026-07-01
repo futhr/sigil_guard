@@ -146,16 +146,25 @@ defmodule SigilGuard.Audit.Export do
         {:ok, nil}
 
       true ->
-        {:ok, Anchor.create(checkpoint)}
+        create_anchor(checkpoint, [])
 
       anchor_opts when is_list(anchor_opts) ->
-        {:ok, Anchor.create(checkpoint, anchor_opts)}
+        create_anchor(checkpoint, anchor_opts)
 
       anchor_opts when is_map(anchor_opts) ->
-        {:ok, Anchor.create(checkpoint, anchor_opts(anchor_opts))}
+        create_anchor(checkpoint, anchor_opts(anchor_opts))
 
       _ ->
         {:error, :invalid_anchor_options}
+    end
+  end
+
+  defp create_anchor(checkpoint, opts) do
+    anchor = Anchor.create(checkpoint, opts)
+
+    case Anchor.validate(anchor) do
+      :ok -> {:ok, anchor}
+      {:error, reason} -> {:error, reason}
     end
   end
 
