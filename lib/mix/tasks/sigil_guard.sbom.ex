@@ -71,6 +71,8 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     with :ok <- require_equal(document["spdxVersion"], @spdx_version, :invalid_spdx_version),
          :ok <- require_equal(document["dataLicense"], @data_license, :invalid_data_license),
          :ok <- require_equal(document["SPDXID"], "SPDXRef-DOCUMENT", :invalid_document_id),
+         :ok <- require_equal(document["name"], document_name(project), :invalid_document_name),
+         :ok <- require_document_namespace(document["documentNamespace"], project),
          :ok <- require_creation_info(document["creationInfo"]),
          :ok <- require_root_package(document["packages"], package),
          :ok <- require_dependency_packages(document["packages"], dependencies),
@@ -125,7 +127,7 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
       "spdxVersion" => @spdx_version,
       "dataLicense" => @data_license,
       "SPDXID" => "SPDXRef-DOCUMENT",
-      "name" => "#{project[:app]}-#{project[:version]}",
+      "name" => document_name(project),
       "documentNamespace" => document_namespace(project, git_revision, created_at),
       "creationInfo" => %{
         "created" => created_at,
@@ -402,6 +404,19 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   defp require_equal(actual, expected, _) when actual == expected, do: :ok
   defp require_equal(_, _, reason), do: {:error, reason}
 
+  defp require_document_namespace(namespace, project) when is_binary(namespace) do
+    prefix = document_namespace_prefix(project)
+    suffix = String.replace_prefix(namespace, prefix, "")
+
+    if suffix != namespace and suffix =~ ~r/^[a-f0-9]{64}$/ do
+      :ok
+    else
+      {:error, :invalid_document_namespace}
+    end
+  end
+
+  defp require_document_namespace(_, _), do: {:error, :invalid_document_namespace}
+
   defp lock_entries do
     Mix.Dep.Lock.read()
     |> Map.new()
@@ -415,9 +430,15 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
       "#{project[:app]}:#{project[:version]}:#{git_revision}:#{created_at}"
       |> sha256_hex()
 
-    source = project[:source_url] || project[:homepage_url] || "https://example.invalid"
-    "#{source}/sbom/#{project[:app]}-#{project[:version]}-#{hash}"
+    document_namespace_prefix(project) <> hash
   end
+
+  defp document_namespace_prefix(project) do
+    source = project[:source_url] || project[:homepage_url] || "https://example.invalid"
+    "#{source}/sbom/#{document_name(project)}-"
+  end
+
+  defp document_name(project), do: "#{project[:app]}-#{project[:version]}"
 
   defp package_id(name) do
     normalized =

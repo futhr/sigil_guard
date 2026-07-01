@@ -70,6 +70,18 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
         |> Map.put("spdxVersion", "SPDX-2.2")
 
       assert {:error, :invalid_spdx_version} = Sbom.verify_document(sbom)
+
+      assert {:error, :invalid_document_name} =
+               [created_at: @created_at, git_revision: @git_revision]
+               |> Sbom.generate()
+               |> Map.put("name", "tampered")
+               |> Sbom.verify_document()
+
+      assert {:error, :invalid_document_namespace} =
+               [created_at: @created_at, git_revision: @git_revision]
+               |> Sbom.generate()
+               |> Map.put("documentNamespace", "https://example.invalid/sbom/tampered")
+               |> Sbom.verify_document()
     end
 
     test "rejects documents without the expected root package" do
