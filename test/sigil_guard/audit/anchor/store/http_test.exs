@@ -558,6 +558,12 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert {:error, :invalid_metadata} =
                Store.put(HTTP, anchor, url: url, metadata: "bad")
 
+      assert {:error, :invalid_metadata} =
+               Store.put(HTTP, anchor, url: url, metadata: %{"pid" => self()})
+
+      assert {:error, :invalid_metadata} =
+               Store.put(HTTP, anchor, url: url, metadata: %{{:tuple, :key} => "bad"})
+
       assert {:error, :invalid_headers} =
                Store.put(HTTP, anchor, url: url, headers: [{"x-bad", %{nested: true}}])
 
