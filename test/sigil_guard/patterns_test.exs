@@ -149,6 +149,39 @@ defmodule SigilGuard.PatternsTest do
       assert [pattern] = Patterns.compile(raw)
       assert pattern.severity == :medium
     end
+
+    test "defaults severity for unknown atom severity" do
+      raw = [%{name: "s", pattern: "s", severity: :critical}]
+      assert [pattern] = Patterns.compile(raw)
+      assert pattern.severity == :medium
+    end
+
+    test "does not let fallbacks mask explicit malformed pattern fields" do
+      raw = [
+        %{
+          :name => "masked",
+          :pattern => false,
+          "regex" => "MASKED_\\w+",
+          :severity => false,
+          "severity" => "high"
+        },
+        %{
+          :name => false,
+          "name" => "fallback_name",
+          :category => false,
+          "category" => "fallback_category",
+          :severity => false,
+          "severity" => "high",
+          :pattern => "VISIBLE_\\w+"
+        }
+      ]
+
+      assert [pattern] = Patterns.compile(raw)
+      assert pattern.name == "false"
+      assert pattern.category == "false"
+      assert pattern.severity == :medium
+      assert Regex.match?(pattern.regex, "VISIBLE_value")
+    end
   end
 
   describe "parse_bundle/1" do

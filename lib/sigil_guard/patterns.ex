@@ -174,18 +174,36 @@ defmodule SigilGuard.Patterns do
   end
 
   defp extract_regex_source(raw) do
-    raw[:pattern] || raw["regex"] || raw["pattern"]
+    cond do
+      Map.has_key?(raw, :pattern) -> raw[:pattern]
+      Map.has_key?(raw, "regex") -> raw["regex"]
+      true -> raw["pattern"]
+    end
   end
 
   defp extract_severity(raw) do
-    raw[:severity] || parse_severity(raw["severity"]) || :medium
+    case flex_fetch(raw, :severity) do
+      {:ok, severity} -> parse_severity(severity) || :medium
+      :error -> :medium
+    end
   end
 
   # Get a value from a map with atom or string keys.
   defp flex_get(raw, key, default \\ nil) do
-    raw[key] || raw[Atom.to_string(key)] || default
+    case flex_fetch(raw, key) do
+      {:ok, value} -> value
+      :error -> default
+    end
   end
 
+  defp flex_fetch(raw, key) do
+    case Map.fetch(raw, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(raw, Atom.to_string(key))
+    end
+  end
+
+  defp parse_severity(severity) when severity in [:low, :medium, :high], do: severity
   defp parse_severity("low"), do: :low
   defp parse_severity("medium"), do: :medium
   defp parse_severity("high"), do: :high
