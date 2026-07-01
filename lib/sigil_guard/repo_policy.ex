@@ -491,6 +491,7 @@ defmodule SigilGuard.RepoPolicy do
   defp normalize_decision(_), do: {:error, :invalid_decision}
 
   defp normalize_matchers(value) when is_binary(value), do: normalize_matchers([value])
+  defp normalize_matchers(value) when is_atom(value), do: normalize_matchers([value])
 
   defp normalize_matchers(values) when is_list(values) do
     normalized =
@@ -574,6 +575,8 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   defp normalize_pattern(_), do: {:error, :invalid_path_pattern}
+
+  defp normalize_changed_paths(path) when is_binary(path), do: normalize_changed_paths([path])
 
   defp normalize_changed_paths(paths) when is_list(paths) do
     result =
@@ -687,6 +690,7 @@ defmodule SigilGuard.RepoPolicy do
     value = first_present(keys, map)
 
     case value do
+      nil -> nil
       value when is_atom(value) -> Atom.to_string(value)
       value when is_binary(value) -> value
       _ -> nil
