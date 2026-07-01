@@ -404,9 +404,11 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
         "anchor_digest" => digest
       }
 
-      assert {:ok, ^anchor} = Store.fetch(HTTP, receipt)
+      opts = [allow_private_receipt_url: true]
 
-      assert {:ok, verified} = Store.verify(HTTP, receipt, checkpoint)
+      assert {:ok, ^anchor} = Store.fetch(HTTP, receipt, opts)
+
+      assert {:ok, verified} = Store.verify(HTTP, receipt, checkpoint, opts)
       assert verified.digest == digest
       assert verified.record == anchor
     end
@@ -428,6 +430,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       end)
 
       opts = [
+        allow_private_receipt_url: true,
         require_receipt_signature: true,
         receipt_public_keys: %{@issuer => TestSigner.public_key_b64u()}
       ]
@@ -466,7 +469,9 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       end)
 
       assert {:ok, ^anchor} =
-               Store.fetch(HTTP, %{"uri" => "#{url}/audit/anchors/#{digest}##{digest}"})
+               Store.fetch(HTTP, %{"uri" => "#{url}/audit/anchors/#{digest}##{digest}"},
+                 allow_private_receipt_url: true
+               )
     end
 
     test "rejects receipts with malformed explicit digests before URI fallback", %{
@@ -578,6 +583,36 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert {:error, :invalid_anchor} = HTTP.put("bad", [])
       assert {:error, :missing_url} = HTTP.fetch(Anchor.digest(anchor), :bad)
       assert {:error, :missing_digest} = HTTP.fetch(:bad, [])
+    end
+
+    test "rejects private receipt URLs by default" do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+
+      unsafe_uris = [
+        "http://localhost/audit/anchors/#{digest}##{digest}",
+        "http://anchor.localhost/audit/anchors/#{digest}##{digest}",
+        "http://0.0.0.0/audit/anchors/#{digest}##{digest}",
+        "http://127.0.0.1/audit/anchors/#{digest}##{digest}",
+        "http://10.0.0.1/audit/anchors/#{digest}##{digest}",
+        "http://100.64.0.1/audit/anchors/#{digest}##{digest}",
+        "http://172.16.0.1/audit/anchors/#{digest}##{digest}",
+        "http://192.168.0.1/audit/anchors/#{digest}##{digest}",
+        "http://198.18.0.1/audit/anchors/#{digest}##{digest}",
+        "http://169.254.169.254/latest/meta-data##{digest}",
+        "http://[::]/audit/anchors/#{digest}##{digest}",
+        "http://[::1]/audit/anchors/#{digest}##{digest}",
+        "http://[fd00::1]/audit/anchors/#{digest}##{digest}",
+        "http://[fe80::1]/audit/anchors/#{digest}##{digest}"
+      ]
+
+      Enum.each(unsafe_uris, fn uri ->
+        assert {:error, :unsafe_receipt_url} =
+                 Store.fetch(HTTP, %{
+                   "uri" => uri,
+                   "anchor_digest" => digest
+                 })
+      end)
     end
 
     test "returns HTTP and body errors", %{bypass: bypass, url: url} do

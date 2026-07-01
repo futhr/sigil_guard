@@ -29,7 +29,9 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   `fetch/2` sends `GET /audit/anchors/:digest` by default and accepts either a
   raw anchor record or `%{"record" => record}` / `%{"anchor" => record}`.
   Fetched records are rejected when their canonical digest does not match the
-  requested digest.
+  requested digest. When no explicit fetch URL is configured and the adapter
+  falls back to a receipt URI, private, loopback, link-local, and localhost
+  targets are rejected unless `allow_private_receipt_url: true` is passed.
   """
 
   @behaviour SigilGuard.Audit.Anchor.Store
@@ -140,21 +142,72 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
       true ->
         ref
         |> receipt_uri()
-        |> fetch_url_from_receipt()
+        |> fetch_url_from_receipt(opts)
     end
   end
 
-  defp fetch_url_from_receipt(uri) when is_binary(uri) do
+  defp fetch_url_from_receipt(uri, opts) when is_binary(uri) do
     case URI.parse(uri) do
-      %URI{scheme: scheme} = parsed when scheme in ["http", "https"] ->
-        {:ok, URI.to_string(%{parsed | fragment: nil})}
+      %URI{scheme: scheme, host: host} = parsed
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        with :ok <- validate_receipt_url_host(host, opts) do
+          {:ok, URI.to_string(%{parsed | fragment: nil})}
+        end
 
       _ ->
         {:error, :missing_url}
     end
   end
 
-  defp fetch_url_from_receipt(_), do: {:error, :missing_url}
+  defp fetch_url_from_receipt(_, _), do: {:error, :missing_url}
+
+  defp validate_receipt_url_host(host, opts) do
+    cond do
+      Keyword.get(opts, :allow_private_receipt_url, false) == true ->
+        :ok
+
+      private_receipt_host?(host) ->
+        {:error, :unsafe_receipt_url}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp private_receipt_host?(host) do
+    host = String.downcase(host)
+
+    local_hostname?(host) or private_ip?(host)
+  end
+
+  defp local_hostname?("localhost"), do: true
+  defp local_hostname?(host), do: String.ends_with?(host, ".localhost")
+
+  defp private_ip?(host) do
+    case :inet.parse_address(String.to_charlist(host)) do
+      {:ok, address} -> private_ip_tuple?(address)
+      {:error, _} -> false
+    end
+  rescue
+    ArgumentError -> false
+  end
+
+  defp private_ip_tuple?({0, _, _, _}), do: true
+  defp private_ip_tuple?({10, _, _, _}), do: true
+  defp private_ip_tuple?({100, second, _, _}) when second in 64..127, do: true
+  defp private_ip_tuple?({127, _, _, _}), do: true
+  defp private_ip_tuple?({169, 254, _, _}), do: true
+  defp private_ip_tuple?({172, second, _, _}) when second in 16..31, do: true
+  defp private_ip_tuple?({192, 168, _, _}), do: true
+  defp private_ip_tuple?({198, second, _, _}) when second in 18..19, do: true
+  defp private_ip_tuple?({0, 0, 0, 0, 0, 0, 0, 0}), do: true
+  defp private_ip_tuple?({0, 0, 0, 0, 0, 0, 0, 1}), do: true
+
+  defp private_ip_tuple?({first, _, _, _, _, _, _, _}) do
+    Bitwise.band(first, 0xFE00) == 0xFC00 or Bitwise.band(first, 0xFFC0) == 0xFE80
+  end
+
+  defp private_ip_tuple?(_), do: false
 
   defp metadata(opts) do
     case Keyword.get(opts, :metadata, %{}) do

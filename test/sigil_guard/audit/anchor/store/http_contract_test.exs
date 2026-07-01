@@ -73,6 +73,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPContractTest do
 
     assert {:ok, verified} =
              Store.verify(HTTP, receipt, checkpoint,
+               allow_private_receipt_url: true,
                require_receipt_signature: true,
                receipt_public_keys: public_keys
              )
