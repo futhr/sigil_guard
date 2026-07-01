@@ -522,9 +522,17 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
                Store.put(HTTP, anchor, url: url, headers: [{"x-bad", %{nested: true}}])
 
       assert {:error, :invalid_headers} = Store.put(HTTP, anchor, url: url, headers: "bad")
+      assert {:error, :invalid_timeout} = Store.put(HTTP, anchor, url: url, timeout: "bad")
+      assert {:error, :invalid_timeout} = Store.put(HTTP, anchor, url: url, timeout: -1)
 
       assert {:error, :missing_digest} = Store.fetch(HTTP, %{}, url: url)
       assert {:error, :missing_url} = Store.fetch(HTTP, Anchor.digest(anchor))
+
+      assert {:error, :invalid_timeout} =
+               Store.fetch(HTTP, Anchor.digest(anchor), url: url, timeout: false)
+
+      assert {:error, :invalid_timeout} =
+               Store.fetch(HTTP, Anchor.digest(anchor), url: url, timeout: -1)
 
       assert {:error, :missing_url} =
                Store.fetch(HTTP, %{

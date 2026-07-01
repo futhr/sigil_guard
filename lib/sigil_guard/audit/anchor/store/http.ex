@@ -64,7 +64,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
          {:ok, url} <- put_url(opts),
          {:ok, metadata} <- metadata(opts),
          {:ok, headers} <- headers(opts),
-         {:ok, body, response_headers} <- post_anchor(url, record, metadata, headers, opts),
+         {:ok, timeout} <- timeout(opts),
+         {:ok, body, response_headers} <- post_anchor(url, record, metadata, headers, timeout),
          {:ok, receipt} <- normalize_receipt(body, record, url, metadata, response_headers),
          :ok <- validate_required_worm(receipt, opts),
          :ok <- verify_required_receipt_signature(receipt, opts) do
@@ -80,7 +81,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
          {:ok, digest} <- digest_from_ref(receipt_or_digest),
          {:ok, url} <- fetch_url(receipt_or_digest, opts, digest),
          {:ok, headers} <- headers(opts),
-         {:ok, body} <- get_anchor(url, headers, opts),
+         {:ok, timeout} <- timeout(opts),
+         {:ok, body} <- get_anchor(url, headers, timeout),
          {:ok, record} <- normalize_record(body),
          :ok <- verify_digest(record, digest) do
       {:ok, record}
@@ -197,7 +199,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   defp valid_header?(_), do: false
 
-  defp post_anchor(url, record, metadata, headers, opts) do
+  defp post_anchor(url, record, metadata, headers, timeout) do
     body =
       %{
         "kind" => @put_kind,
@@ -209,13 +211,13 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
       |> Jason.encode_to_iodata!()
 
     Finch.build(:post, url, headers, body)
-    |> request_json(timeout(opts), allow_empty?: true)
+    |> request_json(timeout, allow_empty?: true)
     |> response_with_headers()
   end
 
-  defp get_anchor(url, headers, opts) do
+  defp get_anchor(url, headers, timeout) do
     Finch.build(:get, url, headers)
-    |> request_json(timeout(opts), allow_empty?: false)
+    |> request_json(timeout, allow_empty?: false)
     |> response_body()
   end
 
@@ -457,7 +459,13 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   defp replace_digest(path, digest),
     do: String.replace(path, ":digest", URI.encode_www_form(digest))
 
-  defp timeout(opts), do: Keyword.get(opts, :timeout, @default_timeout_ms)
+  defp timeout(opts) do
+    case Keyword.get(opts, :timeout, @default_timeout_ms) do
+      timeout when is_integer(timeout) and timeout >= 0 -> {:ok, timeout}
+      :infinity -> {:ok, :infinity}
+      _ -> {:error, :invalid_timeout}
+    end
+  end
 
   defp field(map, key) when is_map(map) do
     case fetch_field(map, key) do
