@@ -40,14 +40,15 @@ defmodule SigilGuard.Runtime.Stream do
 
   Options are passed through to `SigilGuard.Runtime.Gate.evaluate/3`.
   `:stream_window_bytes` controls the trailing holdback window and defaults
-  to `#{@default_window_bytes}` bytes.
+  to `#{@default_window_bytes}` bytes. Invalid window values fall back to the
+  default so stream checks keep a conservative holdback.
   """
   @spec new(Context.t() | map() | keyword(), keyword()) :: t()
   def new(context \\ %Context{}, opts \\ []) do
     %__MODULE__{
       context: Context.new(context),
       opts: opts,
-      window_bytes: Keyword.get(opts, :stream_window_bytes, @default_window_bytes)
+      window_bytes: stream_window_bytes(opts)
     }
   end
 
@@ -126,4 +127,11 @@ defmodule SigilGuard.Runtime.Stream do
   defp sanitize_allowed(emittable, _, _, _, _), do: emittable
 
   defp contained?(hit, emit_size), do: hit.offset + hit.length <= emit_size
+
+  defp stream_window_bytes(opts) do
+    case Keyword.get(opts, :stream_window_bytes, @default_window_bytes) do
+      value when is_integer(value) and value > 0 -> value
+      _ -> @default_window_bytes
+    end
+  end
 end

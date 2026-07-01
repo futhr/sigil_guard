@@ -24,6 +24,23 @@ defmodule SigilGuard.Runtime.StreamTest do
       assert stream.pending == ""
     end
 
+    test "falls back to conservative holdback for invalid window settings" do
+      for invalid_window <- [0, -1, "8", nil] do
+        stream =
+          Stream.new([phase: :tool_result, sink: :model, trust_level: :medium],
+            stream_window_bytes: invalid_window
+          )
+
+        assert stream.window_bytes == 256
+
+        {stream, decision, emitted} = Stream.push(stream, "hello world")
+
+        assert decision.verdict == :allowed
+        assert emitted == ""
+        assert stream.pending == "hello world"
+      end
+    end
+
     test "redacts a secret split across chunks before release" do
       stream =
         Stream.new([phase: :tool_result, sink: :model, trust_level: :medium],
