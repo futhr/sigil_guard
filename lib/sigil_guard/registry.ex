@@ -1,25 +1,29 @@
 defmodule SigilGuard.Registry do
   @moduledoc """
-  REST client for the SIGIL registry.
+  Legacy HTTP compatibility adapter for remote pattern, policy, and DID data.
 
-  Fetches pattern bundles, resolves DIDs, and retrieves policy definitions
-  from a SIGIL registry server. Uses Finch for HTTP with configurable timeouts.
-  DID resolution is profile-aware and normalizes the live response shapes seen
-  across SigilGuard legacy registries, reference profiles, and draft spec examples.
+  SigilGuard's forward trust model is embedded and bundle-first. This module
+  remains for applications that already consume remote pattern bundles, DID
+  responses, or policy documents through the existing public API. There is no
+  public default endpoint; callers must configure an explicit internal URL or
+  pass `:url` per request.
 
-  `fetch_bundle/1` intentionally returns raw registry JSON. Use
+  DID resolution is profile-aware and normalizes the response shapes seen across
+  legacy SigilGuard consumers, reference profiles, and draft examples.
+
+  `fetch_bundle/1` intentionally returns raw compatibility JSON. Use
   `SigilGuard.Registry.Bundle.verify/2` or `SigilGuard.Registry.Cache` when
-  registry pattern bundles must pass signed provenance checks before loading.
+  remotely loaded bundles must pass signed provenance checks before loading.
 
   ## Configuration
 
   Set these in your application config:
 
       config :sigil_guard,
-        registry_url: "https://registry.sigil-protocol.org",
+        registry_url: "https://internal.example/sigil-compat",
         registry_timeout_ms: 5_000,
         registry_require_signed_bundles: true,
-        registry_bundle_public_keys: %{"did:sigil:registry" => "..."},
+        registry_bundle_public_keys: %{"did:example:issuer" => "..."},
         registry_enabled: true
 
   ## Usage
@@ -47,48 +51,46 @@ defmodule SigilGuard.Registry do
         }
 
   @doc """
-  Fetch the pattern bundle from the registry.
+  Fetch a pattern bundle from the configured legacy HTTP endpoint.
 
   Returns the parsed JSON response containing patterns for sensitivity scanning.
 
   ## Options
 
-    * `:url` — override registry base URL
+    * `:url` — override legacy endpoint base URL
     * `:timeout` — override request timeout in milliseconds
 
   """
   @spec fetch_bundle(keyword()) :: fetch_result()
   def fetch_bundle(opts \\ []) do
-    url = Keyword.get(opts, :url, Config.registry_url())
-
-    with {:ok, timeout} <- request_timeout(opts) do
+    with {:ok, url} <- registry_url(opts),
+         {:ok, timeout} <- request_timeout(opts) do
       request_json("#{url}/patterns/bundle", timeout, %{endpoint: "patterns/bundle"})
     end
   end
 
   @doc """
-  Resolve a DID (Decentralized Identifier) via the registry.
+  Resolve a DID (Decentralized Identifier) via the configured legacy endpoint.
 
   Returns the upstream DID response. Use `resolve_key/2` when you need
   normalized Ed25519 key material for envelope verification.
 
   ## Options
 
-    * `:url` — override registry base URL
+    * `:url` — override legacy endpoint base URL
     * `:timeout` — override request timeout in milliseconds
     * `:profile` — compatibility profile controlling endpoint order
 
   """
   @spec resolve_did(String.t(), keyword()) :: fetch_result()
   def resolve_did(did, opts \\ []) do
-    url = Keyword.get(opts, :url, Config.registry_url())
-
     profile =
       opts
       |> Keyword.get_lazy(:profile, &Config.protocol_profile/0)
       |> Profile.normalize!()
 
-    with {:ok, timeout} <- request_timeout(opts) do
+    with {:ok, url} <- registry_url(opts),
+         {:ok, timeout} <- request_timeout(opts) do
       profile
       |> Profile.registry_identity_endpoints()
       |> request_first_success(url, did, timeout)
@@ -96,7 +98,7 @@ defmodule SigilGuard.Registry do
   end
 
   @doc """
-  Resolve a DID and normalize supported registry key response shapes.
+  Resolve a DID and normalize supported legacy key response shapes.
 
   Supports:
 
@@ -112,26 +114,32 @@ defmodule SigilGuard.Registry do
   end
 
   @doc """
-  Fetch policy definitions from the registry.
+  Fetch policy definitions from the configured legacy HTTP endpoint.
 
   Returns a list of policy rules for action classification and trust requirements.
 
   ## Options
 
-    * `:url` — override registry base URL
+    * `:url` — override legacy endpoint base URL
     * `:timeout` — override request timeout in milliseconds
 
   """
   @spec fetch_policies(keyword()) :: fetch_result()
   def fetch_policies(opts \\ []) do
-    url = Keyword.get(opts, :url, Config.registry_url())
-
-    with {:ok, timeout} <- request_timeout(opts) do
+    with {:ok, url} <- registry_url(opts),
+         {:ok, timeout} <- request_timeout(opts) do
       request_json("#{url}/policies", timeout, %{endpoint: "policies"})
     end
   end
 
   # -- Private --
+
+  defp registry_url(opts) do
+    case Keyword.get(opts, :url, Config.registry_url()) do
+      url when is_binary(url) and url != "" -> {:ok, String.trim_trailing(url, "/")}
+      _ -> {:error, :missing_registry_url}
+    end
+  end
 
   defp request_timeout(opts) do
     case Keyword.get(opts, :timeout, Config.registry_timeout_ms()) do

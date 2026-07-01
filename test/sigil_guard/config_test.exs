@@ -136,9 +136,9 @@ defmodule SigilGuard.ConfigTest do
   end
 
   describe "registry_url/0" do
-    test "returns default URL" do
+    test "defaults to nil" do
       Application.delete_env(:sigil_guard, :registry_url)
-      assert Config.registry_url() == "https://registry.sigil-protocol.org"
+      assert Config.registry_url() == nil
     end
 
     test "returns configured URL" do

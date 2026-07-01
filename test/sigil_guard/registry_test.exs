@@ -12,6 +12,12 @@ defmodule SigilGuard.RegistryTest do
   end
 
   describe "fetch_bundle/1" do
+    test "requires an explicit registry URL" do
+      Application.delete_env(:sigil_guard, :registry_url)
+
+      assert {:error, :missing_registry_url} = Registry.fetch_bundle()
+    end
+
     test "returns parsed bundle on success", %{bypass: bypass, url: url} do
       bundle = %{
         "generated_at" => "2024-01-01T00:00:00Z",
@@ -73,6 +79,12 @@ defmodule SigilGuard.RegistryTest do
   end
 
   describe "resolve_did/2" do
+    test "requires an explicit registry URL" do
+      Application.delete_env(:sigil_guard, :registry_url)
+
+      assert {:error, :missing_registry_url} = Registry.resolve_did("did:sigil:alice")
+    end
+
     test "resolves via /resolve by default", %{bypass: bypass, url: url} do
       did_doc = %{
         "did" => "did:sigil:alice",
@@ -417,6 +429,12 @@ defmodule SigilGuard.RegistryTest do
   end
 
   describe "fetch_policies/1" do
+    test "requires an explicit registry URL" do
+      Application.delete_env(:sigil_guard, :registry_url)
+
+      assert {:error, :missing_registry_url} = Registry.fetch_policies()
+    end
+
     test "returns policy definitions", %{bypass: bypass, url: url} do
       policies = %{
         "policies" => [
