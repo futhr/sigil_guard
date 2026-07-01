@@ -275,7 +275,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   end
 
   defp request_json(request, timeout, opts) do
-    case Finch.request(request, SigilGuard.Finch, receive_timeout: timeout) do
+    case request(request, timeout) do
       {:ok, %Finch.Response{status: status, body: body, headers: headers}}
       when status in @success_statuses ->
         with {:ok, decoded} <- decode_object(body, opts) do
@@ -286,9 +286,23 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
         {:error, {:http_error, status}}
 
       {:error, reason} ->
-        {:error, reason}
+        {:error, normalize_request_error(reason)}
     end
   end
+
+  defp request(request, timeout) do
+    Finch.request(request, SigilGuard.Finch, receive_timeout: timeout)
+  rescue
+    error in ArgumentError -> {:error, error}
+  catch
+    :exit, {:noproc, _} -> {:error, :finch_not_started}
+    :exit, reason -> {:error, {:finch_exit, reason}}
+  end
+
+  defp normalize_request_error(%ArgumentError{message: "unknown registry: " <> _}),
+    do: :finch_not_started
+
+  defp normalize_request_error(reason), do: reason
 
   defp response_with_headers({:ok, body, headers}), do: {:ok, body, headers}
   defp response_with_headers({:error, reason}), do: {:error, reason}

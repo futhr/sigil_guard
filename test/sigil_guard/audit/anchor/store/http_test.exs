@@ -758,3 +758,22 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
     end
   end
 end
+
+defmodule SigilGuard.Audit.Anchor.Store.HTTPNoFinchTest do
+  @moduledoc false
+
+  use ExUnit.Case, async: false
+
+  alias SigilGuard.Audit.Anchor.Store
+  alias SigilGuard.Audit.Anchor.Store.HTTP
+
+  test "returns a stable error when Finch is not supervised" do
+    assert Process.whereis(SigilGuard.Finch) == nil
+
+    assert {:error, :finch_not_started} =
+             Store.fetch(HTTP, String.duplicate("a", 64),
+               url: "http://localhost:1",
+               timeout: 1
+             )
+  end
+end
