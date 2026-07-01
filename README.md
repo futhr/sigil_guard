@@ -460,6 +460,19 @@ public_key_b64u = MyAuditSigner.public_key_b64u()
   )
 ```
 
+Remote anchor services are expected to accept `POST /audit/anchors` with a
+JSON object containing `"kind"`, `"version"`, `"anchor_digest"`, `"record"`,
+and `"metadata"`. They may respond with either a receipt object or
+`%{"receipt" => receipt}`. For strict mode, the receipt must include
+`"worm": true` and a top-level `"signature"` produced with
+`SigilGuard.Audit.Anchor.Receipt.sign/3`; the receipt digest and signature are
+computed over canonical receipt bytes with top-level signature metadata
+excluded.
+
+`GET /audit/anchors/:digest` should return the original anchor record directly,
+`%{"record" => record}`, or `%{"anchor" => record}`. SigilGuard rejects fetched
+records whose canonical anchor digest does not match the requested digest.
+
 ### Secure Vaulting
 
 ```elixir
