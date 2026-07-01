@@ -71,6 +71,58 @@ defmodule SigilGuard.MCP.GatewayTest do
       refute inspect(decision.audit_metadata) =~ "AKIAIOSFODNN7EXAMPLE"
     end
 
+    test "scans nested request content even when top-level text is safe" do
+      request = %{
+        "method" => "tools/call",
+        "text" => "safe summary",
+        "params" => %{
+          "name" => "send_webhook",
+          "arguments" => %{"body" => "AWS_KEY=AKIAIOSFODNN7EXAMPLE"}
+        }
+      }
+
+      decision = Gateway.guard_request(request, trust_level: :high)
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.audit_metadata.tool == "send_webhook"
+      assert decision.audit_metadata.hit_count == 1
+      assert decision.sanitized_text =~ "[AWS_KEY]"
+      refute inspect(decision.audit_metadata) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
+
+    test "blocks malformed request action before falling back to params name" do
+      request = %{
+        "method" => "tools/call",
+        "action" => false,
+        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+      }
+
+      decision = Gateway.guard_request(request, trust_level: :high)
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason =~ "invalid_action"
+      assert decision.audit_metadata.runtime_input_error == :invalid_action
+      assert decision.audit_metadata.tool == "read_file"
+    end
+
+    test "blocks malformed request tool before falling back to params name" do
+      request = %{
+        "method" => "tools/call",
+        "tool" => false,
+        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+      }
+
+      decision = Gateway.guard_request(request, trust_level: :high)
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason =~ "invalid_action"
+      assert decision.audit_metadata.runtime_input_error == :invalid_action
+      assert decision.audit_metadata.tool == nil
+    end
+
     test "accepts context structs and string-keyed context overrides" do
       request = unsigned_request()
 

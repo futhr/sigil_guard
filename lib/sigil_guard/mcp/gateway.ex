@@ -27,6 +27,7 @@ defmodule SigilGuard.MCP.Gateway do
   @blocked_code -32_001
   @confirm_code -32_002
   @quarantine_code -32_003
+  @invalid_payload_field false
 
   @doc """
   Guard an MCP tool request before execution.
@@ -397,26 +398,32 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp request_context(request, context) do
+    tool = tool_name(request)
+    action = action_name(request)
+
     defaults = %{
       phase: :tool_request,
       origin: :model,
       sink: :tool,
-      tool: tool_name(request),
-      action: action_name(request),
-      mcp_server: mcp_server(request)
+      tool: context_field(tool),
+      action: action_field(action, tool),
+      mcp_server: context_field(mcp_server(request))
     }
 
     merge_context(defaults, context)
   end
 
   defp result_context(result, context) do
+    tool = tool_name(result)
+    action = action_name(result)
+
     defaults = %{
       phase: :tool_result,
       origin: :tool,
       sink: :model,
-      tool: tool_name(result),
-      action: action_name(result),
-      mcp_server: mcp_server(result)
+      tool: context_field(tool),
+      action: action_field(action, tool),
+      mcp_server: context_field(mcp_server(result))
     }
 
     merge_context(defaults, context)
@@ -462,10 +469,12 @@ defmodule SigilGuard.MCP.Gateway do
 
   defp gate_payload(payload) do
     payload = strip_guard_metadata(payload)
+    tool = tool_name(payload)
+    action = action_name(payload)
 
     %{
-      tool: tool_name(payload),
-      action: action_name(payload),
+      tool: context_field(tool),
+      action: action_field(action, tool),
       text: text_payload(payload)
     }
   end
@@ -489,12 +498,8 @@ defmodule SigilGuard.MCP.Gateway do
     end
   end
 
-  defp text_payload(payload) do
-    case Context.text(payload) do
-      text when is_binary(text) -> text
-      _ -> joined_strings(payload)
-    end
-  end
+  defp text_payload(payload) when is_map(payload), do: joined_strings(payload)
+  defp text_payload(payload), do: Context.text(payload) || joined_strings(payload)
 
   defp joined_strings(payload) do
     payload
@@ -563,17 +568,45 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp first_payload_value(payload, paths) when is_map(payload) do
-    Enum.find_value(paths, &string_at(payload, &1))
+    Enum.reduce_while(paths, nil, fn path, nil ->
+      case fetch_path(payload, path) do
+        {:ok, nil} -> {:cont, nil}
+        {:ok, value} when is_binary(value) -> {:halt, value}
+        {:ok, _} -> {:halt, @invalid_payload_field}
+        :error -> {:cont, nil}
+      end
+    end)
   end
 
   defp first_payload_value(_, _), do: nil
 
-  defp string_at(payload, path) do
-    case get_in(payload, path) do
-      value when is_binary(value) -> value
-      _ -> nil
+  defp fetch_path(payload, [key]) when is_map(payload), do: Map.fetch(payload, key)
+
+  defp fetch_path(payload, [key | rest]) when is_map(payload) do
+    case Map.fetch(payload, key) do
+      {:ok, value} when is_map(value) -> fetch_path(value, rest)
+      {:ok, nil} -> :error
+      {:ok, _} -> {:ok, @invalid_payload_field}
+      :error -> :error
     end
   end
+
+  defp fetch_path(_, _), do: :error
+
+  defp action_field(action, tool) do
+    if invalid_payload_field?(action) or invalid_payload_field?(tool) do
+      @invalid_payload_field
+    else
+      action
+    end
+  end
+
+  defp context_field(value) do
+    if invalid_payload_field?(value), do: nil, else: value
+  end
+
+  defp invalid_payload_field?(@invalid_payload_field), do: true
+  defp invalid_payload_field?(_), do: false
 
   defp executable?(%Decision{verdict: :allowed, action: action}), do: action in [:allow, :redact]
   defp executable?(%Decision{}), do: false
