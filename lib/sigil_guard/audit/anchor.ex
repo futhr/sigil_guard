@@ -122,8 +122,12 @@ defmodule SigilGuard.Audit.Anchor do
          :ok <- require_field(record, "version", @version, :invalid_version),
          :ok <- require_binary(field(record, "anchored_at"), :missing_anchored_at),
          :ok <- require_binary(field(record, "checkpoint_digest"), :missing_checkpoint_digest),
-         :ok <- require_integer(field(record, "event_count"), :missing_event_count) do
-      require_binary(field(record, "merkle_root"), :missing_merkle_root)
+         :ok <- require_integer(field(record, "event_count"), :missing_event_count),
+         :ok <- require_binary(field(record, "merkle_root"), :missing_merkle_root),
+         :ok <- require_binary(field(record, "storage"), :missing_storage),
+         :ok <- require_optional_binary(field(record, "uri"), :invalid_uri),
+         :ok <- require_boolean(field(record, "worm"), :invalid_worm) do
+      require_metadata(field(record, "metadata"))
     end
   end
 
@@ -154,8 +158,18 @@ defmodule SigilGuard.Audit.Anchor do
   defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
   defp require_binary(_, reason), do: {:error, reason}
 
+  defp require_optional_binary(nil, _), do: :ok
+  defp require_optional_binary(value, _) when is_binary(value) and value != "", do: :ok
+  defp require_optional_binary(_, reason), do: {:error, reason}
+
+  defp require_boolean(value, _) when is_boolean(value), do: :ok
+  defp require_boolean(_, reason), do: {:error, reason}
+
   defp require_integer(value, _) when is_integer(value) and value >= 0, do: :ok
   defp require_integer(_, reason), do: {:error, reason}
+
+  defp require_metadata(metadata) when is_map(metadata), do: :ok
+  defp require_metadata(_), do: {:error, :invalid_metadata}
 
   defp field(map, key) when is_map(map) do
     case Map.fetch(map, key) do

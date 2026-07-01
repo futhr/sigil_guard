@@ -86,6 +86,26 @@ defmodule SigilGuard.Audit.AnchorTest do
                anchor
                |> Map.put("merkle_root", "")
                |> Anchor.validate()
+
+      assert {:error, :missing_storage} =
+               anchor
+               |> Map.put("storage", "")
+               |> Anchor.validate()
+
+      assert {:error, :invalid_uri} =
+               anchor
+               |> Map.put("uri", false)
+               |> Anchor.validate()
+
+      assert {:error, :invalid_worm} =
+               anchor
+               |> Map.put("worm", "true")
+               |> Anchor.validate()
+
+      assert {:error, :invalid_metadata} =
+               anchor
+               |> Map.put("metadata", false)
+               |> Anchor.validate()
     end
   end
 
@@ -149,6 +169,14 @@ defmodule SigilGuard.Audit.AnchorTest do
         |> Map.put(:kind, "sigil_guard.audit.anchor")
 
       assert {:error, :invalid_kind} = Anchor.verify(invalid, checkpoint)
+
+      invalid_worm =
+        checkpoint
+        |> Anchor.create(anchored_at: @anchored_at)
+        |> Map.put("worm", "true")
+        |> Map.put(:worm, true)
+
+      assert {:error, :invalid_worm} = Anchor.verify(invalid_worm, checkpoint)
     end
   end
 
