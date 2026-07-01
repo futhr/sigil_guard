@@ -172,6 +172,27 @@ defmodule SigilGuard.Registry.BundleTest do
       assert quarantine.reason == :invalid_provenance
     end
 
+    test "quarantines uncanonicalizable bundle terms without raising" do
+      uncanonicalizable = Map.put(bundle(), "pid", self())
+
+      assert {:quarantine, quarantine} = Bundle.verify(uncanonicalizable)
+      assert quarantine.reason == :invalid_bundle
+      assert quarantine.digest == nil
+      assert quarantine.issuer == nil
+
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+      uncanonicalizable_signed = Map.put(signed, "pid", self())
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(uncanonicalizable_signed,
+                 public_keys: %{@issuer => TestSigner.public_key_b64u()}
+               )
+
+      assert quarantine.reason == :invalid_bundle
+      assert quarantine.digest == nil
+      assert quarantine.issuer == @issuer
+    end
+
     test "quarantines digest mismatches before loading tampered content" do
       signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
 

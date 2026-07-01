@@ -115,14 +115,20 @@ defmodule SigilGuard.Registry.Bundle do
     if Keyword.get(opts, :require_signature, false) do
       quarantine(:unsigned_bundle, bundle, nil)
     else
-      {:ok,
-       %{
-         bundle: unsigned_bundle(bundle),
-         status: :unsigned,
-         digest: digest(bundle),
-         issuer: nil,
-         provenance: nil
-       }}
+      case safe_digest(bundle) do
+        {:ok, digest} ->
+          {:ok,
+           %{
+             bundle: unsigned_bundle(bundle),
+             status: :unsigned,
+             digest: digest,
+             issuer: nil,
+             provenance: nil
+           }}
+
+        {:error, reason} ->
+          quarantine(reason, bundle, nil)
+      end
     end
   end
 
@@ -172,7 +178,9 @@ defmodule SigilGuard.Registry.Bundle do
   defp require_algorithm(_), do: {:error, :unsupported_algorithm}
 
   defp validate_digest(bundle, claimed_digest) do
-    if secure_compare(digest(bundle), claimed_digest), do: :ok, else: {:error, :digest_mismatch}
+    with {:ok, actual_digest} <- safe_digest(bundle) do
+      if secure_compare(actual_digest, claimed_digest), do: :ok, else: {:error, :digest_mismatch}
+    end
   end
 
   defp validate_time_bounds(fields, opts) do
@@ -356,8 +364,21 @@ defmodule SigilGuard.Registry.Bundle do
     }
   end
 
-  defp digest_or_nil(bundle) when is_map(bundle), do: digest(bundle)
+  defp digest_or_nil(bundle) when is_map(bundle) do
+    case safe_digest(bundle) do
+      {:ok, digest} -> digest
+      {:error, _} -> nil
+    end
+  end
+
   defp digest_or_nil(_), do: nil
+
+  defp safe_digest(bundle) when is_map(bundle) do
+    {:ok, digest(bundle)}
+  rescue
+    _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_bundle}
+  end
 
   defp provenance(bundle) do
     case Map.fetch(bundle, "provenance") do
