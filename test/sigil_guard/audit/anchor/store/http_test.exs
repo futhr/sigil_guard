@@ -143,6 +143,28 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert {:error, :invalid_receipt} = Store.put(HTTP, anchor, url: url)
     end
 
+    test "rejects remote receipts whose URI fragment conflicts with the anchor digest", %{
+      bypass: bypass,
+      url: url
+    } do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      wrong_digest = String.duplicate("0", 64)
+
+      Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          201,
+          Jason.encode!(%{
+            "anchor_digest" => digest,
+            "uri" => "#{url}/audit/anchors/#{digest}##{wrong_digest}"
+          })
+        )
+      end)
+
+      assert {:error, :digest_mismatch} = Store.put(HTTP, anchor, url: url)
+    end
+
     test "requires explicit WORM receipts when requested", %{bypass: bypass, url: url} do
       {_, anchor} = anchor_fixture()
       digest = Anchor.digest(anchor)
@@ -463,6 +485,19 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
         |> Map.put(:anchor_digest, false)
 
       assert {:error, :missing_digest} = Store.fetch(HTTP, atom_receipt)
+    end
+
+    test "rejects receipts whose explicit digest conflicts with URI fragment", %{url: url} do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      wrong_digest = String.duplicate("0", 64)
+
+      receipt =
+        url
+        |> receipt_fixture(digest)
+        |> Map.put("uri", "#{url}/audit/anchors/#{digest}##{wrong_digest}")
+
+      assert {:error, :digest_mismatch} = Store.fetch(HTTP, receipt)
     end
 
     test "fetches anchors by digest through a custom endpoint", %{bypass: bypass, url: url} do

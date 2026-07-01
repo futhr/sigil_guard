@@ -236,7 +236,10 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   defp digest_from_ref(%{} = receipt) do
     case fetch_field(receipt, "anchor_digest") do
       {:ok, digest} when is_binary(digest) ->
-        digest_from_ref(digest)
+        with {:ok, digest} <- digest_from_ref(digest),
+             :ok <- validate_uri_digest(receipt, digest) do
+          {:ok, digest}
+        end
 
       {:ok, _} ->
         {:error, :missing_digest}
@@ -250,6 +253,20 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp digest_from_ref(_), do: {:error, :missing_digest}
+
+  defp validate_uri_digest(receipt, digest) do
+    case digest_from_uri(field(receipt, "uri")) do
+      uri_digest when is_binary(uri_digest) ->
+        cond do
+          not Regex.match?(@hex_digest, uri_digest) -> :ok
+          uri_digest == digest -> :ok
+          true -> {:error, :digest_mismatch}
+        end
+
+      _ ->
+        :ok
+    end
+  end
 
   defp digest_from_uri("file://" <> _ = uri) do
     uri

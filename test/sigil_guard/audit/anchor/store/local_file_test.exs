@@ -108,6 +108,23 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:error, :missing_digest} = Store.fetch(LocalFile, atom_receipt)
     end
 
+    test "rejects receipts whose explicit digest conflicts with URI fragment" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+      wrong_digest = String.duplicate("0", 64)
+
+      assert {:ok, receipt} = Store.put(LocalFile, anchor, path: path)
+
+      conflicting_receipt =
+        Map.update!(
+          receipt,
+          "uri",
+          &String.replace_suffix(&1, receipt["anchor_digest"], wrong_digest)
+        )
+
+      assert {:error, :digest_mismatch} = Store.fetch(LocalFile, conflicting_receipt)
+    end
+
     test "does not let explicit paths mask malformed receipt URIs" do
       {_, anchor} = anchor_fixture()
       path = tmp_path()
