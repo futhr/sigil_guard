@@ -18,6 +18,7 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   @default_output "dist/sigil_guard.spdx.json"
   @spdx_version "SPDX-2.3"
   @data_license "CC0-1.0"
+  @unsupported_runtime_sources [:git, :github, :path, :in_umbrella]
 
   @type spdx_document :: %{required(String.t()) => term()}
 
@@ -63,26 +64,26 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     project = Mix.Project.config()
     package = root_package(project)
     locks = lock_entries()
-    root_dependencies = runtime_root_dependencies(project)
-    dependency_names = dependency_closure(root_dependencies, locks)
-    dependencies = dependency_packages(locks, dependency_names)
-    dependency_edges = dependency_edges(root_dependencies, dependency_names, locks)
-    dependency_relationships = dependency_relationships(package, dependency_edges)
-    expected_relationships = relationships(package, dependency_edges)
 
-    with :ok <- require_equal(document["spdxVersion"], @spdx_version, :invalid_spdx_version),
-         :ok <- require_equal(document["dataLicense"], @data_license, :invalid_data_license),
-         :ok <- require_equal(document["SPDXID"], "SPDXRef-DOCUMENT", :invalid_document_id),
-         :ok <- require_equal(document["name"], document_name(project), :invalid_document_name),
-         {:ok, created} <- require_creation_info(document["creationInfo"]),
-         :ok <- require_document_namespace(document["documentNamespace"], project, created),
-         :ok <- require_root_package(document["packages"], package),
-         :ok <- require_dependency_packages(document["packages"], dependencies),
-         :ok <- reject_unexpected_packages(document["packages"], [package | dependencies]),
-         :ok <- require_describes_relationship(document["relationships"], package),
-         :ok <-
-           require_dependency_relationships(document["relationships"], dependency_relationships) do
-      reject_unexpected_relationships(document["relationships"], expected_relationships)
+    with {:ok, graph} <- dependency_graph(project, locks) do
+      dependencies = graph.dependencies
+      dependency_relationships = dependency_relationships(package, graph.dependency_edges)
+      expected_relationships = relationships(package, graph.dependency_edges)
+
+      with :ok <- require_equal(document["spdxVersion"], @spdx_version, :invalid_spdx_version),
+           :ok <- require_equal(document["dataLicense"], @data_license, :invalid_data_license),
+           :ok <- require_equal(document["SPDXID"], "SPDXRef-DOCUMENT", :invalid_document_id),
+           :ok <- require_equal(document["name"], document_name(project), :invalid_document_name),
+           {:ok, created} <- require_creation_info(document["creationInfo"]),
+           :ok <- require_document_namespace(document["documentNamespace"], project, created),
+           :ok <- require_root_package(document["packages"], package),
+           :ok <- require_dependency_packages(document["packages"], dependencies),
+           :ok <- reject_unexpected_packages(document["packages"], [package | dependencies]),
+           :ok <- require_describes_relationship(document["relationships"], package),
+           :ok <-
+             require_dependency_relationships(document["relationships"], dependency_relationships) do
+        reject_unexpected_relationships(document["relationships"], expected_relationships)
+      end
     end
   end
 
@@ -120,10 +121,7 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     git_revision = Keyword.get_lazy(opts, :git_revision, &git_revision/0)
     root = root_package(project)
     locks = lock_entries()
-    root_dependencies = runtime_root_dependencies(project)
-    dependency_names = dependency_closure(root_dependencies, locks)
-    dependencies = dependency_packages(locks, dependency_names)
-    dependency_edges = dependency_edges(root_dependencies, dependency_names, locks)
+    graph = dependency_graph!(project, locks)
 
     %{
       "spdxVersion" => @spdx_version,
@@ -138,8 +136,8 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
           "Organization: SigilGuard"
         ]
       },
-      "packages" => [root | dependencies],
-      "relationships" => relationships(root, dependency_edges)
+      "packages" => [root | graph.dependencies],
+      "relationships" => relationships(root, graph.dependency_edges)
     }
   end
 
@@ -170,28 +168,71 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   end
 
   defp runtime_root_dependencies(project) do
-    project
-    |> Keyword.get(:deps, [])
-    |> Enum.flat_map(&runtime_root_dependency/1)
-    |> Enum.uniq()
-    |> Enum.sort()
+    result =
+      Enum.reduce_while(Keyword.get(project, :deps, []), {:ok, []}, fn dependency, {:ok, names} ->
+        case runtime_root_dependency(dependency) do
+          {:ok, dependency_names} -> {:cont, {:ok, dependency_names ++ names}}
+          {:error, _} = error -> {:halt, error}
+        end
+      end)
+
+    case result do
+      {:ok, names} ->
+        {:ok,
+         names
+         |> Enum.uniq()
+         |> Enum.sort()}
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   defp runtime_root_dependency({name, opts}) when is_list(opts) do
-    if Keyword.keyword?(opts) do
-      if runtime_dependency?(opts), do: [name], else: []
-    else
-      [name]
+    cond do
+      not Keyword.keyword?(opts) ->
+        {:error, {:unsupported_runtime_dependency, name}}
+
+      not runtime_dependency?(opts) ->
+        {:ok, []}
+
+      true ->
+        {:error, {:unsupported_runtime_dependency, name}}
+    end
+  end
+
+  defp runtime_root_dependency({name, requirement}) when is_binary(requirement) do
+    {:ok, [name]}
+  end
+
+  defp runtime_root_dependency({name, requirement, opts})
+       when is_binary(requirement) and is_list(opts) do
+    cond do
+      not Keyword.keyword?(opts) ->
+        {:error, {:unsupported_runtime_dependency, name}}
+
+      not runtime_dependency?(opts) ->
+        {:ok, []}
+
+      non_hex_runtime_source?(opts) ->
+        {:error, {:unsupported_runtime_dependency, name}}
+
+      true ->
+        {:ok, [name]}
     end
   end
 
   defp runtime_root_dependency({name, _, opts}) when is_list(opts) do
-    if runtime_dependency?(opts), do: [name], else: []
+    if Keyword.keyword?(opts) and not runtime_dependency?(opts) do
+      {:ok, []}
+    else
+      {:error, {:unsupported_runtime_dependency, name}}
+    end
   end
 
-  defp runtime_root_dependency({name, _}), do: [name]
+  defp runtime_root_dependency({name, _}), do: {:error, {:unsupported_runtime_dependency, name}}
 
-  defp runtime_root_dependency(_), do: []
+  defp runtime_root_dependency(_), do: {:error, :invalid_dependency}
 
   defp runtime_dependency?(opts) do
     Keyword.get(opts, :runtime, true) != false and
@@ -204,26 +245,83 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   defp production_dependency?(envs) when is_list(envs), do: :prod in envs
   defp production_dependency?(_), do: false
 
+  defp non_hex_runtime_source?(opts) do
+    Enum.any?(@unsupported_runtime_sources, &Keyword.has_key?(opts, &1))
+  end
+
+  defp dependency_graph!(project, locks) do
+    case dependency_graph(project, locks) do
+      {:ok, graph} -> graph
+      {:error, reason} -> Mix.raise("cannot generate SBOM: #{inspect(reason)}")
+    end
+  end
+
+  defp dependency_graph(project, locks) do
+    with {:ok, root_dependencies} <- runtime_root_dependencies(project),
+         {:ok, dependency_names} <- dependency_closure(root_dependencies, locks) do
+      {:ok,
+       %{
+         root_dependencies: root_dependencies,
+         dependency_names: dependency_names,
+         dependencies: dependency_packages(locks, dependency_names),
+         dependency_edges: dependency_edges(root_dependencies, dependency_names, locks)
+       }}
+    end
+  end
+
   defp dependency_closure(root_dependencies, locks) do
-    root_dependencies
-    |> Enum.reduce(MapSet.new(), &include_dependency(&1, locks, &2))
-    |> MapSet.to_list()
-    |> Enum.sort()
+    result =
+      Enum.reduce_while(root_dependencies, {:ok, MapSet.new()}, fn name, {:ok, seen} ->
+        case include_dependency(name, locks, seen) do
+          {:ok, seen} -> {:cont, {:ok, seen}}
+          {:error, _} = error -> {:halt, error}
+        end
+      end)
+
+    case result do
+      {:ok, dependency_names} ->
+        {:ok,
+         dependency_names
+         |> MapSet.to_list()
+         |> Enum.sort()}
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   defp include_dependency(name, locks, seen) do
     cond do
-      MapSet.member?(seen, name) -> seen
-      not Map.has_key?(locks, name) -> seen
-      true -> include_lock_dependency(name, locks, seen)
+      MapSet.member?(seen, name) ->
+        {:ok, seen}
+
+      not Map.has_key?(locks, name) ->
+        {:error, {:missing_runtime_dependency_lock, name}}
+
+      true ->
+        include_lock_dependency(name, locks, seen)
     end
   end
 
   defp include_lock_dependency(name, locks, seen) do
-    locks
-    |> Map.fetch!(name)
-    |> lock_dependency_names()
-    |> Enum.reduce(MapSet.put(seen, name), &include_dependency(&1, locks, &2))
+    case Map.fetch!(locks, name) do
+      {:hex, _, _, _, _, _, _, _} = lock ->
+        lock
+        |> lock_dependency_names()
+        |> include_lock_dependencies(locks, MapSet.put(seen, name))
+
+      _ ->
+        {:error, {:unsupported_runtime_dependency_lock, name}}
+    end
+  end
+
+  defp include_lock_dependencies(names, locks, seen) do
+    Enum.reduce_while(names, {:ok, seen}, fn child, {:ok, seen} ->
+      case include_dependency(child, locks, seen) do
+        {:ok, seen} -> {:cont, {:ok, seen}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
   end
 
   defp dependency_packages(locks, dependency_names) do

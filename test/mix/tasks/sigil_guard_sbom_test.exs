@@ -31,6 +31,127 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
     end
   end
 
+  defmodule MissingRuntimeLockProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [
+          {:jason, "~> 1.4"},
+          {:not_locked, "~> 0.1"}
+        ]
+      ]
+    end
+  end
+
+  defmodule RuntimePathProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [
+          {:jason, "~> 1.4"},
+          {:local_runtime, path: "../local_runtime"}
+        ]
+      ]
+    end
+  end
+
+  defmodule NonRuntimePathProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [
+          {:jason, "~> 1.4"},
+          {:local_dev, path: "../local_dev", only: :dev, runtime: false}
+        ]
+      ]
+    end
+  end
+
+  defmodule RuntimeGithubProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [
+          {:remote_runtime, "~> 0.1", github: "example/remote_runtime"}
+        ]
+      ]
+    end
+  end
+
+  defmodule BadDependencyShapeProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [:not_a_tuple]
+      ]
+    end
+  end
+
+  defmodule BadDependencyOptionsProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [
+          {:bad_options, [:not_keyword]}
+        ]
+      ]
+    end
+  end
+
   describe "generate/1" do
     test "builds an SPDX 2.3 document from the project and lockfile" do
       sbom = Sbom.generate(created_at: @created_at, git_revision: @git_revision)
@@ -86,6 +207,71 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
         assert :ok = Sbom.verify_document(sbom)
       end)
     end
+
+    test "rejects runtime dependencies missing from the lockfile" do
+      with_project(MissingRuntimeLockProject, fn ->
+        assert_raise Mix.Error, ~r/missing_runtime_dependency_lock.*not_locked/, fn ->
+          Sbom.generate(created_at: @created_at)
+        end
+
+        assert {:error, {:missing_runtime_dependency_lock, :not_locked}} =
+                 Sbom.verify_document(%{})
+      end)
+    end
+
+    test "rejects runtime non-Hex dependency sources" do
+      with_project(RuntimePathProject, fn ->
+        assert_raise Mix.Error, ~r/unsupported_runtime_dependency.*local_runtime/, fn ->
+          Sbom.generate(created_at: @created_at)
+        end
+
+        assert {:error, {:unsupported_runtime_dependency, :local_runtime}} =
+                 Sbom.verify_document(%{})
+      end)
+    end
+
+    test "rejects runtime git dependency sources" do
+      with_project(RuntimeGithubProject, fn ->
+        assert_raise Mix.Error, ~r/unsupported_runtime_dependency.*remote_runtime/, fn ->
+          Sbom.generate(created_at: @created_at)
+        end
+
+        assert {:error, {:unsupported_runtime_dependency, :remote_runtime}} =
+                 Sbom.verify_document(%{})
+      end)
+    end
+
+    test "rejects invalid dependency shapes" do
+      with_project(BadDependencyShapeProject, fn ->
+        assert_raise Mix.Error, ~r/invalid_dependency/, fn ->
+          Sbom.generate(created_at: @created_at)
+        end
+
+        assert {:error, :invalid_dependency} = Sbom.verify_document(%{})
+      end)
+    end
+
+    test "rejects dependency tuples with invalid option lists" do
+      with_project(BadDependencyOptionsProject, fn ->
+        assert_raise Mix.Error, ~r/unsupported_runtime_dependency.*bad_options/, fn ->
+          Sbom.generate(created_at: @created_at)
+        end
+
+        assert {:error, {:unsupported_runtime_dependency, :bad_options}} =
+                 Sbom.verify_document(%{})
+      end)
+    end
+
+    test "allows non-runtime non-Hex dependency sources" do
+      with_project(NonRuntimePathProject, fn ->
+        sbom = Sbom.generate(created_at: @created_at)
+        package_names = MapSet.new(sbom["packages"], & &1["name"])
+
+        assert MapSet.member?(package_names, "jason")
+        refute MapSet.member?(package_names, "local_dev")
+        assert :ok = Sbom.verify_document(sbom)
+      end)
+    end
   end
 
   describe "verify_document/1" do
@@ -93,6 +279,10 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
       sbom = verifiable_sbom()
 
       assert :ok = Sbom.verify_document(sbom)
+    end
+
+    test "rejects non-map documents" do
+      assert {:error, :invalid_document} = Sbom.verify_document([])
     end
 
     test "rejects invalid SPDX metadata" do
@@ -247,6 +437,7 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
       assert {:error, :invalid_json} = Sbom.verify_file(output)
       assert {:error, :enoent} = Sbom.verify_file(tmp_path("missing"))
+      assert {:error, :invalid_path} = Sbom.verify_file(:not_a_path)
     end
   end
 
@@ -278,6 +469,21 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
       assert capture_io(fn ->
                Sbom.run(["--verify", output])
              end) =~ "Verified SBOM"
+    end
+
+    test "raises for invalid CLI options" do
+      assert_raise Mix.Error, ~r/invalid options/, fn ->
+        Sbom.run(["--unknown"])
+      end
+    end
+
+    test "raises for invalid SBOM files" do
+      output = tmp_path("verify-invalid")
+      File.write!(output, Jason.encode!(%{}))
+
+      assert_raise Mix.Error, ~r/invalid SBOM: :invalid_spdx_version/, fn ->
+        Sbom.run(["--verify", output])
+      end
     end
   end
 
