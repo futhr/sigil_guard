@@ -93,6 +93,43 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert receipt["metadata"] == %{}
     end
 
+    test "requires explicit WORM receipts when requested", %{bypass: bypass, url: url} do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+
+      Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          201,
+          Jason.encode!(%{"anchor_digest" => digest, "worm" => true})
+        )
+      end)
+
+      assert {:ok, receipt} = Store.put(HTTP, anchor, url: url, require_worm: true)
+      assert receipt["worm"]
+
+      Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          201,
+          Jason.encode!(%{"anchor_digest" => digest, "worm" => false})
+        )
+      end)
+
+      assert {:error, :worm_required} =
+               Store.put(HTTP, anchor, url: url, require_worm: true)
+
+      Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          201,
+          Jason.encode!(%{"anchor_digest" => digest, "worm" => "true"})
+        )
+      end)
+
+      assert {:error, :worm_required} = HTTP.put(anchor, url: url, require_worm: true)
+    end
+
     test "supports explicit put URLs and map headers", %{bypass: bypass, url: url} do
       {_, anchor} = anchor_fixture()
       digest = Anchor.digest(anchor)

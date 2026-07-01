@@ -306,6 +306,18 @@ defmodule SigilGuard.TelemetryTest do
       assert metadata.anchor_store == "String"
       assert metadata.outcome == :error
       assert metadata.error_reason == :invalid_store
+
+      {_, anchor} = anchor_fixture()
+
+      assert {:error, :worm_required} =
+               Store.put(LocalFile, anchor, path: tmp_path(), require_worm: true)
+
+      assert_receive {^ref, [:sigil_guard, :audit, :anchor_store, :put, :stop], %{duration: _},
+                      worm_metadata}
+
+      assert worm_metadata.anchor_store == "SigilGuard.Audit.Anchor.Store.LocalFile"
+      assert worm_metadata.outcome == :error
+      assert worm_metadata.error_reason == :worm_required
     end
   end
 

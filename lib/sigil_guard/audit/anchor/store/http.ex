@@ -19,7 +19,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   A successful `200`, `201`, or `202` response may return either a receipt
   object or `%{"receipt" => receipt}`. Missing receipt fields are filled from
-  the request and response location.
+  the request and response location. Pass `require_worm: true` to reject
+  receipts unless the remote service explicitly returns `"worm": true`.
 
   `fetch/2` sends `GET /audit/anchors/:digest` by default and accepts either a
   raw anchor record or `%{"record" => record}` / `%{"anchor" => record}`.
@@ -59,8 +60,10 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
          {:ok, url} <- put_url(opts),
          {:ok, metadata} <- metadata(opts),
          {:ok, headers} <- headers(opts),
-         {:ok, body, response_headers} <- post_anchor(url, record, metadata, headers, opts) do
-      normalize_receipt(body, record, url, metadata, response_headers)
+         {:ok, body, response_headers} <- post_anchor(url, record, metadata, headers, opts),
+         {:ok, receipt} <- normalize_receipt(body, record, url, metadata, response_headers),
+         :ok <- validate_required_worm(receipt, opts) do
+      {:ok, receipt}
     end
   end
 
@@ -272,9 +275,17 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
         receipt_uri(receipt) || location_header(response_headers) || "#{request_url}##{digest}",
       "anchor_digest" => digest,
       "stored_at" => field(receipt, "stored_at") || timestamp(),
-      "worm" => field(receipt, "worm") || false,
+      "worm" => field(receipt, "worm") == true,
       "metadata" => field(receipt, "metadata") || metadata
     }
+  end
+
+  defp validate_required_worm(receipt, opts) do
+    if Keyword.get(opts, :require_worm, false) == true and field(receipt, "worm") != true do
+      {:error, :worm_required}
+    else
+      :ok
+    end
   end
 
   defp receipt_body(%{"receipt" => receipt}) when is_map(receipt), do: receipt
@@ -342,7 +353,10 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   defp timeout(opts), do: Keyword.get(opts, :timeout, @default_timeout_ms)
 
   defp field(map, key) when is_map(map) do
-    Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+    end
   end
 
   defp nonempty_binary?(value), do: is_binary(value) and value != ""

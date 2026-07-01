@@ -66,6 +66,21 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
 
       assert {:ok, ^anchor} = Store.fetch(LocalFile, atom_receipt)
     end
+
+    test "rejects local receipts when WORM receipts are required" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+
+      assert {:error, :worm_required} =
+               Store.put(LocalFile, anchor, path: path, require_worm: true)
+
+      refute File.exists?(path)
+
+      assert {:error, :worm_required} =
+               LocalFile.put(anchor, path: path, require_worm: true)
+
+      refute File.exists?(path)
+    end
   end
 
   describe "error handling" do

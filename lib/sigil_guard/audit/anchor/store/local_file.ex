@@ -25,6 +25,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   @impl SigilGuard.Audit.Anchor.Store
   def put(record, opts) when is_map(record) and is_list(opts) do
     with :ok <- validate_anchor(record),
+         :ok <- allow_local_receipt(opts),
          {:ok, path} <- path_from_opts(opts),
          {:ok, metadata} <- metadata(opts),
          :ok <- ensure_parent(path),
@@ -51,6 +52,14 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
       :ok
     else
       {:error, :invalid_anchor}
+    end
+  end
+
+  defp allow_local_receipt(opts) do
+    if Keyword.get(opts, :require_worm, false) == true do
+      {:error, :worm_required}
+    else
+      :ok
     end
   end
 

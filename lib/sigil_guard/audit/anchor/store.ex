@@ -16,7 +16,8 @@ defmodule SigilGuard.Audit.Anchor.Store do
     "anchor_digest" => :anchor_digest,
     "kind" => :kind,
     "storage" => :storage,
-    "uri" => :uri
+    "uri" => :uri,
+    "worm" => :worm
   }
   @anchor_kind "sigil_guard.audit.anchor"
 
@@ -28,13 +29,21 @@ defmodule SigilGuard.Audit.Anchor.Store do
 
   @doc """
   Persist an anchor record through a store module.
+
+  Options:
+
+    * `:require_worm` - when `true`, rejects receipts unless they explicitly
+      mark the external storage target as immutable with `"worm"` or `:worm`
+      set to `true`.
   """
   @spec put(module(), Anchor.t(), keyword()) :: {:ok, receipt()} | {:error, term()}
   def put(store, record, opts \\ [])
 
   def put(store, record, opts) when is_atom(store) and is_map(record) and is_list(opts) do
     span(:put, store, fn ->
-      if store?(store), do: store.put(record, opts), else: {:error, :invalid_store}
+      result = if store?(store), do: store.put(record, opts), else: {:error, :invalid_store}
+
+      enforce_required_worm(result, opts)
     end)
   end
 
@@ -95,6 +104,21 @@ defmodule SigilGuard.Audit.Anchor.Store do
 
   defp result_metadata(_), do: %{outcome: :unknown}
 
+  defp enforce_required_worm({:ok, receipt}, opts) do
+    cond do
+      Keyword.get(opts, :require_worm, false) != true ->
+        {:ok, receipt}
+
+      is_map(receipt) and field(receipt, "worm") == true ->
+        {:ok, receipt}
+
+      true ->
+        {:error, :worm_required}
+    end
+  end
+
+  defp enforce_required_worm(result, _), do: result
+
   defp digest_metadata(%{digest: digest}) when is_binary(digest), do: %{anchor_digest: digest}
 
   defp digest_metadata(%{} = map) do
@@ -120,8 +144,12 @@ defmodule SigilGuard.Audit.Anchor.Store do
   defp uri_scheme(uri) when is_binary(uri), do: URI.parse(uri).scheme
   defp uri_scheme(_), do: nil
 
-  defp field(map, key) when is_map(map),
-    do: Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+  defp field(map, key) when is_map(map) do
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+    end
+  end
 
   defp maybe_put(map, _, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)

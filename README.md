@@ -413,7 +413,8 @@ anchor =
     SigilGuard.Audit.Anchor.Store.HTTP,
     anchor,
     url: "https://audit.example.internal",
-    headers: [{"authorization", "Bearer <audit-token>"}]
+    headers: [{"authorization", "Bearer <audit-token>"}],
+    require_worm: true
   )
 
 {:ok, _verified_remote_anchor} =
