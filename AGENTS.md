@@ -52,6 +52,10 @@ SigilGuard (Main API)
     +-- SigilGuard.Audit           Tamper-evident audit chain
     |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
     |   +-- Audit.Anchor           External WORM/append-only anchor records
+    |   +-- Audit.Anchor.Receipt   Signed remote anchor receipts
+    |   +-- Audit.Anchor.Store     External anchor persistence behaviour
+    |   |   +-- Store.HTTP         Remote append-only/WORM anchor adapter
+    |   |   +-- Store.LocalFile    JSONL anchor store for local tests/dev
     |   +-- Audit.Export           Portable signed checkpoint + anchor package
     |   +-- Audit.Logger           Audit logger behaviour
     +-- SigilGuard.Identity        Trust level hierarchy
@@ -90,6 +94,10 @@ SigilGuard (Main API)
 | `lib/sigil_guard/audit.ex` | HMAC-SHA256 chain integrity |
 | `lib/sigil_guard/audit/checkpoint.ex` | Merkle checkpoint export, signing, and verification |
 | `lib/sigil_guard/audit/anchor.ex` | External WORM/append-only anchor records |
+| `lib/sigil_guard/audit/anchor/receipt.ex` | Canonical signed remote anchor receipt helpers |
+| `lib/sigil_guard/audit/anchor/store.ex` | External anchor persistence facade |
+| `lib/sigil_guard/audit/anchor/store/http.ex` | Strict remote WORM/append-only anchor adapter |
+| `lib/sigil_guard/audit/anchor/store/local_file.ex` | JSONL local anchor store |
 | `lib/sigil_guard/audit/export.ex` | Portable signed checkpoint + anchor export package |
 | `lib/sigil_guard/identity.ex` | Trust level hierarchy |
 | `lib/sigil_guard/vault.ex` | Encrypted storage behaviour |
@@ -149,9 +157,12 @@ test/
 |   +-- policy_test.exs        # Policy evaluation tests
 |   +-- audit_test.exs         # Audit chain tests
 |   +-- audit/
-|   |   +-- checkpoint_test.exs # Signed checkpoint/Merkle tests
-|   |   +-- anchor_test.exs     # External anchor tests
-|   |   +-- export_test.exs     # Portable export package tests
+|   |   +-- checkpoint_test.exs  # Signed checkpoint/Merkle tests
+|   |   +-- anchor_test.exs      # External anchor tests
+|   |   +-- export_test.exs      # Portable export package tests
+|   |   +-- anchor/
+|   |       +-- receipt_test.exs # Signed receipt canonicalization/provenance tests
+|   |       +-- store/           # Local and HTTP anchor store contract tests
 |   +-- backend_test.exs       # Backend dispatch tests
 |   +-- registry/
 |   |   +-- bundle_test.exs    # Registry provenance tests
