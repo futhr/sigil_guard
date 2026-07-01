@@ -112,6 +112,32 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
+  Issue an action-bound confirmation token for a confirm-required MCP result.
+
+  The token is bound to the same normalized result payload and tool-to-model
+  boundary context used by `guard_result/3`. When accepted by
+  `guard_confirmed_result/3`, quarantined tool output is released only as the
+  sanitized result text.
+  """
+  @spec issue_result_confirmation_token(
+          term(),
+          Context.t() | map() | keyword(),
+          Decision.t(),
+          binary(),
+          keyword()
+        ) ::
+          {:ok, String.t()} | {:error, term()}
+  def issue_result_confirmation_token(result, context, %Decision{} = decision, key, opts \\ []) do
+    Confirmation.issue(
+      gate_payload(result),
+      result_context(result, context),
+      decision,
+      key,
+      opts
+    )
+  end
+
+  @doc """
   Guard an MCP tool request and honor an optional confirmation token.
 
   If the request does not require confirmation, this behaves like
@@ -253,6 +279,21 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
+  Guard an MCP tool result and honor an optional confirmation token.
+
+  Confirmed quarantines are released as sanitized JSON-RPC results, never as
+  raw tool output. Confirmation tokens are consumed by default; pass
+  `consume_confirmation: false` to keep verification stateless.
+  """
+  @spec guard_confirmed_result(term(), Context.t() | map() | keyword(), keyword()) ::
+          Decision.t()
+  def guard_confirmed_result(result, context \\ %{}, opts \\ []) do
+    decision = guard_result(result, context, opts)
+
+    maybe_apply_result_confirmation(decision, result, result_context(result, context), opts)
+  end
+
+  @doc """
   Guard an MCP tool result and return a safe MCP-shaped result or JSON-RPC error.
 
   Redacted results are returned as JSON-RPC result objects containing sanitized
@@ -263,6 +304,26 @@ defmodule SigilGuard.MCP.Gateway do
           {:ok, map(), Decision.t()} | {:error, map(), Decision.t()}
   def guarded_result(result, context \\ %{}, opts \\ []) do
     decision = guard_result(result, context, opts)
+
+    case decision.action do
+      :allow ->
+        {:ok, jsonrpc_result(result, request_id(result)), decision}
+
+      :redact ->
+        {:ok, sanitized_result(result, decision, request_id(result)), decision}
+
+      _ ->
+        {:error, response_for_decision(decision, request_id(result), opts), decision}
+    end
+  end
+
+  @doc """
+  Guard a possibly confirmed MCP result and return a safe MCP-shaped result or JSON-RPC error.
+  """
+  @spec guarded_confirmed_result(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, map(), Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_confirmed_result(result, context \\ %{}, opts \\ []) do
+    decision = guard_confirmed_result(result, context, opts)
 
     case decision.action do
       :allow ->
@@ -503,6 +564,19 @@ defmodule SigilGuard.MCP.Gateway do
 
   defp maybe_apply_confirmation(%Decision{} = decision, _, _, _), do: decision
 
+  defp maybe_apply_result_confirmation(
+         %Decision{verdict: {:confirm, _}} = decision,
+         result,
+         context,
+         opts
+       ) do
+    decision
+    |> maybe_apply_confirmation(result, context, opts)
+    |> release_confirmed_result()
+  end
+
+  defp maybe_apply_result_confirmation(%Decision{} = decision, _, _, _), do: decision
+
   defp verify_confirmation_token(decision, request, context, token, opts) do
     with {:ok, key} <- confirmation_key(opts),
          {:ok, claims} <-
@@ -550,6 +624,29 @@ defmodule SigilGuard.MCP.Gateway do
         audit_metadata: metadata
     }
   end
+
+  defp release_confirmed_result(
+         %Decision{
+           verdict: :allowed,
+           action: :quarantine,
+           audit_metadata: metadata
+         } = decision
+       ) do
+    released_metadata =
+      Map.merge(metadata, %{
+        action: :redact,
+        release_status: :confirmed_sanitized
+      })
+
+    %{
+      decision
+      | action: :redact,
+        reason: "Confirmation token accepted; sanitized result released",
+        audit_metadata: released_metadata
+    }
+  end
+
+  defp release_confirmed_result(%Decision{} = decision), do: decision
 
   defp confirmation_failure_decision(%Decision{} = decision, reason) do
     metadata =

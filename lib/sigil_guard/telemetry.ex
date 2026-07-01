@@ -118,6 +118,7 @@ defmodule SigilGuard.Telemetry do
     repo_policy_rules: "sigil.repo_policy.rules",
     repo_policy_verdict: "sigil.repo_policy.verdict",
     repo_unmatched_paths: "sigil.repo_policy.unmatched_paths",
+    release_status: "sigil.release.status",
     risk_level: "sigil.security.risk_level",
     scanner_validate: "sigil.scanner.validate",
     sink: "sigil.security.sink",

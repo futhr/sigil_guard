@@ -40,6 +40,7 @@ defmodule SigilGuard.TelemetryTest do
             confirmation_reason: :digest_mismatch,
             confirmation_actor: "did:sigil:agent",
             confirmation_nonce_hash: "nonce-hash",
+            release_status: :confirmed_sanitized,
             content_hash: "abc123"
           }
         )
@@ -59,6 +60,7 @@ defmodule SigilGuard.TelemetryTest do
       assert attributes["sigil.confirmation.reason"] == "digest_mismatch"
       assert attributes["sigil.confirmation.actor"] == "did:sigil:agent"
       assert attributes["sigil.confirmation.nonce_hash"] == "nonce-hash"
+      assert attributes["sigil.release.status"] == "confirmed_sanitized"
       assert attributes["sigil.security.content_hash"] == "abc123"
       refute Map.has_key?(attributes, "match")
     end
