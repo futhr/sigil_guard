@@ -408,6 +408,21 @@ anchor =
     signed_checkpoint
   )
 
+{:ok, remote_receipt} =
+  SigilGuard.Audit.Anchor.Store.put(
+    SigilGuard.Audit.Anchor.Store.HTTP,
+    anchor,
+    url: "https://audit.example.internal",
+    headers: [{"authorization", "Bearer <audit-token>"}]
+  )
+
+{:ok, _verified_remote_anchor} =
+  SigilGuard.Audit.Anchor.Store.verify(
+    SigilGuard.Audit.Anchor.Store.HTTP,
+    remote_receipt,
+    signed_checkpoint
+  )
+
 {:ok, export} =
   SigilGuard.Audit.Export.create(signed,
     chain_id: "prod-audit",
@@ -533,6 +548,7 @@ SigilGuard (Main API)
     |   +-- Audit.Checkpoint       Merkle checkpoint export/sign/verify
     |   +-- Audit.Anchor           External WORM/append-only anchor records
     |   +-- Audit.Anchor.Store     External anchor persistence behaviour
+    |   +-- Audit.Anchor.Store.HTTP Remote append-only/WORM anchor adapter
     |   +-- Audit.Export           Portable signed checkpoint + anchor package
     +-- SigilGuard.Identity        Trust level hierarchy
     +-- SigilGuard.Signer          Cryptographic signing behaviour
