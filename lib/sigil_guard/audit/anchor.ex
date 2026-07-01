@@ -77,10 +77,11 @@ defmodule SigilGuard.Audit.Anchor do
   """
   @spec verify(t(), Checkpoint.t()) :: {:ok, verified()} | {:error, atom()}
   def verify(record, checkpoint) when is_map(record) and is_map(checkpoint) do
-    with :ok <- verify_static_fields(record),
-         :ok <- verify_checkpoint_digest(record, checkpoint),
+    with {:ok, record_digest} <- verify_record(record),
+         {:ok, checkpoint_digest} <- safe_checkpoint_digest(checkpoint),
+         :ok <- verify_checkpoint_digest(record, checkpoint_digest),
          :ok <- verify_checkpoint_summary(record, checkpoint) do
-      {:ok, %{record: record, digest: digest(record)}}
+      {:ok, %{record: record, digest: record_digest}}
     end
   end
 
@@ -93,7 +94,13 @@ defmodule SigilGuard.Audit.Anchor do
   available. Use `verify/2` when comparing an anchor to its checkpoint.
   """
   @spec validate(t()) :: :ok | {:error, atom()}
-  def validate(record) when is_map(record), do: verify_static_fields(record)
+  def validate(record) when is_map(record) do
+    case verify_record(record) do
+      {:ok, _} -> :ok
+      error -> error
+    end
+  end
+
   def validate(_), do: {:error, :invalid_anchor}
 
   @doc """
@@ -131,8 +138,14 @@ defmodule SigilGuard.Audit.Anchor do
     end
   end
 
-  defp verify_checkpoint_digest(record, checkpoint) do
-    if secure_compare(field(record, "checkpoint_digest"), Checkpoint.digest(checkpoint)) do
+  defp verify_record(record) do
+    with :ok <- verify_static_fields(record) do
+      safe_digest(record)
+    end
+  end
+
+  defp verify_checkpoint_digest(record, checkpoint_digest) do
+    if secure_compare(field(record, "checkpoint_digest"), checkpoint_digest) do
       :ok
     else
       {:error, :anchor_mismatch}
@@ -170,6 +183,20 @@ defmodule SigilGuard.Audit.Anchor do
 
   defp require_metadata(metadata) when is_map(metadata), do: :ok
   defp require_metadata(_), do: {:error, :invalid_metadata}
+
+  defp safe_digest(record) do
+    {:ok, digest(record)}
+  rescue
+    _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_anchor}
+  end
+
+  defp safe_checkpoint_digest(checkpoint) do
+    {:ok, Checkpoint.digest(checkpoint)}
+  rescue
+    _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_checkpoint}
+  end
 
   defp field(map, key) when is_map(map) do
     case Map.fetch(map, key) do

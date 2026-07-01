@@ -107,6 +107,14 @@ defmodule SigilGuard.Audit.AnchorTest do
                |> Map.put("metadata", false)
                |> Anchor.validate()
     end
+
+    test "rejects uncanonicalizable anchor terms during validation" do
+      {checkpoint, _} = signed_checkpoint()
+      anchor = Anchor.create(checkpoint, anchored_at: @anchored_at)
+      invalid = put_in(anchor, ["metadata", "pid"], self())
+
+      assert {:error, :invalid_anchor} = Anchor.validate(invalid)
+    end
   end
 
   describe "verify/2" do
@@ -177,6 +185,17 @@ defmodule SigilGuard.Audit.AnchorTest do
         |> Map.put(:worm, true)
 
       assert {:error, :invalid_worm} = Anchor.verify(invalid_worm, checkpoint)
+    end
+
+    test "rejects uncanonicalizable anchor and checkpoint terms without raising" do
+      {checkpoint, _} = signed_checkpoint()
+      anchor = Anchor.create(checkpoint, anchored_at: @anchored_at)
+
+      invalid_anchor = put_in(anchor, ["metadata", "pid"], self())
+      assert {:error, :invalid_anchor} = Anchor.verify(invalid_anchor, checkpoint)
+
+      invalid_checkpoint = put_in(checkpoint, ["metadata", "pid"], self())
+      assert {:error, :invalid_checkpoint} = Anchor.verify(anchor, invalid_checkpoint)
     end
   end
 

@@ -297,6 +297,24 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert {:error, :invalid_kind} = Checkpoint.verify(invalid, events)
     end
 
+    test "rejects uncanonicalizable checkpoint terms without raising" do
+      events = build_signed_chain(2)
+      signed = signed_checkpoint(events)
+      invalid_signed = put_in(signed, ["metadata", "pid"], self())
+
+      assert {:error, :invalid_checkpoint} =
+               Checkpoint.verify(invalid_signed, events,
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
+
+      invalid_unsigned =
+        signed
+        |> Map.delete("signature")
+        |> put_in(["metadata", "pid"], self())
+
+      assert {:error, :invalid_checkpoint} = Checkpoint.verify(invalid_unsigned, events)
+    end
+
     test "rejects invalid signature metadata" do
       events = build_signed_chain(2)
       signed = signed_checkpoint(events)

@@ -295,6 +295,9 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp checkpoint_canonical_bytes(checkpoint) do
     {:ok, canonical_bytes(checkpoint)}
+  rescue
+    _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_checkpoint}
   end
 
   defp verify_signature_status(checkpoint, opts, canonical, digest) do
