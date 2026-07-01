@@ -17,6 +17,32 @@ defmodule SigilGuard.ScannerPipelineTestStub do
   end
 end
 
+defmodule SigilGuard.ScannerBadReturnTestStub do
+  @moduledoc false
+
+  @spec scan(String.t(), [map()], keyword()) :: term()
+  def scan(_, _, _), do: :not_hits
+end
+
+defmodule SigilGuard.ScannerBadHitTestStub do
+  @moduledoc false
+
+  @spec scan(String.t(), [map()], keyword()) :: [map()]
+  def scan(text, _, _) do
+    [
+      %{
+        name: "bad",
+        category: "test",
+        severity: :low,
+        match: "x",
+        offset: byte_size(text) + 1,
+        length: 1,
+        replacement_hint: nil
+      }
+    ]
+  end
+end
+
 defmodule SigilGuard.Scanner.PipelineTest do
   @moduledoc false
 
@@ -214,6 +240,16 @@ defmodule SigilGuard.Scanner.PipelineTest do
                Scanner.scan("x", patterns: patterns, pipeline: SigilGuard.ScannerPipelineTestStub)
 
       assert hit.name == "stub"
+    end
+
+    test "rejects custom scanner pipelines with malformed output" do
+      assert_raise ArgumentError, ~r/must return a hit list/, fn ->
+        Scanner.scan("x", pipeline: SigilGuard.ScannerBadReturnTestStub)
+      end
+
+      assert_raise ArgumentError, ~r/must return valid scan hits/, fn ->
+        Scanner.scan("x", pipeline: SigilGuard.ScannerBadHitTestStub)
+      end
     end
 
     test "raises on invalid scanner pipeline modules" do

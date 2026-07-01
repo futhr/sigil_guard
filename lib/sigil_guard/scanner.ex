@@ -48,7 +48,10 @@ defmodule SigilGuard.Scanner do
     telemetry_metadata = telemetry_metadata(patterns, opts)
 
     Telemetry.span([:sigil_guard, :scan], telemetry_metadata, fn ->
-      hits = do_scan(text, patterns, opts)
+      hits =
+        text
+        |> do_scan(patterns, opts)
+        |> validate_hits!(text)
 
       result =
         if hits == [] do
@@ -129,11 +132,42 @@ defmodule SigilGuard.Scanner do
     end
   end
 
+  defp validate_hits!(hits, text) when is_list(hits) do
+    if Enum.all?(hits, &valid_hit?(&1, text)) do
+      hits
+    else
+      raise ArgumentError, "scanner pipeline must return valid scan hits"
+    end
+  end
+
+  defp validate_hits!(_, _), do: raise(ArgumentError, "scanner pipeline must return a hit list")
+
+  defp valid_hit?(
+         %{
+           name: name,
+           category: category,
+           severity: severity,
+           match: match,
+           offset: offset,
+           length: length
+         } = hit,
+         text
+       )
+       when is_binary(name) and is_binary(category) and severity in [:low, :medium, :high] and
+              is_binary(match) and is_integer(offset) and is_integer(length) and
+              offset >= 0 and length >= 0 and offset + length <= byte_size(text) do
+    valid_replacement_hint?(Map.get(hit, :replacement_hint))
+  end
+
+  defp valid_hit?(_, _), do: false
+
+  defp valid_replacement_hint?(hint), do: is_binary(hint) or is_nil(hint)
+
   defp telemetry_metadata(patterns, opts) do
     %{
       patterns_checked: length(patterns),
       pipeline: pipeline_name(Keyword.get(opts, :pipeline, :staged)),
-      scanner_validate: Keyword.get(opts, :validate, true)
+      scanner_validate: Keyword.get(opts, :validate, true) != false
     }
   end
 

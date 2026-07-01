@@ -1,3 +1,10 @@
+defmodule SigilGuard.Runtime.BadScannerPipelineTestStub do
+  @moduledoc false
+
+  @spec scan(String.t(), [map()], keyword()) :: term()
+  def scan(_, _, _), do: :not_hits
+end
+
 defmodule SigilGuard.Runtime.GateTest do
   @moduledoc false
 
@@ -157,6 +164,55 @@ defmodule SigilGuard.Runtime.GateTest do
                       %{action_digest_error: :invalid_payload} = metadata}
 
       assert metadata.action_digest == nil
+      assert metadata.verdict == :blocked
+    end
+
+    test "blocks when scanner pipeline output is malformed" do
+      ref = make_ref()
+      parent = self()
+      handler_id = "runtime-gate-scanner-error-test-#{System.unique_integer()}"
+
+      :telemetry.attach(
+        handler_id,
+        [:sigil_guard, :runtime, :gate],
+        fn event, measurements, metadata, _ ->
+          send(parent, {ref, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      text = "secret=R7v9K2mQ4xZ8pL6n"
+
+      decision =
+        Gate.evaluate(
+          text,
+          [
+            phase: :tool_result,
+            origin: :tool,
+            sink: :model,
+            tool: "fetch_url",
+            trust_level: :high
+          ],
+          pipeline: SigilGuard.Runtime.BadScannerPipelineTestStub
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.risk_level == :high
+      assert decision.reason =~ "Scanner failed"
+      assert decision.sanitized_text == "[SCANNER_ERROR]"
+      assert decision.audit_metadata.scanner_error == :scanner_failed
+
+      assert [%{name: "scanner_error", match: "", replacement_hint: "[SCANNER_ERROR]"}] =
+               decision.hits
+
+      refute inspect(decision) =~ "R7v9K2mQ4xZ8pL6n"
+
+      assert_receive {^ref, [:sigil_guard, :runtime, :gate], %{system_time: _},
+                      %{scanner_error: :scanner_failed} = metadata}
+
       assert metadata.verdict == :blocked
     end
 

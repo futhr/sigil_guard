@@ -966,6 +966,7 @@ defmodule SigilGuard.MCP.Gateway do
         :content_hash,
         :action_digest,
         :action_digest_error,
+        :scanner_error,
         :confirmation_status,
         :confirmation_reason,
         :confirmation_actor,
@@ -1043,6 +1044,7 @@ defmodule SigilGuard.MCP.Gateway do
         "indicator_ids" => Enum.map(decision.indicators, &Atom.to_string(&1.id)),
         "content_hash" => decision.content_hash,
         "action_digest" => decision.audit_metadata[:action_digest],
+        "scanner_error" => error_value(decision.audit_metadata[:scanner_error]),
         "confirmation_status" => error_value(decision.audit_metadata[:confirmation_status]),
         "confirmation_reason" => error_value(decision.audit_metadata[:confirmation_reason])
       }

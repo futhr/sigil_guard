@@ -68,7 +68,7 @@ defmodule SigilGuard.Runtime.Gate do
   end
 
   defp evaluate_checked(payload, context, text, action, opts) do
-    hits = scan_hits(text, opts)
+    {hits, scanner_error} = scan_hits(text, opts)
     quarantine = Quarantine.inspect(text, context, opts)
     repo_policy = repo_policy_decision(payload, context, action, opts)
 
@@ -77,6 +77,7 @@ defmodule SigilGuard.Runtime.Gate do
         action: action,
         context: context,
         hits: hits,
+        scanner_error: scanner_error,
         quarantine: quarantine,
         repo_policy: repo_policy,
         opts: opts
@@ -94,6 +95,7 @@ defmodule SigilGuard.Runtime.Gate do
       text: text,
       context: context,
       hits: hits,
+      scanner_error: scanner_error,
       quarantine: quarantine,
       repo_policy: repo_policy,
       risk: risk,
@@ -147,13 +149,33 @@ defmodule SigilGuard.Runtime.Gate do
   defp audit_binary(value) when is_binary(value), do: value
   defp audit_binary(_), do: nil
 
-  defp scan_hits(nil, _), do: []
+  defp scan_hits(nil, _), do: {[], nil}
 
   defp scan_hits(text, opts) do
-    case Scanner.scan(text, opts) do
-      {:ok, _} -> []
-      {:hit, hits} -> hits
+    try do
+      case Scanner.scan(text, opts) do
+        {:ok, _} -> {[], nil}
+        {:hit, hits} -> {hits, nil}
+      end
+    rescue
+      _ -> {scanner_error_hit(text), :scanner_failed}
+    catch
+      _, _ -> {scanner_error_hit(text), :scanner_failed}
     end
+  end
+
+  defp scanner_error_hit(text) do
+    [
+      %{
+        name: "scanner_error",
+        category: "scanner",
+        severity: :high,
+        match: "",
+        offset: 0,
+        length: byte_size(text),
+        replacement_hint: "[SCANNER_ERROR]"
+      }
+    ]
   end
 
   defp risk_level(state) do
@@ -163,27 +185,33 @@ defmodule SigilGuard.Runtime.Gate do
   end
 
   defp inferred_risk_level(state) do
+    scanner_error_risk(state.scanner_error) ||
+      repo_policy_risk(state.repo_policy) ||
+      quarantine_risk(state.quarantine) ||
+      hit_risk(state.hits, state.context) ||
+      Policy.classify_risk(state.action, state.opts)
+  end
+
+  defp scanner_error_risk(nil), do: nil
+  defp scanner_error_risk(_), do: :high
+
+  defp repo_policy_risk(repo_policy) do
+    case repo_policy_verdict(repo_policy) do
+      :block -> :high
+      :require_approval -> :medium
+      _ -> nil
+    end
+  end
+
+  defp quarantine_risk(%{verdict: :blocked}), do: :high
+  defp quarantine_risk(%{verdict: :suspicious}), do: :medium
+  defp quarantine_risk(_), do: nil
+
+  defp hit_risk(hits, context) do
     cond do
-      repo_policy_verdict(state.repo_policy) == :block ->
-        :high
-
-      repo_policy_verdict(state.repo_policy) == :require_approval ->
-        :medium
-
-      state.quarantine.verdict == :blocked ->
-        :high
-
-      state.quarantine.verdict == :suspicious ->
-        :medium
-
-      Enum.any?(state.hits, &(&1.severity == :high)) and external_sink?(state.context.sink) ->
-        :high
-
-      state.hits != [] ->
-        :medium
-
-      true ->
-        Policy.classify_risk(state.action, state.opts)
+      Enum.any?(hits, &(&1.severity == :high)) and external_sink?(context.sink) -> :high
+      hits != [] -> :medium
+      true -> nil
     end
   end
 
@@ -343,6 +371,11 @@ defmodule SigilGuard.Runtime.Gate do
     {verdict, action, reason, nil, nil}
   end
 
+  defp source_sink_verdict(%{scanner_error: scanner_error})
+       when scanner_error in [:scanner_failed] do
+    {:blocked, :block, "Scanner failed during runtime gate: #{scanner_error}"}
+  end
+
   defp source_sink_verdict(%{
          repo_policy: %RepoDecision{verdict: :block} = decision
        }) do
@@ -463,7 +496,8 @@ defmodule SigilGuard.Runtime.Gate do
       indicator_count: length(state.quarantine.indicators),
       indicator_ids: Enum.map(state.quarantine.indicators, & &1.id),
       content_hash: state.quarantine.content_hash,
-      action_digest: action_digest
+      action_digest: action_digest,
+      scanner_error: state.scanner_error
     }
     |> put_action_digest_error(action_digest_error)
     |> put_repo_policy_metadata(state.repo_policy)
@@ -530,6 +564,7 @@ defmodule SigilGuard.Runtime.Gate do
         :content_hash,
         :action_digest,
         :action_digest_error,
+        :scanner_error,
         :runtime_input_error,
         :repo_policy_verdict,
         :repo_policy_rules,

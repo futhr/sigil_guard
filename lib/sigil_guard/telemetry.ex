@@ -52,6 +52,7 @@ defmodule SigilGuard.Telemetry do
       hit_count: integer, indicator_count: integer, indicator_ids: [atom],
       content_hash: String.t(), action_digest: String.t() | nil,
       action_digest_error: atom | nil, runtime_input_error: atom | nil,
+      scanner_error: atom | nil,
       repo_policy_verdict: atom, repo_policy_rules: [String.t()],
       repo_unmatched_paths: [String.t()]}`
 
@@ -144,6 +145,7 @@ defmodule SigilGuard.Telemetry do
     release_status: "sigil.release.status",
     risk_level: "sigil.security.risk_level",
     runtime_input_error: "sigil.security.runtime_input_error",
+    scanner_error: "sigil.scanner.error",
     scanner_validate: "sigil.scanner.validate",
     sink: "sigil.security.sink",
     source: "sigil.registry.source",
