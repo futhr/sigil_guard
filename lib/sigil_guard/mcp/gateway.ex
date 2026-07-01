@@ -749,10 +749,10 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp request_confirmation_token(payload) when is_map(payload) do
-    case first_payload_term(payload, confirmation_token_paths()) do
-      token when is_binary(token) -> {:ok, token}
-      nil -> {:error, :missing_confirmation_token}
-      _ -> {:error, :invalid_confirmation_token}
+    case first_present_payload_term(payload, confirmation_token_paths()) do
+      {:ok, token} when is_binary(token) -> {:ok, token}
+      {:ok, _} -> {:error, :invalid_confirmation_token}
+      :not_found -> {:error, :missing_confirmation_token}
     end
   end
 
@@ -786,10 +786,31 @@ defmodule SigilGuard.MCP.Gateway do
     Enum.find_value(paths, &get_in(payload, &1))
   end
 
+  defp first_present_payload_term(payload, paths) when is_map(payload) do
+    Enum.reduce_while(paths, :not_found, fn path, :not_found ->
+      case fetch_payload_path(payload, path) do
+        {:ok, value} -> {:halt, {:ok, value}}
+        :error -> {:cont, :not_found}
+      end
+    end)
+  end
+
+  defp fetch_payload_path(payload, []), do: {:ok, payload}
+
+  defp fetch_payload_path(payload, [key | rest]) when is_map(payload) do
+    case Map.fetch(payload, key) do
+      {:ok, value} -> fetch_payload_path(value, rest)
+      :error -> :error
+    end
+  end
+
+  defp fetch_payload_path(_, _), do: :error
+
   defp request_envelope(payload) when is_map(payload) do
-    case first_payload_term(payload, envelope_paths()) do
-      envelope when is_map(envelope) -> {:ok, envelope}
-      _ -> {:error, :missing_envelope}
+    case first_present_payload_term(payload, envelope_paths()) do
+      {:ok, envelope} when is_map(envelope) -> {:ok, envelope}
+      {:ok, _} -> {:error, :invalid_envelope}
+      :not_found -> {:error, :missing_envelope}
     end
   end
 
@@ -817,12 +838,25 @@ defmodule SigilGuard.MCP.Gateway do
     public_keys = Keyword.get(opts, :public_keys, %{})
 
     if is_map(public_keys) do
-      case public_keys[identity] || Keyword.get(opts, :public_key_b64u) do
-        public_key_b64u when is_binary(public_key_b64u) -> {:ok, public_key_b64u}
-        _ -> {:error, :unknown_identity}
+      case Map.fetch(public_keys, identity) do
+        {:ok, public_key_b64u} when is_binary(public_key_b64u) ->
+          {:ok, public_key_b64u}
+
+        {:ok, _} ->
+          {:error, :invalid_public_key}
+
+        :error ->
+          fallback_public_key(opts)
       end
     else
       {:error, :invalid_public_keys}
+    end
+  end
+
+  defp fallback_public_key(opts) do
+    case Keyword.get(opts, :public_key_b64u) do
+      public_key_b64u when is_binary(public_key_b64u) -> {:ok, public_key_b64u}
+      _ -> {:error, :unknown_identity}
     end
   end
 

@@ -335,6 +335,26 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.audit_metadata.confirmation_reason == :invalid_confirmation_token
     end
 
+    test "does not let malformed confirmation metadata fall back to later token fields" do
+      request = confirmable_request()
+      token = issue_request_token(request)
+
+      confirmed_request =
+        request
+        |> Map.put("_sigil_confirmation", false)
+        |> put_in(["params", "_sigil_confirmation"], token)
+
+      decision =
+        Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.confirmation_reason == :invalid_confirmation_token
+      refute inspect(decision.audit_metadata) =~ token
+    end
+
     test "accepts confirmation tokens supplied as gateway options" do
       request = confirmable_request()
       token = issue_request_token(request)
@@ -446,6 +466,18 @@ defmodule SigilGuard.MCP.GatewayTest do
                Gateway.verify_request_envelope(unsigned_request(), public_keys: public_keys())
     end
 
+    test "does not let malformed envelope metadata fall back to later envelope fields" do
+      envelope = Envelope.sign("did:sigil:agent", :allowed, signer: TestSigner)
+
+      request =
+        envelope
+        |> signed_request()
+        |> Map.put("_sigil", false)
+
+      assert {:error, :invalid_envelope} =
+               Gateway.verify_request_envelope(request, public_keys: public_keys())
+    end
+
     test "rejects identities without a configured public key" do
       envelope = Envelope.sign("did:sigil:unknown", :allowed, signer: TestSigner)
 
@@ -499,6 +531,17 @@ defmodule SigilGuard.MCP.GatewayTest do
                )
 
       assert claims.identity == "did:sigil:agent"
+    end
+
+    test "does not let malformed identity public keys fall back to the global key" do
+      envelope = Envelope.sign("did:sigil:agent", :allowed, signer: TestSigner)
+      request = signed_request(envelope)
+
+      assert {:error, :invalid_public_key} =
+               Gateway.verify_request_envelope(request,
+                 public_keys: %{"did:sigil:agent" => false},
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
     end
 
     test "rejects envelopes without an identity claim" do
@@ -1012,6 +1055,26 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert replay.audit_metadata.confirmation_status == :invalid
       assert replay.audit_metadata.confirmation_reason == :replay_detected
       refute inspect(replay.audit_metadata) =~ token
+    end
+
+    test "does not let malformed result confirmation metadata fall back to later token fields" do
+      result = prompt_injection_result()
+      token = issue_result_token(result)
+
+      confirmed_result =
+        result
+        |> Map.put("_sigil_confirmation", false)
+        |> Map.put("confirmation_token", token)
+
+      decision =
+        Gateway.guard_confirmed_result(confirmed_result, [trust_level: :high],
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.confirmation_reason == :invalid_confirmation_token
+      refute inspect(decision.audit_metadata) =~ token
     end
 
     test "rejects tokens bound to a different result" do
