@@ -15,6 +15,18 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
   @anchored_at "2026-01-01T00:00:05.000Z"
   @issuer "did:web:anchor-store.example"
 
+  defmodule BadReceiptStore do
+    @moduledoc false
+
+    @behaviour SigilGuard.Audit.Anchor.Store
+
+    @impl SigilGuard.Audit.Anchor.Store
+    def put(_, _), do: {:ok, :bad_receipt}
+
+    @impl SigilGuard.Audit.Anchor.Store
+    def fetch(_, _), do: {:error, :not_found}
+  end
+
   describe "put/3, fetch/3, and verify/4" do
     test "persists, fetches, and verifies anchors through the store facade" do
       {checkpoint, anchor} = anchor_fixture()
@@ -97,6 +109,12 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
                LocalFile.put(anchor, path: path, require_worm: true)
 
       refute File.exists?(path)
+    end
+
+    test "rejects malformed receipts returned by store adapters" do
+      {_, anchor} = anchor_fixture()
+
+      assert {:error, :invalid_receipt} = Store.put(BadReceiptStore, anchor)
     end
   end
 

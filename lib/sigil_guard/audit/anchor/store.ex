@@ -104,12 +104,12 @@ defmodule SigilGuard.Audit.Anchor.Store do
 
   defp result_metadata(_), do: %{outcome: :unknown}
 
-  defp enforce_required_worm({:ok, receipt}, opts) do
+  defp enforce_required_worm({:ok, receipt}, opts) when is_map(receipt) do
     cond do
       Keyword.get(opts, :require_worm, false) != true ->
         {:ok, receipt}
 
-      is_map(receipt) and field(receipt, "worm") == true ->
+      field(receipt, "worm") == true ->
         {:ok, receipt}
 
       true ->
@@ -117,6 +117,7 @@ defmodule SigilGuard.Audit.Anchor.Store do
     end
   end
 
+  defp enforce_required_worm({:ok, _}, _), do: {:error, :invalid_receipt}
   defp enforce_required_worm(result, _), do: result
 
   defp digest_metadata(%{digest: digest}) when is_binary(digest), do: %{anchor_digest: digest}
