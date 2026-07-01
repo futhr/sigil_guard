@@ -339,6 +339,49 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert verified.record == anchor
     end
 
+    test "requires signed receipts during fetch and verify when requested", %{
+      bypass: bypass,
+      url: url
+    } do
+      {checkpoint, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+
+      signed_receipt =
+        url
+        |> receipt_fixture(digest)
+        |> sign_receipt()
+
+      Bypass.expect(bypass, "GET", "/audit/anchors/#{digest}", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{"record" => anchor}))
+      end)
+
+      opts = [
+        require_receipt_signature: true,
+        receipt_public_keys: %{@issuer => TestSigner.public_key_b64u()}
+      ]
+
+      assert {:ok, ^anchor} = Store.fetch(HTTP, signed_receipt, opts)
+
+      assert {:ok, verified} =
+               Store.verify(HTTP, signed_receipt, checkpoint, opts)
+
+      assert verified.digest == digest
+
+      unsigned_receipt = Map.delete(signed_receipt, "signature")
+
+      assert {:error, :unsigned_receipt} =
+               Store.fetch(HTTP, unsigned_receipt, opts)
+
+      tampered_receipt =
+        put_in(signed_receipt, ["uri"], "#{url}/audit/anchors/tampered##{digest}")
+
+      assert {:error, :digest_mismatch} =
+               Store.fetch(HTTP, tampered_receipt, opts)
+
+      assert {:error, :missing_receipt} =
+               Store.fetch(HTTP, digest, Keyword.put(opts, :url, url))
+    end
+
     test "fetches anchors when only the receipt URI fragment carries the digest", %{
       bypass: bypass,
       url: url

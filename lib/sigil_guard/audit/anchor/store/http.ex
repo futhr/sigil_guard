@@ -82,7 +82,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   @impl SigilGuard.Audit.Anchor.Store
   def fetch(receipt_or_digest, opts) when is_list(opts) do
-    with {:ok, digest} <- digest_from_ref(receipt_or_digest),
+    with :ok <- verify_fetch_receipt_reference(receipt_or_digest, opts),
+         {:ok, digest} <- digest_from_ref(receipt_or_digest),
          {:ok, url} <- fetch_url(receipt_or_digest, opts, digest),
          {:ok, headers} <- headers(opts),
          {:ok, body} <- get_anchor(url, headers, opts),
@@ -298,6 +299,19 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
       {:error, :worm_required}
     else
       :ok
+    end
+  end
+
+  defp verify_fetch_receipt_reference(ref, opts) do
+    cond do
+      Keyword.get(opts, :require_receipt_signature, false) != true ->
+        :ok
+
+      is_map(ref) ->
+        verify_required_receipt_signature(ref, opts)
+
+      true ->
+        {:error, :missing_receipt}
     end
   end
 
