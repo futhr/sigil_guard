@@ -67,6 +67,23 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:ok, ^anchor} = Store.fetch(LocalFile, atom_receipt)
     end
 
+    test "rejects receipts with malformed explicit digests before URI fallback" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+
+      assert {:ok, receipt} = Store.put(LocalFile, anchor, path: path)
+
+      assert {:error, :missing_digest} =
+               Store.fetch(LocalFile, Map.put(receipt, "anchor_digest", false))
+
+      atom_receipt =
+        receipt
+        |> Map.delete("anchor_digest")
+        |> Map.put(:anchor_digest, false)
+
+      assert {:error, :missing_digest} = Store.fetch(LocalFile, atom_receipt)
+    end
+
     test "rejects local receipts when WORM receipts are required" do
       {_, anchor} = anchor_fixture()
       path = tmp_path()

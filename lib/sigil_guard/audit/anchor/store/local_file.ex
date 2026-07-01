@@ -202,9 +202,18 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp digest_from_ref(%{} = receipt) do
-    case field(receipt, "anchor_digest") || digest_from_uri(field(receipt, "uri")) do
-      digest when is_binary(digest) -> digest_from_ref(digest)
-      _ -> {:error, :missing_digest}
+    case fetch_field(receipt, "anchor_digest") do
+      {:ok, digest} when is_binary(digest) ->
+        digest_from_ref(digest)
+
+      {:ok, _} ->
+        {:error, :missing_digest}
+
+      :error ->
+        case digest_from_uri(field(receipt, "uri")) do
+          digest when is_binary(digest) -> digest_from_ref(digest)
+          _ -> {:error, :missing_digest}
+        end
     end
   end
 
@@ -219,9 +228,16 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   defp digest_from_uri(_), do: nil
 
   defp field(map, key) when is_map(map) do
-    case Map.fetch(map, key) do
+    case fetch_field(map, key) do
       {:ok, value} -> value
-      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+      :error -> nil
+    end
+  end
+
+  defp fetch_field(map, key) when is_map(map) do
+    case Map.fetch(map, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(map, Map.fetch!(@atom_fields, key))
     end
   end
 

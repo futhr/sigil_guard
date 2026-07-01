@@ -398,6 +398,24 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
                Store.fetch(HTTP, %{"uri" => "#{url}/audit/anchors/#{digest}##{digest}"})
     end
 
+    test "rejects receipts with malformed explicit digests before URI fallback", %{
+      url: url
+    } do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      receipt = receipt_fixture(url, digest)
+
+      assert {:error, :missing_digest} =
+               Store.fetch(HTTP, Map.put(receipt, "anchor_digest", false))
+
+      atom_receipt =
+        receipt
+        |> Map.delete("anchor_digest")
+        |> Map.put(:anchor_digest, false)
+
+      assert {:error, :missing_digest} = Store.fetch(HTTP, atom_receipt)
+    end
+
     test "fetches anchors by digest through a custom endpoint", %{bypass: bypass, url: url} do
       {_, anchor} = anchor_fixture()
       digest = Anchor.digest(anchor)
