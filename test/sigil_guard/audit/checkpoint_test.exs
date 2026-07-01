@@ -115,6 +115,10 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert {:error, :invalid_prev_hmac} = Checkpoint.create([], prev_hmac: "")
       assert {:error, :invalid_prev_hmac} = Checkpoint.create(events, prev_hmac: 123)
       assert {:error, :invalid_prev_hmac} = Checkpoint.create(events, prev_hmac: "")
+      assert {:error, :invalid_generated_at} = Checkpoint.create(events, generated_at: false)
+      assert {:error, :invalid_generated_at} = Checkpoint.create(events, generated_at: "")
+      assert {:error, :invalid_metadata} = Checkpoint.create(events, metadata: "bad")
+      assert {:error, :invalid_anchor_metadata} = Checkpoint.create(events, anchor: "bad")
     end
   end
 

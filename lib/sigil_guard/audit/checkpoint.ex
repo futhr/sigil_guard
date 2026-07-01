@@ -76,15 +76,18 @@ defmodule SigilGuard.Audit.Checkpoint do
   def create(events, opts) when is_list(events) and is_list(opts) do
     prev_hmac = Keyword.get(opts, :prev_hmac)
 
-    with :ok <- validate_links(events, prev_hmac),
+    with {:ok, generated_at} <- generated_at(opts),
+         {:ok, metadata} <- metadata(opts),
+         {:ok, anchor} <- anchor(opts),
+         :ok <- validate_links(events, prev_hmac),
          {:ok, root} <- merkle_root(events) do
       {:ok,
        base_checkpoint(events, root, %{
          prev_hmac: prev_hmac,
          chain_id: Keyword.get(opts, :chain_id),
-         metadata: Keyword.get(opts, :metadata, %{}),
-         anchor: Keyword.get(opts, :anchor, %{}),
-         generated_at: Keyword.get_lazy(opts, :generated_at, &timestamp/0)
+         metadata: metadata,
+         anchor: anchor,
+         generated_at: generated_at
        })}
     end
   end
@@ -236,6 +239,27 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp require_integer(value, _) when is_integer(value) and value >= 0, do: :ok
   defp require_integer(_, reason), do: {:error, reason}
+
+  defp generated_at(opts) do
+    case Keyword.get_lazy(opts, :generated_at, &timestamp/0) do
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, :invalid_generated_at}
+    end
+  end
+
+  defp metadata(opts) do
+    case Keyword.get(opts, :metadata, %{}) do
+      metadata when is_map(metadata) -> {:ok, metadata}
+      _ -> {:error, :invalid_metadata}
+    end
+  end
+
+  defp anchor(opts) do
+    case Keyword.get(opts, :anchor, %{}) do
+      anchor when is_map(anchor) -> {:ok, anchor}
+      _ -> {:error, :invalid_anchor_metadata}
+    end
+  end
 
   defp checkpoint_prev_hmac(checkpoint) do
     case field(checkpoint, "prev_hmac") do
