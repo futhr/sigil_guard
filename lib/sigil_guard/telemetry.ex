@@ -51,6 +51,7 @@ defmodule SigilGuard.Telemetry do
       trust_level: atom, risk_level: atom, verdict: atom, action: atom,
       hit_count: integer, indicator_count: integer, indicator_ids: [atom],
       content_hash: String.t(), action_digest: String.t() | nil,
+      runtime_input_error: atom | nil,
       repo_policy_verdict: atom, repo_policy_rules: [String.t()],
       repo_unmatched_paths: [String.t()]}`
 
@@ -141,6 +142,7 @@ defmodule SigilGuard.Telemetry do
     repo_unmatched_paths: "sigil.repo_policy.unmatched_paths",
     release_status: "sigil.release.status",
     risk_level: "sigil.security.risk_level",
+    runtime_input_error: "sigil.security.runtime_input_error",
     scanner_validate: "sigil.scanner.validate",
     sink: "sigil.security.sink",
     source: "sigil.registry.source",
