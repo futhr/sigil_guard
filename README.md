@@ -414,7 +414,9 @@ anchor =
     anchor,
     url: "https://audit.example.internal",
     headers: [{"authorization", "Bearer <audit-token>"}],
-    require_worm: true
+    require_worm: true,
+    require_receipt_signature: true,
+    receipt_public_keys: %{"did:web:audit.example.internal" => "<ed25519-public-key>"}
   )
 
 {:ok, _verified_remote_anchor} =

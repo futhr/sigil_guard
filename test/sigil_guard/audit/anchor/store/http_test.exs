@@ -130,6 +130,155 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert {:error, :worm_required} = HTTP.put(anchor, url: url, require_worm: true)
     end
 
+    test "requires valid signed receipts when requested", %{bypass: bypass, url: url} do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+
+      receipt =
+        url
+        |> receipt_fixture(digest)
+        |> sign_receipt()
+
+      expect_receipt(bypass, receipt)
+
+      assert {:ok, verified_receipt} =
+               Store.put(HTTP, anchor,
+                 url: url,
+                 require_worm: true,
+                 require_receipt_signature: true,
+                 receipt_public_keys: %{@issuer => TestSigner.public_key_b64u()}
+               )
+
+      assert verified_receipt["anchor_digest"] == digest
+      assert verified_receipt["worm"]
+      assert get_in(verified_receipt, ["signature", "issuer"]) == @issuer
+      assert get_in(verified_receipt, ["signature", "algorithm"]) == "Ed25519"
+    end
+
+    test "rejects unsigned and untrusted receipts when signatures are required", %{
+      bypass: bypass,
+      url: url
+    } do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      receipt = receipt_fixture(url, digest)
+
+      expect_receipt(bypass, receipt)
+
+      assert {:error, :unsigned_receipt} =
+               Store.put(HTTP, anchor, url: url, require_receipt_signature: true)
+
+      expect_receipt(bypass, Map.put(receipt, "signature", "bad"))
+
+      assert {:error, :invalid_signature_metadata} =
+               Store.put(HTTP, anchor, url: url, require_receipt_signature: true)
+
+      expect_receipt(bypass, sign_receipt(receipt))
+
+      assert {:error, :unknown_issuer} =
+               Store.put(HTTP, anchor, url: url, require_receipt_signature: true)
+
+      expect_receipt(bypass, sign_receipt(receipt))
+
+      assert {:error, :invalid_public_keys} =
+               Store.put(HTTP, anchor,
+                 url: url,
+                 require_receipt_signature: true,
+                 receipt_public_keys: "bad"
+               )
+    end
+
+    test "rejects signed receipts with invalid provenance", %{bypass: bypass, url: url} do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      receipt = receipt_fixture(url, digest)
+
+      opts = [
+        url: url,
+        require_receipt_signature: true,
+        receipt_public_key_b64u: TestSigner.public_key_b64u()
+      ]
+
+      expect_receipt(bypass, sign_receipt(receipt, digest: String.duplicate("0", 64)))
+
+      assert {:error, :digest_mismatch} = Store.put(HTTP, anchor, opts)
+
+      bad_signature = Base.url_encode64(:binary.copy(<<0>>, 64), padding: false)
+      expect_receipt(bypass, sign_receipt(receipt, signature: bad_signature))
+
+      assert {:error, :invalid_signature} = Store.put(HTTP, anchor, opts)
+
+      expect_receipt(bypass, sign_receipt(receipt, algorithm: "Ed448"))
+
+      assert {:error, :unsupported_algorithm} = Store.put(HTTP, anchor, opts)
+
+      bad_public_key = Base.url_encode64(<<1, 2, 3>>, padding: false)
+      expect_receipt(bypass, sign_receipt(receipt))
+
+      assert {:error, :invalid_key} =
+               Store.put(HTTP, anchor,
+                 url: url,
+                 require_receipt_signature: true,
+                 receipt_public_key_b64u: bad_public_key
+               )
+
+      invalid_public_key = "not!base64"
+      expect_receipt(bypass, sign_receipt(receipt))
+
+      assert {:error, :invalid_base64} =
+               Store.put(HTTP, anchor,
+                 url: url,
+                 require_receipt_signature: true,
+                 receipt_public_key_b64u: invalid_public_key
+               )
+
+      standard_base64_wrong_key = Base.encode64(:binary.copy(<<255>>, 32))
+      expect_receipt(bypass, sign_receipt(receipt))
+
+      assert {:error, :invalid_signature} =
+               Store.put(HTTP, anchor,
+                 url: url,
+                 require_receipt_signature: true,
+                 receipt_public_key_b64u: standard_base64_wrong_key
+               )
+
+      short_signature = Base.url_encode64("short", padding: false)
+      expect_receipt(bypass, sign_receipt(receipt, signature: short_signature))
+
+      assert {:error, :invalid_signature} = Store.put(HTTP, anchor, opts)
+
+      invalid_signature = "not!base64"
+      expect_receipt(bypass, sign_receipt(receipt, signature: invalid_signature))
+
+      assert {:error, :invalid_base64} = Store.put(HTTP, anchor, opts)
+    end
+
+    test "rejects signed receipts with incomplete provenance", %{bypass: bypass, url: url} do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      receipt = receipt_fixture(url, digest)
+      opts = [url: url, require_receipt_signature: true]
+
+      missing_issuer = update_in(sign_receipt(receipt), ["signature"], &Map.delete(&1, "issuer"))
+      expect_receipt(bypass, missing_issuer)
+
+      assert {:error, :missing_issuer} = Store.put(HTTP, anchor, opts)
+
+      missing_algorithm =
+        update_in(sign_receipt(receipt), ["signature"], &Map.delete(&1, "algorithm"))
+
+      expect_receipt(bypass, missing_algorithm)
+
+      assert {:error, :missing_algorithm} = Store.put(HTTP, anchor, opts)
+
+      missing_signature =
+        update_in(sign_receipt(receipt), ["signature"], &Map.delete(&1, "signature"))
+
+      expect_receipt(bypass, missing_signature)
+
+      assert {:error, :missing_signature} = Store.put(HTTP, anchor, opts)
+    end
+
     test "supports explicit put URLs and map headers", %{bypass: bypass, url: url} do
       {_, anchor} = anchor_fixture()
       digest = Anchor.digest(anchor)
@@ -374,4 +523,88 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
 
     {signed_checkpoint, anchor}
   end
+
+  defp receipt_fixture(url, digest) do
+    %{
+      "kind" => "sigil_guard.audit.anchor.receipt",
+      "version" => 1,
+      "storage" => "worm_gateway",
+      "uri" => "#{url}/audit/anchors/#{digest}##{digest}",
+      "anchor_digest" => digest,
+      "stored_at" => "2026-01-01T00:00:06.000Z",
+      "worm" => true,
+      "metadata" => %{"region" => "eu", "replicas" => ["a", "b"]}
+    }
+  end
+
+  defp expect_receipt(bypass, receipt) do
+    Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+      Plug.Conn.resp(conn, 201, Jason.encode!(%{"receipt" => receipt}))
+    end)
+  end
+
+  defp sign_receipt(receipt, opts \\ []) do
+    unsigned_receipt = Map.delete(receipt, "signature")
+    signature_bytes = canonical_bytes(unsigned_receipt)
+
+    signature = %{
+      "issuer" => Keyword.get(opts, :issuer, @issuer),
+      "algorithm" => Keyword.get(opts, :algorithm, "Ed25519"),
+      "digest" => Keyword.get_lazy(opts, :digest, fn -> digest(unsigned_receipt) end),
+      "signature" =>
+        Keyword.get_lazy(opts, :signature, fn ->
+          signature_bytes
+          |> TestSigner.sign()
+          |> Base.url_encode64(padding: false)
+        end)
+    }
+
+    Map.put(unsigned_receipt, "signature", signature)
+  end
+
+  defp digest(receipt) do
+    receipt
+    |> canonical_bytes()
+    |> then(&:crypto.hash(:sha256, &1))
+    |> Base.encode16(case: :lower)
+  end
+
+  defp canonical_bytes(value) do
+    value
+    |> canonical_iodata()
+    |> IO.iodata_to_binary()
+  end
+
+  defp canonical_iodata(value) when is_map(value) do
+    parts =
+      value
+      |> Enum.map(fn {key, item} -> {canonical_key(key), item} end)
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.map(fn {key, item} -> [Jason.encode!(key), ?:, canonical_iodata(item)] end)
+      |> Enum.intersperse(",")
+
+    [?{, parts, ?}]
+  end
+
+  defp canonical_iodata(value) when is_list(value) do
+    parts =
+      value
+      |> Enum.map(&canonical_iodata/1)
+      |> Enum.intersperse(",")
+
+    [?[, parts, ?]]
+  end
+
+  defp canonical_iodata(value)
+       when is_atom(value) and not is_boolean(value) and not is_nil(value) do
+    value
+    |> Atom.to_string()
+    |> Jason.encode!()
+  end
+
+  defp canonical_iodata(value), do: Jason.encode!(value)
+
+  defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp canonical_key(key) when is_binary(key), do: key
+  defp canonical_key(key), do: to_string(key)
 end
