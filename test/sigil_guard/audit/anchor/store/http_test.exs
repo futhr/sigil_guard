@@ -94,6 +94,55 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert receipt["metadata"] == %{}
     end
 
+    test "rejects malformed remote receipt fields instead of defaulting them", %{
+      bypass: bypass,
+      url: url
+    } do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+
+      invalid_receipts = [
+        %{"receipt" => false},
+        %{"anchor_digest" => false},
+        %{"anchor_digest" => digest, "kind" => false},
+        %{"anchor_digest" => digest, "kind" => "wrong"},
+        %{"anchor_digest" => digest, "version" => false},
+        %{"anchor_digest" => digest, "storage" => false},
+        %{"anchor_digest" => digest, "stored_at" => false},
+        %{"anchor_digest" => digest, "worm" => "true"},
+        %{"anchor_digest" => digest, "metadata" => false}
+      ]
+
+      Enum.each(invalid_receipts, fn receipt ->
+        Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+          Plug.Conn.resp(conn, 201, Jason.encode!(receipt))
+        end)
+
+        assert {:error, :invalid_receipt} =
+                 Store.put(HTTP, anchor,
+                   url: url,
+                   metadata: %{"request" => "metadata"}
+                 )
+      end)
+    end
+
+    test "does not let response Location mask malformed receipt URIs", %{
+      bypass: bypass,
+      url: url
+    } do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+      location = "#{url}/audit/anchors/#{digest}##{digest}"
+
+      Bypass.expect_once(bypass, "POST", "/audit/anchors", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("location", location)
+        |> Plug.Conn.resp(201, Jason.encode!(%{"anchor_digest" => digest, "uri" => false}))
+      end)
+
+      assert {:error, :invalid_receipt} = Store.put(HTTP, anchor, url: url)
+    end
+
     test "requires explicit WORM receipts when requested", %{bypass: bypass, url: url} do
       {_, anchor} = anchor_fixture()
       digest = Anchor.digest(anchor)
@@ -128,7 +177,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
         )
       end)
 
-      assert {:error, :worm_required} = HTTP.put(anchor, url: url, require_worm: true)
+      assert {:error, :invalid_receipt} = HTTP.put(anchor, url: url, require_worm: true)
     end
 
     test "requires valid signed receipts when requested", %{bypass: bypass, url: url} do

@@ -19,8 +19,9 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   A successful `200`, `201`, or `202` response may return either a receipt
   object or `%{"receipt" => receipt}`. Missing receipt fields are filled from
-  the request and response location. Pass `require_worm: true` to reject
-  receipts unless the remote service explicitly returns `"worm": true`. Pass
+  the request and response location, while explicitly malformed receipt fields
+  are rejected. Pass `require_worm: true` to reject receipts unless the remote
+  service explicitly returns `"worm": true`. Pass
   `require_receipt_signature: true` with `receipt_public_keys` or
   `receipt_public_key_b64u` to require Ed25519 provenance over canonical
   receipt bytes.
@@ -254,21 +255,79 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   end
 
   defp normalize_receipt(body, record, request_url, metadata, response_headers) do
-    receipt = receipt_body(body)
     digest = Anchor.digest(record)
 
-    with :ok <- verify_receipt_digest(receipt, digest) do
+    with {:ok, receipt} <- receipt_body(body),
+         :ok <- verify_receipt_digest(receipt, digest),
+         :ok <- validate_receipt_fields(receipt) do
       {:ok, build_receipt(receipt, digest, request_url, metadata, response_headers)}
     end
   end
 
   defp verify_receipt_digest(receipt, digest) do
-    case field(receipt, "anchor_digest") do
-      received_digest when is_binary(received_digest) and received_digest != digest ->
+    case fetch_field(receipt, "anchor_digest") do
+      {:ok, ^digest} ->
+        :ok
+
+      {:ok, received_digest} when is_binary(received_digest) ->
         {:error, :digest_mismatch}
 
-      _ ->
+      {:ok, _} ->
+        {:error, :invalid_receipt}
+
+      :error ->
         :ok
+    end
+  end
+
+  defp validate_receipt_fields(receipt) do
+    with :ok <- validate_receipt_kind(receipt),
+         :ok <- validate_receipt_version(receipt),
+         :ok <- validate_optional_binary(receipt, "storage"),
+         :ok <- validate_optional_binary(receipt, "uri"),
+         :ok <- validate_optional_binary(receipt, "stored_at"),
+         :ok <- validate_optional_boolean(receipt, "worm") do
+      validate_optional_metadata(receipt)
+    end
+  end
+
+  defp validate_receipt_kind(receipt) do
+    case fetch_field(receipt, "kind") do
+      {:ok, @kind} -> :ok
+      {:ok, _} -> {:error, :invalid_receipt}
+      :error -> :ok
+    end
+  end
+
+  defp validate_receipt_version(receipt) do
+    case fetch_field(receipt, "version") do
+      {:ok, @version} -> :ok
+      {:ok, _} -> {:error, :invalid_receipt}
+      :error -> :ok
+    end
+  end
+
+  defp validate_optional_binary(receipt, key) do
+    case fetch_field(receipt, key) do
+      {:ok, value} when is_binary(value) and value != "" -> :ok
+      {:ok, _} -> {:error, :invalid_receipt}
+      :error -> :ok
+    end
+  end
+
+  defp validate_optional_boolean(receipt, key) do
+    case fetch_field(receipt, key) do
+      {:ok, value} when is_boolean(value) -> :ok
+      {:ok, _} -> {:error, :invalid_receipt}
+      :error -> :ok
+    end
+  end
+
+  defp validate_optional_metadata(receipt) do
+    case fetch_field(receipt, "metadata") do
+      {:ok, metadata} when is_map(metadata) -> :ok
+      {:ok, _} -> {:error, :invalid_receipt}
+      :error -> :ok
     end
   end
 
@@ -331,8 +390,9 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
     end
   end
 
-  defp receipt_body(%{"receipt" => receipt}) when is_map(receipt), do: receipt
-  defp receipt_body(body) when is_map(body), do: body
+  defp receipt_body(%{"receipt" => receipt}) when is_map(receipt), do: {:ok, receipt}
+  defp receipt_body(%{"receipt" => _}), do: {:error, :invalid_receipt}
+  defp receipt_body(body) when is_map(body), do: {:ok, body}
 
   defp normalize_record(%{"record" => record}) when is_map(record), do: normalize_record(record)
   defp normalize_record(%{"anchor" => record}) when is_map(record), do: normalize_record(record)
