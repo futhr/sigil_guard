@@ -469,8 +469,25 @@ defmodule SigilGuard.RepoPolicyTest do
         })
 
       assert decision.verdict == :block
+      assert decision.reason =~ "invalid_agent"
       assert decision.agent == nil
-      assert decision.action == "modify"
+      assert decision.action == "invalid"
+      assert decision.changed_paths == []
+    end
+
+    test "does not let malformed action fields default to modify" do
+      policy = compile!(default: :allow, rules: [])
+
+      decision =
+        RepoPolicy.evaluate(policy, %{
+          "action" => false,
+          :action => "modify",
+          changed_paths: ["README.md"]
+        })
+
+      assert decision.verdict == :block
+      assert decision.reason =~ "invalid_action"
+      assert decision.action == "invalid"
       assert decision.changed_paths == []
     end
 

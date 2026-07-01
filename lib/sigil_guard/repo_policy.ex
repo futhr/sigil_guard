@@ -204,12 +204,13 @@ defmodule SigilGuard.RepoPolicy do
   @spec evaluate(t(), map() | keyword()) :: Decision.t()
   def evaluate(%__MODULE__{} = policy, context) do
     context = context_map(context)
-    agent = first_string(context, ~w(agent identity actor))
-    action = first_string(context, ~w(action)) || "modify"
 
-    case normalize_changed_paths(changed_paths(context)) do
-      {:ok, paths} -> evaluate_paths(policy, agent, action, paths)
-      {:error, reason} -> invalid_path_decision(agent, action, reason)
+    case context_string(context, ~w(agent identity actor), :invalid_agent) do
+      {:ok, agent} ->
+        evaluate_with_agent(policy, context, agent)
+
+      {:error, reason} ->
+        invalid_context_decision(nil, "invalid", reason)
     end
   end
 
@@ -692,20 +693,48 @@ defmodule SigilGuard.RepoPolicy do
   defp context_map(context) when is_map(context), do: context
   defp context_map(_), do: %{}
 
-  defp first_string(map, keys) do
-    value = first_present(keys, map)
+  defp evaluate_with_agent(policy, context, agent) do
+    case context_string(context, ~w(action), :invalid_action) do
+      {:ok, action} ->
+        action = action || "modify"
 
-    case value do
-      nil -> nil
-      value when is_atom(value) -> Atom.to_string(value)
-      value when is_binary(value) -> value
-      _ -> nil
+        case normalize_changed_paths(changed_paths(context)) do
+          {:ok, paths} -> evaluate_paths(policy, agent, action, paths)
+          {:error, reason} -> invalid_path_decision(agent, action, reason)
+        end
+
+      {:error, reason} ->
+        invalid_context_decision(agent, "invalid", reason)
     end
   end
 
-  defp first_present(keys, map) when is_list(keys) and is_map(map) do
-    Enum.find_value(keys, fn key -> field(map, key) end)
+  defp context_string(map, keys, invalid_reason) do
+    result =
+      Enum.reduce_while(keys, :missing, fn key, :missing ->
+        case fetch_field(map, key) do
+          {:ok, value} ->
+            context_string_value(value, invalid_reason)
+
+          :error ->
+            {:cont, :missing}
+        end
+      end)
+
+    case result do
+      :missing -> {:ok, nil}
+      result -> result
+    end
   end
+
+  defp context_string_value(nil, _), do: {:cont, :missing}
+
+  defp context_string_value(value, _) when is_binary(value) and value != "",
+    do: {:halt, {:ok, value}}
+
+  defp context_string_value(value, _) when is_atom(value) and not is_boolean(value),
+    do: {:halt, {:ok, Atom.to_string(value)}}
+
+  defp context_string_value(_, invalid_reason), do: {:halt, {:error, invalid_reason}}
 
   defp field(map, key) when is_map(map) do
     case fetch_field(map, key) do
@@ -748,6 +777,18 @@ defmodule SigilGuard.RepoPolicy do
     build_decision(%{
       verdict: :block,
       reason: "Repo policy blocked invalid changed path: #{reason}",
+      agent: agent,
+      action: action,
+      changed_paths: [],
+      matched_rule_ids: [],
+      unmatched_paths: []
+    })
+  end
+
+  defp invalid_context_decision(agent, action, reason) do
+    build_decision(%{
+      verdict: :block,
+      reason: "Repo policy blocked invalid context: #{reason}",
       agent: agent,
       action: action,
       changed_paths: [],
