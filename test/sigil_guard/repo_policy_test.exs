@@ -79,6 +79,16 @@ defmodule SigilGuard.RepoPolicyTest do
       assert {:error, {:invalid_matchers, 0}} =
                RepoPolicy.compile(%{rules: [%{decision: :allow, agents: [123], paths: ["*"]}]})
 
+      assert {:error, {:invalid_matchers, 0}} =
+               RepoPolicy.compile(%{
+                 rules: [%{decision: :allow, agents: ["runner", 123], paths: ["*"]}]
+               })
+
+      assert {:error, {:invalid_matchers, 0}} =
+               RepoPolicy.compile(%{
+                 rules: [%{decision: :allow, actions: ["modify", " "], paths: ["*"]}]
+               })
+
       assert {:error, {:missing_paths, 0}} =
                RepoPolicy.compile(%{rules: [%{decision: :allow, paths: []}]})
 

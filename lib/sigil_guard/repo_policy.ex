@@ -498,20 +498,44 @@ defmodule SigilGuard.RepoPolicy do
     do: normalize_matchers([value])
 
   defp normalize_matchers(values) when is_list(values) do
-    normalized =
-      values
-      |> Enum.map(&to_matcher/1)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
+    result =
+      Enum.reduce_while(values, {:ok, []}, fn value, {:ok, acc} ->
+        case normalize_matcher(value) do
+          {:ok, matcher} -> {:cont, {:ok, [matcher | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
 
-    if normalized == [], do: {:error, :invalid_matchers}, else: {:ok, normalized}
+    case result do
+      {:ok, []} ->
+        {:error, :invalid_matchers}
+
+      {:ok, normalized} ->
+        normalized =
+          normalized
+          |> Enum.reverse()
+          |> Enum.uniq()
+
+        {:ok, normalized}
+
+      error ->
+        error
+    end
   end
 
   defp normalize_matchers(_), do: {:error, :invalid_matchers}
 
-  defp to_matcher(value) when is_atom(value) and not is_boolean(value), do: Atom.to_string(value)
-  defp to_matcher(value) when is_binary(value), do: String.trim(value)
-  defp to_matcher(_), do: nil
+  defp normalize_matcher(value) when is_atom(value) and not is_boolean(value),
+    do: {:ok, Atom.to_string(value)}
+
+  defp normalize_matcher(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> {:error, :invalid_matchers}
+      matcher -> {:ok, matcher}
+    end
+  end
+
+  defp normalize_matcher(_), do: {:error, :invalid_matchers}
 
   defp normalize_patterns(value) when is_binary(value), do: normalize_patterns([value])
 
