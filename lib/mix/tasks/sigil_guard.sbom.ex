@@ -177,11 +177,19 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     |> Enum.sort()
   end
 
-  defp runtime_root_dependency({name, _}), do: [name]
+  defp runtime_root_dependency({name, opts}) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      if runtime_dependency?(opts), do: [name], else: []
+    else
+      [name]
+    end
+  end
 
   defp runtime_root_dependency({name, _, opts}) when is_list(opts) do
     if runtime_dependency?(opts), do: [name], else: []
   end
+
+  defp runtime_root_dependency({name, _}), do: [name]
 
   defp runtime_root_dependency(_), do: []
 

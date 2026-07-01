@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.SigilGuard.SbomTest do
   @moduledoc false
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
@@ -9,6 +9,27 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
   @created_at "2026-06-30T12:00:00Z"
   @git_revision String.duplicate("a", 40)
+
+  defmodule TwoTupleKeywordProject do
+    @moduledoc false
+
+    @spec project() :: keyword()
+    def project do
+      [
+        app: :sigil_guard_sbom_fixture,
+        version: "1.0.0",
+        source_url: "https://example.invalid/sigil_guard_sbom_fixture",
+        package: [
+          name: "sigil_guard_sbom_fixture",
+          licenses: ["MIT"]
+        ],
+        deps: [
+          {:jason, "~> 1.4"},
+          {:credo, only: [:dev, :test], runtime: false}
+        ]
+      ]
+    end
+  end
 
   describe "generate/1" do
     test "builds an SPDX 2.3 document from the project and lockfile" do
@@ -53,6 +74,17 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
                  relationship["relationshipType"] == "DEPENDS_ON" and
                  relationship["relatedSpdxElement"] == "SPDXRef-Package-mint"
              end)
+    end
+
+    test "excludes non-runtime two-tuple keyword dependencies" do
+      with_project(TwoTupleKeywordProject, fn ->
+        sbom = Sbom.generate(created_at: @created_at)
+        package_names = MapSet.new(sbom["packages"], & &1["name"])
+
+        assert MapSet.member?(package_names, "jason")
+        refute MapSet.member?(package_names, "credo")
+        assert :ok = Sbom.verify_document(sbom)
+      end)
     end
   end
 
@@ -270,6 +302,16 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
         package -> package
       end)
     end)
+  end
+
+  defp with_project(project, fun) do
+    Mix.Project.push(project)
+
+    try do
+      fun.()
+    after
+      Mix.Project.pop()
+    end
   end
 
   defp tmp_path(label) do
