@@ -56,12 +56,64 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
     end
   end
 
+  describe "verify_document/1" do
+    test "accepts the generated SPDX document shape for the current project" do
+      sbom = Sbom.generate(created_at: @created_at, git_revision: @git_revision)
+
+      assert :ok = Sbom.verify_document(sbom)
+    end
+
+    test "rejects invalid SPDX metadata" do
+      sbom =
+        [created_at: @created_at, git_revision: @git_revision]
+        |> Sbom.generate()
+        |> Map.put("spdxVersion", "SPDX-2.2")
+
+      assert {:error, :invalid_spdx_version} = Sbom.verify_document(sbom)
+    end
+
+    test "rejects documents without the expected root package" do
+      sbom =
+        [created_at: @created_at, git_revision: @git_revision]
+        |> Sbom.generate()
+        |> Map.put("packages", [])
+
+      assert {:error, :missing_root_package} = Sbom.verify_document(sbom)
+    end
+
+    test "rejects documents without the root DESCRIBES relationship" do
+      sbom =
+        [created_at: @created_at, git_revision: @git_revision]
+        |> Sbom.generate()
+        |> Map.put("relationships", [])
+
+      assert {:error, :missing_describes_relationship} = Sbom.verify_document(sbom)
+    end
+  end
+
+  describe "verify_file/1" do
+    test "accepts valid JSON SPDX files" do
+      output = tmp_path("valid")
+      sbom = Sbom.generate(created_at: @created_at, git_revision: @git_revision)
+
+      File.write!(output, Jason.encode!(sbom))
+
+      assert :ok = Sbom.verify_file(output)
+    end
+
+    test "rejects invalid JSON and missing files" do
+      output = tmp_path("invalid")
+
+      File.write!(output, "{")
+
+      assert {:error, :invalid_json} = Sbom.verify_file(output)
+      assert {:error, :enoent} = Sbom.verify_file(tmp_path("missing"))
+    end
+  end
+
   describe "run/1" do
     test "writes pretty JSON to the selected output path" do
-      output =
-        Path.join(System.tmp_dir!(), "sigil_guard_sbom_test_#{System.unique_integer()}.json")
-
-      on_exit(fn -> File.rm(output) end)
+      output = tmp_path("write")
 
       capture_io(fn ->
         Sbom.run(["--output", output])
@@ -76,6 +128,18 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
       assert decoded["spdxVersion"] == "SPDX-2.3"
     end
+
+    test "verifies an existing SBOM file" do
+      output = tmp_path("verify")
+
+      capture_io(fn ->
+        Sbom.run(["--output", output])
+      end)
+
+      assert capture_io(fn ->
+               Sbom.run(["--verify", output])
+             end) =~ "Verified SBOM"
+    end
   end
 
   defp direct_dependency_ids(sbom) do
@@ -86,5 +150,14 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
     end)
     |> Enum.map(& &1["relatedSpdxElement"])
     |> MapSet.new()
+  end
+
+  defp tmp_path(label) do
+    path =
+      System.tmp_dir!()
+      |> Path.join("sigil_guard_sbom_test_#{label}_#{System.unique_integer()}.json")
+
+    on_exit(fn -> File.rm(path) end)
+    path
   end
 end

@@ -61,6 +61,7 @@ jobs:
           mkdir -p dist
           mix hex.build --output "dist/sigil_guard-${GITHUB_REF_NAME}.tar"
           mix sigil_guard.sbom --output "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json"
+          mix sigil_guard.sbom --verify "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json"
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

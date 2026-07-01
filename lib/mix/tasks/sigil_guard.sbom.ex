@@ -2,18 +2,19 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   @shortdoc "Generate an SPDX JSON SBOM"
 
   @moduledoc """
-  Generate an SPDX 2.3 JSON SBOM from the Mix project and lockfile.
+  Generate or verify an SPDX 2.3 JSON SBOM from the Mix project and lockfile.
 
   The generated document is intentionally dependency-light: it uses Mix project
   metadata, production dependencies, `mix.lock`, and Jason to produce a
   package-level SBOM suitable for release artifact attestation.
 
       mix sigil_guard.sbom --output dist/sigil_guard.spdx.json
+      mix sigil_guard.sbom --verify dist/sigil_guard.spdx.json
   """
 
   use Mix.Task
 
-  @switches [output: :string]
+  @switches [output: :string, verify: :string]
   @default_output "dist/sigil_guard.spdx.json"
   @spdx_version "SPDX-2.3"
   @data_license "CC0-1.0"
@@ -31,6 +32,49 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
       Mix.raise("invalid options: #{inspect(invalid)}")
     end
 
+    case Keyword.fetch(opts, :verify) do
+      {:ok, path} -> verify_file!(path)
+      :error -> write_generated_sbom(opts)
+    end
+  end
+
+  @doc """
+  Verify an SPDX document stored on disk against the current Mix project.
+  """
+  @spec verify_file(String.t()) :: :ok | {:error, term()}
+  def verify_file(path) when is_binary(path) do
+    with {:ok, body} <- File.read(path),
+         {:ok, document} <- Jason.decode(body),
+         :ok <- verify_document(document) do
+      :ok
+    else
+      {:error, %Jason.DecodeError{}} -> {:error, :invalid_json}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def verify_file(_), do: {:error, :invalid_path}
+
+  @doc """
+  Verify an SPDX document map against the current Mix project.
+  """
+  @spec verify_document(spdx_document()) :: :ok | {:error, term()}
+  def verify_document(document) when is_map(document) do
+    project = Mix.Project.config()
+    package = root_package(project)
+
+    with :ok <- require_equal(document["spdxVersion"], @spdx_version, :invalid_spdx_version),
+         :ok <- require_equal(document["dataLicense"], @data_license, :invalid_data_license),
+         :ok <- require_equal(document["SPDXID"], "SPDXRef-DOCUMENT", :invalid_document_id),
+         :ok <- require_creation_info(document["creationInfo"]),
+         :ok <- require_root_package(document["packages"], package) do
+      require_describes_relationship(document["relationships"], package)
+    end
+  end
+
+  def verify_document(_), do: {:error, :invalid_document}
+
+  defp write_generated_sbom(opts) do
     output = Keyword.get(opts, :output, @default_output)
     sbom = generate()
 
@@ -40,6 +84,16 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
     File.write!(output, Jason.encode_to_iodata!(sbom, pretty: true))
     Mix.shell().info("Generated SBOM at #{output}")
+  end
+
+  defp verify_file!(path) do
+    case verify_file(path) do
+      :ok ->
+        Mix.shell().info("Verified SBOM at #{path}")
+
+      {:error, reason} ->
+        Mix.raise("invalid SBOM: #{inspect(reason)}")
+    end
   end
 
   @doc """
@@ -244,6 +298,57 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
     describes ++ dependency_relationships
   end
+
+  defp require_creation_info(%{"created" => created, "creators" => creators})
+       when is_binary(created) and is_list(creators) do
+    if "Tool: mix sigil_guard.sbom" in creators do
+      :ok
+    else
+      {:error, :missing_creator}
+    end
+  end
+
+  defp require_creation_info(_), do: {:error, :invalid_creation_info}
+
+  defp require_root_package(packages, package) when is_list(packages) do
+    if Enum.any?(packages, &root_package?(&1, package)) do
+      :ok
+    else
+      {:error, :missing_root_package}
+    end
+  end
+
+  defp require_root_package(_, _), do: {:error, :invalid_packages}
+
+  defp root_package?(candidate, package) when is_map(candidate) do
+    candidate["name"] == package["name"] and
+      candidate["SPDXID"] == package["SPDXID"] and
+      candidate["versionInfo"] == package["versionInfo"] and
+      candidate["externalRefs"] == package["externalRefs"]
+  end
+
+  defp root_package?(_, _), do: false
+
+  defp require_describes_relationship(relationships, package) when is_list(relationships) do
+    if Enum.any?(relationships, &describes_root?(&1, package)) do
+      :ok
+    else
+      {:error, :missing_describes_relationship}
+    end
+  end
+
+  defp require_describes_relationship(_, _), do: {:error, :invalid_relationships}
+
+  defp describes_root?(relationship, package) when is_map(relationship) do
+    relationship["spdxElementId"] == "SPDXRef-DOCUMENT" and
+      relationship["relationshipType"] == "DESCRIBES" and
+      relationship["relatedSpdxElement"] == package["SPDXID"]
+  end
+
+  defp describes_root?(_, _), do: false
+
+  defp require_equal(actual, expected, _) when actual == expected, do: :ok
+  defp require_equal(_, _, reason), do: {:error, reason}
 
   defp lock_entries do
     Mix.Dep.Lock.read()

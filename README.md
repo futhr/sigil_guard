@@ -585,6 +585,8 @@ mix lint             # Format + Credo + Dialyzer
 mix check            # All quality checks
 mix docs             # Generate documentation
 mix bench            # Run benchmarks
+mix sigil_guard.sbom --output dist/sigil_guard.spdx.json
+mix sigil_guard.sbom --verify dist/sigil_guard.spdx.json
 ```
 
 Envelope compatibility is covered by checked-in Rust-generated golden vectors
