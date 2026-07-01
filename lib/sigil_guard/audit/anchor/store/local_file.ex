@@ -90,8 +90,12 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
 
   defp path_from_uri("file://" <> _ = uri) do
     case URI.parse(uri) do
-      %URI{scheme: "file", path: path} when is_binary(path) and path != "" ->
+      %URI{scheme: "file", host: host, path: path}
+      when host in [nil, ""] and is_binary(path) and path != "" ->
         {:ok, URI.decode(path)}
+
+      %URI{scheme: "file", host: host} when is_binary(host) and host != "" ->
+        {:error, :remote_file_uri}
 
       _ ->
         {:error, :missing_path}

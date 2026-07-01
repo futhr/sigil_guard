@@ -173,6 +173,13 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       }
 
       assert {:error, :missing_digest} = Store.fetch(LocalFile, invalid_receipt)
+
+      remote_file_receipt = %{
+        "anchor_digest" => Anchor.digest(anchor),
+        "uri" => "file://example.test/tmp/anchors.jsonl##{Anchor.digest(anchor)}"
+      }
+
+      assert {:error, :remote_file_uri} = Store.fetch(LocalFile, remote_file_receipt)
     end
 
     test "reports missing and corrupt logs" do
