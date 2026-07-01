@@ -6,6 +6,16 @@ defmodule SigilGuard.VaultTest do
   alias SigilGuard.Vault.InMemory
 
   setup do
+    sentinel = make_ref()
+    previous_master_key = Application.get_env(:sigil_guard, :vault_master_key, sentinel)
+
+    on_exit(fn ->
+      case previous_master_key do
+        ^sentinel -> Application.delete_env(:sigil_guard, :vault_master_key)
+        value -> Application.put_env(:sigil_guard, :vault_master_key, value)
+      end
+    end)
+
     master_key = :crypto.strong_rand_bytes(32)
     start_supervised!({InMemory, master_key: master_key})
     %{master_key: master_key}
@@ -157,6 +167,38 @@ defmodule SigilGuard.VaultTest do
 
       Application.delete_env(:sigil_guard, :vault_master_key)
     end
+
+    test "rejects malformed direct master keys cleanly" do
+      stop_supervised!(InMemory)
+
+      for {key, reason} <- [
+            {"short", {:invalid_master_key, :invalid_length}},
+            {:not_binary, {:invalid_master_key, :invalid_type}}
+          ] do
+        assert_start_link_error(reason, master_key: key)
+      end
+    end
+
+    test "rejects malformed configured master keys cleanly" do
+      stop_supervised!(InMemory)
+
+      for {configured, reason} <- [
+            {"not base64!", {:invalid_master_key, :invalid_base64}},
+            {Base.encode64("short"), {:invalid_master_key, :invalid_length}},
+            {:not_binary, {:invalid_master_key, :invalid_type}}
+          ] do
+        Application.put_env(:sigil_guard, :vault_master_key, configured)
+
+        assert_start_link_error(reason)
+      end
+    end
+
+    test "rejects invalid start options cleanly" do
+      stop_supervised!(InMemory)
+
+      assert_start_link_error(:invalid_options, :bad)
+      assert_start_link_error(:invalid_options, [:bad])
+    end
   end
 
   describe "format_status/1" do
@@ -212,6 +254,26 @@ defmodule SigilGuard.VaultTest do
 
       assert SigilGuard.Vault.exists?(vault_id, InMemory)
       refute SigilGuard.Vault.exists?("vault_nope", InMemory)
+    end
+  end
+
+  defp assert_start_link_error(reason, opts \\ []) do
+    trap_exit? = Process.flag(:trap_exit, true)
+
+    try do
+      assert {:error, ^reason} = InMemory.start_link(opts)
+      drain_start_link_exit(reason)
+      refute Process.whereis(InMemory)
+    after
+      Process.flag(:trap_exit, trap_exit?)
+    end
+  end
+
+  defp drain_start_link_exit(reason) do
+    receive do
+      {:EXIT, _, ^reason} -> :ok
+    after
+      100 -> :ok
     end
   end
 end

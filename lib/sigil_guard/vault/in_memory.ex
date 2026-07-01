@@ -45,6 +45,7 @@ defmodule SigilGuard.Vault.InMemory do
 
   @table :sigil_guard_vault
   @aad "sigil_guard_vault_v1"
+  @master_key_bytes 32
 
   # -- Client API --
 
@@ -85,19 +86,15 @@ defmodule SigilGuard.Vault.InMemory do
 
   @impl GenServer
   def init(opts) do
-    table = :ets.new(@table, [:named_table, :set, :private])
-
-    master_key =
-      Keyword.get_lazy(opts, :master_key, fn ->
-        case Application.get_env(:sigil_guard, :vault_master_key) do
-          nil -> :crypto.strong_rand_bytes(32)
-          base64_key -> Base.decode64!(base64_key)
-        end
-      end)
-
     Process.flag(:sensitive, true)
 
-    {:ok, %{table: table, master_key: master_key}}
+    with :ok <- validate_opts(opts),
+         {:ok, master_key} <- master_key(opts) do
+      table = :ets.new(@table, [:named_table, :set, :private])
+      {:ok, %{table: table, master_key: master_key}}
+    else
+      {:error, reason} -> {:stop, reason}
+    end
   end
 
   @impl GenServer
@@ -193,5 +190,45 @@ defmodule SigilGuard.Vault.InMemory do
 
   defp generate_vault_id do
     "vault_" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
+  end
+
+  defp validate_opts(opts) when is_list(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+  end
+
+  defp validate_opts(_), do: {:error, :invalid_options}
+
+  defp master_key(opts) do
+    case Keyword.fetch(opts, :master_key) do
+      {:ok, key} -> validate_master_key(key)
+      :error -> configured_master_key()
+    end
+  end
+
+  defp configured_master_key do
+    case Application.get_env(:sigil_guard, :vault_master_key) do
+      nil -> {:ok, :crypto.strong_rand_bytes(@master_key_bytes)}
+      key when is_binary(key) -> decode_configured_master_key(key)
+      _ -> {:error, {:invalid_master_key, :invalid_type}}
+    end
+  end
+
+  defp decode_configured_master_key(key) do
+    case Base.decode64(key) do
+      {:ok, decoded} -> validate_master_key(decoded)
+      :error -> {:error, {:invalid_master_key, :invalid_base64}}
+    end
+  end
+
+  defp validate_master_key(key) when is_binary(key) and byte_size(key) == @master_key_bytes do
+    {:ok, key}
+  end
+
+  defp validate_master_key(key) when is_binary(key) do
+    {:error, {:invalid_master_key, :invalid_length}}
+  end
+
+  defp validate_master_key(_) do
+    {:error, {:invalid_master_key, :invalid_type}}
   end
 end
