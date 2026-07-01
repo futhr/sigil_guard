@@ -58,7 +58,12 @@ defmodule SigilGuard.Audit.Anchor.Store do
 
   def fetch(store, receipt_or_digest, opts) when is_atom(store) and is_list(opts) do
     span(:fetch, store, fn ->
-      if store?(store), do: store.fetch(receipt_or_digest, opts), else: {:error, :invalid_store}
+      result =
+        if store?(store),
+          do: store.fetch(receipt_or_digest, opts),
+          else: {:error, :invalid_store}
+
+      enforce_anchor_result(result)
     end)
   end
 
@@ -119,6 +124,10 @@ defmodule SigilGuard.Audit.Anchor.Store do
 
   defp enforce_required_worm({:ok, _}, _), do: {:error, :invalid_receipt}
   defp enforce_required_worm(result, _), do: result
+
+  defp enforce_anchor_result({:ok, record}) when is_map(record), do: {:ok, record}
+  defp enforce_anchor_result({:ok, _}), do: {:error, :invalid_anchor}
+  defp enforce_anchor_result(result), do: result
 
   defp digest_metadata(%{digest: digest}) when is_binary(digest), do: %{anchor_digest: digest}
 

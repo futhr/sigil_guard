@@ -24,7 +24,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
     def put(_, _), do: {:ok, :bad_receipt}
 
     @impl SigilGuard.Audit.Anchor.Store
-    def fetch(_, _), do: {:error, :not_found}
+    def fetch(_, _), do: {:ok, :bad_record}
   end
 
   describe "put/3, fetch/3, and verify/4" do
@@ -115,6 +115,13 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       {_, anchor} = anchor_fixture()
 
       assert {:error, :invalid_receipt} = Store.put(BadReceiptStore, anchor)
+    end
+
+    test "rejects malformed records returned by store adapters" do
+      {checkpoint, _} = anchor_fixture()
+
+      assert {:error, :invalid_anchor} = Store.fetch(BadReceiptStore, "ignored")
+      assert {:error, :invalid_anchor} = Store.verify(BadReceiptStore, "ignored", checkpoint)
     end
   end
 
