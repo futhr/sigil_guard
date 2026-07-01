@@ -22,6 +22,13 @@ defmodule SigilGuard.ContextTest do
       assert context.sink == :repo
       assert context.actor == "codex"
     end
+
+    test "ignores unknown string keys without atomizing them" do
+      context = Context.new(%{"unknown-key" => "value", "phase" => :tool_result})
+
+      assert context.phase == :tool_result
+      refute Map.has_key?(Map.from_struct(context), :"unknown-key")
+    end
   end
 
   describe "text/1" do
@@ -29,6 +36,11 @@ defmodule SigilGuard.ContextTest do
       assert Context.text(%{"content" => "hello"}) == "hello"
       assert Context.text(%{output: "result"}) == "result"
       assert Context.text("raw") == "raw"
+    end
+
+    test "returns nil for payloads without text" do
+      assert Context.text(%{"content" => ["not", "a", "string"]}) == nil
+      assert Context.text(123) == nil
     end
   end
 

@@ -163,6 +163,147 @@ defmodule SigilGuard.Runtime.GateTest do
       assert review.audit_metadata.repo_policy_rules == ["config-review"]
     end
 
+    test "blocks repo changes when deterministic repo policy blocks them" do
+      {:ok, repo_policy} =
+        SigilGuard.RepoPolicy.compile(%{
+          rules: [
+            %{
+              id: "protect-config",
+              decision: :block,
+              agents: ["*"],
+              actions: ["modify"],
+              paths: ["config/**"]
+            }
+          ]
+        })
+
+      decision =
+        Gate.evaluate(
+          %{changed_paths: ["config/runtime.exs"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.reason =~ "protect-config"
+      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.audit_metadata.repo_policy_rules == ["protect-config"]
+    end
+
+    test "blocks repo changes when supplied repo policy cannot compile" do
+      decision =
+        Gate.evaluate(
+          %{changed_paths: ["lib/app.ex"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            trust_level: :high
+          ],
+          repo_policy: %{rules: [%{id: "missing-paths", decision: :allow}]}
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.reason =~ "Repo policy could not be compiled"
+      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.audit_metadata.repo_policy_error
+    end
+
+    test "handles repo-change contexts without changed path lists" do
+      {:ok, repo_policy} =
+        SigilGuard.RepoPolicy.compile(%{
+          default_decision: :require_approval,
+          rules: [
+            %{
+              id: "docs",
+              decision: :allow,
+              agents: ["*"],
+              actions: ["modify"],
+              paths: ["docs/**"]
+            }
+          ]
+        })
+
+      decision =
+        Gate.evaluate(
+          "no structured path payload",
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            metadata: "not-a-map",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.audit_metadata.repo_policy_verdict == :require_approval
+      assert decision.audit_metadata.repo_unmatched_paths == []
+    end
+
+    test "blocks when trust policy rejects an otherwise clean action" do
+      decision =
+        Gate.evaluate("safe",
+          phase: :tool_request,
+          origin: :model,
+          sink: :tool,
+          action: "delete_database",
+          trust_level: :low
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason == "Policy blocked this action"
+    end
+
+    test "requires confirmation for medium quarantine indicators in tool output" do
+      decision =
+        Gate.evaluate("The tool result mentions a system prompt.",
+          phase: :tool_result,
+          origin: :tool,
+          sink: :model,
+          tool: "fetch_url",
+          trust_level: :high
+        )
+
+      assert {:confirm, reason} = decision.verdict
+      assert reason == "Tool result should be reviewed before model ingestion"
+      assert decision.action == :quarantine
+      assert [:system_prompt_probe] == decision.audit_metadata.indicator_ids
+    end
+
+    test "merges policy confirmation with source confirmation" do
+      decision =
+        Gate.evaluate(
+          "The tool result mentions a system prompt.",
+          [
+            phase: :tool_result,
+            origin: :tool,
+            sink: :model,
+            action: "delete_database",
+            trust_level: :medium
+          ],
+          risk_level: :high
+        )
+
+      assert {:confirm, reason} = decision.verdict
+      assert reason =~ "Manual confirmation allowed"
+      assert reason =~ "Tool result should be reviewed"
+      assert decision.action == :quarantine
+    end
+
     test "emits redacted runtime telemetry" do
       ref = make_ref()
       parent = self()

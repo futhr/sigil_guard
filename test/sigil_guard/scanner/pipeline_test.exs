@@ -111,6 +111,72 @@ defmodule SigilGuard.Scanner.PipelineTest do
       assert hit.stage == :enriched
     end
 
+    test "validates raw high-entropy generic secret candidates without delimiters" do
+      patterns =
+        Patterns.compile([
+          %{
+            name: "generic_secret",
+            category: "credential",
+            severity: :medium,
+            pattern: "[A-Za-z0-9]{20,}"
+          }
+        ])
+
+      assert [hit] = Pipeline.scan("R7v9K2mQ4xZ8pL6nT5y0", patterns)
+
+      assert hit.name == "generic_secret"
+      assert hit.match == "R7v9K2mQ4xZ8pL6nT5y0"
+      assert :high_entropy in hit.signals
+    end
+
+    test "validates bearer-token-shaped values without a Bearer prefix for custom patterns" do
+      patterns =
+        Patterns.compile([
+          %{
+            name: "bearer_token",
+            category: "credential",
+            severity: :high,
+            pattern: "sk-[A-Za-z0-9._~+\\/=\\-]{24,}"
+          }
+        ])
+
+      assert [hit] = Pipeline.scan("sk-aB3dE5gH7jK9mN2pQ4rS6tU8", patterns)
+
+      assert hit.name == "bearer_token"
+      assert hit.match == "sk-aB3dE5gH7jK9mN2pQ4rS6tU8"
+      assert :token_boundary in hit.signals
+    end
+
+    test "extracts quoted assignment values before terminators" do
+      patterns =
+        Patterns.compile([
+          %{
+            name: "generic_secret",
+            category: "credential",
+            severity: :medium,
+            pattern: ~S(secret\s*=\s*'[^']+')
+          },
+          %{
+            name: "generic_api_key",
+            category: "credential",
+            severity: :high,
+            pattern: ~S(api_key\s*=\s*"[^"]+")
+          }
+        ])
+
+      assert [single_quoted] =
+               Pipeline.scan("secret='R7v9K2mQ4xZ8pL6n extra'", patterns)
+
+      assert single_quoted.name == "generic_secret"
+      assert single_quoted.validated
+
+      assert [double_quoted] =
+               Pipeline.scan("api_key=\"R7v9K2mQ4xZ8pL6nT5y0\"", patterns)
+
+      assert double_quoted.name == "generic_api_key"
+      assert double_quoted.validated
+    end
+
     test "filters hits below the configured confidence floor" do
       patterns =
         Patterns.compile([
@@ -133,6 +199,12 @@ defmodule SigilGuard.Scanner.PipelineTest do
     test "raises on invalid scanner pipeline modules" do
       assert_raise ArgumentError, ~r/export scan\/3/, fn ->
         Scanner.scan("x", pipeline: String)
+      end
+    end
+
+    test "raises on invalid scanner pipeline option values" do
+      assert_raise ArgumentError, ~r/invalid scanner pipeline 123/, fn ->
+        Scanner.scan("x", pipeline: 123)
       end
     end
   end

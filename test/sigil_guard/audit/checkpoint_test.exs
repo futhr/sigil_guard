@@ -33,6 +33,16 @@ defmodule SigilGuard.Audit.CheckpointTest do
 
       assert {:error, :unsigned_event} = Checkpoint.merkle_root(events)
     end
+
+    test "supports empty chains with a domain-separated root" do
+      assert {:ok, root} = Checkpoint.merkle_root([])
+      assert {:ok, ^root} = Checkpoint.merkle_root([])
+      assert byte_size(root) == 64
+    end
+
+    test "rejects non-list event inputs" do
+      assert {:error, :invalid_events} = Checkpoint.merkle_root(:bad)
+    end
   end
 
   describe "create/2" do
@@ -83,6 +93,27 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert checkpoint["first_event_id"] == second.id
       assert checkpoint["last_event_id"] == third.id
     end
+
+    test "creates and verifies empty checkpoints" do
+      assert {:ok, checkpoint} = Checkpoint.create([], generated_at: @generated_at)
+
+      assert checkpoint["event_count"] == 0
+      assert checkpoint["first_event_id"] == nil
+      assert checkpoint["last_event_id"] == nil
+      assert checkpoint["first_hmac"] == nil
+      assert checkpoint["last_hmac"] == nil
+      assert {:ok, verified} = Checkpoint.verify(checkpoint, [])
+      assert verified.status == :unsigned
+    end
+
+    test "rejects invalid create inputs and invalid continuation anchors" do
+      events = build_signed_chain(1)
+
+      assert {:error, :invalid_events} = Checkpoint.create(:bad)
+      assert {:error, :invalid_events} = Checkpoint.create(events, :bad)
+      assert {:error, :invalid_prev_hmac} = Checkpoint.create([], prev_hmac: 123)
+      assert {:error, :invalid_prev_hmac} = Checkpoint.create(events, prev_hmac: 123)
+    end
   end
 
   describe "canonical_bytes/1 and digest/1" do
@@ -92,6 +123,30 @@ defmodule SigilGuard.Audit.CheckpointTest do
 
       assert Checkpoint.canonical_bytes(checkpoint) == Checkpoint.canonical_bytes(unsigned)
       assert Checkpoint.digest(checkpoint) == Checkpoint.digest(unsigned)
+    end
+
+    test "canonical bytes normalize atom keys" do
+      {:ok, checkpoint} = create_checkpoint(build_signed_chain(1))
+
+      atomized = %{
+        kind: checkpoint["kind"],
+        version: checkpoint["version"],
+        algorithm: checkpoint["algorithm"],
+        generated_at: checkpoint["generated_at"],
+        chain_id: checkpoint["chain_id"],
+        event_count: checkpoint["event_count"],
+        prev_hmac: checkpoint["prev_hmac"],
+        first_event_id: checkpoint["first_event_id"],
+        last_event_id: checkpoint["last_event_id"],
+        first_hmac: checkpoint["first_hmac"],
+        last_hmac: checkpoint["last_hmac"],
+        merkle_root: checkpoint["merkle_root"],
+        metadata: checkpoint["metadata"],
+        anchor: checkpoint["anchor"]
+      }
+
+      assert Checkpoint.canonical_bytes(atomized) == Checkpoint.canonical_bytes(checkpoint)
+      assert Checkpoint.digest(atomized) == Checkpoint.digest(checkpoint)
     end
   end
 
@@ -125,6 +180,25 @@ defmodule SigilGuard.Audit.CheckpointTest do
 
       assert {:error, :unsigned_checkpoint} =
                Checkpoint.verify(checkpoint, events, require_signature: true)
+    end
+
+    test "verifies signed checkpoints with standard base64 public keys and signatures" do
+      events = build_signed_chain(2)
+      signed = signed_checkpoint(events)
+
+      signature =
+        signed["signature"]["signature"]
+        |> Base.url_decode64!(padding: false)
+        |> Base.encode64()
+
+      public_key =
+        TestSigner.public_key()
+        |> Base.encode64()
+
+      reencoded = put_in(signed, ["signature", "signature"], signature)
+
+      assert {:ok, verified} = Checkpoint.verify(reencoded, events, public_key_b64u: public_key)
+      assert verified.status == :verified
     end
 
     test "detects event/checkpoint mismatch" do
@@ -165,6 +239,83 @@ defmodule SigilGuard.Audit.CheckpointTest do
       signed = signed_checkpoint(events)
 
       assert {:error, :unknown_issuer} = Checkpoint.verify(signed, events)
+    end
+
+    test "rejects invalid checkpoint and static-field inputs" do
+      events = build_signed_chain(1)
+      {:ok, checkpoint} = create_checkpoint(events)
+
+      assert {:error, :invalid_checkpoint} = Checkpoint.verify(:bad, events)
+      assert {:error, :invalid_checkpoint} = Checkpoint.verify(checkpoint, :bad)
+
+      assert {:error, :invalid_kind} =
+               Checkpoint.verify(%{checkpoint | "kind" => "wrong"}, events)
+
+      assert {:error, :invalid_version} =
+               Checkpoint.verify(%{checkpoint | "version" => 2}, events)
+
+      assert {:error, :invalid_algorithm} =
+               Checkpoint.verify(%{checkpoint | "algorithm" => "sha1"}, events)
+
+      assert {:error, :missing_generated_at} =
+               Checkpoint.verify(%{checkpoint | "generated_at" => nil}, events)
+
+      assert {:error, :missing_event_count} =
+               Checkpoint.verify(%{checkpoint | "event_count" => "1"}, events)
+
+      assert {:error, :missing_merkle_root} =
+               Checkpoint.verify(%{checkpoint | "merkle_root" => nil}, events)
+
+      assert {:error, :invalid_prev_hmac} =
+               Checkpoint.verify(%{checkpoint | "prev_hmac" => 123}, events)
+    end
+
+    test "rejects invalid signature metadata" do
+      events = build_signed_chain(2)
+      signed = signed_checkpoint(events)
+
+      assert {:error, :invalid_signature_metadata} =
+               Checkpoint.verify(%{signed | "signature" => "bad"}, events)
+
+      for {field, reason} <- [
+            {"issuer", :missing_issuer},
+            {"digest", :missing_digest},
+            {"signature", :missing_signature}
+          ] do
+        tampered = update_in(signed, ["signature"], &Map.delete(&1, field))
+        assert {:error, ^reason} = Checkpoint.verify(tampered, events)
+      end
+
+      unsupported = put_in(signed, ["signature", "algorithm"], "RSA")
+      assert {:error, :unsupported_algorithm} = Checkpoint.verify(unsupported, events)
+    end
+
+    test "rejects malformed keys and signatures before verification" do
+      events = build_signed_chain(2)
+      signed = signed_checkpoint(events)
+
+      short_public_key = Base.url_encode64("short", padding: false)
+      short_signature = Base.url_encode64("short", padding: false)
+
+      assert {:error, :invalid_base64} =
+               Checkpoint.verify(signed, events, public_key_b64u: "not base64!")
+
+      assert {:error, :invalid_key} =
+               Checkpoint.verify(signed, events, public_key_b64u: short_public_key)
+
+      short_sig_checkpoint = put_in(signed, ["signature", "signature"], short_signature)
+
+      assert {:error, :invalid_signature} =
+               Checkpoint.verify(short_sig_checkpoint, events,
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
+
+      bad_sig_checkpoint = put_in(signed, ["signature", "signature"], "not base64!")
+
+      assert {:error, :invalid_base64} =
+               Checkpoint.verify(bad_sig_checkpoint, events,
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
     end
   end
 

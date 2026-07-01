@@ -47,6 +47,21 @@ defmodule SigilGuard.Registry.BundleTest do
       assert is_binary(verified.digest)
     end
 
+    test "verifies signed bundles with standard base64 public keys and signatures" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+
+      signature =
+        signed["provenance"]["signature"]
+        |> Base.url_decode64!(padding: false)
+        |> Base.encode64()
+
+      reencoded = put_in(signed, ["provenance", "signature"], signature)
+      public_key = Base.encode64(TestSigner.public_key())
+
+      assert {:ok, verified} = Bundle.verify(reencoded, public_key_b64u: public_key)
+      assert verified.status == :verified
+    end
+
     test "signs and verifies time-bound bundle provenance" do
       signed =
         Bundle.sign(bundle(), TestSigner,
@@ -73,6 +88,20 @@ defmodule SigilGuard.Registry.BundleTest do
 
       assert {:quarantine, quarantine} = Bundle.verify(bundle(), require_signature: true)
       assert quarantine.reason == :unsigned_bundle
+    end
+
+    test "quarantines invalid bundles and provenance shapes" do
+      assert {:quarantine, quarantine} = Bundle.verify(:bad)
+      assert quarantine.reason == :invalid_bundle
+      assert quarantine.digest == nil
+
+      assert {:quarantine, quarantine} =
+               bundle()
+               |> Map.put("provenance", "bad")
+               |> Bundle.verify()
+
+      assert quarantine.reason == :invalid_provenance
+      assert is_binary(quarantine.digest)
     end
 
     test "quarantines digest mismatches before loading tampered content" do
@@ -191,6 +220,95 @@ defmodule SigilGuard.Registry.BundleTest do
 
       assert quarantine.reason == :missing_algorithm
       assert quarantine.issuer == @issuer
+    end
+
+    test "quarantines missing provenance fields and unsupported algorithms" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+
+      for {field, reason} <- [
+            {"issuer", :missing_issuer},
+            {"digest", :missing_digest},
+            {"signature", :missing_signature}
+          ] do
+        tampered = update_in(signed, ["provenance"], &Map.delete(&1, field))
+        assert {:quarantine, quarantine} = Bundle.verify(tampered)
+        assert quarantine.reason == reason
+      end
+
+      unsupported = put_in(signed, ["provenance", "algorithm"], "RSA")
+      assert {:quarantine, quarantine} = Bundle.verify(unsupported)
+      assert quarantine.reason == :unsupported_algorithm
+    end
+
+    test "quarantines invalid verification time options and timestamps" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(signed,
+                 public_key_b64u: TestSigner.public_key_b64u(),
+                 max_age_seconds: -1
+               )
+
+      assert quarantine.reason == :invalid_max_age
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(signed,
+                 public_key_b64u: TestSigner.public_key_b64u(),
+                 clock_skew_seconds: -1
+               )
+
+      assert quarantine.reason == :invalid_clock_skew
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(signed,
+                 public_key_b64u: TestSigner.public_key_b64u(),
+                 now: :bad
+               )
+
+      assert quarantine.reason == :invalid_now
+
+      invalid_expires = put_in(signed, ["provenance", "expires_at"], :bad)
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(invalid_expires, public_key_b64u: TestSigner.public_key_b64u())
+
+      assert quarantine.reason == :invalid_expires_at
+    end
+
+    test "accepts missing issued-at when age checks are disabled" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+      no_issued_at = update_in(signed, ["provenance"], &Map.delete(&1, "issued_at"))
+
+      assert {:ok, verified} =
+               Bundle.verify(no_issued_at, public_key_b64u: TestSigner.public_key_b64u())
+
+      assert verified.status == :verified
+    end
+
+    test "quarantines malformed public keys and signatures" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+      short_public_key = Base.url_encode64("short", padding: false)
+      short_signature = Base.url_encode64("short", padding: false)
+
+      assert {:quarantine, quarantine} = Bundle.verify(signed, public_key_b64u: "not base64!")
+      assert quarantine.reason == :invalid_base64
+
+      assert {:quarantine, quarantine} = Bundle.verify(signed, public_key_b64u: short_public_key)
+      assert quarantine.reason == :invalid_key
+
+      short_sig_bundle = put_in(signed, ["provenance", "signature"], short_signature)
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(short_sig_bundle, public_key_b64u: TestSigner.public_key_b64u())
+
+      assert quarantine.reason == :invalid_signature
+
+      bad_sig_bundle = put_in(signed, ["provenance", "signature"], "not base64!")
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(bad_sig_bundle, public_key_b64u: TestSigner.public_key_b64u())
+
+      assert quarantine.reason == :invalid_base64
     end
 
     test "quarantines unknown issuers" do

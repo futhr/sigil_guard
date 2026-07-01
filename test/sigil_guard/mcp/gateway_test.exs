@@ -3,6 +3,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
   use ExUnit.Case, async: false
 
+  alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.Envelope
   alias SigilGuard.MCP.Gateway
@@ -68,6 +69,39 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.verdict == :blocked
       assert decision.audit_metadata.hit_count == 1
       refute inspect(decision.audit_metadata) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
+
+    test "accepts context structs and string-keyed context overrides" do
+      request = unsigned_request()
+
+      struct_decision =
+        Gateway.guard_request(request, %Context{
+          trust_level: :high,
+          actor: "did:sigil:struct",
+          mcp_server: "local"
+        })
+
+      string_key_decision =
+        Gateway.guard_request(request, %{
+          "trust_level" => :high,
+          "actor" => "did:sigil:string",
+          "unknown-key" => "ignored"
+        })
+
+      assert struct_decision.verdict == :allowed
+      assert struct_decision.audit_metadata.actor == "did:sigil:struct"
+      assert struct_decision.audit_metadata.mcp_server == "local"
+
+      assert string_key_decision.verdict == :allowed
+      assert string_key_decision.audit_metadata.actor == "did:sigil:string"
+    end
+
+    test "falls back safely for invalid contexts and non-map payloads" do
+      decision = Gateway.guard_request("plain text request", :not_a_context, risk_level: :low)
+
+      assert decision.verdict == :allowed
+      assert decision.audit_metadata.tool == nil
+      assert decision.audit_metadata.action == :allow
     end
   end
 
@@ -228,6 +262,17 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.audit_metadata.action_digest
     end
 
+    test "leaves already allowed requests unchanged when confirmation guard is used" do
+      request = unsigned_request()
+
+      direct = Gateway.guard_request(request, trust_level: :high)
+      confirmed = Gateway.guard_confirmed_request(request, trust_level: :high)
+
+      assert direct.verdict == :allowed
+      assert confirmed.verdict == :allowed
+      assert Map.get(confirmed.audit_metadata, :confirmation_status) == nil
+    end
+
     test "accepts a valid request confirmation token and consumes it once" do
       request = confirmable_request()
       token = issue_request_token(request)
@@ -288,6 +333,64 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       assert decision.verdict == :blocked
       assert decision.audit_metadata.confirmation_reason == :invalid_confirmation_token
+    end
+
+    test "accepts confirmation tokens supplied as gateway options" do
+      request = confirmable_request()
+      token = issue_request_token(request)
+
+      decision =
+        Gateway.guard_confirmed_request(request, [trust_level: :medium],
+          confirmation_key: @confirmation_key,
+          confirmation_token: token,
+          now: @now
+        )
+
+      assert decision.verdict == :allowed
+      assert decision.audit_metadata.confirmation_status == :accepted
+    end
+
+    test "blocks invalid confirmation token option types" do
+      decision =
+        Gateway.guard_confirmed_request(confirmable_request(), [trust_level: :medium],
+          confirmation_key: @confirmation_key,
+          confirmation_token: 123
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.confirmation_reason == :invalid_confirmation_token
+    end
+
+    test "blocks supplied tokens when confirmation key is missing" do
+      request = confirmable_request()
+      token = issue_request_token(request)
+
+      decision =
+        request
+        |> put_in(["params", "_sigil_confirmation"], token)
+        |> Gateway.guard_confirmed_request([trust_level: :medium], now: @now)
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.confirmation_reason == :missing_confirmation_key
+      refute inspect(decision.audit_metadata) =~ token
+    end
+
+    test "can verify request confirmations without consuming tokens" do
+      request = confirmable_request()
+      token = issue_request_token(request)
+      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], token)
+
+      opts = [
+        confirmation_key: @confirmation_key,
+        consume_confirmation: false,
+        now: @now
+      ]
+
+      first = Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium], opts)
+      second = Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium], opts)
+
+      assert first.verdict == :allowed
+      assert second.verdict == :allowed
     end
   end
 
@@ -359,6 +462,30 @@ defmodule SigilGuard.MCP.GatewayTest do
         |> Map.put("signature", Base.url_encode64(:binary.copy(<<0>>, 64), padding: false))
 
       assert {:error, :invalid_signature} =
+               envelope
+               |> signed_request()
+               |> Gateway.verify_request_envelope(public_keys: public_keys())
+    end
+
+    test "uses a fallback public key when no identity map is configured" do
+      envelope = Envelope.sign("did:sigil:agent", :allowed, signer: TestSigner)
+      request = signed_request(envelope)
+
+      assert {:ok, claims} =
+               Gateway.verify_request_envelope(request,
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
+
+      assert claims.identity == "did:sigil:agent"
+    end
+
+    test "rejects envelopes without an identity claim" do
+      envelope =
+        "did:sigil:agent"
+        |> Envelope.sign(:allowed, signer: TestSigner)
+        |> Map.delete("identity")
+
+      assert {:error, :missing_identity} =
                envelope
                |> signed_request()
                |> Gateway.verify_request_envelope(public_keys: public_keys())
@@ -741,6 +868,29 @@ defmodule SigilGuard.MCP.GatewayTest do
       refute inspect(response) =~ "supersecretvalue123"
     end
 
+    test "preserves atom-key JSON-RPC result envelopes for allowed content" do
+      result = %{
+        jsonrpc: "2.0",
+        id: "atom-result",
+        result: %{
+          content: [
+            %{type: "text", text: "build completed"}
+          ],
+          tool: "compile"
+        }
+      }
+
+      assert {:ok, response, decision} = Gateway.guarded_result(result, trust_level: :high)
+
+      assert decision.action == :allow
+
+      assert response == %{
+               "jsonrpc" => "2.0",
+               "id" => "atom-result",
+               "result" => result.result
+             }
+    end
+
     test "returns quarantine JSON-RPC errors for prompt-injection results" do
       result = %{
         "jsonrpc" => "2.0",
@@ -797,6 +947,17 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert {:confirm, _} = decision.verdict
       assert decision.action == :quarantine
       assert decision.audit_metadata.action_digest
+    end
+
+    test "leaves already allowed results unchanged when confirmation guard is used" do
+      result = %{"content" => [%{"type" => "text", "text" => "build completed"}]}
+
+      direct = Gateway.guard_result(result, trust_level: :high)
+      confirmed = Gateway.guard_confirmed_result(result, trust_level: :high)
+
+      assert direct.verdict == :allowed
+      assert confirmed.verdict == :allowed
+      assert Map.get(confirmed.audit_metadata, :confirmation_status) == nil
     end
 
     test "accepts a valid result confirmation token and consumes it once" do
@@ -996,6 +1157,13 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert replay_decision == decision
       assert replay_response["error"]["data"]["content_hash"] == decision.content_hash
       refute inspect(replay_response) =~ "Ignore previous instructions"
+
+      assert {_, {:error, finish_response, finish_decision}} =
+               Gateway.finish_guarded_result_stream(stream, id: 14)
+
+      assert finish_decision == decision
+      assert finish_response["error"]["data"]["content_hash"] == decision.content_hash
+      refute inspect(finish_response) =~ "Ignore previous instructions"
     end
   end
 
@@ -1033,6 +1201,27 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.verdict == :blocked
       assert response["error"]["data"]["sanitized_text"] =~ "[AWS_KEY]"
       refute inspect(response) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
+
+    test "returns sanitized result payloads for executable redaction decisions" do
+      result = %{
+        "id" => "response-redact",
+        "content" => [
+          %{"type" => "text", "text" => "token=supersecretvalue123"}
+        ],
+        "tool" => "fetch_secret"
+      }
+
+      decision = Gateway.guard_result(result, trust_level: :medium)
+      response = Gateway.response_for_decision(decision, "response-redact")
+
+      assert decision.action == :redact
+
+      assert response["result"]["content"] == [
+               %{"type" => "text", "text" => decision.sanitized_text}
+             ]
+
+      refute inspect(response) =~ "supersecretvalue123"
     end
   end
 

@@ -190,6 +190,28 @@ defmodule SigilGuard.RegistryTest do
       assert resolved.source_format == :did_doc_publicKeyBase64
     end
 
+    test "normalizes legacy DID-doc base64url publicKey arrays", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/identities/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "id" => "did:sigil:alice",
+            "publicKey" => [%{"publicKeyBase64Url" => public_key_b64u()}]
+          })
+        )
+      end)
+
+      assert {:ok, resolved} =
+               Registry.resolve_key("did:sigil:alice",
+                 url: url,
+                 profile: :legacy_sigil_guard
+               )
+
+      assert resolved.raw_public_key == public_key_raw()
+      assert resolved.source_format == :did_doc_publicKeyBase64Url
+    end
+
     test "rejects malformed key material", %{bypass: bypass, url: url} do
       Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
         Plug.Conn.resp(
@@ -200,6 +222,53 @@ defmodule SigilGuard.RegistryTest do
       end)
 
       assert {:error, :invalid_base64} = Registry.resolve_key("did:sigil:alice", url: url)
+    end
+
+    test "rejects wrong-length key material", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{"did" => "did:sigil:alice", "public_key" => Base.encode64("short")})
+        )
+      end)
+
+      assert {:error, :invalid_key} = Registry.resolve_key("did:sigil:alice", url: url)
+    end
+
+    test "rejects responses without usable public key material", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{"did" => "did:sigil:alice"}))
+      end)
+
+      assert {:error, :missing_public_key} = Registry.resolve_key("did:sigil:alice", url: url)
+    end
+
+    test "rejects DID-doc arrays without supported key entries", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/identities/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "id" => "did:sigil:alice",
+            "publicKey" => [%{"type" => "Unsupported"}]
+          })
+        )
+      end)
+
+      assert {:error, :missing_public_key} =
+               Registry.resolve_key("did:sigil:alice",
+                 url: url,
+                 profile: :legacy_sigil_guard
+               )
+    end
+
+    test "rejects key responses without a DID", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{"public_key" => public_key_b64u()}))
+      end)
+
+      assert {:error, :missing_did} = Registry.resolve_key("did:sigil:alice", url: url)
     end
   end
 
