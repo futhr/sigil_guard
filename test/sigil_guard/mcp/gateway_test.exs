@@ -192,6 +192,25 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert response["error"]["data"]["content_hash"]
       refute inspect(response) =~ "AKIAIOSFODNN7EXAMPLE"
     end
+
+    test "returns JSON-RPC errors for malformed context labels" do
+      request = %{
+        "jsonrpc" => "2.0",
+        "id" => "bad-context",
+        "method" => "tools/call",
+        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+      }
+
+      assert {:error, response, decision} =
+               Gateway.guarded_request(request, %{"trust_level" => "admin"})
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.runtime_input_error == :invalid_trust_level
+      assert response["id"] == "bad-context"
+      assert response["error"]["code"] == -32_001
+      assert response["error"]["data"]["reason"] =~ "invalid_trust_level"
+      assert response["error"]["data"]["trust_level"] == "admin"
+    end
   end
 
   describe "issue_confirmation_token/5" do
