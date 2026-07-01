@@ -81,13 +81,14 @@ defmodule SigilGuard.Audit.Export do
     with :ok <- verify_static_fields(export),
          {:ok, checkpoint} <- export_checkpoint(export),
          {:ok, checkpoint_status} <- Checkpoint.verify(checkpoint, events, opts),
-         {:ok, anchor_status} <- verify_anchor(export, checkpoint, opts) do
+         {:ok, anchor_status} <- verify_anchor(export, checkpoint, opts),
+         {:ok, export_digest} <- safe_digest(export) do
       {:ok,
        %{
          export: export,
          checkpoint: checkpoint_status,
          anchor: anchor_status,
-         digest: digest(export)
+         digest: export_digest
        }}
     end
   end
@@ -216,6 +217,13 @@ defmodule SigilGuard.Audit.Export do
 
   defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
   defp require_binary(_, reason), do: {:error, reason}
+
+  defp safe_digest(export) do
+    {:ok, digest(export)}
+  rescue
+    _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_export}
+  end
 
   defp field(map, key) when is_map(map) do
     case Map.fetch(map, key) do

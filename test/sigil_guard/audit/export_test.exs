@@ -104,7 +104,8 @@ defmodule SigilGuard.Audit.ExportTest do
             {[storage: ""], :missing_storage},
             {[uri: false], :invalid_uri},
             {[worm: "true"], :invalid_worm},
-            {[metadata: "bad"], :invalid_metadata}
+            {[metadata: "bad"], :invalid_metadata},
+            {[metadata: %{"pid" => self()}], :invalid_anchor}
           ] do
         assert {:error, ^reason} =
                  Export.create(build_signed_chain(1),
@@ -229,6 +230,19 @@ defmodule SigilGuard.Audit.ExportTest do
         |> Map.put(:kind, "sigil_guard.audit.export")
 
       assert {:error, :invalid_kind} = Export.verify(invalid, events)
+    end
+
+    test "rejects uncanonicalizable export terms without raising" do
+      events = build_signed_chain(1)
+      {:ok, export} = signed_export(events)
+      invalid = Map.put(export, "pid", self())
+
+      assert {:error, :invalid_export} =
+               Export.verify(invalid, events,
+                 public_keys: %{@issuer => TestSigner.public_key_b64u()},
+                 require_signature: true,
+                 require_anchor: true
+               )
     end
 
     test "validates atom-keyed export packages" do
