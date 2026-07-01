@@ -107,6 +107,18 @@ defmodule SigilGuard.Audit.AnchorTest do
 
       assert {:error, :missing_checkpoint_digest} = Anchor.verify(missing_digest, checkpoint)
     end
+
+    test "does not let atom fallbacks mask explicit invalid string fields" do
+      {checkpoint, _} = signed_checkpoint()
+
+      invalid =
+        checkpoint
+        |> Anchor.create(anchored_at: @anchored_at)
+        |> Map.put("kind", false)
+        |> Map.put(:kind, "sigil_guard.audit.anchor")
+
+      assert {:error, :invalid_kind} = Anchor.verify(invalid, checkpoint)
+    end
   end
 
   defp signed_checkpoint do

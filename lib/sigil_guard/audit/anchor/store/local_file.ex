@@ -16,6 +16,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   @kind "sigil_guard.audit.anchor.receipt"
   @version 1
   @anchor_kind "sigil_guard.audit.anchor"
+  @hex_digest ~r/\A[0-9a-f]{64}\z/
   @atom_fields %{
     "anchor_digest" => :anchor_digest,
     "kind" => :kind,
@@ -196,13 +197,13 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
     end
   end
 
-  defp digest_from_ref(digest) when is_binary(digest) and byte_size(digest) == 64 do
-    {:ok, digest}
+  defp digest_from_ref(digest) when is_binary(digest) do
+    if Regex.match?(@hex_digest, digest), do: {:ok, digest}, else: {:error, :missing_digest}
   end
 
   defp digest_from_ref(%{} = receipt) do
     case field(receipt, "anchor_digest") || digest_from_uri(field(receipt, "uri")) do
-      digest when is_binary(digest) and byte_size(digest) == 64 -> {:ok, digest}
+      digest when is_binary(digest) -> digest_from_ref(digest)
       _ -> {:error, :missing_digest}
     end
   end
@@ -218,7 +219,10 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   defp digest_from_uri(_), do: nil
 
   defp field(map, key) when is_map(map) do
-    Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+    end
   end
 
   defp file_uri(path, digest) do

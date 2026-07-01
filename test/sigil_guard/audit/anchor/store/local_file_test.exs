@@ -100,11 +100,29 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:error, :invalid_anchor} =
                Store.put(LocalFile, %{"kind" => "other"}, path: tmp_path())
 
+      invalid_with_atom_fallback =
+        anchor
+        |> Map.put("kind", false)
+        |> Map.put(:kind, "sigil_guard.audit.anchor")
+
+      assert {:error, :invalid_anchor} =
+               Store.put(LocalFile, invalid_with_atom_fallback, path: tmp_path())
+
       assert {:error, :invalid_metadata} =
                Store.put(LocalFile, anchor, path: tmp_path(), metadata: "bad")
 
       assert {:error, :missing_digest} = Store.fetch(LocalFile, %{}, path: tmp_path())
       assert {:error, :missing_path} = Store.fetch(LocalFile, Anchor.digest(anchor))
+
+      assert {:error, :missing_digest} =
+               Store.fetch(LocalFile, String.duplicate("g", 64), path: tmp_path())
+
+      invalid_receipt = %{
+        "anchor_digest" => String.duplicate("g", 64),
+        "uri" => "file:///tmp/anchors.jsonl##{String.duplicate("g", 64)}"
+      }
+
+      assert {:error, :missing_digest} = Store.fetch(LocalFile, invalid_receipt)
     end
 
     test "reports missing and corrupt logs" do
