@@ -68,6 +68,15 @@ defmodule SigilGuard.AuditTest do
 
       assert signed1.hmac != signed2.hmac
     end
+
+    test "rejects malformed previous HMAC anchors" do
+      event = Audit.new_event("test", "actor", "action", "ok")
+      Process.put(:sigil_guard_bad_prev_hmac, false)
+
+      assert_raise ArgumentError, ~r/prev_hmac must be a binary or nil/, fn ->
+        Audit.sign_event(event, @secret_key, Process.get(:sigil_guard_bad_prev_hmac))
+      end
+    end
   end
 
   describe "verify_chain/2" do
@@ -204,6 +213,12 @@ defmodule SigilGuard.AuditTest do
       signed = build_signed_chain(2)
 
       assert :ok = Audit.verify_chain(signed, @secret_key, prev_hmac: nil)
+    end
+
+    test "rejects malformed continuation anchors instead of treating them as genesis" do
+      signed = build_signed_chain(1)
+
+      assert {:broken, 0} = Audit.verify_chain(signed, @secret_key, prev_hmac: false)
     end
   end
 

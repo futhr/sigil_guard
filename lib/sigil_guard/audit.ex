@@ -127,7 +127,7 @@ defmodule SigilGuard.Audit do
   """
   @spec sign_event(t(), binary(), String.t() | nil) :: t()
   def sign_event(event, key, prev_hmac \\ nil) do
-    chain_input = prev_hmac || @genesis_marker
+    chain_input = chain_input!(prev_hmac)
     canonical = canonical_iodata(event)
     hmac = compute_hmac(key, [canonical, chain_input])
 
@@ -172,25 +172,9 @@ defmodule SigilGuard.Audit do
   def verify_chain(events, key, opts \\ []) do
     anchor = Keyword.get(opts, :prev_hmac)
 
-    result =
-      events
-      |> Enum.with_index()
-      |> Enum.reduce_while({:ok, anchor}, fn {event, index}, {:ok, expected_prev} ->
-        canonical = canonical_iodata(event)
-        expected_hmac = compute_hmac(key, [canonical, expected_prev || @genesis_marker])
-
-        # Contiguity uses plain == — prev_hmac values are public chain
-        # data, not secrets; only the HMAC comparison needs constant time.
-        if event.prev_hmac == expected_prev and secure_compare(expected_hmac, event.hmac) do
-          {:cont, {:ok, event.hmac}}
-        else
-          {:halt, {:broken, index}}
-        end
-      end)
-
-    case result do
-      {:ok, _} -> :ok
-      broken -> broken
+    case chain_input(anchor) do
+      {:ok, _} -> verify_chain_events(events, key, anchor)
+      :error -> {:broken, 0}
     end
   end
 
@@ -252,6 +236,44 @@ defmodule SigilGuard.Audit do
   defp compute_hmac(key, data) do
     Base.encode16(:crypto.mac(:hmac, :sha256, key, data), case: :lower)
   end
+
+  defp verify_chain_events(events, key, anchor) do
+    result =
+      events
+      |> Enum.with_index()
+      |> Enum.reduce_while({:ok, anchor}, fn {event, index}, {:ok, expected_prev} ->
+        verify_chain_event(event, index, key, expected_prev)
+      end)
+
+    case result do
+      {:ok, _} -> :ok
+      broken -> broken
+    end
+  end
+
+  defp verify_chain_event(event, index, key, expected_prev) do
+    canonical = canonical_iodata(event)
+    expected_hmac = compute_hmac(key, [canonical, chain_input!(expected_prev)])
+
+    # Contiguity uses plain == — prev_hmac values are public chain
+    # data, not secrets; only the HMAC comparison needs constant time.
+    if event.prev_hmac == expected_prev and secure_compare(expected_hmac, event.hmac) do
+      {:cont, {:ok, event.hmac}}
+    else
+      {:halt, {:broken, index}}
+    end
+  end
+
+  defp chain_input!(prev_hmac) do
+    case chain_input(prev_hmac) do
+      {:ok, chain_input} -> chain_input
+      :error -> raise ArgumentError, "prev_hmac must be a binary or nil"
+    end
+  end
+
+  defp chain_input(nil), do: {:ok, @genesis_marker}
+  defp chain_input(prev_hmac) when is_binary(prev_hmac), do: {:ok, prev_hmac}
+  defp chain_input(_), do: :error
 
   defp generate_event_id do
     Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
