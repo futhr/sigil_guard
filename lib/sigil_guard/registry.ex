@@ -189,40 +189,62 @@ defmodule SigilGuard.Registry do
     end
   end
 
-  defp normalize_resolved_key(
-         %{"public_key" => %{"kty" => "OKP", "crv" => "Ed25519", "x" => key}} = body
-       ) do
+  defp normalize_resolved_key(%{"public_key" => key} = body) do
+    normalize_public_key(key, body)
+  end
+
+  defp normalize_resolved_key(%{"publicKey" => keys} = body) when is_list(keys) do
+    case did_doc_public_key(keys) do
+      :missing ->
+        {:error, :missing_public_key}
+
+      {:ok, key, source_format} ->
+        did = did_field(body, ["id", "did"])
+        build_resolved_key(did, Map.get(body, "status"), key, source_format)
+
+      :error ->
+        {:error, :invalid_public_key}
+    end
+  end
+
+  defp normalize_resolved_key(%{"publicKey" => _}), do: {:error, :invalid_public_key}
+
+  defp normalize_resolved_key(_), do: {:error, :missing_public_key}
+
+  defp normalize_public_key(%{"kty" => "OKP", "crv" => "Ed25519", "x" => key}, body)
+       when is_binary(key) do
     did = did_field(body, ["did", "id"])
     build_resolved_key(did, Map.get(body, "status"), key, :jwk_okp_x)
   end
 
-  defp normalize_resolved_key(%{"public_key" => key} = body) when is_binary(key) do
+  defp normalize_public_key(key, body) when is_binary(key) do
     did = did_field(body, ["did", "id"])
     build_resolved_key(did, Map.get(body, "status"), key, :flat_public_key)
   end
 
-  defp normalize_resolved_key(%{"publicKey" => keys} = body) when is_list(keys) do
-    case Enum.find_value(keys, &did_doc_public_key/1) do
-      nil ->
-        {:error, :missing_public_key}
+  defp normalize_public_key(_, _), do: {:error, :invalid_public_key}
 
-      {key, source_format} ->
-        did = did_field(body, ["id", "did"])
-        build_resolved_key(did, Map.get(body, "status"), key, source_format)
-    end
+  defp did_doc_public_key(keys) do
+    Enum.reduce_while(keys, :missing, fn key, :missing ->
+      case did_doc_public_key_entry(key) do
+        :skip -> {:cont, :missing}
+        result -> {:halt, result}
+      end
+    end)
   end
 
-  defp normalize_resolved_key(_), do: {:error, :missing_public_key}
-
-  defp did_doc_public_key(%{"publicKeyBase64" => key}) when is_binary(key) do
-    {key, :did_doc_publicKeyBase64}
+  defp did_doc_public_key_entry(%{"publicKeyBase64" => key}) when is_binary(key) do
+    {:ok, key, :did_doc_publicKeyBase64}
   end
 
-  defp did_doc_public_key(%{"publicKeyBase64Url" => key}) when is_binary(key) do
-    {key, :did_doc_publicKeyBase64Url}
+  defp did_doc_public_key_entry(%{"publicKeyBase64" => _}), do: :error
+
+  defp did_doc_public_key_entry(%{"publicKeyBase64Url" => key}) when is_binary(key) do
+    {:ok, key, :did_doc_publicKeyBase64Url}
   end
 
-  defp did_doc_public_key(_), do: nil
+  defp did_doc_public_key_entry(%{"publicKeyBase64Url" => _}), do: :error
+  defp did_doc_public_key_entry(_), do: :skip
 
   defp did_field(body, keys) do
     Enum.reduce_while(keys, nil, fn key, nil ->

@@ -224,6 +224,44 @@ defmodule SigilGuard.RegistryTest do
       assert {:error, :invalid_base64} = Registry.resolve_key("did:sigil:alice", url: url)
     end
 
+    test "does not let legacy publicKey mask malformed flat public_key", %{
+      bypass: bypass,
+      url: url
+    } do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "did" => "did:sigil:alice",
+            "public_key" => false,
+            "publicKey" => [%{"publicKeyBase64" => public_key_b64()}]
+          })
+        )
+      end)
+
+      assert {:error, :invalid_public_key} = Registry.resolve_key("did:sigil:alice", url: url)
+    end
+
+    test "does not let legacy publicKey mask malformed JWK public_key", %{
+      bypass: bypass,
+      url: url
+    } do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "did" => "did:sigil:alice",
+            "public_key" => %{"kty" => "OKP", "crv" => "Ed25519", "x" => false},
+            "publicKey" => [%{"publicKeyBase64" => public_key_b64()}]
+          })
+        )
+      end)
+
+      assert {:error, :invalid_public_key} = Registry.resolve_key("did:sigil:alice", url: url)
+    end
+
     test "rejects wrong-length key material", %{bypass: bypass, url: url} do
       Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
         Plug.Conn.resp(
@@ -257,6 +295,31 @@ defmodule SigilGuard.RegistryTest do
       end)
 
       assert {:error, :missing_public_key} =
+               Registry.resolve_key("did:sigil:alice",
+                 url: url,
+                 profile: :legacy_sigil_guard
+               )
+    end
+
+    test "does not let malformed DID-doc key entries fall through to later keys", %{
+      bypass: bypass,
+      url: url
+    } do
+      Bypass.expect_once(bypass, "GET", "/identities/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "id" => "did:sigil:alice",
+            "publicKey" => [
+              %{"publicKeyBase64" => false},
+              %{"publicKeyBase64" => public_key_b64()}
+            ]
+          })
+        )
+      end)
+
+      assert {:error, :invalid_public_key} =
                Registry.resolve_key("did:sigil:alice",
                  url: url,
                  profile: :legacy_sigil_guard
