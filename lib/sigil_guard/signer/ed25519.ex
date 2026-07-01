@@ -32,6 +32,8 @@ defmodule SigilGuard.Signer.Ed25519 do
 
   use Agent
 
+  @private_key_bytes 32
+
   @type t :: %__MODULE__{
           private_key: binary(),
           public_key: binary()
@@ -60,9 +62,11 @@ defmodule SigilGuard.Signer.Ed25519 do
   """
   @spec start_link(keyword()) :: Agent.on_start()
   def start_link(opts) do
-    private_key = Keyword.fetch!(opts, :private_key)
-    signer = new(private_key)
-    Agent.start_link(fn -> signer end, name: __MODULE__)
+    with :ok <- validate_opts(opts),
+         {:ok, private_key} <- private_key(opts) do
+      signer = new(private_key)
+      Agent.start_link(fn -> signer end, name: __MODULE__)
+    end
   end
 
   @impl SigilGuard.Signer
@@ -87,4 +91,24 @@ defmodule SigilGuard.Signer.Ed25519 do
   def verify(message, signature, public_key) do
     :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
   end
+
+  defp validate_opts(opts) when is_list(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+  end
+
+  defp validate_opts(_), do: {:error, :invalid_options}
+
+  defp private_key(opts) do
+    case Keyword.fetch(opts, :private_key) do
+      {:ok, private_key} -> validate_private_key(private_key)
+      :error -> {:error, :missing_private_key}
+    end
+  end
+
+  defp validate_private_key(private_key)
+       when is_binary(private_key) and byte_size(private_key) == @private_key_bytes do
+    {:ok, private_key}
+  end
+
+  defp validate_private_key(_), do: {:error, :invalid_private_key}
 end

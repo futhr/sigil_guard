@@ -126,5 +126,15 @@ defmodule SigilGuard.SignerTest do
       assert byte_size(signature) == 64
       assert Ed25519.verify(message, signature, pub_key)
     end
+
+    test "start_link/1 rejects malformed options cleanly" do
+      assert {:error, :invalid_options} = Ed25519.start_link(:bad)
+      assert {:error, :invalid_options} = Ed25519.start_link([:bad])
+      assert {:error, :missing_private_key} = Ed25519.start_link([])
+      assert {:error, :invalid_private_key} = Ed25519.start_link(private_key: "short")
+      assert {:error, :invalid_private_key} = Ed25519.start_link(private_key: :not_binary)
+
+      refute Process.whereis(Ed25519)
+    end
   end
 end
