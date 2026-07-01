@@ -407,6 +407,37 @@ defmodule SigilGuard.RepoPolicyTest do
       assert single.verdict == :allow
     end
 
+    test "does not let atom fallbacks mask explicit invalid string context fields" do
+      policy =
+        compile!(
+          default: :block,
+          rules: [
+            %{
+              id: "src",
+              decision: :allow,
+              agents: ["runner"],
+              actions: ["modify"],
+              paths: ["src/**"]
+            }
+          ]
+        )
+
+      decision =
+        RepoPolicy.evaluate(policy, %{
+          "agent" => false,
+          :agent => "runner",
+          "action" => false,
+          :action => "modify",
+          "changed_paths" => false,
+          :changed_paths => ["src/main.ex"]
+        })
+
+      assert decision.verdict == :block
+      assert decision.agent == nil
+      assert decision.action == "modify"
+      assert decision.changed_paths == []
+    end
+
     test "matches globstar across zero or more path segments" do
       policy =
         compile!(

@@ -702,7 +702,10 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   defp field(map, key) when is_map(map) do
-    Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+    end
   end
 
   defp invalid_path_decision(agent, action, reason) do

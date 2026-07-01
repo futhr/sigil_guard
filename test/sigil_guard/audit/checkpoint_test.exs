@@ -270,6 +270,18 @@ defmodule SigilGuard.Audit.CheckpointTest do
                Checkpoint.verify(%{checkpoint | "prev_hmac" => 123}, events)
     end
 
+    test "does not let atom fallbacks mask explicit invalid string fields" do
+      events = build_signed_chain(1)
+      {:ok, checkpoint} = create_checkpoint(events)
+
+      invalid =
+        checkpoint
+        |> Map.put("kind", false)
+        |> Map.put(:kind, "sigil_guard.audit.checkpoint")
+
+      assert {:error, :invalid_kind} = Checkpoint.verify(invalid, events)
+    end
+
     test "rejects invalid signature metadata" do
       events = build_signed_chain(2)
       signed = signed_checkpoint(events)

@@ -209,7 +209,10 @@ defmodule SigilGuard.Audit.Export do
   defp require_binary(_, reason), do: {:error, reason}
 
   defp field(map, key) when is_map(map) do
-    Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+    end
   end
 
   defp timestamp do

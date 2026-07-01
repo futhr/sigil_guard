@@ -205,6 +205,18 @@ defmodule SigilGuard.Audit.ExportTest do
                |> Export.verify(events, public_keys: %{@issuer => TestSigner.public_key_b64u()})
     end
 
+    test "does not let atom fallbacks mask explicit invalid string fields" do
+      events = build_signed_chain(1)
+      {:ok, export} = signed_export(events)
+
+      invalid =
+        export
+        |> Map.put("kind", false)
+        |> Map.put(:kind, "sigil_guard.audit.export")
+
+      assert {:error, :invalid_kind} = Export.verify(invalid, events)
+    end
+
     test "validates atom-keyed export packages" do
       events = build_signed_chain(1)
       {:ok, export} = signed_export(events)

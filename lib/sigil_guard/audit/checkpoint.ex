@@ -480,7 +480,10 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp canonical_key(key), do: to_string(key)
 
   defp field(map, key) when is_map(map) do
-    Map.get(map, key) || Map.get(map, Map.fetch!(@atom_fields, key))
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+    end
   end
 
   defp timestamp do
