@@ -219,6 +219,15 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:error, :invalid_metadata} =
                Store.put(LocalFile, anchor, path: tmp_path(), metadata: "bad")
 
+      assert {:error, :invalid_metadata} =
+               Store.put(LocalFile, anchor, path: tmp_path(), metadata: %{"pid" => self()})
+
+      assert {:error, :invalid_metadata} =
+               Store.put(LocalFile, anchor,
+                 path: tmp_path(),
+                 metadata: %{{:tuple, :key} => "bad"}
+               )
+
       assert {:error, :missing_digest} = Store.fetch(LocalFile, %{}, path: tmp_path())
       assert {:error, :missing_path} = Store.fetch(LocalFile, Anchor.digest(anchor))
 

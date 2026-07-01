@@ -130,9 +130,18 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
 
   defp metadata(opts) do
     case Keyword.get(opts, :metadata, %{}) do
-      metadata when is_map(metadata) -> {:ok, metadata}
+      metadata when is_map(metadata) -> validate_metadata_json(metadata)
       _ -> {:error, :invalid_metadata}
     end
+  end
+
+  defp validate_metadata_json(metadata) do
+    case Jason.encode(metadata) do
+      {:ok, _} -> {:ok, metadata}
+      {:error, _} -> {:error, :invalid_metadata}
+    end
+  rescue
+    Protocol.UndefinedError -> {:error, :invalid_metadata}
   end
 
   defp receipt(record, path, metadata) do
