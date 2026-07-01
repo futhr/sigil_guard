@@ -546,6 +546,17 @@ defmodule SigilGuard.Bench do
         uri: "file://bench/anchors/100"
       )
 
+    remote_anchor_receipt = %{
+      "kind" => "sigil_guard.audit.anchor.receipt",
+      "version" => 1,
+      "storage" => "worm_gateway",
+      "uri" => "bench://audit/checkpoints/100",
+      "anchor_digest" => SigilGuard.Audit.Anchor.digest(anchor_100),
+      "stored_at" => "2026-06-30T12:00:02.000Z",
+      "worm" => true,
+      "metadata" => %{"region" => "bench", "replicas" => ["a", "b"]}
+    }
+
     {:ok, export_100} =
       SigilGuard.Audit.Export.create(chain_100,
         chain_id: "bench-chain",
@@ -563,6 +574,13 @@ defmodule SigilGuard.Bench do
     audit_public_keys = %{
       "did:sigil:bench-audit" => SigilGuard.BenchSigner.public_key_b64u()
     }
+
+    signed_anchor_receipt =
+      SigilGuard.Audit.Anchor.Receipt.sign(
+        remote_anchor_receipt,
+        SigilGuard.BenchSigner,
+        issuer: "did:sigil:bench-audit"
+      )
 
     anchor_store_path =
       System.tmp_dir!()
@@ -619,6 +637,24 @@ defmodule SigilGuard.Bench do
       end,
       "audit anchor / verify 100 checkpoint" => fn ->
         SigilGuard.Audit.Anchor.verify(anchor_100, signed_checkpoint_100)
+      end,
+      "audit anchor receipt / canonical bytes" => fn ->
+        SigilGuard.Audit.Anchor.Receipt.canonical_bytes(remote_anchor_receipt)
+      end,
+      "audit anchor receipt / digest" => fn ->
+        SigilGuard.Audit.Anchor.Receipt.digest(remote_anchor_receipt)
+      end,
+      "audit anchor receipt / sign" => fn ->
+        SigilGuard.Audit.Anchor.Receipt.sign(
+          remote_anchor_receipt,
+          SigilGuard.BenchSigner,
+          issuer: "did:sigil:bench-audit"
+        )
+      end,
+      "audit anchor receipt / verify signed" => fn ->
+        SigilGuard.Audit.Anchor.Receipt.verify(signed_anchor_receipt,
+          public_keys: audit_public_keys
+        )
       end,
       "audit anchor store / local fetch" => fn ->
         SigilGuard.Audit.Anchor.Store.fetch(
