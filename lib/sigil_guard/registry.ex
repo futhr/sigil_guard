@@ -192,12 +192,12 @@ defmodule SigilGuard.Registry do
   defp normalize_resolved_key(
          %{"public_key" => %{"kty" => "OKP", "crv" => "Ed25519", "x" => key}} = body
        ) do
-    did = Map.get(body, "did") || Map.get(body, "id")
+    did = did_field(body, ["did", "id"])
     build_resolved_key(did, Map.get(body, "status"), key, :jwk_okp_x)
   end
 
   defp normalize_resolved_key(%{"public_key" => key} = body) when is_binary(key) do
-    did = Map.get(body, "did") || Map.get(body, "id")
+    did = did_field(body, ["did", "id"])
     build_resolved_key(did, Map.get(body, "status"), key, :flat_public_key)
   end
 
@@ -207,7 +207,7 @@ defmodule SigilGuard.Registry do
         {:error, :missing_public_key}
 
       {key, source_format} ->
-        did = Map.get(body, "id") || Map.get(body, "did")
+        did = did_field(body, ["id", "did"])
         build_resolved_key(did, Map.get(body, "status"), key, source_format)
     end
   end
@@ -223,6 +223,15 @@ defmodule SigilGuard.Registry do
   end
 
   defp did_doc_public_key(_), do: nil
+
+  defp did_field(body, keys) do
+    Enum.reduce_while(keys, nil, fn key, nil ->
+      case Map.fetch(body, key) do
+        {:ok, value} -> {:halt, value}
+        :error -> {:cont, nil}
+      end
+    end)
+  end
 
   defp build_resolved_key(did, status, encoded_key, source_format) when is_binary(did) do
     with {:ok, raw_key} <- decode_public_key(encoded_key) do

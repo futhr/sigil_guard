@@ -270,6 +270,40 @@ defmodule SigilGuard.RegistryTest do
 
       assert {:error, :missing_did} = Registry.resolve_key("did:sigil:alice", url: url)
     end
+
+    test "does not let fallback IDs mask malformed primary DIDs", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "did" => false,
+            "id" => "did:sigil:alice",
+            "public_key" => public_key_b64u()
+          })
+        )
+      end)
+
+      assert {:error, :missing_did} = Registry.resolve_key("did:sigil:alice", url: url)
+
+      Bypass.expect_once(bypass, "GET", "/identities/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "id" => false,
+            "did" => "did:sigil:alice",
+            "publicKey" => [%{"publicKeyBase64" => public_key_b64()}]
+          })
+        )
+      end)
+
+      assert {:error, :missing_did} =
+               Registry.resolve_key("did:sigil:alice",
+                 url: url,
+                 profile: :legacy_sigil_guard
+               )
+    end
   end
 
   describe "fetch_policies/1" do
