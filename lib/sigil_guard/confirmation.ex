@@ -34,18 +34,39 @@ defmodule SigilGuard.Confirmation do
   """
   @spec action_digest(term(), Context.t() | map() | keyword()) :: String.t()
   def action_digest(payload, context) do
+    case fetch_action_digest(payload, context) do
+      {:ok, digest} -> digest
+      {:error, reason} -> raise ArgumentError, "could not compute action digest: #{reason}"
+    end
+  end
+
+  @doc """
+  Safely compute the deterministic action digest.
+
+  Returns `{:error, :invalid_payload}` when the payload or context cannot be
+  represented as canonical JSON for action binding.
+  """
+  @spec fetch_action_digest(term(), Context.t() | map() | keyword()) ::
+          {:ok, String.t()} | {:error, :invalid_payload}
+  def fetch_action_digest(payload, context) do
     context_map =
       context
       |> Context.new()
       |> Map.from_struct()
 
-    %{
-      "context" => context_map,
-      "payload" => payload
-    }
-    |> canonical_bytes()
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
+    digest =
+      %{
+        "context" => context_map,
+        "payload" => payload
+      }
+      |> canonical_bytes()
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+
+    {:ok, digest}
+  rescue
+    _ in [ArgumentError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_payload}
   end
 
   @doc """
@@ -68,10 +89,12 @@ defmodule SigilGuard.Confirmation do
          {:ok, now} <- issue_now(opts),
          {:ok, ttl_ms} <- issue_ttl_ms(opts),
          {:ok, actor} <- issue_actor(context, opts),
-         {:ok, nonce} <- issue_nonce(opts) do
+         {:ok, nonce} <- issue_nonce(opts),
+         {:ok, action_digest} <- fetch_action_digest(payload, context) do
       claims =
-        build_claims(payload, context, decision, %{
+        build_claims(decision, %{
           actor: actor,
+          action_digest: action_digest,
           issued_at: DateTime.to_iso8601(now),
           expires_at: expires_at(now, ttl_ms),
           nonce: nonce
@@ -120,13 +143,13 @@ defmodule SigilGuard.Confirmation do
     match?({:ok, _}, verify(token, payload, context, key, opts))
   end
 
-  defp build_claims(payload, context, decision, attrs) do
+  defp build_claims(decision, attrs) do
     %{
       "v" => @version,
       "typ" => @token_type,
       "alg" => "HS256",
       "actor" => attrs.actor,
-      "action_digest" => action_digest(payload, context),
+      "action_digest" => attrs.action_digest,
       "decision" => "confirm",
       "action" => Atom.to_string(decision.action),
       "reason" => decision.reason || "",
@@ -207,9 +230,9 @@ defmodule SigilGuard.Confirmation do
   end
 
   defp validate_digest(%{"action_digest" => digest}, payload, context) do
-    expected = action_digest(payload, context)
-
-    if secure_compare(expected, digest), do: :ok, else: {:error, :digest_mismatch}
+    with {:ok, expected} <- fetch_action_digest(payload, context) do
+      if secure_compare(expected, digest), do: :ok, else: {:error, :digest_mismatch}
+    end
   end
 
   defp maybe_consume_nonce(claims, opts) do

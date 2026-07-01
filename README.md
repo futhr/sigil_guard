@@ -304,7 +304,9 @@ claims["action_digest"] == decision.audit_metadata.action_digest
 Confirmation tokens are local runtime grants. They do not contain raw payload
 text and cannot be replayed for a different payload, tool, actor, sink, or trust
 boundary. Pass `consume: true` during verification to reject a second use of
-the same token nonce until expiry.
+the same token nonce until expiry. Token issue and verification return
+`{:error, :invalid_payload}` when a payload cannot be canonically encoded for
+action binding.
 
 ### Envelope Signing
 
@@ -615,7 +617,7 @@ SigilGuard emits telemetry events for observability:
 | `[:sigil_guard, :scan, :start\|:stop]` | `duration` | `hit_count`, `patterns_checked`, `pipeline`, `scanner_validate` |
 | `[:sigil_guard, :registry, :fetch, :start\|:stop]` | `duration` | `url`, `count`, `source` |
 | `[:sigil_guard, :policy, :decision]` | `system_time` | `action`, `risk_level`, `trust_level` |
-| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
+| `[:sigil_guard, :runtime, :gate]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `hit_count`, `indicator_count`, `indicator_ids`, `content_hash`, `action_digest`, `action_digest_error`, `repo_policy_verdict`, `repo_policy_rules`, `repo_unmatched_paths` |
 | `[:sigil_guard, :mcp, :request]` | `system_time` | `phase`, `actor`, `identity`, `origin`, `sink`, `tool`, `trust_zone`, `trust_level`, `risk_level`, `verdict`, `action`, `envelope_status`, `envelope_reason`, `confirmation_status`, `confirmation_reason`, `confirmation_actor`, `confirmation_nonce_hash`, `content_hash` |
 | `[:sigil_guard, :audit, :logged]` | `system_time` | `event_type`, `actor`, `action`, `result` |
 

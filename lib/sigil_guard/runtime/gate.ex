@@ -307,6 +307,10 @@ defmodule SigilGuard.Runtime.Gate do
   defp decide(state) do
     source_sink = source_sink_verdict(state)
     {verdict, action, reason} = strongest_verdict(state.policy_verdict, source_sink)
+
+    {verdict, action, reason, action_digest, action_digest_error} =
+      enforce_confirmable_digest(state, verdict, action, reason)
+
     sanitized_text = sanitized_text(state.text, state.hits, state.quarantine, action, state.opts)
 
     %Decision{
@@ -320,8 +324,23 @@ defmodule SigilGuard.Runtime.Gate do
       indicators: state.quarantine.indicators,
       sanitized_text: sanitized_text,
       content_hash: state.quarantine.content_hash,
-      audit_metadata: audit_metadata(state, verdict, action)
+      audit_metadata: audit_metadata(state, verdict, action, action_digest, action_digest_error)
     }
+  end
+
+  defp enforce_confirmable_digest(state, {:confirm, _} = verdict, action, reason) do
+    case Confirmation.fetch_action_digest(state.payload, state.context) do
+      {:ok, digest} ->
+        {verdict, action, reason, digest, nil}
+
+      {:error, digest_error} ->
+        {:blocked, :block, "Confirmation action digest could not be computed: #{digest_error}",
+         nil, digest_error}
+    end
+  end
+
+  defp enforce_confirmable_digest(_, verdict, action, reason) do
+    {verdict, action, reason, nil, nil}
   end
 
   defp source_sink_verdict(%{
@@ -425,7 +444,7 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp external_sink?(sink), do: sink in @external_sinks
 
-  defp audit_metadata(state, verdict, action) do
+  defp audit_metadata(state, verdict, action, action_digest, action_digest_error) do
     %{
       phase: state.context.phase,
       actor: state.context.actor,
@@ -444,16 +463,16 @@ defmodule SigilGuard.Runtime.Gate do
       indicator_count: length(state.quarantine.indicators),
       indicator_ids: Enum.map(state.quarantine.indicators, & &1.id),
       content_hash: state.quarantine.content_hash,
-      action_digest: action_digest(state, verdict)
+      action_digest: action_digest
     }
+    |> put_action_digest_error(action_digest_error)
     |> put_repo_policy_metadata(state.repo_policy)
   end
 
-  defp action_digest(state, {:confirm, _}) do
-    Confirmation.action_digest(state.payload, state.context)
-  end
+  defp put_action_digest_error(metadata, nil), do: metadata
 
-  defp action_digest(_, _), do: nil
+  defp put_action_digest_error(metadata, reason),
+    do: Map.put(metadata, :action_digest_error, reason)
 
   defp action_from_payload(payload) when is_map(payload) do
     payload[:tool] || payload["tool"] || payload[:action] || payload["action"]
@@ -510,6 +529,7 @@ defmodule SigilGuard.Runtime.Gate do
         :indicator_ids,
         :content_hash,
         :action_digest,
+        :action_digest_error,
         :runtime_input_error,
         :repo_policy_verdict,
         :repo_policy_rules,
