@@ -70,6 +70,12 @@ defmodule SigilGuard.Telemetry do
       Metadata: `%{event_type: String.t(), actor: String.t(), action: String.t(),
       result: String.t()}`
 
+    * `[:sigil_guard, :audit, :anchor_store, :put | :fetch | :verify, :start | :stop | :exception]`
+      Measurements: `%{system_time: integer}` (start), `%{duration: integer}` (stop)
+      Metadata: `%{anchor_store: String.t(), anchor_digest: String.t() | nil,
+      anchor_storage: String.t() | nil, anchor_uri_scheme: String.t() | nil,
+      outcome: :ok | :error, error_reason: atom | nil}`
+
   """
 
   @events [
@@ -84,13 +90,26 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :policy, :decision],
     [:sigil_guard, :runtime, :gate],
     [:sigil_guard, :mcp, :request],
-    [:sigil_guard, :audit, :logged]
+    [:sigil_guard, :audit, :logged],
+    [:sigil_guard, :audit, :anchor_store, :put, :start],
+    [:sigil_guard, :audit, :anchor_store, :put, :stop],
+    [:sigil_guard, :audit, :anchor_store, :put, :exception],
+    [:sigil_guard, :audit, :anchor_store, :fetch, :start],
+    [:sigil_guard, :audit, :anchor_store, :fetch, :stop],
+    [:sigil_guard, :audit, :anchor_store, :fetch, :exception],
+    [:sigil_guard, :audit, :anchor_store, :verify, :start],
+    [:sigil_guard, :audit, :anchor_store, :verify, :stop],
+    [:sigil_guard, :audit, :anchor_store, :verify, :exception]
   ]
 
   @attribute_map %{
     action: "sigil.security.action",
     action_digest: "sigil.security.action_digest",
     actor: "sigil.actor",
+    anchor_digest: "sigil.audit.anchor.digest",
+    anchor_storage: "sigil.audit.anchor.storage",
+    anchor_store: "sigil.audit.anchor.store",
+    anchor_uri_scheme: "sigil.audit.anchor.uri_scheme",
     confirmation_actor: "sigil.confirmation.actor",
     confirmation_expires_at: "sigil.confirmation.expires_at",
     confirmation_issued_at: "sigil.confirmation.issued_at",
@@ -102,6 +121,7 @@ defmodule SigilGuard.Telemetry do
     endpoint: "sigil.registry.endpoint",
     envelope_reason: "sigil.envelope.reason",
     envelope_status: "sigil.envelope.status",
+    error_reason: "sigil.error.reason",
     event_type: "sigil.audit.event_type",
     hit_count: "sigil.security.hit_count",
     identity: "sigil.identity",
@@ -109,6 +129,7 @@ defmodule SigilGuard.Telemetry do
     indicator_ids: "sigil.security.indicator_ids",
     mcp_server: "sigil.mcp.server",
     origin: "sigil.security.origin",
+    outcome: "sigil.outcome",
     patterns_checked: "sigil.scanner.patterns_checked",
     phase: "sigil.security.phase",
     pipeline: "sigil.scanner.pipeline",
