@@ -27,6 +27,18 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
     def fetch(_, _), do: {:ok, :bad_record}
   end
 
+  defmodule InvalidAnchorStore do
+    @moduledoc false
+
+    @behaviour SigilGuard.Audit.Anchor.Store
+
+    @impl SigilGuard.Audit.Anchor.Store
+    def put(_, _), do: {:ok, %{"worm" => true}}
+
+    @impl SigilGuard.Audit.Anchor.Store
+    def fetch(_, _), do: {:ok, %{"kind" => "other"}}
+  end
+
   describe "put/3, fetch/3, and verify/4" do
     test "persists, fetches, and verifies anchors through the store facade" do
       {checkpoint, anchor} = anchor_fixture()
@@ -145,6 +157,13 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:error, :invalid_anchor} = Store.fetch(BadReceiptStore, "ignored")
       assert {:error, :invalid_anchor} = Store.verify(BadReceiptStore, "ignored", checkpoint)
     end
+
+    test "rejects digest-compatible non-anchor maps returned by store adapters" do
+      {checkpoint, _} = anchor_fixture()
+
+      assert {:error, :invalid_anchor} = Store.fetch(InvalidAnchorStore, "ignored")
+      assert {:error, :invalid_anchor} = Store.verify(InvalidAnchorStore, "ignored", checkpoint)
+    end
   end
 
   describe "error handling" do
@@ -233,6 +252,34 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       File.write!(path, [entry, ?\n])
 
       assert {:error, :digest_mismatch} = Store.fetch(LocalFile, digest, path: path)
+    end
+
+    test "rejects matching log entries without anchor records" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+      digest = Anchor.digest(anchor)
+
+      entry = Jason.encode!(%{"anchor_digest" => digest})
+
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, [entry, ?\n])
+
+      assert {:error, :invalid_log} = Store.fetch(LocalFile, digest, path: path)
+    end
+
+    test "rejects digest-compatible invalid anchor records inside the log" do
+      path = tmp_path()
+      invalid_record = %{"kind" => "other"}
+      digest = Anchor.digest(invalid_record)
+
+      entry =
+        %{"anchor_digest" => digest, "record" => invalid_record}
+        |> Jason.encode!()
+
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, [entry, ?\n])
+
+      assert {:error, :invalid_anchor} = Store.fetch(LocalFile, digest, path: path)
     end
 
     test "returns not found when no log entry matches the digest" do

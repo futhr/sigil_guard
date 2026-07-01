@@ -125,7 +125,14 @@ defmodule SigilGuard.Audit.Anchor.Store do
   defp enforce_required_worm({:ok, _}, _), do: {:error, :invalid_receipt}
   defp enforce_required_worm(result, _), do: result
 
-  defp enforce_anchor_result({:ok, record}) when is_map(record), do: {:ok, record}
+  defp enforce_anchor_result({:ok, record}) when is_map(record) do
+    case Anchor.validate(record) do
+      :ok -> {:ok, record}
+      {:error, :invalid_kind} -> {:error, :invalid_anchor}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp enforce_anchor_result({:ok, _}), do: {:error, :invalid_anchor}
   defp enforce_anchor_result(result), do: result
 

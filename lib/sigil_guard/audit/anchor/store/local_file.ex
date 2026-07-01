@@ -197,6 +197,9 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
       {:ok, %{"anchor_digest" => ^digest, "record" => record}} when is_map(record) ->
         matching_record_result(record, digest)
 
+      {:ok, %{"anchor_digest" => ^digest}} ->
+        {:halt, {:error, :invalid_log}}
+
       {:ok, %{"anchor_digest" => _}} ->
         {:cont, :not_found}
 
@@ -209,10 +212,12 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp matching_record_result(record, digest) do
-    if Anchor.digest(record) == digest do
+    with true <- Anchor.digest(record) == digest,
+         :ok <- validate_anchor(record) do
       {:halt, {:ok, record}}
     else
-      {:halt, {:error, :digest_mismatch}}
+      false -> {:halt, {:error, :digest_mismatch}}
+      {:error, reason} -> {:halt, {:error, reason}}
     end
   end
 
