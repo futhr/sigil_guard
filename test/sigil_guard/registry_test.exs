@@ -48,6 +48,11 @@ defmodule SigilGuard.RegistryTest do
       assert {:error, _} = Registry.fetch_bundle(url: "http://localhost:1", timeout: 500)
     end
 
+    test "rejects malformed timeouts before requesting", %{url: url} do
+      assert {:error, :invalid_timeout} = Registry.fetch_bundle(url: url, timeout: "bad")
+      assert {:error, :invalid_timeout} = Registry.fetch_bundle(url: url, timeout: -1)
+    end
+
     test "returns error for invalid JSON", %{bypass: bypass, url: url} do
       Bypass.expect_once(bypass, "GET", "/patterns/bundle", fn conn ->
         Plug.Conn.resp(conn, 200, "not json")
@@ -125,6 +130,14 @@ defmodule SigilGuard.RegistryTest do
       end)
 
       assert {:error, {:http_error, 404}} = Registry.resolve_did("did:sigil:unknown", url: url)
+    end
+
+    test "rejects malformed timeouts before DID resolution requests", %{url: url} do
+      assert {:error, :invalid_timeout} =
+               Registry.resolve_did("did:sigil:alice", url: url, timeout: false)
+
+      assert {:error, :invalid_timeout} =
+               Registry.resolve_did("did:sigil:alice", url: url, timeout: -1)
     end
   end
 
@@ -416,6 +429,11 @@ defmodule SigilGuard.RegistryTest do
       end)
 
       assert {:ok, ^policies} = Registry.fetch_policies(url: url)
+    end
+
+    test "rejects malformed timeouts before policy requests", %{url: url} do
+      assert {:error, :invalid_timeout} = Registry.fetch_policies(url: url, timeout: :bad)
+      assert {:error, :invalid_timeout} = Registry.fetch_policies(url: url, timeout: -1)
     end
   end
 

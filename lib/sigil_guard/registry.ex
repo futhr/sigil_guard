@@ -60,9 +60,10 @@ defmodule SigilGuard.Registry do
   @spec fetch_bundle(keyword()) :: fetch_result()
   def fetch_bundle(opts \\ []) do
     url = Keyword.get(opts, :url, Config.registry_url())
-    timeout = Keyword.get(opts, :timeout, Config.registry_timeout_ms())
 
-    request_json("#{url}/patterns/bundle", timeout, %{endpoint: "patterns/bundle"})
+    with {:ok, timeout} <- request_timeout(opts) do
+      request_json("#{url}/patterns/bundle", timeout, %{endpoint: "patterns/bundle"})
+    end
   end
 
   @doc """
@@ -81,16 +82,17 @@ defmodule SigilGuard.Registry do
   @spec resolve_did(String.t(), keyword()) :: fetch_result()
   def resolve_did(did, opts \\ []) do
     url = Keyword.get(opts, :url, Config.registry_url())
-    timeout = Keyword.get(opts, :timeout, Config.registry_timeout_ms())
 
     profile =
       opts
       |> Keyword.get_lazy(:profile, &Config.protocol_profile/0)
       |> Profile.normalize!()
 
-    profile
-    |> Profile.registry_identity_endpoints()
-    |> request_first_success(url, did, timeout)
+    with {:ok, timeout} <- request_timeout(opts) do
+      profile
+      |> Profile.registry_identity_endpoints()
+      |> request_first_success(url, did, timeout)
+    end
   end
 
   @doc """
@@ -123,12 +125,21 @@ defmodule SigilGuard.Registry do
   @spec fetch_policies(keyword()) :: fetch_result()
   def fetch_policies(opts \\ []) do
     url = Keyword.get(opts, :url, Config.registry_url())
-    timeout = Keyword.get(opts, :timeout, Config.registry_timeout_ms())
 
-    request_json("#{url}/policies", timeout, %{endpoint: "policies"})
+    with {:ok, timeout} <- request_timeout(opts) do
+      request_json("#{url}/policies", timeout, %{endpoint: "policies"})
+    end
   end
 
   # -- Private --
+
+  defp request_timeout(opts) do
+    case Keyword.get(opts, :timeout, Config.registry_timeout_ms()) do
+      timeout when is_integer(timeout) and timeout >= 0 -> {:ok, timeout}
+      :infinity -> {:ok, :infinity}
+      _ -> {:error, :invalid_timeout}
+    end
+  end
 
   defp request_json(full_url, timeout, telemetry_meta) do
     Telemetry.span(
