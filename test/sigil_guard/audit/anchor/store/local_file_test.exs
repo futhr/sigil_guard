@@ -96,6 +96,28 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:error, :missing_digest} = Store.fetch(LocalFile, atom_receipt)
     end
 
+    test "does not let explicit paths mask malformed receipt URIs" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+
+      assert {:ok, receipt} = Store.put(LocalFile, anchor, path: path)
+
+      remote_file_receipt =
+        Map.put(
+          receipt,
+          "uri",
+          "file://example.test/tmp/anchors.jsonl##{receipt["anchor_digest"]}"
+        )
+
+      assert {:error, :remote_file_uri} =
+               Store.fetch(LocalFile, remote_file_receipt, path: path)
+
+      malformed_uri_receipt = Map.put(receipt, "uri", false)
+
+      assert {:error, :missing_path} =
+               Store.fetch(LocalFile, malformed_uri_receipt, path: path)
+    end
+
     test "rejects local receipts when WORM receipts are required" do
       {_, anchor} = anchor_fixture()
       path = tmp_path()

@@ -70,7 +70,15 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
     end
   end
 
-  defp path_from_ref(ref, opts) do
+  defp path_from_ref(%{} = ref, opts) do
+    with :ok <- validate_receipt_uri(ref) do
+      path_from_ref_with_opts(ref, opts)
+    end
+  end
+
+  defp path_from_ref(ref, opts), do: path_from_ref_with_opts(ref, opts)
+
+  defp path_from_ref_with_opts(ref, opts) do
     case path_from_opts(opts) do
       {:ok, path} ->
         {:ok, path}
@@ -87,6 +95,22 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp receipt_path(_), do: {:error, :missing_path}
+
+  defp validate_receipt_uri(%{} = receipt) do
+    case fetch_field(receipt, "uri") do
+      {:ok, "file://" <> _ = uri} ->
+        case path_from_uri(uri) do
+          {:ok, _} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      {:ok, _} ->
+        {:error, :missing_path}
+
+      :error ->
+        :ok
+    end
+  end
 
   defp path_from_uri("file://" <> _ = uri) do
     case URI.parse(uri) do
