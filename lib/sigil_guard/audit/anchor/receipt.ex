@@ -137,7 +137,7 @@ defmodule SigilGuard.Audit.Anchor.Receipt do
     end
   end
 
-  defp require_binary(value, _) when is_binary(value), do: :ok
+  defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
   defp require_binary(_, reason), do: {:error, reason}
 
   defp require_algorithm(@signature_algorithm), do: :ok

@@ -68,25 +68,22 @@ defmodule SigilGuard.Audit.Anchor.ReceiptTest do
     test "rejects incomplete or unsupported signature metadata" do
       signed = Receipt.sign(receipt_fixture(), TestSigner, issuer: @issuer)
 
-      assert {:error, :missing_issuer} =
-               signed
-               |> update_in(["signature"], &Map.delete(&1, "issuer"))
-               |> Receipt.verify()
+      for {field, reason} <- [
+            {"issuer", :missing_issuer},
+            {"algorithm", :missing_algorithm},
+            {"digest", :missing_digest},
+            {"signature", :missing_signature}
+          ] do
+        assert {:error, ^reason} =
+                 signed
+                 |> update_in(["signature"], &Map.delete(&1, field))
+                 |> Receipt.verify()
 
-      assert {:error, :missing_algorithm} =
-               signed
-               |> update_in(["signature"], &Map.delete(&1, "algorithm"))
-               |> Receipt.verify()
-
-      assert {:error, :missing_digest} =
-               signed
-               |> update_in(["signature"], &Map.delete(&1, "digest"))
-               |> Receipt.verify()
-
-      assert {:error, :missing_signature} =
-               signed
-               |> update_in(["signature"], &Map.delete(&1, "signature"))
-               |> Receipt.verify()
+        assert {:error, ^reason} =
+                 signed
+                 |> put_in(["signature", field], "")
+                 |> Receipt.verify(public_key_b64u: TestSigner.public_key_b64u())
+      end
 
       assert {:error, :unsupported_algorithm} =
                signed
