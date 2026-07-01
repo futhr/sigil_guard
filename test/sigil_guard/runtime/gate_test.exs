@@ -104,6 +104,39 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.reason =~ "Untrusted tool requests"
     end
 
+    test "blocks malformed text payloads before scanning alias fallbacks" do
+      decision =
+        Gate.evaluate(%{"text" => false, "content" => "safe fallback"},
+          phase: :tool_result,
+          origin: :tool,
+          sink: :model,
+          trust_level: :high
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason =~ "invalid_text"
+      assert decision.sanitized_text == nil
+      assert decision.audit_metadata.runtime_input_error == :invalid_text
+      assert decision.audit_metadata.hit_count == 0
+    end
+
+    test "blocks malformed action payloads before tool alias fallbacks" do
+      decision =
+        Gate.evaluate(%{"action" => false, "tool" => "read_file", "text" => "README.md"},
+          phase: :tool_request,
+          origin: :model,
+          sink: :tool,
+          trust_level: :high
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.action == :block
+      assert decision.reason =~ "invalid_action"
+      assert decision.audit_metadata.runtime_input_error == :invalid_action
+      assert decision.audit_metadata.tool == nil
+    end
+
     test "applies repo policy to repo-change contexts" do
       {:ok, repo_policy} =
         SigilGuard.RepoPolicy.compile(%{
@@ -343,7 +376,7 @@ defmodule SigilGuard.Runtime.GateTest do
         )
 
       assert decision.verdict == :blocked
-      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.audit_metadata.runtime_input_error == :invalid_action
       assert decision.reason =~ "invalid_action"
     end
 

@@ -42,6 +42,13 @@ defmodule SigilGuard.ContextTest do
       assert Context.text(%{"content" => ["not", "a", "string"]}) == nil
       assert Context.text(123) == nil
     end
+
+    test "does not let malformed primary text fields fall through to aliases" do
+      payload = %{"text" => false, "content" => "safe fallback"}
+
+      assert Context.text(payload) == nil
+      assert Context.fetch_text(payload) == {:error, :invalid_text}
+    end
   end
 
   describe "action_name/2" do
@@ -53,6 +60,22 @@ defmodule SigilGuard.ContextTest do
 
     test "falls back to tool payload" do
       assert Context.action_name(Context.new(%{}), %{"tool" => "read_file"}) == "read_file"
+    end
+
+    test "does not let malformed action fields fall through to tool aliases" do
+      context = Context.new(action: false, tool: "read_file")
+
+      assert Context.action_name(context, %{"action" => "write_file"}) == "tool_call"
+
+      assert Context.fetch_action_name(context, %{"action" => "write_file"}) ==
+               {:error, :invalid_action}
+    end
+
+    test "does not let malformed payload action fields fall through to aliases" do
+      payload = %{"action" => false, "tool" => "read_file"}
+
+      assert Context.action_name(Context.new(%{}), payload) == "tool_call"
+      assert Context.fetch_action_name(Context.new(%{}), payload) == {:error, :invalid_action}
     end
   end
 end

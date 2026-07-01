@@ -74,29 +74,85 @@ defmodule SigilGuard.Context do
   Return the action string used by policy evaluation.
   """
   @spec action_name(t(), term()) :: String.t()
-  def action_name(%__MODULE__{action: action}, _) when is_binary(action), do: action
-  def action_name(%__MODULE__{tool: tool}, _) when is_binary(tool), do: tool
-
-  def action_name(_, payload) when is_map(payload) do
-    case first_string(payload, [:action, "action", :tool, "tool", :name, "name"]) do
-      nil -> "tool_call"
-      action -> action
+  def action_name(%__MODULE__{} = context, payload) do
+    case fetch_action_name(context, payload) do
+      {:ok, action} -> action
+      {:error, _} -> "tool_call"
     end
   end
 
-  def action_name(_, _), do: "tool_call"
+  def action_name(_, payload), do: action_name(new(%{}), payload)
+
+  @doc """
+  Strictly fetch the action string used by runtime policy evaluation.
+
+  Missing fields fall back through the known aliases. Present non-binary fields
+  are treated as malformed instead of being hidden by later aliases.
+  """
+  @spec fetch_action_name(t(), term()) :: {:ok, String.t()} | {:error, :invalid_action}
+  def fetch_action_name(%__MODULE__{} = context, payload) do
+    with {:ok, nil} <- first_context_string(context, [:action, :tool], :invalid_action),
+         {:ok, nil} <-
+           first_string(
+             payload,
+             [:action, "action", :tool, "tool", :name, "name"],
+             :invalid_action
+           ) do
+      {:ok, "tool_call"}
+    else
+      {:ok, action} when is_binary(action) -> {:ok, action}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Strictly extract scan text from common payload shapes.
+
+  Missing fields return `{:ok, nil}`. Present non-binary text fields are treated
+  as malformed instead of being hidden by later aliases.
+  """
+  @spec fetch_text(term()) :: {:ok, String.t() | nil} | {:error, :invalid_text}
+  def fetch_text(payload) when is_binary(payload), do: {:ok, payload}
+
+  def fetch_text(payload) when is_map(payload) do
+    first_string(
+      payload,
+      [:text, "text", :content, "content", :output, "output", :body, "body"],
+      :invalid_text
+    )
+  end
+
+  def fetch_text(_), do: {:ok, nil}
 
   @doc """
   Extract scan text from common payload shapes.
   """
   @spec text(term()) :: String.t() | nil
-  def text(payload) when is_binary(payload), do: payload
-
-  def text(payload) when is_map(payload) do
-    first_string(payload, [:text, "text", :content, "content", :output, "output", :body, "body"])
+  def text(payload) do
+    case fetch_text(payload) do
+      {:ok, text} -> text
+      {:error, _} -> nil
+    end
   end
 
-  def text(_), do: nil
+  defp first_context_string(%__MODULE__{} = context, keys, error) do
+    context
+    |> Map.from_struct()
+    |> first_string(keys, error)
+  end
+
+  defp first_string(map, keys, error) when is_map(map) do
+    Enum.reduce_while(keys, {:ok, nil}, fn key, {:ok, nil} ->
+      case Map.fetch(map, key) do
+        {:ok, nil} -> {:cont, {:ok, nil}}
+        {:ok, value} when is_binary(value) -> {:halt, {:ok, value}}
+        {:ok, _} -> {:halt, {:error, error}}
+        :error -> {:cont, {:ok, nil}}
+      end
+    end)
+  end
+
+  defp first_string(_, _, _), do: {:ok, nil}
 
   defp atomize_known_keys(context) do
     known =
@@ -124,14 +180,5 @@ defmodule SigilGuard.Context do
     {:ok, String.to_existing_atom(key)}
   rescue
     ArgumentError -> :error
-  end
-
-  defp first_string(map, keys) do
-    Enum.find_value(keys, fn key ->
-      case Map.get(map, key) do
-        value when is_binary(value) -> value
-        _ -> nil
-      end
-    end)
   end
 end

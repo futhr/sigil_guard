@@ -46,8 +46,25 @@ defmodule SigilGuard.Runtime.Gate do
   @spec evaluate(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def evaluate(payload, context \\ %Context{}, opts \\ []) do
     context = Context.new(context)
-    text = Context.text(payload)
-    action = Context.action_name(context, payload)
+
+    decision =
+      case runtime_inputs(payload, context) do
+        {:ok, text, action} -> evaluate_checked(payload, context, text, action, opts)
+        {:error, reason} -> malformed_input_decision(context, reason)
+      end
+
+    emit_decision(decision)
+    decision
+  end
+
+  defp runtime_inputs(payload, context) do
+    with {:ok, text} <- Context.fetch_text(payload),
+         {:ok, action} <- Context.fetch_action_name(context, payload) do
+      {:ok, text, action}
+    end
+  end
+
+  defp evaluate_checked(payload, context, text, action, opts) do
     hits = scan_hits(text, opts)
     quarantine = Quarantine.inspect(text, context, opts)
     repo_policy = repo_policy_decision(payload, context, action, opts)
@@ -65,22 +82,63 @@ defmodule SigilGuard.Runtime.Gate do
     policy_verdict =
       Policy.evaluate(action, context.trust_level, Keyword.put(opts, :risk_level, risk))
 
-    decision =
-      decide(%{
-        payload: payload,
-        text: text,
-        context: context,
-        hits: hits,
-        quarantine: quarantine,
-        repo_policy: repo_policy,
-        risk: risk,
-        policy_verdict: policy_verdict,
-        opts: opts
-      })
-
-    emit_decision(decision)
-    decision
+    decide(%{
+      payload: payload,
+      text: text,
+      context: context,
+      hits: hits,
+      quarantine: quarantine,
+      repo_policy: repo_policy,
+      risk: risk,
+      policy_verdict: policy_verdict,
+      opts: opts
+    })
   end
+
+  defp malformed_input_decision(context, reason) do
+    quarantine = Quarantine.inspect(nil, context, [])
+
+    %Decision{
+      verdict: :blocked,
+      action: :block,
+      reason: "Malformed runtime input: #{reason}",
+      phase: context.phase,
+      risk_level: :high,
+      trust_level: context.trust_level,
+      hits: [],
+      indicators: [],
+      sanitized_text: nil,
+      content_hash: quarantine.content_hash,
+      audit_metadata: malformed_input_audit_metadata(context, reason, quarantine.content_hash)
+    }
+  end
+
+  defp malformed_input_audit_metadata(context, reason, content_hash) do
+    %{
+      phase: context.phase,
+      actor: context.actor,
+      identity: context.identity,
+      origin: context.origin,
+      sink: context.sink,
+      tool: audit_binary(context.tool),
+      mcp_server: audit_binary(context.mcp_server),
+      resource_uri: audit_binary(context.resource_uri),
+      trust_zone: context.trust_zone,
+      trust_level: context.trust_level,
+      risk_level: :high,
+      verdict: :blocked,
+      action: :block,
+      hit_count: 0,
+      indicator_count: 0,
+      indicator_ids: [],
+      content_hash: content_hash,
+      action_digest: nil,
+      runtime_input_error: reason
+    }
+  end
+
+  defp audit_binary(value) when is_binary(value), do: value
+  defp audit_binary(_), do: nil
 
   defp scan_hits(nil, _), do: []
 
@@ -411,6 +469,7 @@ defmodule SigilGuard.Runtime.Gate do
         :indicator_ids,
         :content_hash,
         :action_digest,
+        :runtime_input_error,
         :repo_policy_verdict,
         :repo_policy_rules,
         :repo_unmatched_paths,
