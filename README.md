@@ -19,7 +19,7 @@
 SigilGuard provides a high-level Elixir API for the [SIGIL Protocol](https://sigil-protocol.org/),
 securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use SigilGuard for:
 
-- **Sensitivity Scanning** — Detect and redact credentials with staged validation/enrichment
+- **Sensitivity Scanning** — Detect and redact credentials with boundary-aware staged validation/enrichment
 - **Runtime Gate** — Boundary-aware decisions for tool input, tool output, and external sinks
 - **Repo Policy Kernel** — deterministic allow/approval/block decisions for changed paths
 - **MCP Gateway Helpers** — Guard MCP-shaped tool requests and results without adapter lock-in
@@ -36,7 +36,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 | Feature | Description |
 |---------|-------------|
-| **Sensitivity Scanner** | Staged regex, validation, confidence, and signal enrichment for secrets and credentials |
+| **Sensitivity Scanner** | Boundary-aware staged regex, validation, confidence, and signal enrichment for secrets and credentials |
 | **Runtime Gate** | Source-to-sink guard combining scanning, quarantine indicators, and policy |
 | **Repo Policy** | Deterministic agent/action/path rules for repo changes |
 | **MCP Gateway** | Transport-agnostic guards for MCP request/result maps |

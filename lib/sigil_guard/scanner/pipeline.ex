@@ -10,7 +10,7 @@ defmodule SigilGuard.Scanner.Pipeline do
   ## Stages
 
     * `:regex` - collect pattern candidates and byte offsets
-    * `:validate` - reject structurally weak, placeholder, or low-entropy generic candidates
+    * `:validate` - reject structurally weak, boundary-ambiguous, placeholder, or low-entropy candidates
     * `:enrich` - add confidence and non-sensitive signal metadata
     * `:sort` - return hits in source order
 
@@ -23,10 +23,12 @@ defmodule SigilGuard.Scanner.Pipeline do
   @typedoc "Non-sensitive evidence labels attached to enriched scanner hits."
   @type signal ::
           :assignment_context
+          | :assignment_boundary
           | :credential_category
           | :high_entropy
           | :known_key_format
           | :long_value
+          | :token_boundary
           | :uri_with_authority
 
   @typedoc "Internal regex candidate before validation and enrichment."
@@ -34,7 +36,9 @@ defmodule SigilGuard.Scanner.Pipeline do
           pattern: Patterns.compiled_pattern(),
           match: String.t(),
           offset: non_neg_integer(),
-          length: non_neg_integer()
+          length: non_neg_integer(),
+          previous_byte: byte() | nil,
+          next_byte: byte() | nil
         }
 
   @doc """
@@ -80,11 +84,15 @@ defmodule SigilGuard.Scanner.Pipeline do
       pattern.regex
       |> Regex.scan(text, return: :index)
       |> Enum.map(fn [{offset, length} | _] ->
+        {previous_byte, next_byte} = boundary_bytes(text, offset, length)
+
         %{
           pattern: pattern,
           match: binary_part(text, offset, length),
           offset: offset,
-          length: length
+          length: length,
+          previous_byte: previous_byte,
+          next_byte: next_byte
         }
       end)
     end)
@@ -94,18 +102,20 @@ defmodule SigilGuard.Scanner.Pipeline do
     not Keyword.get(opts, :validate, true) or structurally_valid?(candidate, opts)
   end
 
-  defp structurally_valid?(%{pattern: %{name: "aws_access_key"}, match: match}, _) do
-    Regex.match?(~r/\A(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\z/, match)
+  defp structurally_valid?(%{pattern: %{name: "aws_access_key"}, match: match} = candidate, _) do
+    Regex.match?(~r/\A(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\z/, match) and
+      token_boundary?(candidate, &ascii_alphanumeric_byte?/1)
   end
 
-  defp structurally_valid?(%{pattern: %{name: "bearer_token"}, match: match}, opts) do
-    match
-    |> bearer_value()
-    |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
+  defp structurally_valid?(%{pattern: %{name: "bearer_token"}, match: match} = candidate, opts) do
+    label_boundary?(candidate) and token_boundary?(candidate, &bearer_token_byte?/1) and
+      match
+      |> bearer_value()
+      |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
   end
 
-  defp structurally_valid?(%{pattern: %{name: "database_uri"}, match: match}, _) do
-    String.contains?(match, "://") and String.contains?(match, ":") and
+  defp structurally_valid?(%{pattern: %{name: "database_uri"}, match: match} = candidate, _) do
+    label_boundary?(candidate) and String.contains?(match, "://") and String.contains?(match, ":") and
       String.ends_with?(match, "@")
   end
 
@@ -113,20 +123,22 @@ defmodule SigilGuard.Scanner.Pipeline do
     String.starts_with?(match, "-----BEGIN ") and String.ends_with?(match, "PRIVATE KEY-----")
   end
 
-  defp structurally_valid?(%{pattern: %{name: "generic_api_key"}, match: match}, opts) do
-    match
-    |> assignment_value()
-    |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
+  defp structurally_valid?(%{pattern: %{name: "generic_api_key"}, match: match} = candidate, opts) do
+    assignment_boundary?(candidate) and
+      match
+      |> assignment_value()
+      |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
   end
 
-  defp structurally_valid?(%{pattern: %{name: "generic_secret"}, match: match}, opts) do
+  defp structurally_valid?(%{pattern: %{name: "generic_secret"}, match: match} = candidate, opts) do
     value = assignment_value(match)
 
-    secret_like?(
-      value,
-      Keyword.get(opts, :generic_secret_min_length, 10),
-      Keyword.get(opts, :generic_secret_min_entropy, 2.8)
-    )
+    assignment_boundary?(candidate) and
+      secret_like?(
+        value,
+        Keyword.get(opts, :generic_secret_min_length, 10),
+        Keyword.get(opts, :generic_secret_min_entropy, 2.8)
+      )
   end
 
   defp structurally_valid?(_, _), do: true
@@ -164,8 +176,10 @@ defmodule SigilGuard.Scanner.Pipeline do
       credential_category?(candidate) && :credential_category,
       known_key_format?(candidate) && :known_key_format,
       assignment_context?(candidate.match) && :assignment_context,
+      assignment_boundary?(candidate) && :assignment_boundary,
       high_entropy?(value) && :high_entropy,
       byte_size(value) >= 20 && :long_value,
+      token_boundary_signal?(candidate) && :token_boundary,
       uri_authority?(candidate) && :uri_with_authority
     ]
     |> Enum.filter(& &1)
@@ -193,9 +207,11 @@ defmodule SigilGuard.Scanner.Pipeline do
 
   defp signal_bonus(:known_key_format), do: 0.08
   defp signal_bonus(:assignment_context), do: 0.08
+  defp signal_bonus(:assignment_boundary), do: 0.04
   defp signal_bonus(:high_entropy), do: 0.08
   defp signal_bonus(:long_value), do: 0.04
   defp signal_bonus(:credential_category), do: 0.03
+  defp signal_bonus(:token_boundary), do: 0.03
   defp signal_bonus(:uri_with_authority), do: 0.07
 
   defp credential_category?(%{pattern: %{category: "credential"}}), do: true
@@ -207,6 +223,27 @@ defmodule SigilGuard.Scanner.Pipeline do
 
   defp assignment_context?(match),
     do: String.contains?(match, "=") or String.contains?(match, ":")
+
+  defp assignment_boundary?(%{pattern: %{name: name}} = candidate)
+       when name in ["generic_api_key", "generic_secret"] do
+    label_boundary?(candidate)
+  end
+
+  defp assignment_boundary?(%{pattern: %{name: "database_uri"}} = candidate) do
+    label_boundary?(candidate)
+  end
+
+  defp assignment_boundary?(_), do: false
+
+  defp token_boundary_signal?(%{pattern: %{name: "aws_access_key"}} = candidate) do
+    token_boundary?(candidate, &ascii_alphanumeric_byte?/1)
+  end
+
+  defp token_boundary_signal?(%{pattern: %{name: "bearer_token"}} = candidate) do
+    token_boundary?(candidate, &bearer_token_byte?/1)
+  end
+
+  defp token_boundary_signal?(_), do: false
 
   defp high_entropy?(value), do: shannon_entropy(value) >= 3.0
 
@@ -258,6 +295,39 @@ defmodule SigilGuard.Scanner.Pipeline do
       {offset, _} -> binary_part(value, 0, offset)
       :nomatch -> value
     end
+  end
+
+  defp boundary_bytes(text, offset, length) do
+    {previous_byte(text, offset), next_byte(text, offset + length)}
+  end
+
+  defp previous_byte(_, 0), do: nil
+  defp previous_byte(text, offset), do: :binary.at(text, offset - 1)
+
+  defp next_byte(text, offset) when offset < byte_size(text), do: :binary.at(text, offset)
+  defp next_byte(_, _), do: nil
+
+  defp label_boundary?(%{previous_byte: byte}), do: boundary_byte?(byte)
+
+  defp token_boundary?(%{previous_byte: previous_byte, next_byte: next_byte}, byte?) do
+    boundary_for?(previous_byte, byte?) and boundary_for?(next_byte, byte?)
+  end
+
+  defp boundary_for?(nil, _), do: true
+  defp boundary_for?(byte, byte?), do: not byte?.(byte)
+
+  defp boundary_byte?(nil), do: true
+
+  defp boundary_byte?(byte) do
+    not ascii_alphanumeric_byte?(byte) and byte != ?_ and byte != ?-
+  end
+
+  defp ascii_alphanumeric_byte?(byte) do
+    (byte >= ?a and byte <= ?z) or (byte >= ?A and byte <= ?Z) or (byte >= ?0 and byte <= ?9)
+  end
+
+  defp bearer_token_byte?(byte) do
+    ascii_alphanumeric_byte?(byte) or byte in [?., ?_, ?~, ?+, ?/, ?=, ?-]
   end
 
   defp token_like?(value, min_length, min_entropy) do

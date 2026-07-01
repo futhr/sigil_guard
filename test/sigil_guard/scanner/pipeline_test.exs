@@ -36,6 +36,7 @@ defmodule SigilGuard.Scanner.PipelineTest do
       assert hit.confidence >= 0.9
       assert :known_key_format in hit.signals
       assert :credential_category in hit.signals
+      assert :token_boundary in hit.signals
     end
 
     test "keeps legacy regex-only hits when requested" do
@@ -65,6 +66,34 @@ defmodule SigilGuard.Scanner.PipelineTest do
       assert hit.validated
       assert :high_entropy in hit.signals
       assert :assignment_context in hit.signals
+      assert :assignment_boundary in hit.signals
+    end
+
+    test "rejects embedded assignment labels in staged mode" do
+      text = "notsecret=R7v9K2mQ4xZ8pL6n"
+
+      assert {:ok, ^text} = Scanner.scan(text)
+      assert {:hit, [hit]} = Scanner.scan(text, pipeline: :regex)
+      assert hit.name == "generic_secret"
+      assert hit.offset == 3
+    end
+
+    test "rejects embedded fixed-format token substrings in staged mode" do
+      text = "XAKIAIOSFODNN7EXAMPLEY"
+
+      assert {:ok, ^text} = Scanner.scan(text)
+      assert {:hit, [hit]} = Scanner.scan(text, pipeline: :regex)
+      assert hit.name == "aws_access_key"
+      assert hit.offset == 1
+    end
+
+    test "rejects embedded bearer token labels in staged mode" do
+      text = "notbearer sk-abc123def456ghi789jkl012mno345"
+
+      assert {:ok, ^text} = Scanner.scan(text)
+      assert {:hit, [hit]} = Scanner.scan(text, pipeline: :regex)
+      assert hit.name == "bearer_token"
+      assert hit.offset == 3
     end
 
     test "allows local validation thresholds to be tightened" do
