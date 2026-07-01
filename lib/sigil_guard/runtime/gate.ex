@@ -138,10 +138,38 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp repo_policy_context(payload, context, action) do
     %{
-      agent: context.identity || context.actor,
-      action: action,
+      identity: context.identity,
+      actor: context.actor,
+      action: repo_policy_action(payload, context, action),
       changed_paths: changed_paths(payload, context)
     }
+  end
+
+  defp repo_policy_action(payload, context, fallback_action) do
+    cond do
+      context.action != nil ->
+        context.action
+
+      context.tool != nil ->
+        context.tool
+
+      true ->
+        payload_repo_policy_action(payload, fallback_action)
+    end
+  end
+
+  defp payload_repo_policy_action(payload, fallback_action) when is_map(payload) do
+    case first_present_value(payload, repo_policy_action_keys()) do
+      {:ok, nil} -> fallback_action
+      {:ok, action} -> action
+      :not_found -> fallback_action
+    end
+  end
+
+  defp payload_repo_policy_action(_, fallback_action), do: fallback_action
+
+  defp repo_policy_action_keys do
+    [:action, "action", :tool, "tool", :name, "name"]
   end
 
   defp changed_paths(payload, context) do

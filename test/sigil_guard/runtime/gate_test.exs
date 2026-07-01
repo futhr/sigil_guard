@@ -301,6 +301,52 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.reason =~ "invalid_changed_paths"
     end
 
+    test "blocks malformed repo identity before actor fallback" do
+      {:ok, repo_policy} = SigilGuard.RepoPolicy.compile(%{default: :allow})
+
+      decision =
+        Gate.evaluate(
+          %{changed_paths: ["README.md"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: false,
+            actor: "did:web:codex",
+            action: "modify",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.reason =~ "invalid_agent"
+    end
+
+    test "blocks malformed repo action before tool or payload fallback" do
+      {:ok, repo_policy} = SigilGuard.RepoPolicy.compile(%{default: :allow})
+
+      decision =
+        Gate.evaluate(
+          %{action: "modify", changed_paths: ["README.md"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: false,
+            tool: "modify",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.reason =~ "invalid_action"
+    end
+
     test "blocks when trust policy rejects an otherwise clean action" do
       decision =
         Gate.evaluate("safe",
