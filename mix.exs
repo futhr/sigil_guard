@@ -150,6 +150,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Audit,
           SigilGuard.Audit.Action,
           SigilGuard.Audit.Anchor,
+          SigilGuard.Audit.Anchor.Receipt,
           SigilGuard.Audit.Anchor.Store,
           SigilGuard.Audit.Anchor.Store.HTTP,
           SigilGuard.Audit.Anchor.Store.LocalFile,

@@ -394,6 +394,22 @@ anchor =
 
 {:ok, _verified_anchor} = SigilGuard.Audit.Anchor.verify(anchor, signed_checkpoint)
 
+remote_service_receipt =
+  SigilGuard.Audit.Anchor.Receipt.sign(
+    %{
+      "kind" => "sigil_guard.audit.anchor.receipt",
+      "version" => 1,
+      "storage" => "s3-object-lock",
+      "uri" => "s3://audit-lock/checkpoints/001.json",
+      "anchor_digest" => SigilGuard.Audit.Anchor.digest(anchor),
+      "stored_at" => "2026-01-01T00:00:00Z",
+      "worm" => true,
+      "metadata" => %{}
+    },
+    MyAuditSigner,
+    issuer: "did:web:audit.example.internal"
+  )
+
 {:ok, receipt} =
   SigilGuard.Audit.Anchor.Store.put(
     SigilGuard.Audit.Anchor.Store.LocalFile,

@@ -5,6 +5,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
 
   alias SigilGuard.Audit
   alias SigilGuard.Audit.Anchor
+  alias SigilGuard.Audit.Anchor.Receipt
   alias SigilGuard.Audit.Anchor.Store
   alias SigilGuard.Audit.Anchor.Store.HTTP
   alias SigilGuard.Audit.Checkpoint
@@ -587,67 +588,25 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
   end
 
   defp sign_receipt(receipt, opts \\ []) do
-    unsigned_receipt = Map.delete(receipt, "signature")
-    signature_bytes = canonical_bytes(unsigned_receipt)
+    signed = Receipt.sign(receipt, TestSigner, issuer: Keyword.get(opts, :issuer, @issuer))
 
-    signature = %{
-      "issuer" => Keyword.get(opts, :issuer, @issuer),
-      "algorithm" => Keyword.get(opts, :algorithm, "Ed25519"),
-      "digest" => Keyword.get_lazy(opts, :digest, fn -> digest(unsigned_receipt) end),
-      "signature" =>
-        Keyword.get_lazy(opts, :signature, fn ->
-          signature_bytes
-          |> TestSigner.sign()
-          |> Base.url_encode64(padding: false)
-        end)
-    }
+    signature =
+      signed
+      |> Map.fetch!("signature")
+      |> maybe_override_signature("algorithm", :algorithm, opts)
+      |> maybe_override_signature("digest", :digest, opts)
+      |> maybe_override_signature("signature", :signature, opts)
 
-    Map.put(unsigned_receipt, "signature", signature)
+    signed
+    |> Map.delete("signature")
+    |> Map.put("signature", signature)
   end
 
-  defp digest(receipt) do
-    receipt
-    |> canonical_bytes()
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
+  defp maybe_override_signature(signature, field, opt, opts) do
+    if Keyword.has_key?(opts, opt) do
+      Map.put(signature, field, Keyword.fetch!(opts, opt))
+    else
+      signature
+    end
   end
-
-  defp canonical_bytes(value) do
-    value
-    |> canonical_iodata()
-    |> IO.iodata_to_binary()
-  end
-
-  defp canonical_iodata(value) when is_map(value) do
-    parts =
-      value
-      |> Enum.map(fn {key, item} -> {canonical_key(key), item} end)
-      |> Enum.sort_by(&elem(&1, 0))
-      |> Enum.map(fn {key, item} -> [Jason.encode!(key), ?:, canonical_iodata(item)] end)
-      |> Enum.intersperse(",")
-
-    [?{, parts, ?}]
-  end
-
-  defp canonical_iodata(value) when is_list(value) do
-    parts =
-      value
-      |> Enum.map(&canonical_iodata/1)
-      |> Enum.intersperse(",")
-
-    [?[, parts, ?]]
-  end
-
-  defp canonical_iodata(value)
-       when is_atom(value) and not is_boolean(value) and not is_nil(value) do
-    value
-    |> Atom.to_string()
-    |> Jason.encode!()
-  end
-
-  defp canonical_iodata(value), do: Jason.encode!(value)
-
-  defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
-  defp canonical_key(key) when is_binary(key), do: key
-  defp canonical_key(key), do: to_string(key)
 end

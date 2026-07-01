@@ -34,28 +34,22 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   @behaviour SigilGuard.Audit.Anchor.Store
 
   alias SigilGuard.Audit.Anchor
+  alias SigilGuard.Audit.Anchor.Receipt
 
   @kind "sigil_guard.audit.anchor.receipt"
   @version 1
   @anchor_kind "sigil_guard.audit.anchor"
   @put_kind "sigil_guard.audit.anchor.put"
-  @signature_algorithm "Ed25519"
   @default_put_path "/audit/anchors"
   @default_fetch_path "/audit/anchors/:digest"
   @default_timeout_ms 5_000
   @success_statuses [200, 201, 202]
-  @metadata_keys ~w(signature)
-  @metadata_atom_keys [:signature]
   @atom_fields %{
-    "algorithm" => :algorithm,
     "anchor" => :anchor,
     "anchor_digest" => :anchor_digest,
-    "digest" => :digest,
-    "issuer" => :issuer,
     "kind" => :kind,
     "metadata" => :metadata,
     "record" => :record,
-    "signature" => :signature,
     "storage" => :storage,
     "stored_at" => :stored_at,
     "uri" => :uri,
@@ -317,129 +311,21 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   defp verify_required_receipt_signature(receipt, opts) do
     if Keyword.get(opts, :require_receipt_signature, false) do
-      case field(receipt, "signature") do
-        signature when is_map(signature) -> verify_receipt_signature(receipt, signature, opts)
-        nil -> {:error, :unsigned_receipt}
-        _ -> {:error, :invalid_signature_metadata}
-      end
+      Receipt.verify(receipt, receipt_verify_opts(opts))
     else
       :ok
     end
   end
 
-  defp verify_receipt_signature(receipt, signature, opts) do
-    with {:ok, fields} <- signature_fields(signature),
-         :ok <- validate_signature_digest(receipt, fields.digest),
-         {:ok, public_key} <- receipt_public_key(fields.issuer, opts),
-         {:ok, decoded_signature} <- decode_signature(fields.signature) do
-      verify_ed25519(receipt, decoded_signature, public_key)
-    end
-  end
-
-  defp signature_fields(%{} = signature) do
-    fields = %{
-      issuer: field(signature, "issuer"),
-      algorithm: field(signature, "algorithm"),
-      digest: field(signature, "digest"),
-      signature: field(signature, "signature")
-    }
-
-    with :ok <- require_binary(fields.issuer, :missing_issuer),
-         :ok <- require_binary(fields.algorithm, :missing_algorithm),
-         :ok <- require_algorithm(fields.algorithm),
-         :ok <- require_binary(fields.digest, :missing_digest),
-         :ok <- require_binary(fields.signature, :missing_signature) do
-      {:ok, fields}
-    end
-  end
-
-  defp require_binary(value, _) when is_binary(value), do: :ok
-  defp require_binary(_, reason), do: {:error, reason}
-
-  defp require_algorithm(@signature_algorithm), do: :ok
-  defp require_algorithm(_), do: {:error, :unsupported_algorithm}
-
-  defp validate_signature_digest(receipt, claimed_digest) do
-    if secure_compare(receipt_digest(receipt), claimed_digest) do
-      :ok
-    else
-      {:error, :digest_mismatch}
-    end
-  end
-
-  defp receipt_public_key(issuer, opts) do
-    public_keys = Keyword.get(opts, :receipt_public_keys, %{})
-
-    if is_map(public_keys) do
-      encoded =
-        public_keys[issuer] || public_keys[to_string(issuer)] ||
-          Keyword.get(opts, :receipt_public_key_b64u)
-
-      case encoded do
-        value when is_binary(value) -> decode_public_key(value)
-        _ -> {:error, :unknown_issuer}
-      end
-    else
-      {:error, :invalid_public_keys}
-    end
-  end
-
-  defp decode_public_key(value) do
-    case decode_base64(value) do
-      key when is_binary(key) and byte_size(key) == 32 -> {:ok, key}
-      key when is_binary(key) -> {:error, :invalid_key}
-      nil -> {:error, :invalid_base64}
-    end
-  end
-
-  defp decode_signature(value) do
-    case decode_base64(value) do
-      signature when is_binary(signature) and byte_size(signature) == 64 -> {:ok, signature}
-      signature when is_binary(signature) -> {:error, :invalid_signature}
-      nil -> {:error, :invalid_base64}
-    end
-  end
-
-  defp decode_base64(value) do
-    case decode_url64(value) do
-      nil -> decode_64(value)
-      decoded -> decoded
-    end
-  end
-
-  defp decode_url64(value) do
-    with :error <- Base.url_decode64(value, padding: false),
-         :error <- Base.url_decode64(value, padding: true) do
-      nil
-    else
-      {:ok, decoded} -> decoded
-    end
-  end
-
-  defp decode_64(value) do
-    with :error <- Base.decode64(value, padding: false),
-         :error <- Base.decode64(value, padding: true) do
-      nil
-    else
-      {:ok, decoded} -> decoded
-    end
-  end
-
-  defp verify_ed25519(receipt, signature, public_key) do
-    if :crypto.verify(:eddsa, :none, canonical_receipt_bytes(receipt), signature, [
-         public_key,
-         :ed25519
-       ]) do
-      :ok
-    else
-      {:error, :invalid_signature}
-    end
-  rescue
-    ErlangError -> {:error, :invalid_signature}
+  defp receipt_verify_opts(opts) do
+    [
+      public_keys: Keyword.get(opts, :receipt_public_keys, %{}),
+      public_key_b64u: Keyword.get(opts, :receipt_public_key_b64u)
+    ]
   end
 
   defp signed_receipt_field(receipt) do
-    case field(receipt, "signature") do
+    case Receipt.signature(receipt) do
       nil -> %{}
       signature -> %{"signature" => signature}
     end
@@ -509,55 +395,6 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   defp timeout(opts), do: Keyword.get(opts, :timeout, @default_timeout_ms)
 
-  defp receipt_digest(receipt) do
-    receipt
-    |> canonical_receipt_bytes()
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
-  end
-
-  defp canonical_receipt_bytes(receipt) do
-    receipt
-    |> unsigned_receipt()
-    |> canonical_iodata()
-    |> IO.iodata_to_binary()
-  end
-
-  defp unsigned_receipt(receipt), do: Map.drop(receipt, @metadata_keys ++ @metadata_atom_keys)
-
-  defp canonical_iodata(value) when is_map(value) do
-    parts =
-      value
-      |> Enum.map(fn {key, item} -> {canonical_key(key), item} end)
-      |> Enum.sort_by(&elem(&1, 0))
-      |> Enum.map(fn {key, item} -> [Jason.encode!(key), ?:, canonical_iodata(item)] end)
-      |> Enum.intersperse(",")
-
-    [?{, parts, ?}]
-  end
-
-  defp canonical_iodata(value) when is_list(value) do
-    parts =
-      value
-      |> Enum.map(&canonical_iodata/1)
-      |> Enum.intersperse(",")
-
-    [?[, parts, ?]]
-  end
-
-  defp canonical_iodata(value)
-       when is_atom(value) and not is_boolean(value) and not is_nil(value) do
-    value
-    |> Atom.to_string()
-    |> Jason.encode!()
-  end
-
-  defp canonical_iodata(value), do: Jason.encode!(value)
-
-  defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
-  defp canonical_key(key) when is_binary(key), do: key
-  defp canonical_key(key), do: to_string(key)
-
   defp field(map, key) when is_map(map) do
     case Map.fetch(map, key) do
       {:ok, value} -> value
@@ -566,18 +403,6 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   end
 
   defp nonempty_binary?(value), do: is_binary(value) and value != ""
-
-  defp secure_compare(a, b) when is_binary(a) and is_binary(b) and byte_size(a) == byte_size(b) do
-    secure_compare(a, b, 0)
-  end
-
-  defp secure_compare(_, _), do: false
-
-  defp secure_compare(<<a, rest_a::binary>>, <<b, rest_b::binary>>, diff) do
-    secure_compare(rest_a, rest_b, Bitwise.bor(diff, Bitwise.bxor(a, b)))
-  end
-
-  defp secure_compare(<<>>, <<>>, diff), do: diff == 0
 
   defp timestamp do
     DateTime.utc_now(:millisecond)
