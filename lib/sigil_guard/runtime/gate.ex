@@ -145,33 +145,37 @@ defmodule SigilGuard.Runtime.Gate do
   end
 
   defp changed_paths(payload, context) do
-    first_list(context.metadata, [
-      :changed_paths,
-      "changed_paths",
-      :changed_files,
-      "changed_files"
-    ]) ||
-      first_list(payload, [
-        :changed_paths,
-        "changed_paths",
-        :changed_files,
-        "changed_files",
-        :files,
-        "files"
-      ]) ||
-      []
+    case first_present_value(context.metadata, changed_path_context_keys()) do
+      {:ok, value} -> value
+      :not_found -> payload_changed_paths(payload)
+    end
   end
 
-  defp first_list(map, keys) when is_map(map) do
-    Enum.find_value(keys, fn key ->
-      case Map.get(map, key) do
-        value when is_list(value) -> value
-        _ -> nil
+  defp payload_changed_paths(payload) do
+    case first_present_value(payload, changed_path_payload_keys()) do
+      {:ok, value} -> value
+      :not_found -> []
+    end
+  end
+
+  defp changed_path_context_keys do
+    ["changed_paths", :changed_paths, "changed_files", :changed_files]
+  end
+
+  defp changed_path_payload_keys do
+    ["changed_paths", :changed_paths, "changed_files", :changed_files, "files", :files]
+  end
+
+  defp first_present_value(map, keys) when is_map(map) do
+    Enum.reduce_while(keys, :not_found, fn key, :not_found ->
+      case Map.fetch(map, key) do
+        {:ok, value} -> {:halt, {:ok, value}}
+        :error -> {:cont, :not_found}
       end
     end)
   end
 
-  defp first_list(_, _), do: nil
+  defp first_present_value(_, _), do: :not_found
 
   defp decide(state) do
     source_sink = source_sink_verdict(state)

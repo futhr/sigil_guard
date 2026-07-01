@@ -515,6 +515,20 @@ defmodule SigilGuard.RepoPolicyTest do
       end
     end
 
+    test "does not treat malformed changed-path fields as absent" do
+      policy = compile!(default: :allow, rules: [])
+
+      decision =
+        RepoPolicy.evaluate(policy, %{
+          "changed_paths" => false,
+          :changed_paths => ["README.md"]
+        })
+
+      assert decision.verdict == :block
+      assert decision.reason =~ "invalid_changed_paths"
+      assert decision.changed_paths == []
+    end
+
     test "uses default action and nil identity for malformed contexts" do
       policy = compile!(default: :allow, rules: [])
 

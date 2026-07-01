@@ -685,7 +685,7 @@ defmodule SigilGuard.RepoPolicy do
   defp optional_string(_), do: nil
 
   defp changed_paths(context) do
-    first_present(~w(changed_paths changed_files files paths), context) || []
+    field_or_default(context, ~w(changed_paths changed_files files paths), [])
   end
 
   defp context_map(context) when is_list(context), do: Map.new(context)

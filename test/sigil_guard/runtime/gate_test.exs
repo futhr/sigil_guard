@@ -253,6 +253,54 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.audit_metadata.repo_unmatched_paths == []
     end
 
+    test "blocks malformed changed-path fields before fallback defaults can allow" do
+      {:ok, repo_policy} = SigilGuard.RepoPolicy.compile(%{default: :allow})
+
+      decision =
+        Gate.evaluate(
+          %{
+            "changed_paths" => false,
+            changed_paths: ["README.md"]
+          },
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.reason =~ "invalid_changed_paths"
+    end
+
+    test "blocks malformed metadata changed-path fields before payload fallback" do
+      {:ok, repo_policy} = SigilGuard.RepoPolicy.compile(%{default: :allow})
+
+      decision =
+        Gate.evaluate(
+          %{changed_paths: ["README.md"]},
+          [
+            phase: :repo_change,
+            origin: :model,
+            sink: :repo,
+            identity: "did:web:codex",
+            action: "modify",
+            metadata: %{"changed_paths" => false},
+            trust_level: :high
+          ],
+          repo_policy: repo_policy
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.repo_policy_verdict == :block
+      assert decision.reason =~ "invalid_changed_paths"
+    end
+
     test "blocks when trust policy rejects an otherwise clean action" do
       decision =
         Gate.evaluate("safe",
