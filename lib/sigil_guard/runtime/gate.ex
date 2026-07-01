@@ -268,16 +268,29 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp sanitized_text(nil, _, quarantine, _, _), do: quarantine.sanitized_text
 
-  defp sanitized_text(text, hits, _, action, opts)
-       when action in [:redact, :quarantine] do
-    text
-    |> Scanner.redact(hits, opts)
-    |> then(fn redacted ->
-      if action == :quarantine, do: Quarantine.sanitize(redacted), else: redacted
-    end)
+  defp sanitized_text(text, hits, quarantine, action, opts) do
+    redacted = redact_hits(text, hits, opts)
+
+    cond do
+      action == :quarantine ->
+        Quarantine.sanitize(redacted)
+
+      action == :redact ->
+        redacted
+
+      action == :block and hits != [] ->
+        redacted
+
+      action == :block and quarantine.indicators != [] ->
+        Quarantine.sanitize(redacted)
+
+      true ->
+        text
+    end
   end
 
-  defp sanitized_text(text, _, _, _, _), do: text
+  defp redact_hits(text, [], _), do: text
+  defp redact_hits(text, hits, opts), do: Scanner.redact(text, hits, opts)
 
   defp external_sink?(sink), do: sink in @external_sinks
 

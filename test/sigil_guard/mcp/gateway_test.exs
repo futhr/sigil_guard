@@ -1016,6 +1016,24 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert response["error"]["data"]["action_digest"] == decision.audit_metadata.action_digest
       refute inspect(response) =~ "tenant-a"
     end
+
+    test "includes only redacted sanitized text for blocked sensitive content" do
+      request = %{
+        "id" => 15,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "send_webhook",
+          "arguments" => %{"body" => "AWS_KEY=AKIAIOSFODNN7EXAMPLE"}
+        }
+      }
+
+      decision = Gateway.guard_request(request, trust_level: :high)
+      response = Gateway.response_for_decision(decision, 15, include_sanitized: true)
+
+      assert decision.verdict == :blocked
+      assert response["error"]["data"]["sanitized_text"] =~ "[AWS_KEY]"
+      refute inspect(response) =~ "AKIAIOSFODNN7EXAMPLE"
+    end
   end
 
   defp unsigned_request(overrides \\ %{}) do
