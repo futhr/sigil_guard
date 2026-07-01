@@ -455,6 +455,28 @@ defmodule SigilGuard.MCP.GatewayTest do
                |> Gateway.verify_request_envelope(public_keys: public_keys())
     end
 
+    test "rejects malformed public key maps" do
+      envelope = Envelope.sign("did:sigil:agent", :allowed, signer: TestSigner)
+
+      assert {:error, :invalid_public_keys} =
+               envelope
+               |> signed_request()
+               |> Gateway.verify_request_envelope(public_keys: "bad")
+    end
+
+    test "does not let atom identity fallback mask explicit invalid identity" do
+      envelope =
+        "did:sigil:agent"
+        |> Envelope.sign(:allowed, signer: TestSigner)
+        |> Map.put("identity", false)
+        |> Map.put(:identity, "did:sigil:agent")
+
+      assert {:error, :missing_identity} =
+               envelope
+               |> signed_request()
+               |> Gateway.verify_request_envelope(public_keys: public_keys())
+    end
+
     test "rejects tampered signatures" do
       envelope =
         "did:sigil:agent"

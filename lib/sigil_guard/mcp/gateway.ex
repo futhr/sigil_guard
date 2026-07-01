@@ -807,7 +807,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp envelope_identity(%{} = envelope) do
-    case Map.get(envelope, "identity") || Map.get(envelope, :identity) do
+    case fetch_field(envelope, "identity", :identity) do
       identity when is_binary(identity) -> {:ok, identity}
       _ -> {:error, :missing_identity}
     end
@@ -816,9 +816,20 @@ defmodule SigilGuard.MCP.Gateway do
   defp envelope_public_key(identity, opts) do
     public_keys = Keyword.get(opts, :public_keys, %{})
 
-    case public_keys[identity] || Keyword.get(opts, :public_key_b64u) do
-      public_key_b64u when is_binary(public_key_b64u) -> {:ok, public_key_b64u}
-      _ -> {:error, :unknown_identity}
+    if is_map(public_keys) do
+      case public_keys[identity] || Keyword.get(opts, :public_key_b64u) do
+        public_key_b64u when is_binary(public_key_b64u) -> {:ok, public_key_b64u}
+        _ -> {:error, :unknown_identity}
+      end
+    else
+      {:error, :invalid_public_keys}
+    end
+  end
+
+  defp fetch_field(map, string_key, atom_key) do
+    case Map.fetch(map, string_key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, atom_key)
     end
   end
 

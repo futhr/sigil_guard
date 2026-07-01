@@ -328,6 +328,9 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert {:error, :invalid_base64} =
                Checkpoint.verify(signed, events, public_key_b64u: "not base64!")
 
+      assert {:error, :invalid_public_keys} =
+               Checkpoint.verify(signed, events, public_keys: "bad")
+
       assert {:error, :invalid_key} =
                Checkpoint.verify(signed, events, public_key_b64u: short_public_key)
 

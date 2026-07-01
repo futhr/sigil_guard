@@ -320,12 +320,17 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp public_key(issuer, opts) do
     public_keys = Keyword.get(opts, :public_keys, %{})
 
-    encoded =
-      public_keys[issuer] || public_keys[to_string(issuer)] || Keyword.get(opts, :public_key_b64u)
+    if is_map(public_keys) do
+      encoded =
+        public_keys[issuer] || public_keys[to_string(issuer)] ||
+          Keyword.get(opts, :public_key_b64u)
 
-    case encoded do
-      value when is_binary(value) -> decode_public_key(value)
-      _ -> {:error, :unknown_issuer}
+      case encoded do
+        value when is_binary(value) -> decode_public_key(value)
+        _ -> {:error, :unknown_issuer}
+      end
+    else
+      {:error, :invalid_public_keys}
     end
   end
 
