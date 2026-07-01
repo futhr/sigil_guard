@@ -115,6 +115,24 @@ defmodule SigilGuard.EnvelopeTest do
       end
     end
 
+    test "validates signer-facing arguments" do
+      assert_raise ArgumentError, ~r/identity must be a string/, fn ->
+        Envelope.sign(:not_a_string, :allowed, signer: TestSigner)
+      end
+
+      assert_raise ArgumentError, ~r/invalid envelope verdict/, fn ->
+        bad_verdict = String.to_existing_atom("Elixir")
+        Envelope.sign("did:sigil:test", bad_verdict, signer: TestSigner)
+      end
+
+      assert_raise ArgumentError, ~r/invalid wire_verdict_format :upper/, fn ->
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          wire_verdict_format: :upper
+        )
+      end
+    end
+
     test "excludes reason when not provided" do
       envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
 
@@ -275,6 +293,20 @@ defmodule SigilGuard.EnvelopeTest do
                )
     end
 
+    test "blocked reason policy can be required independent of profile" do
+      envelope =
+        Envelope.sign("did:sigil:test", :blocked,
+          signer: TestSigner,
+          reason: "policy blocked",
+          timestamp: "2024-06-15T10:30:00.000Z",
+          nonce: "aabbccdd11223344"
+        )
+        |> Map.delete("reason")
+
+      assert {:error, :blocked_reason_required} =
+               Envelope.verify(envelope, TestSigner.public_key_b64u(), blocked_reason: :require)
+    end
+
     test "enforces timestamp freshness when requested" do
       envelope =
         Envelope.sign("did:sigil:test", :allowed,
@@ -285,6 +317,23 @@ defmodule SigilGuard.EnvelopeTest do
 
       assert {:error, :stale_envelope} =
                Envelope.verify(envelope, TestSigner.public_key_b64u(), max_skew_ms: 1)
+    end
+
+    test "rejects invalid freshness configuration and timestamps" do
+      envelope =
+        Envelope.sign("did:sigil:test", :allowed,
+          signer: TestSigner,
+          timestamp: "not-a-timestamp",
+          nonce: "aabbccdd11223344"
+        )
+
+      assert {:error, :invalid_timestamp} =
+               Envelope.verify(envelope, TestSigner.public_key_b64u(), max_skew_ms: 1_000)
+
+      fresh_envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+
+      assert {:error, :invalid_timestamp} =
+               Envelope.verify(fresh_envelope, TestSigner.public_key_b64u(), max_skew_ms: -1)
     end
 
     test "detects replayed nonces when requested" do
@@ -412,6 +461,13 @@ defmodule SigilGuard.EnvelopeTest do
 
       assert {:error, :invalid_signature} =
                Envelope.verify(tampered, TestSigner.public_key_b64u())
+    end
+
+    test "treats invalid Ed25519 public-key points as signature failures" do
+      envelope = Envelope.sign("did:sigil:test", :allowed, signer: TestSigner)
+      invalid_curve_point = Base.url_encode64(:binary.copy(<<0>>, 32), padding: false)
+
+      assert {:error, :invalid_signature} = Envelope.verify(envelope, invalid_curve_point)
     end
   end
 

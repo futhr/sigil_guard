@@ -77,6 +77,19 @@ defmodule SigilGuard.Audit.ExportTest do
       assert map_anchor_export["anchor"]["uri"] == "bench://audit/export"
     end
 
+    test "treats nil anchor option as no external anchor" do
+      events = build_signed_chain(1)
+
+      assert {:ok, export} =
+               Export.create(events,
+                 chain_id: "chain-a",
+                 generated_at: @generated_at,
+                 anchor: nil
+               )
+
+      assert export["anchor"] == nil
+    end
+
     test "rejects invalid event and anchor inputs" do
       assert {:error, :invalid_events} = Export.create("bad")
 
@@ -172,6 +185,7 @@ defmodule SigilGuard.Audit.ExportTest do
       {:ok, export} = signed_export(events)
 
       assert {:error, :invalid_export} = Export.verify("bad", events)
+      assert {:error, :invalid_export} = Export.verify(export, "bad")
       assert {:error, :invalid_kind} = Export.verify(%{export | "kind" => "other"}, events)
       assert {:error, :invalid_version} = Export.verify(%{export | "version" => 2}, events)
 
@@ -189,6 +203,38 @@ defmodule SigilGuard.Audit.ExportTest do
                export
                |> Map.put("anchor", "bad")
                |> Export.verify(events, public_keys: %{@issuer => TestSigner.public_key_b64u()})
+    end
+
+    test "validates atom-keyed export packages" do
+      events = build_signed_chain(1)
+      {:ok, export} = signed_export(events)
+
+      atom_export = %{
+        kind: export["kind"],
+        version: export["version"],
+        generated_at: export["generated_at"],
+        checkpoint: export["checkpoint"],
+        anchor: export["anchor"]
+      }
+
+      assert {:ok, verified} =
+               Export.verify(atom_export, events,
+                 public_keys: %{@issuer => TestSigner.public_key_b64u()},
+                 require_signature: true,
+                 require_anchor: true
+               )
+
+      assert verified.export == atom_export
+
+      assert {:error, :missing_generated_at} =
+               atom_export
+               |> Map.put(:generated_at, "")
+               |> Export.verify(events)
+
+      assert {:error, :missing_checkpoint} =
+               atom_export
+               |> Map.put(:checkpoint, nil)
+               |> Export.verify(events)
     end
   end
 
@@ -219,6 +265,27 @@ defmodule SigilGuard.Audit.ExportTest do
 
       assert Export.canonical_bytes(atom_export) == Export.canonical_bytes(export)
       assert Export.digest(atom_export) == Export.digest(export)
+    end
+
+    test "canonical bytes handle list, atom, and numeric-key values" do
+      export = %{
+        kind: "sigil_guard.audit.export",
+        version: 1,
+        generated_at: @generated_at,
+        checkpoint: %{
+          1 => :numeric_key,
+          values: [:ok, true, nil, 12]
+        },
+        anchor: nil
+      }
+
+      decoded =
+        export
+        |> Export.canonical_bytes()
+        |> Jason.decode!()
+
+      assert decoded["checkpoint"]["1"] == "numeric_key"
+      assert decoded["checkpoint"]["values"] == ["ok", true, nil, 12]
     end
   end
 

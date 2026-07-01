@@ -31,6 +31,36 @@ defmodule SigilGuard.Registry.BundleTest do
       assert Bundle.canonical_bytes(signed) == Bundle.canonical_bytes(bundle())
       assert Bundle.digest(signed) == Bundle.digest(bundle())
     end
+
+    test "normalizes atom and numeric keys in canonical bytes" do
+      raw = %{
+        generated_at: "2026-06-30T12:00:00Z",
+        patterns: [
+          %{
+            1 => :numeric_key,
+            name: "registry_pat",
+            regex: "REG_[0-9]+",
+            category: "test",
+            severity: "low"
+          }
+        ]
+      }
+
+      decoded =
+        raw
+        |> Bundle.canonical_bytes()
+        |> Jason.decode!()
+
+      assert decoded["patterns"] == [
+               %{
+                 "1" => "numeric_key",
+                 "category" => "test",
+                 "name" => "registry_pat",
+                 "regex" => "REG_[0-9]+",
+                 "severity" => "low"
+               }
+             ]
+    end
   end
 
   describe "sign/3 and verify/2" do
@@ -47,6 +77,14 @@ defmodule SigilGuard.Registry.BundleTest do
       assert is_binary(verified.digest)
     end
 
+    test "defaults provenance issued_at and omits nil expiry" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer)
+
+      assert is_binary(signed["provenance"]["issued_at"])
+      assert {:ok, _, _} = DateTime.from_iso8601(signed["provenance"]["issued_at"])
+      refute Map.has_key?(signed["provenance"], "expires_at")
+    end
+
     test "verifies signed bundles with standard base64 public keys and signatures" do
       signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
 
@@ -60,6 +98,24 @@ defmodule SigilGuard.Registry.BundleTest do
 
       assert {:ok, verified} = Bundle.verify(reencoded, public_key_b64u: public_key)
       assert verified.status == :verified
+    end
+
+    test "verifies atom-keyed provenance metadata" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+
+      atom_provenance =
+        Map.new(signed["provenance"], fn {key, value} -> {String.to_existing_atom(key), value} end)
+
+      atom_signed =
+        signed
+        |> Map.delete("provenance")
+        |> Map.put(:provenance, atom_provenance)
+
+      assert {:ok, verified} =
+               Bundle.verify(atom_signed, public_keys: %{@issuer => TestSigner.public_key_b64u()})
+
+      assert verified.status == :verified
+      assert verified.provenance == atom_provenance
     end
 
     test "signs and verifies time-bound bundle provenance" do
@@ -309,6 +365,17 @@ defmodule SigilGuard.Registry.BundleTest do
                Bundle.verify(bad_sig_bundle, public_key_b64u: TestSigner.public_key_b64u())
 
       assert quarantine.reason == :invalid_base64
+    end
+
+    test "treats invalid Ed25519 public-key points as signature failures" do
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+      invalid_curve_point = Base.url_encode64(:binary.copy(<<0>>, 32), padding: false)
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(signed, public_key_b64u: invalid_curve_point)
+
+      assert quarantine.reason == :invalid_signature
+      assert quarantine.issuer == @issuer
     end
 
     test "quarantines unknown issuers" do
