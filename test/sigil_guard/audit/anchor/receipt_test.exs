@@ -119,6 +119,12 @@ defmodule SigilGuard.Audit.Anchor.ReceiptTest do
       assert {:error, :invalid_public_keys} = Receipt.verify(signed, public_keys: "bad")
 
       assert {:error, :invalid_key} =
+               Receipt.verify(signed,
+                 public_keys: %{@issuer => false},
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
+
+      assert {:error, :invalid_key} =
                Receipt.verify(signed, public_key_b64u: Base.encode64("short"))
 
       assert {:error, :invalid_base64} = Receipt.verify(signed, public_key_b64u: "not!base64")

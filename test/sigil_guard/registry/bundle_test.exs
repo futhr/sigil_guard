@@ -372,6 +372,14 @@ defmodule SigilGuard.Registry.BundleTest do
       assert {:quarantine, quarantine} = Bundle.verify(signed, public_keys: "bad")
       assert quarantine.reason == :invalid_public_keys
 
+      assert {:quarantine, quarantine} =
+               Bundle.verify(signed,
+                 public_keys: %{@issuer => false},
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
+
+      assert quarantine.reason == :invalid_key
+
       assert {:quarantine, quarantine} = Bundle.verify(signed, public_key_b64u: short_public_key)
       assert quarantine.reason == :invalid_key
 

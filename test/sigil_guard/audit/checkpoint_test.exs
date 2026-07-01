@@ -332,6 +332,12 @@ defmodule SigilGuard.Audit.CheckpointTest do
                Checkpoint.verify(signed, events, public_keys: "bad")
 
       assert {:error, :invalid_key} =
+               Checkpoint.verify(signed, events,
+                 public_keys: %{@issuer => false},
+                 public_key_b64u: TestSigner.public_key_b64u()
+               )
+
+      assert {:error, :invalid_key} =
                Checkpoint.verify(signed, events, public_key_b64u: short_public_key)
 
       short_sig_checkpoint = put_in(signed, ["signature", "signature"], short_signature)
