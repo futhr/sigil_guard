@@ -2,7 +2,7 @@ defmodule SigilGuard.RepoPolicy do
   @moduledoc """
   Deterministic repo-level policy kernel for agent-authored changes.
 
-  This module adds an repo-level policy layer to SigilGuard: it evaluates an
+  This module adds a repo-level policy layer to SigilGuard: it evaluates an
   agent identity, action, and changed file paths against ordered path rules and
   returns one of three governance decisions:
 
@@ -35,6 +35,8 @@ defmodule SigilGuard.RepoPolicy do
 
   @version 1
   @default_decision :require_approval
+  @default_policy_paths ["SIGIL_POLICY", ".sigil-policy", ".sigil/policy", ".github/sigil-policy"]
+  @default_max_policy_bytes 262_144
   @decisions [:allow, :require_approval, :block]
   @decision_rank %{allow: 0, require_approval: 1, block: 2}
   @atom_fields %{
@@ -128,6 +130,65 @@ defmodule SigilGuard.RepoPolicy do
     case result do
       {:ok, policy} -> compile(%{policy | rules: Enum.reverse(policy.rules)})
       error -> error
+    end
+  end
+
+  @doc """
+  Load the first policy file found under a repo root.
+
+  By default the loader checks these repo-relative paths in order:
+
+    * `SIGIL_POLICY`
+    * `.sigil-policy`
+    * `.sigil/policy`
+    * `.github/sigil-policy`
+
+  Options:
+
+    * `:candidates` - override the repo-relative candidate paths.
+    * `:max_bytes` - maximum policy file size. Defaults to 256 KiB.
+  """
+  @spec load(Path.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def load(repo_root, opts \\ []) when is_binary(repo_root) do
+    with {:ok, path} <- find_file(repo_root, opts) do
+      load_file(path, opts)
+    end
+  end
+
+  @doc """
+  Return the first policy file path found under a repo root.
+
+  Candidate paths must be safe relative paths. Absolute paths and traversal are
+  rejected before any filesystem lookup.
+  """
+  @spec find_file(Path.t(), keyword()) :: {:ok, Path.t()} | {:error, term()}
+  def find_file(repo_root, opts \\ []) when is_binary(repo_root) do
+    root = Path.expand(repo_root)
+
+    with {:ok, candidates} <-
+           normalize_policy_paths(Keyword.get(opts, :candidates, @default_policy_paths)) do
+      case first_existing_policy_path(root, candidates) do
+        nil -> {:error, :not_found}
+        path -> {:ok, path}
+      end
+    end
+  end
+
+  @doc """
+  Load a policy from a specific file path.
+
+  The file must be regular and no larger than `:max_bytes`.
+  """
+  @spec load_file(Path.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  # sobelow_skip ["Traversal.FileModule"]
+  def load_file(path, opts \\ []) when is_binary(path) do
+    path = Path.expand(path)
+
+    with {:ok, max_bytes} <-
+           normalize_max_bytes(Keyword.get(opts, :max_bytes, @default_max_policy_bytes)),
+         :ok <- ensure_policy_file(path, max_bytes),
+         {:ok, text} <- File.read(path) do
+      parse(text)
     end
   end
 
@@ -467,6 +528,39 @@ defmodule SigilGuard.RepoPolicy do
 
   defp normalize_patterns(_), do: {:error, :missing_paths}
 
+  defp normalize_policy_paths(paths) when is_binary(paths), do: normalize_policy_paths([paths])
+
+  defp normalize_policy_paths(paths) when is_list(paths) do
+    result =
+      Enum.reduce_while(paths, {:ok, []}, fn path, {:ok, acc} ->
+        case normalize_policy_path(path) do
+          {:ok, normalized} -> {:cont, {:ok, [normalized | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, []} -> {:error, :missing_policy_paths}
+      {:ok, normalized} -> {:ok, Enum.reverse(normalized)}
+      error -> error
+    end
+  end
+
+  defp normalize_policy_paths(_), do: {:error, :invalid_policy_paths}
+
+  defp normalize_policy_path(path) when is_binary(path) do
+    path = normalize_separators(String.trim(path))
+
+    cond do
+      path == "" -> {:error, :invalid_policy_path}
+      absolute_path?(path) -> {:error, :absolute_policy_path}
+      traversal_path?(path) -> {:error, :policy_path_traversal}
+      true -> {:ok, collapse_relative(path)}
+    end
+  end
+
+  defp normalize_policy_path(_), do: {:error, :invalid_policy_path}
+
   defp normalize_pattern(pattern) when is_binary(pattern) do
     pattern = String.trim(pattern)
 
@@ -540,6 +634,36 @@ defmodule SigilGuard.RepoPolicy do
       segments -> Enum.join(segments, "/")
     end
   end
+
+  defp first_existing_policy_path(root, candidates) do
+    Enum.find_value(candidates, fn relative ->
+      path = Path.expand(relative, root)
+
+      if inside_root?(root, path) and File.regular?(path) do
+        path
+      end
+    end)
+  end
+
+  defp inside_root?(root, path) do
+    root = Path.expand(root)
+    path = Path.expand(path)
+    root_prefix = root <> "/"
+
+    path == root or String.starts_with?(path, root_prefix)
+  end
+
+  defp ensure_policy_file(path, max_bytes) do
+    case File.stat(path) do
+      {:ok, %{type: :regular, size: size}} when size <= max_bytes -> :ok
+      {:ok, %{type: :regular}} -> {:error, :policy_too_large}
+      {:ok, %{type: type}} -> {:error, {:invalid_policy_file, type}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp normalize_max_bytes(value) when is_integer(value) and value >= 0, do: {:ok, value}
+  defp normalize_max_bytes(_), do: {:error, :invalid_max_bytes}
 
   defp normalize_id(nil, index), do: {:ok, "rule_#{index}"}
   defp normalize_id(value, _) when is_atom(value), do: {:ok, Atom.to_string(value)}

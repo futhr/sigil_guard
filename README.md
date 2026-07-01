@@ -21,7 +21,7 @@ securing MCP (Model Context Protocol) tool calls and AI agent interactions. Use 
 
 - **Sensitivity Scanning** — Detect and redact credentials with boundary-aware staged validation/enrichment
 - **Runtime Gate** — Boundary-aware decisions for tool input, tool output, and external sinks
-- **Repo Policy Kernel** — deterministic allow/approval/block decisions for changed paths
+- **Repo Policy Kernel** — Deterministic allow/approval/block decisions for changed paths
 - **MCP Gateway Helpers** — Guard MCP-shaped tool requests and results without adapter lock-in
 - **Streaming Sanitization** — Hold back chunk tails so split secrets are not emitted early
 - **Confirmation Tokens** — HMAC-signed approvals bound to exact action digests
@@ -357,6 +357,13 @@ decision =
 :allow = decision.verdict
 ```
 
+To use a repo-local policy file, place a `SIGIL_POLICY`, `.sigil-policy`,
+`.sigil/policy`, or `.github/sigil-policy` file at the repo root:
+
+```elixir
+{:ok, repo_policy} = SigilGuard.RepoPolicy.load("/path/to/repo")
+```
+
 ### Tamper-Evident Audit
 
 ```elixir
@@ -503,7 +510,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Patterns        Pattern compilation and management
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization
-    +-- SigilGuard.RepoPolicy      deterministic repo policy kernel
+    +-- SigilGuard.RepoPolicy      Deterministic repo policy kernel
     +-- SigilGuard.MCP.Gateway     MCP-shaped guard helpers
     +-- SigilGuard.Confirmation    Action-bound approval tokens
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification

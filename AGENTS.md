@@ -42,7 +42,7 @@ SigilGuard (Main API)
     +-- SigilGuard.Quarantine      Prompt-injection/tool-poisoning indicators
     +-- SigilGuard.Runtime.Gate    Boundary-aware runtime decisions
     +-- SigilGuard.Runtime.Stream  Chunk-safe streaming sanitization
-    +-- SigilGuard.RepoPolicy      deterministic repo policy kernel
+    +-- SigilGuard.RepoPolicy      Deterministic repo policy kernel
     +-- SigilGuard.MCP.Gateway     MCP-shaped guard helpers
     +-- SigilGuard.Confirmation    Action-bound approval tokens
     +-- SigilGuard.Envelope        SIGIL envelope signing and verification

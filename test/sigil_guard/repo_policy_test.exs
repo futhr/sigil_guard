@@ -42,7 +42,7 @@ defmodule SigilGuard.RepoPolicyTest do
   end
 
   describe "parse/1" do
-    test "parses line-oriented deterministic repo policies" do
+    test "parses line-oriented repo policies" do
       text = """
       # comments are ignored
       default require_approval
@@ -55,6 +55,73 @@ defmodule SigilGuard.RepoPolicyTest do
       assert Enum.map(policy.rules, & &1.id) == ["line_3", "line_4"]
       assert hd(policy.rules).agents == ["did:web:codex"]
       assert hd(policy.rules).actions == ["modify"]
+    end
+  end
+
+  describe "load/2" do
+    setup do
+      dir =
+        Path.join(
+          System.tmp_dir!(),
+          "sigil_guard_repo_policy_test_#{System.unique_integer([:positive])}"
+        )
+
+      File.mkdir_p!(dir)
+      on_exit(fn -> File.rm_rf!(dir) end)
+
+      {:ok, dir: dir}
+    end
+
+    test "loads the first deterministic policy file from a repo root", %{dir: dir} do
+      File.write!(
+        Path.join(dir, "SIGIL_POLICY"),
+        """
+        default require_approval
+        allow agent:did:web:codex action:modify docs/**
+        """
+      )
+
+      assert {:ok, policy} = RepoPolicy.load(dir)
+
+      decision =
+        RepoPolicy.evaluate(policy,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["docs/guide.md"]
+        )
+
+      assert decision.verdict == :allow
+      assert decision.matched_rule_ids == ["line_2"]
+    end
+
+    test "honors candidate order without escaping the repo root", %{dir: dir} do
+      github_dir = Path.join(dir, ".github")
+      File.mkdir_p!(github_dir)
+
+      File.write!(Path.join(dir, ".sigil-policy"), "default block\n")
+      File.write!(Path.join(github_dir, "sigil-policy"), "default allow\n")
+
+      assert {:ok, path} = RepoPolicy.find_file(dir)
+      assert path == Path.join(dir, ".sigil-policy")
+
+      assert {:error, :policy_path_traversal} =
+               RepoPolicy.find_file(dir, candidates: ["../SIGIL_POLICY"])
+
+      assert {:error, :absolute_policy_path} =
+               RepoPolicy.find_file(dir, candidates: [Path.join(dir, ".sigil-policy")])
+    end
+
+    test "returns not_found when no candidate exists", %{dir: dir} do
+      assert {:error, :not_found} = RepoPolicy.load(dir)
+    end
+
+    test "rejects oversized or invalid policy files", %{dir: dir} do
+      path = Path.join(dir, "SIGIL_POLICY")
+      File.write!(path, "default allow\n")
+
+      assert {:error, :policy_too_large} = RepoPolicy.load_file(path, max_bytes: 4)
+      assert {:error, :invalid_max_bytes} = RepoPolicy.load_file(path, max_bytes: -1)
+      assert {:error, {:invalid_policy_file, :directory}} = RepoPolicy.load_file(dir)
     end
   end
 
