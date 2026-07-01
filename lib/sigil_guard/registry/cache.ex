@@ -272,9 +272,20 @@ defmodule SigilGuard.Registry.Cache do
       {:error, reason} ->
         Logger.warning("[SigilGuard.Registry.Cache] Invalid bundle format: #{inspect(reason)}")
 
-        fallback(state)
+        handle_invalid_verified_bundle(verified, state, reason)
     end
   end
+
+  defp handle_invalid_verified_bundle(%{status: :verified} = verified, state, reason) do
+    quarantine(state, %{
+      reason: reason,
+      digest: verified.digest,
+      issuer: verified.issuer,
+      provenance: verified.provenance
+    })
+  end
+
+  defp handle_invalid_verified_bundle(_, state, _), do: fallback(state)
 
   defp fallback(%{source: :empty} = state) do
     # No previous data — use built-in patterns

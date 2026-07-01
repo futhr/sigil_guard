@@ -119,7 +119,11 @@ defmodule SigilGuard.Patterns do
   """
   @spec parse_bundle(map()) :: {:ok, [map()]} | {:error, term()}
   def parse_bundle(%{"patterns" => patterns}) when is_list(patterns) do
-    {:ok, patterns}
+    if Enum.all?(patterns, &valid_raw_pattern?/1) do
+      {:ok, patterns}
+    else
+      {:error, :invalid_pattern_format}
+    end
   end
 
   def parse_bundle(_), do: {:error, :invalid_bundle_format}
@@ -136,12 +140,28 @@ defmodule SigilGuard.Patterns do
     |> Enum.concat(override)
   end
 
-  defp compile_pattern(raw) do
-    case Regex.compile(extract_regex_source(raw)) do
-      {:ok, regex} -> build_compiled(raw, regex)
-      {:error, _} -> nil
+  defp compile_pattern(raw) when is_map(raw) do
+    case extract_regex_source(raw) do
+      source when is_binary(source) ->
+        case Regex.compile(source) do
+          {:ok, regex} -> build_compiled(raw, regex)
+          {:error, _} -> nil
+        end
+
+      _ ->
+        nil
     end
   end
+
+  defp compile_pattern(_), do: nil
+
+  defp valid_raw_pattern?(raw) when is_map(raw) do
+    raw
+    |> extract_regex_source()
+    |> is_binary()
+  end
+
+  defp valid_raw_pattern?(_), do: false
 
   defp build_compiled(raw, regex) do
     %{

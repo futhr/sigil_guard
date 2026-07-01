@@ -73,6 +73,17 @@ defmodule SigilGuard.PatternsTest do
       assert pattern.name == "good"
     end
 
+    test "skips malformed pattern entries without raising" do
+      raw = [
+        %{"name" => "good", "regex" => "GOOD", "category" => "test", "severity" => "low"},
+        %{"name" => "missing_regex"},
+        "not a map"
+      ]
+
+      assert [pattern] = Patterns.compile(raw)
+      assert pattern.name == "good"
+    end
+
     test "defaults severity to :medium when missing" do
       raw = [%{name: "no_sev", category: "test", pattern: "test"}]
       assert [pattern] = Patterns.compile(raw)
@@ -162,6 +173,14 @@ defmodule SigilGuard.PatternsTest do
     test "returns error for non-list patterns" do
       assert {:error, :invalid_bundle_format} =
                Patterns.parse_bundle(%{"patterns" => "not_a_list"})
+    end
+
+    test "returns error for malformed pattern entries" do
+      assert {:error, :invalid_pattern_format} =
+               Patterns.parse_bundle(%{"patterns" => [%{"name" => "missing_regex"}]})
+
+      assert {:error, :invalid_pattern_format} =
+               Patterns.parse_bundle(%{"patterns" => ["not_a_map"]})
     end
 
     test "returns error for non-map input" do

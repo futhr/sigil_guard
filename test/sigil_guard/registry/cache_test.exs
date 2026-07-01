@@ -324,6 +324,32 @@ defmodule SigilGuard.Registry.CacheTest do
       assert length(patterns) > 0
     end
 
+    test "quarantines signed bundles with malformed pattern entries", %{bypass: bypass} do
+      malformed =
+        %{"patterns" => [%{"name" => "missing_regex"}]}
+        |> signed_bundle(issued_at: DateTime.utc_now(:millisecond) |> DateTime.to_iso8601())
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(malformed))
+      end)
+
+      start_supervised!(
+        {Cache,
+         ttl_ms: 600_000,
+         require_signed_bundles: true,
+         bundle_public_keys: %{@registry_issuer => TestSigner.public_key_b64u()}}
+      )
+
+      Process.sleep(100)
+
+      assert Cache.source() == :quarantine
+      assert "aws_access_key" in pattern_names()
+
+      status = Cache.status()
+      assert status.quarantine.reason == :invalid_pattern_format
+      assert status.quarantine.issuer == @registry_issuer
+    end
+
     test "retains previous patterns on re-fetch failure", %{bypass: bypass} do
       call_count = :counters.new(1, [:atomics])
 
