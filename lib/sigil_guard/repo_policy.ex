@@ -100,8 +100,8 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   def compile(raw) when is_map(raw) do
-    with {:ok, default} <- normalize_decision(field(raw, "default") || @default_decision),
-         {:ok, rules} <- compile_rules(field(raw, "rules") || []) do
+    with {:ok, default} <- normalize_decision(field_or_default(raw, "default", @default_decision)),
+         {:ok, rules} <- compile_rules(field_or_default(raw, "rules", [])) do
       {:ok, %__MODULE__{default: default, rules: rules}}
     end
   end
@@ -261,10 +261,11 @@ defmodule SigilGuard.RepoPolicy do
 
   defp compile_rule(raw, index) when is_map(raw) do
     with {:ok, decision} <- normalize_decision(field(raw, "decision")),
-         {:ok, agents} <- normalize_matchers(field(raw, "agents") || field(raw, "agent") || ["*"]),
+         {:ok, agents} <-
+           normalize_matchers(field_or_default(raw, ["agents", "agent"], ["*"])),
          {:ok, actions} <-
-           normalize_matchers(field(raw, "actions") || field(raw, "action") || ["*"]),
-         {:ok, paths} <- normalize_patterns(field(raw, "paths") || field(raw, "path")),
+           normalize_matchers(field_or_default(raw, ["actions", "action"], ["*"])),
+         {:ok, paths} <- normalize_patterns(field_or_default(raw, ["paths", "path"], nil)),
          {:ok, id} <- normalize_id(field(raw, "id"), index) do
       {:ok,
        %{
@@ -491,7 +492,9 @@ defmodule SigilGuard.RepoPolicy do
   defp normalize_decision(_), do: {:error, :invalid_decision}
 
   defp normalize_matchers(value) when is_binary(value), do: normalize_matchers([value])
-  defp normalize_matchers(value) when is_atom(value), do: normalize_matchers([value])
+
+  defp normalize_matchers(value) when is_atom(value) and not is_boolean(value),
+    do: normalize_matchers([value])
 
   defp normalize_matchers(values) when is_list(values) do
     normalized =
@@ -505,7 +508,7 @@ defmodule SigilGuard.RepoPolicy do
 
   defp normalize_matchers(_), do: {:error, :invalid_matchers}
 
-  defp to_matcher(value) when is_atom(value), do: Atom.to_string(value)
+  defp to_matcher(value) when is_atom(value) and not is_boolean(value), do: Atom.to_string(value)
   defp to_matcher(value) when is_binary(value), do: String.trim(value)
   defp to_matcher(_), do: nil
 
@@ -669,7 +672,10 @@ defmodule SigilGuard.RepoPolicy do
   defp normalize_max_bytes(_), do: {:error, :invalid_max_bytes}
 
   defp normalize_id(nil, index), do: {:ok, "rule_#{index}"}
-  defp normalize_id(value, _) when is_atom(value), do: {:ok, Atom.to_string(value)}
+
+  defp normalize_id(value, _) when is_atom(value) and not is_boolean(value),
+    do: {:ok, Atom.to_string(value)}
+
   defp normalize_id(value, _) when is_binary(value) and value != "", do: {:ok, value}
   defp normalize_id(_, _), do: {:error, :invalid_rule_id}
 
@@ -702,9 +708,39 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   defp field(map, key) when is_map(map) do
-    case Map.fetch(map, key) do
+    case fetch_field(map, key) do
       {:ok, value} -> value
-      :error -> Map.get(map, Map.fetch!(@atom_fields, key))
+      :error -> nil
+    end
+  end
+
+  defp field_or_default(map, keys, default) when is_list(keys) do
+    case fetch_any_field(map, keys) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
+
+  defp field_or_default(map, key, default) do
+    case fetch_field(map, key) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
+
+  defp fetch_any_field(map, keys) do
+    Enum.reduce_while(keys, :error, fn key, :error ->
+      case fetch_field(map, key) do
+        {:ok, value} -> {:halt, {:ok, value}}
+        :error -> {:cont, :error}
+      end
+    end)
+  end
+
+  defp fetch_field(map, key) when is_map(map) do
+    case Map.fetch(map, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(map, Map.fetch!(@atom_fields, key))
     end
   end
 

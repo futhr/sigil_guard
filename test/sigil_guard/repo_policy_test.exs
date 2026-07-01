@@ -70,6 +70,8 @@ defmodule SigilGuard.RepoPolicyTest do
       assert {:error, :invalid_rules} = RepoPolicy.compile(%{rules: :bad})
       assert {:error, {:invalid_rule, 0}} = RepoPolicy.compile(%{rules: [:bad]})
       assert {:error, {:invalid_decision, 0}} = RepoPolicy.compile(%{rules: [%{paths: ["*"]}]})
+      assert {:error, :invalid_decision} = RepoPolicy.compile(%{default: false})
+      assert {:error, :invalid_rules} = RepoPolicy.compile(%{rules: false})
 
       assert {:error, {:invalid_decision, 0}} =
                RepoPolicy.compile(%{rules: [%{decision: "nope", paths: ["*"]}]})
@@ -85,6 +87,40 @@ defmodule SigilGuard.RepoPolicyTest do
 
       assert {:error, {:invalid_rule_id, 0}} =
                RepoPolicy.compile(%{rules: [%{id: "", decision: :allow, paths: ["*"]}]})
+
+      assert {:error, {:invalid_rule_id, 0}} =
+               RepoPolicy.compile(%{rules: [%{id: false, decision: :allow, paths: ["*"]}]})
+    end
+
+    test "does not let fallback defaults mask explicit invalid policy fields" do
+      valid_rule = %{decision: :allow, paths: ["*"]}
+
+      invalid_default = %{
+        "default" => false,
+        default: :allow
+      }
+
+      assert {:error, :invalid_decision} = RepoPolicy.compile(invalid_default)
+
+      invalid_rules = %{
+        "rules" => false,
+        rules: [valid_rule]
+      }
+
+      assert {:error, :invalid_rules} = RepoPolicy.compile(invalid_rules)
+
+      for {field, alias_field, reason} <- [
+            {"agents", "agent", :invalid_matchers},
+            {"actions", "action", :invalid_matchers},
+            {"paths", "path", :missing_paths}
+          ] do
+        rule =
+          valid_rule
+          |> Map.put(field, false)
+          |> Map.put(alias_field, "*")
+
+        assert {:error, {^reason, 0}} = RepoPolicy.compile(%{rules: [rule]})
+      end
     end
   end
 
