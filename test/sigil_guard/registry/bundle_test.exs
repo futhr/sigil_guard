@@ -158,6 +158,18 @@ defmodule SigilGuard.Registry.BundleTest do
 
       assert quarantine.reason == :invalid_provenance
       assert is_binary(quarantine.digest)
+
+      signed = Bundle.sign(bundle(), TestSigner, issuer: @issuer, issued_at: @issued_at)
+
+      mixed =
+        signed
+        |> Map.put("provenance", false)
+        |> Map.put(:provenance, signed["provenance"])
+
+      assert {:quarantine, quarantine} =
+               Bundle.verify(mixed, public_keys: %{@issuer => TestSigner.public_key_b64u()})
+
+      assert quarantine.reason == :invalid_provenance
     end
 
     test "quarantines digest mismatches before loading tampered content" do
@@ -283,11 +295,19 @@ defmodule SigilGuard.Registry.BundleTest do
 
       for {field, reason} <- [
             {"issuer", :missing_issuer},
+            {"algorithm", :missing_algorithm},
             {"digest", :missing_digest},
             {"signature", :missing_signature}
           ] do
         tampered = update_in(signed, ["provenance"], &Map.delete(&1, field))
         assert {:quarantine, quarantine} = Bundle.verify(tampered)
+        assert quarantine.reason == reason
+
+        empty = put_in(signed, ["provenance", field], "")
+
+        assert {:quarantine, quarantine} =
+                 Bundle.verify(empty, public_key_b64u: TestSigner.public_key_b64u())
+
         assert quarantine.reason == reason
       end
 
@@ -348,6 +368,9 @@ defmodule SigilGuard.Registry.BundleTest do
 
       assert {:quarantine, quarantine} = Bundle.verify(signed, public_key_b64u: "not base64!")
       assert quarantine.reason == :invalid_base64
+
+      assert {:quarantine, quarantine} = Bundle.verify(signed, public_keys: "bad")
+      assert quarantine.reason == :invalid_public_keys
 
       assert {:quarantine, quarantine} = Bundle.verify(signed, public_key_b64u: short_public_key)
       assert quarantine.reason == :invalid_key

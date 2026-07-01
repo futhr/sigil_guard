@@ -102,7 +102,7 @@ defmodule SigilGuard.Registry.Bundle do
   def verify(bundle, opts \\ [])
 
   def verify(bundle, opts) when is_map(bundle) and is_list(opts) do
-    case Map.get(bundle, "provenance") || Map.get(bundle, :provenance) do
+    case provenance(bundle) do
       nil -> verify_unsigned(bundle, opts)
       provenance when is_map(provenance) -> verify_signed(bundle, provenance, opts)
       _ -> quarantine(:invalid_provenance, bundle, nil)
@@ -148,12 +148,12 @@ defmodule SigilGuard.Registry.Bundle do
 
   defp provenance_fields(%{} = provenance) do
     fields = %{
-      issuer: provenance["issuer"] || provenance[:issuer],
-      algorithm: provenance["algorithm"] || provenance[:algorithm],
-      digest: provenance["digest"] || provenance[:digest],
-      signature: provenance["signature"] || provenance[:signature],
-      issued_at: provenance["issued_at"] || provenance[:issued_at],
-      expires_at: provenance["expires_at"] || provenance[:expires_at]
+      issuer: field(provenance, "issuer"),
+      algorithm: field(provenance, "algorithm"),
+      digest: field(provenance, "digest"),
+      signature: field(provenance, "signature"),
+      issued_at: field(provenance, "issued_at"),
+      expires_at: field(provenance, "expires_at")
     }
 
     with :ok <- require_binary(fields.issuer, :missing_issuer),
@@ -165,7 +165,7 @@ defmodule SigilGuard.Registry.Bundle do
     end
   end
 
-  defp require_binary(value, _) when is_binary(value), do: :ok
+  defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
   defp require_binary(_, reason), do: {:error, reason}
 
   defp require_algorithm(@signature_algorithm), do: :ok
@@ -250,12 +250,17 @@ defmodule SigilGuard.Registry.Bundle do
   defp public_key(issuer, opts) do
     public_keys = Keyword.get(opts, :public_keys, %{})
 
-    encoded =
-      public_keys[issuer] || public_keys[to_string(issuer)] || Keyword.get(opts, :public_key_b64u)
+    if is_map(public_keys) do
+      encoded =
+        public_keys[issuer] || public_keys[to_string(issuer)] ||
+          Keyword.get(opts, :public_key_b64u)
 
-    case encoded do
-      value when is_binary(value) -> decode_public_key(value)
-      _ -> {:error, :unknown_issuer}
+      case encoded do
+        value when is_binary(value) -> decode_public_key(value)
+        _ -> {:error, :unknown_issuer}
+      end
+    else
+      {:error, :invalid_public_keys}
     end
   end
 
@@ -335,8 +340,22 @@ defmodule SigilGuard.Registry.Bundle do
   defp digest_or_nil(bundle) when is_map(bundle), do: digest(bundle)
   defp digest_or_nil(_), do: nil
 
-  defp issuer(%{} = provenance), do: provenance["issuer"] || provenance[:issuer]
+  defp provenance(bundle) do
+    case Map.fetch(bundle, "provenance") do
+      {:ok, value} -> value
+      :error -> Map.get(bundle, :provenance)
+    end
+  end
+
+  defp issuer(%{} = provenance), do: field(provenance, "issuer")
   defp issuer(_), do: nil
+
+  defp field(map, key) when is_map(map) do
+    case Map.fetch(map, key) do
+      {:ok, value} -> value
+      :error -> Map.get(map, String.to_existing_atom(key))
+    end
+  end
 
   defp canonical_iodata(value) when is_map(value) do
     parts =
