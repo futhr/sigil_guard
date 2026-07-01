@@ -512,6 +512,9 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert {:error, :invalid_anchor} =
                Store.put(HTTP, %{"kind" => "other"}, url: url)
 
+      assert {:error, :missing_anchored_at} =
+               Store.put(HTTP, Map.delete(anchor, "anchored_at"), url: url)
+
       assert {:error, :invalid_metadata} =
                Store.put(HTTP, anchor, url: url, metadata: "bad")
 

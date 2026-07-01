@@ -15,7 +15,6 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
 
   @kind "sigil_guard.audit.anchor.receipt"
   @version 1
-  @anchor_kind "sigil_guard.audit.anchor"
   @hex_digest ~r/\A[0-9a-f]{64}\z/
   @atom_fields %{
     "anchor_digest" => :anchor_digest,
@@ -49,10 +48,10 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   def fetch(_, _), do: {:error, :missing_path}
 
   defp validate_anchor(record) do
-    if field(record, "kind") == @anchor_kind do
-      :ok
-    else
-      {:error, :invalid_anchor}
+    case Anchor.validate(record) do
+      :ok -> :ok
+      {:error, :invalid_kind} -> {:error, :invalid_anchor}
+      {:error, reason} -> {:error, reason}
     end
   end
 

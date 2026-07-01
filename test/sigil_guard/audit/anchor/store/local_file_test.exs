@@ -117,6 +117,14 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       assert {:error, :invalid_anchor} =
                Store.put(LocalFile, %{"kind" => "other"}, path: tmp_path())
 
+      incomplete_anchor = Map.delete(anchor, "anchored_at")
+      incomplete_path = tmp_path()
+
+      assert {:error, :missing_anchored_at} =
+               Store.put(LocalFile, incomplete_anchor, path: incomplete_path)
+
+      refute File.exists?(incomplete_path)
+
       invalid_with_atom_fallback =
         anchor
         |> Map.put("kind", false)

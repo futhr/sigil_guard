@@ -39,7 +39,6 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   @kind "sigil_guard.audit.anchor.receipt"
   @version 1
-  @anchor_kind "sigil_guard.audit.anchor"
   @put_kind "sigil_guard.audit.anchor.put"
   @default_put_path "/audit/anchors"
   @default_fetch_path "/audit/anchors/:digest"
@@ -91,10 +90,10 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   def fetch(_, _), do: {:error, :missing_url}
 
   defp validate_anchor(record) do
-    if field(record, "kind") == @anchor_kind do
-      :ok
-    else
-      {:error, :invalid_anchor}
+    case Anchor.validate(record) do
+      :ok -> :ok
+      {:error, :invalid_kind} -> {:error, :invalid_anchor}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -398,10 +397,9 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   defp normalize_record(%{"anchor" => record}) when is_map(record), do: normalize_record(record)
 
   defp normalize_record(record) when is_map(record) do
-    if field(record, "kind") == @anchor_kind do
-      {:ok, record}
-    else
-      {:error, :invalid_anchor}
+    case validate_anchor(record) do
+      :ok -> {:ok, record}
+      {:error, reason} -> {:error, reason}
     end
   end
 

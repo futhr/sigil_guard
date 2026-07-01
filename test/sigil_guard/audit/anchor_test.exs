@@ -58,6 +58,37 @@ defmodule SigilGuard.Audit.AnchorTest do
     end
   end
 
+  describe "validate/1" do
+    test "validates standalone anchor structure before checkpoint comparison" do
+      {checkpoint, _} = signed_checkpoint()
+      anchor = Anchor.create(checkpoint, anchored_at: @anchored_at)
+
+      assert :ok = Anchor.validate(anchor)
+      assert {:error, :invalid_anchor} = Anchor.validate("bad")
+      assert {:error, :invalid_kind} = Anchor.validate(%{"kind" => "other"})
+
+      assert {:error, :missing_anchored_at} =
+               anchor
+               |> Map.delete("anchored_at")
+               |> Anchor.validate()
+
+      assert {:error, :invalid_version} =
+               anchor
+               |> Map.put("version", 2)
+               |> Anchor.validate()
+
+      assert {:error, :missing_event_count} =
+               anchor
+               |> Map.put("event_count", -1)
+               |> Anchor.validate()
+
+      assert {:error, :missing_merkle_root} =
+               anchor
+               |> Map.put("merkle_root", "")
+               |> Anchor.validate()
+    end
+  end
+
   describe "verify/2" do
     test "verifies an anchor against its checkpoint" do
       {checkpoint, _} = signed_checkpoint()

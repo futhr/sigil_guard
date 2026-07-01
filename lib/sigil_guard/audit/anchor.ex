@@ -87,6 +87,16 @@ defmodule SigilGuard.Audit.Anchor do
   def verify(_, _), do: {:error, :invalid_anchor}
 
   @doc """
+  Validate the standalone shape of an anchor record.
+
+  This checks the stable fields that can be validated before a checkpoint is
+  available. Use `verify/2` when comparing an anchor to its checkpoint.
+  """
+  @spec validate(t()) :: :ok | {:error, atom()}
+  def validate(record) when is_map(record), do: verify_static_fields(record)
+  def validate(_), do: {:error, :invalid_anchor}
+
+  @doc """
   Return canonical anchor bytes used for digesting and external comparison.
   """
   @spec canonical_bytes(t()) :: binary()
