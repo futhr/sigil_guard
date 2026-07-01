@@ -26,6 +26,8 @@ defmodule SigilGuard.Registry.Cache do
         registry_retry_ms: 60_000,      # retry failed fetches after 1 minute
         registry_require_signed_bundles: false,
         registry_bundle_public_keys: %{},
+        registry_bundle_max_age_seconds: nil,
+        registry_bundle_clock_skew_seconds: 60,
         registry_url: "https://registry.sigil-protocol.org"
 
   ## Process Model
@@ -69,6 +71,8 @@ defmodule SigilGuard.Registry.Cache do
           retry_ms: non_neg_integer(),
           require_signed_bundles: boolean(),
           bundle_public_keys: %{optional(String.t()) => String.t()},
+          bundle_max_age_seconds: non_neg_integer() | nil,
+          bundle_clock_skew_seconds: non_neg_integer(),
           bundle_provenance: map() | nil,
           bundle_digest: String.t() | nil,
           quarantine: Bundle.quarantine() | nil
@@ -141,6 +145,14 @@ defmodule SigilGuard.Registry.Cache do
         Keyword.get(opts, :require_signed_bundles, Config.registry_require_signed_bundles?()),
       bundle_public_keys:
         Keyword.get(opts, :bundle_public_keys, Config.registry_bundle_public_keys()),
+      bundle_max_age_seconds:
+        Keyword.get(opts, :bundle_max_age_seconds, Config.registry_bundle_max_age_seconds()),
+      bundle_clock_skew_seconds:
+        Keyword.get(
+          opts,
+          :bundle_clock_skew_seconds,
+          Config.registry_bundle_clock_skew_seconds()
+        ),
       bundle_provenance: nil,
       bundle_digest: nil,
       quarantine: nil
@@ -227,7 +239,9 @@ defmodule SigilGuard.Registry.Cache do
   defp verify_bundle(bundle, state) do
     Bundle.verify(bundle,
       public_keys: state.bundle_public_keys,
-      require_signature: state.require_signed_bundles
+      require_signature: state.require_signed_bundles,
+      max_age_seconds: state.bundle_max_age_seconds,
+      clock_skew_seconds: state.bundle_clock_skew_seconds
     )
   end
 

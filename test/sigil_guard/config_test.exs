@@ -17,6 +17,12 @@ defmodule SigilGuard.ConfigTest do
     original_require_signed = Application.get_env(:sigil_guard, :registry_require_signed_bundles)
     original_bundle_keys = Application.get_env(:sigil_guard, :registry_bundle_public_keys)
 
+    original_bundle_max_age =
+      Application.get_env(:sigil_guard, :registry_bundle_max_age_seconds)
+
+    original_bundle_clock_skew =
+      Application.get_env(:sigil_guard, :registry_bundle_clock_skew_seconds)
+
     on_exit(fn ->
       if original_patterns,
         do: Application.put_env(:sigil_guard, :scanner_patterns, original_patterns),
@@ -62,6 +68,24 @@ defmodule SigilGuard.ConfigTest do
       if original_bundle_keys,
         do: Application.put_env(:sigil_guard, :registry_bundle_public_keys, original_bundle_keys),
         else: Application.delete_env(:sigil_guard, :registry_bundle_public_keys)
+
+      if is_nil(original_bundle_max_age),
+        do: Application.delete_env(:sigil_guard, :registry_bundle_max_age_seconds),
+        else:
+          Application.put_env(
+            :sigil_guard,
+            :registry_bundle_max_age_seconds,
+            original_bundle_max_age
+          )
+
+      if is_nil(original_bundle_clock_skew),
+        do: Application.delete_env(:sigil_guard, :registry_bundle_clock_skew_seconds),
+        else:
+          Application.put_env(
+            :sigil_guard,
+            :registry_bundle_clock_skew_seconds,
+            original_bundle_clock_skew
+          )
     end)
 
     :ok
@@ -193,6 +217,30 @@ defmodule SigilGuard.ConfigTest do
       keys = %{"did:sigil:registry" => "pub"}
       Application.put_env(:sigil_guard, :registry_bundle_public_keys, keys)
       assert Config.registry_bundle_public_keys() == keys
+    end
+  end
+
+  describe "registry_bundle_max_age_seconds/0" do
+    test "defaults to nil" do
+      Application.delete_env(:sigil_guard, :registry_bundle_max_age_seconds)
+      assert Config.registry_bundle_max_age_seconds() == nil
+    end
+
+    test "returns configured maximum bundle age" do
+      Application.put_env(:sigil_guard, :registry_bundle_max_age_seconds, 86_400)
+      assert Config.registry_bundle_max_age_seconds() == 86_400
+    end
+  end
+
+  describe "registry_bundle_clock_skew_seconds/0" do
+    test "defaults to 60 seconds" do
+      Application.delete_env(:sigil_guard, :registry_bundle_clock_skew_seconds)
+      assert Config.registry_bundle_clock_skew_seconds() == 60
+    end
+
+    test "returns configured clock skew" do
+      Application.put_env(:sigil_guard, :registry_bundle_clock_skew_seconds, 10)
+      assert Config.registry_bundle_clock_skew_seconds() == 10
     end
   end
 end

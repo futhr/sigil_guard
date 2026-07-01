@@ -205,6 +205,86 @@ defmodule SigilGuard.Registry.CacheTest do
       status = Cache.status()
       assert status.quarantine.reason == :digest_mismatch
     end
+
+    test "quarantines stale signed bundles when maximum age is configured", %{bypass: bypass} do
+      stale =
+        registry_bundle([
+          %{"name" => "stale", "regex" => "STALE", "category" => "t", "severity" => "low"}
+        ])
+        |> signed_bundle(issued_at: "2020-01-01T00:00:00.000Z")
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        Plug.Conn.resp(conn, 200, Jason.encode!(stale))
+      end)
+
+      start_supervised!(
+        {Cache,
+         ttl_ms: 600_000,
+         require_signed_bundles: true,
+         bundle_public_keys: %{@registry_issuer => TestSigner.public_key_b64u()},
+         bundle_max_age_seconds: 600}
+      )
+
+      Process.sleep(100)
+
+      assert Cache.source() == :quarantine
+      refute "stale" in pattern_names()
+      assert "aws_access_key" in pattern_names()
+
+      status = Cache.status()
+      assert status.quarantine.reason == :stale_bundle
+      assert status.quarantine.issuer == @registry_issuer
+    end
+
+    test "retains previous known-good patterns when a refresh fetches a stale signed bundle", %{
+      bypass: bypass
+    } do
+      call_count = :counters.new(1, [:atomics])
+
+      Bypass.expect(bypass, "GET", "/patterns/bundle", fn conn ->
+        :counters.add(call_count, 1, 1)
+
+        bundle =
+          case :counters.get(call_count, 1) do
+            1 ->
+              registry_bundle([
+                %{"name" => "fresh", "regex" => "FRESH", "category" => "t", "severity" => "low"}
+              ])
+              |> signed_bundle(issued_at: DateTime.utc_now(:millisecond) |> DateTime.to_iso8601())
+
+            _ ->
+              registry_bundle([
+                %{"name" => "stale", "regex" => "STALE", "category" => "t", "severity" => "high"}
+              ])
+              |> signed_bundle(issued_at: "2020-01-01T00:00:00.000Z")
+          end
+
+        Plug.Conn.resp(conn, 200, Jason.encode!(bundle))
+      end)
+
+      start_supervised!(
+        {Cache,
+         ttl_ms: 600_000,
+         require_signed_bundles: true,
+         bundle_public_keys: %{@registry_issuer => TestSigner.public_key_b64u()},
+         bundle_max_age_seconds: 600}
+      )
+
+      Process.sleep(100)
+
+      assert Cache.source() == :registry
+      assert "fresh" in pattern_names()
+
+      Cache.refresh()
+      Process.sleep(100)
+
+      assert Cache.source() == :quarantine
+      assert "fresh" in pattern_names()
+      refute "stale" in pattern_names()
+
+      status = Cache.status()
+      assert status.quarantine.reason == :stale_bundle
+    end
   end
 
   describe "rule_count/0" do
@@ -359,10 +439,10 @@ defmodule SigilGuard.Registry.CacheTest do
 
   defp registry_bundle(patterns), do: %{"patterns" => patterns}
 
-  defp signed_bundle(bundle) do
+  defp signed_bundle(bundle, opts \\ []) do
     Bundle.sign(bundle, TestSigner,
       issuer: @registry_issuer,
-      issued_at: "2026-06-30T12:00:00.000Z"
+      issued_at: Keyword.get(opts, :issued_at, "2026-06-30T12:00:00.000Z")
     )
   end
 

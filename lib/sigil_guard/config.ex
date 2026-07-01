@@ -38,6 +38,14 @@ defmodule SigilGuard.Config do
       base64/base64url Ed25519 public key.
       Default: `%{}`
 
+    * `:registry_bundle_max_age_seconds` — Maximum signed bundle age in
+      seconds before quarantine. `nil` disables age enforcement.
+      Default: `nil`
+
+    * `:registry_bundle_clock_skew_seconds` — Allowed future `issued_at`
+      skew for signed bundles.
+      Default: `60`
+
     * `:scanner_patterns` — Pattern source: `:built_in` or `:registry`.
       Default: `:built_in`
 
@@ -54,6 +62,8 @@ defmodule SigilGuard.Config do
   @default_timeout_ms 5_000
   @default_retry_ms :timer.minutes(1)
   @default_protocol_profile :auto
+  @default_bundle_max_age_seconds nil
+  @default_bundle_clock_skew_seconds 60
 
   @doc "Return the configured SIGIL compatibility profile."
   @spec protocol_profile() :: SigilGuard.Profile.t()
@@ -103,6 +113,26 @@ defmodule SigilGuard.Config do
   @spec registry_bundle_public_keys() :: %{optional(String.t()) => String.t()}
   def registry_bundle_public_keys do
     Application.get_env(:sigil_guard, :registry_bundle_public_keys, %{})
+  end
+
+  @doc "Return the maximum accepted signed registry bundle age in seconds, or nil."
+  @spec registry_bundle_max_age_seconds() :: non_neg_integer() | nil
+  def registry_bundle_max_age_seconds do
+    Application.get_env(
+      :sigil_guard,
+      :registry_bundle_max_age_seconds,
+      @default_bundle_max_age_seconds
+    )
+  end
+
+  @doc "Return the accepted future issued-at clock skew for signed registry bundles."
+  @spec registry_bundle_clock_skew_seconds() :: non_neg_integer()
+  def registry_bundle_clock_skew_seconds do
+    Application.get_env(
+      :sigil_guard,
+      :registry_bundle_clock_skew_seconds,
+      @default_bundle_clock_skew_seconds
+    )
   end
 
   @doc "Return the configured pattern source (`:built_in` or `:registry`)."

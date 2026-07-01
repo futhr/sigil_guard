@@ -428,6 +428,8 @@ config :sigil_guard,
   registry_enabled: false,
   registry_require_signed_bundles: false,
   registry_bundle_public_keys: %{},
+  registry_bundle_max_age_seconds: nil,
+  registry_bundle_clock_skew_seconds: 60,
   scanner_patterns: :built_in
 ```
 
@@ -444,6 +446,8 @@ config :sigil_guard,
 | `registry_enabled` | `boolean()` | `false` | Enable registry fetching |
 | `registry_require_signed_bundles` | `boolean()` | `false` | Require Ed25519 provenance on registry pattern bundles |
 | `registry_bundle_public_keys` | `map()` | `%{}` | Trusted registry bundle issuer keys, keyed by issuer DID |
+| `registry_bundle_max_age_seconds` | `integer() \| nil` | `nil` | Quarantine signed registry bundles older than this age |
+| `registry_bundle_clock_skew_seconds` | `integer()` | `60` | Allowed future `issued_at` skew for signed registry bundles |
 | `scanner_patterns` | `atom()` | `:built_in` | Pattern source (`:built_in` or `:registry`) |
 
 ### Backend Selection
