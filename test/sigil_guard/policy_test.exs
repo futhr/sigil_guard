@@ -234,6 +234,22 @@ defmodule SigilGuard.PolicyTest do
       assert :ok = Policy.rate_check("bob", max_requests: 3, rate_store: table)
     end
 
+    test "fails closed on malformed rate limit options" do
+      invalid_cases = [
+        [max_requests: 0],
+        [max_requests: -1],
+        [max_requests: "3"],
+        [window_ms: 0],
+        [window_ms: -1],
+        [window_ms: "60000"],
+        [rate_store: "rate_table"]
+      ]
+
+      for opts <- invalid_cases do
+        assert {:error, :rate_limited} = Policy.rate_check("user-invalid", opts)
+      end
+    end
+
     test "default rate table is owned by the application" do
       assert :ets.whereis(:sigil_guard_rates) != :undefined
 

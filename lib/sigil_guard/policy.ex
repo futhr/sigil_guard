@@ -175,26 +175,12 @@ defmodule SigilGuard.Policy do
   """
   @spec rate_check(String.t(), keyword()) :: :ok | {:error, :rate_limited}
   def rate_check(identity, opts \\ []) do
-    max_requests = Keyword.get(opts, :max_requests, 100)
-    window_ms = Keyword.get(opts, :window_ms, 60_000)
-    table = Keyword.get(opts, :rate_store, @default_rate_table)
-
-    now = System.monotonic_time(:millisecond)
-
-    ensure_rate_table(table)
-
-    case :ets.lookup(table, identity) do
-      [{^identity, count, window_start}] when now - window_start < window_ms ->
-        if count >= max_requests do
-          {:error, :rate_limited}
-        else
-          :ets.update_counter(table, identity, {2, 1})
-          :ok
-        end
-
-      _ ->
-        :ets.insert(table, {identity, 1, now})
-        :ok
+    with {:ok, max_requests} <- positive_integer_option(opts, :max_requests, 100),
+         {:ok, window_ms} <- positive_integer_option(opts, :window_ms, 60_000),
+         {:ok, table} <- rate_store_option(opts) do
+      checked_rate(identity, table, max_requests, window_ms)
+    else
+      {:error, _} -> {:error, :rate_limited}
     end
   end
 
@@ -369,6 +355,40 @@ defmodule SigilGuard.Policy do
     required_idx = Enum.find_index(trust_levels, &(&1 == required))
 
     actual_idx != nil and required_idx != nil and required_idx - actual_idx == 1
+  end
+
+  defp checked_rate(identity, table, max_requests, window_ms) do
+    now = System.monotonic_time(:millisecond)
+
+    ensure_rate_table(table)
+
+    case :ets.lookup(table, identity) do
+      [{^identity, count, window_start}] when now - window_start < window_ms ->
+        if count >= max_requests do
+          {:error, :rate_limited}
+        else
+          :ets.update_counter(table, identity, {2, 1})
+          :ok
+        end
+
+      _ ->
+        :ets.insert(table, {identity, 1, now})
+        :ok
+    end
+  end
+
+  defp positive_integer_option(opts, key, default) do
+    case Keyword.get(opts, key, default) do
+      value when is_integer(value) and value > 0 -> {:ok, value}
+      _ -> {:error, {:invalid_option, key}}
+    end
+  end
+
+  defp rate_store_option(opts) do
+    case Keyword.get(opts, :rate_store, @default_rate_table) do
+      table when is_atom(table) -> {:ok, table}
+      _ -> {:error, {:invalid_option, :rate_store}}
+    end
   end
 
   defp emit_decision(action, risk, trust_level, required_trust, error_reason \\ nil) do
