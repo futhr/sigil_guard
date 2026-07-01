@@ -267,9 +267,13 @@ stream =
     stream_window_bytes: 256
   )
 
-{stream, _decision, chunk1} = SigilGuard.Runtime.Stream.push(stream, "safe output ")
-{_stream, _decision, chunk2} = SigilGuard.Runtime.Stream.finish(stream)
-sanitized_output = chunk1 <> chunk2
+{stream, {:ok, nil, _decision}} =
+  SigilGuard.MCP.Gateway.guarded_result_chunk(stream, "safe output ", id: 3)
+
+{_stream, {:ok, stream_response, _decision}} =
+  SigilGuard.MCP.Gateway.finish_guarded_result_stream(stream, id: 3)
+
+[%{"text" => sanitized_output}] = stream_response["result"]["content"]
 ```
 
 When envelope replay checks are enabled, a confirmed retry must carry a fresh

@@ -283,6 +283,8 @@ defmodule SigilGuard.Bench do
     confirmed_result =
       Map.put(confirmable_result, "_sigil_confirmation", result_confirmation_token)
 
+    stream_prefix = String.duplicate("safe ", 30)
+
     %{
       "mcp gateway / signed request" => fn ->
         SigilGuard.MCP.Gateway.guard_signed_request(request, [trust_level: :high],
@@ -312,6 +314,20 @@ defmodule SigilGuard.Bench do
           now: now,
           consume_confirmation: false
         )
+      end,
+      "mcp gateway / guarded stream result" => fn ->
+        stream =
+          SigilGuard.MCP.Gateway.stream_result([tool: "fetch_secret", trust_level: :medium],
+            stream_window_bytes: 64
+          )
+
+        {stream, _} =
+          SigilGuard.MCP.Gateway.guarded_result_chunk(stream, stream_prefix <> "AKIAIOS", id: 4)
+
+        {stream, _} =
+          SigilGuard.MCP.Gateway.guarded_result_chunk(stream, "FODNN7EXAMPLE tail", id: 4)
+
+        SigilGuard.MCP.Gateway.finish_guarded_result_stream(stream, id: 4)
       end
     }
   end

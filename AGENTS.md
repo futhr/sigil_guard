@@ -333,6 +333,20 @@ confirmed_result = Map.put(tool_result, "_sigil_confirmation", result_token)
 
 :redact = released_decision.action
 [%{"text" => "[QUARANTINED]" <> _}] = released_response["result"]["content"]
+
+stream =
+  SigilGuard.MCP.Gateway.stream_result(
+    [tool: "fetch_url", trust_level: :medium],
+    stream_window_bytes: 256
+  )
+
+{stream, {:ok, nil, _decision}} =
+  SigilGuard.MCP.Gateway.guarded_result_chunk(stream, "safe output ", id: 3)
+
+{_stream, {:ok, stream_response, _decision}} =
+  SigilGuard.MCP.Gateway.finish_guarded_result_stream(stream, id: 3)
+
+[%{"text" => "safe output "}] = stream_response["result"]["content"]
 ```
 
 ### Confirmation Tokens

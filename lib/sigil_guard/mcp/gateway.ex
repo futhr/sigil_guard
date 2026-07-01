@@ -348,6 +348,40 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
+  Push one MCP tool-result stream chunk through the gateway sanitizer.
+
+  Returns `{stream, result}` where `result` is:
+
+    * `{:ok, response, decision}` when a safe MCP-shaped chunk can be emitted.
+    * `{:ok, nil, decision}` when the chunk is still held back for boundary checks.
+    * `{:error, response, decision}` when the stream is blocked or quarantined.
+
+  Pass `id: json_rpc_id` to include the JSON-RPC request id in emitted chunks
+  and error responses.
+  """
+  @spec guarded_result_chunk(Runtime.Stream.t(), String.t(), keyword()) ::
+          {Runtime.Stream.t(), {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
+  def guarded_result_chunk(%Runtime.Stream{} = stream, chunk, opts \\ []) when is_binary(chunk) do
+    stream
+    |> Runtime.Stream.push(chunk)
+    |> stream_response(opts)
+  end
+
+  @doc """
+  Flush a guarded MCP tool-result stream.
+
+  This applies the same response shape as `guarded_result_chunk/3` to the final
+  held-back stream bytes.
+  """
+  @spec finish_guarded_result_stream(Runtime.Stream.t(), keyword()) ::
+          {Runtime.Stream.t(), {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
+  def finish_guarded_result_stream(%Runtime.Stream{} = stream, opts \\ []) do
+    stream
+    |> Runtime.Stream.finish()
+    |> stream_response(opts)
+  end
+
+  @doc """
   Convert a runtime decision into an audit-safe JSON-RPC response.
 
   The response intentionally omits raw payload text. Metadata includes hashes,
@@ -647,6 +681,33 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   defp release_confirmed_result(%Decision{} = decision), do: decision
+
+  defp stream_response({%Runtime.Stream{} = stream, %Decision{} = decision, emitted}, opts) do
+    id = Keyword.get(opts, :id)
+
+    result =
+      if executable?(decision) do
+        {:ok, stream_chunk_response(emitted, id), decision}
+      else
+        {:error, response_for_decision(decision, id, opts), decision}
+      end
+
+    {stream, result}
+  end
+
+  defp stream_chunk_response("", _), do: nil
+
+  defp stream_chunk_response(text, id) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => %{
+        "content" => [
+          %{"type" => "text", "text" => text}
+        ]
+      }
+    }
+  end
 
   defp confirmation_failure_decision(%Decision{} = decision, reason) do
     metadata =
