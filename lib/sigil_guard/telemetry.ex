@@ -225,7 +225,8 @@ defmodule SigilGuard.Telemetry do
 
   defp put_attribute(attributes, _, nil), do: attributes
 
-  defp put_attribute(attributes, key, value) when is_atom(value) do
+  defp put_attribute(attributes, key, value)
+       when is_atom(value) and not is_boolean(value) and not is_nil(value) do
     Map.put(attributes, key, Atom.to_string(value))
   end
 
@@ -245,7 +246,8 @@ defmodule SigilGuard.Telemetry do
 
   defp put_attribute(attributes, _, _), do: attributes
 
-  defp attribute_value(value) when is_atom(value), do: Atom.to_string(value)
+  defp attribute_value(value) when is_atom(value) and not is_boolean(value) and not is_nil(value),
+    do: Atom.to_string(value)
 
   defp attribute_value(value) when is_binary(value) or is_number(value) or is_boolean(value),
     do: value

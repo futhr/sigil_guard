@@ -77,6 +77,37 @@ defmodule SigilGuard.TelemetryTest do
       assert attributes["sigil.registry.endpoint"] == "patterns/bundle"
       assert attributes["sigil.measurement.duration"] == 10
     end
+
+    test "drops nil, unknown, and unsupported attribute values" do
+      attributes =
+        Telemetry.otel_attributes(
+          [:third_party, :event],
+          %{duration: nil, unsupported: %{nested: true}},
+          %{
+            unknown: "ignored",
+            phase: nil,
+            indicator_ids: [:ignore_instructions, "direct", 42, true, %{nested: true}],
+            repo_policy_rules: [%{not: "exportable"}]
+          }
+        )
+
+      assert attributes["sigil.event"] == "third_party.event"
+      assert attributes["sigil.component"] == "unknown"
+      assert attributes["sigil.operation"] == "unknown"
+
+      assert attributes["sigil.security.indicator_ids"] == [
+               "ignore_instructions",
+               "direct",
+               42,
+               true
+             ]
+
+      refute Map.has_key?(attributes, "unknown")
+      refute Map.has_key?(attributes, "sigil.measurement.duration")
+      refute Map.has_key?(attributes, "sigil.measurement.unsupported")
+      refute Map.has_key?(attributes, "sigil.security.phase")
+      refute Map.has_key?(attributes, "sigil.repo_policy.rules")
+    end
   end
 
   describe "attach_otel_forwarder/3" do
@@ -107,6 +138,25 @@ defmodule SigilGuard.TelemetryTest do
       assert metadata.action == "delete_database"
       assert attributes["sigil.security.action"] == "delete_database"
       assert attributes["sigil.security.risk_level"] == "high"
+    end
+
+    test "rejects duplicate handler IDs and reports missing detach targets" do
+      handler_id = "sigil-otel-duplicate-test-#{System.unique_integer()}"
+
+      assert :ok =
+               Telemetry.attach_otel_forwarder(handler_id, fn _, _, _, _ -> :ok end,
+                 events: [[:sigil_guard, :policy, :decision]]
+               )
+
+      on_exit(fn -> Telemetry.detach(handler_id) end)
+
+      assert {:error, :already_exists} =
+               Telemetry.attach_otel_forwarder(handler_id, fn _, _, _, _ -> :ok end,
+                 events: [[:sigil_guard, :policy, :decision]]
+               )
+
+      assert {:error, :not_found} =
+               Telemetry.detach("sigil-otel-missing-test-#{System.unique_integer()}")
     end
   end
 
