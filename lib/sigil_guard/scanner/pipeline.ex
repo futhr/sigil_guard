@@ -54,7 +54,7 @@ defmodule SigilGuard.Scanner.Pipeline do
   """
   @spec scan(String.t(), [Patterns.compiled_pattern()], keyword()) :: [Patterns.scan_hit()]
   def scan(text, patterns, opts \\ []) when is_binary(text) and is_list(patterns) do
-    min_confidence = Keyword.get(opts, :min_confidence, 0.0)
+    min_confidence = confidence_floor(opts, :min_confidence, 0.0)
 
     text
     |> regex_candidates(patterns)
@@ -99,7 +99,7 @@ defmodule SigilGuard.Scanner.Pipeline do
   end
 
   defp valid_candidate?(candidate, opts) do
-    not Keyword.get(opts, :validate, true) or structurally_valid?(candidate, opts)
+    not validation_enabled?(opts) or structurally_valid?(candidate, opts)
   end
 
   defp structurally_valid?(%{pattern: %{name: "aws_access_key"}, match: match} = candidate, _) do
@@ -111,7 +111,7 @@ defmodule SigilGuard.Scanner.Pipeline do
     label_boundary?(candidate) and token_boundary?(candidate, &bearer_token_byte?/1) and
       match
       |> bearer_value()
-      |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
+      |> token_like?(20, entropy_option(opts, :token_min_entropy, 3.0))
   end
 
   defp structurally_valid?(%{pattern: %{name: "database_uri"}, match: match} = candidate, _) do
@@ -127,7 +127,7 @@ defmodule SigilGuard.Scanner.Pipeline do
     assignment_boundary?(candidate) and
       match
       |> assignment_value()
-      |> token_like?(20, Keyword.get(opts, :token_min_entropy, 3.0))
+      |> token_like?(20, entropy_option(opts, :token_min_entropy, 3.0))
   end
 
   defp structurally_valid?(%{pattern: %{name: "generic_secret"}, match: match} = candidate, opts) do
@@ -136,8 +136,8 @@ defmodule SigilGuard.Scanner.Pipeline do
     assignment_boundary?(candidate) and
       secret_like?(
         value,
-        Keyword.get(opts, :generic_secret_min_length, 10),
-        Keyword.get(opts, :generic_secret_min_entropy, 2.8)
+        positive_integer_option(opts, :generic_secret_min_length, 10),
+        entropy_option(opts, :generic_secret_min_entropy, 2.8)
       )
   end
 
@@ -145,7 +145,7 @@ defmodule SigilGuard.Scanner.Pipeline do
 
   defp enrich_hit(candidate, opts) do
     signals = signals(candidate)
-    validated? = Keyword.get(opts, :validate, true)
+    validated? = validation_enabled?(opts)
 
     candidate
     |> legacy_hit()
@@ -382,5 +382,28 @@ defmodule SigilGuard.Scanner.Pipeline do
       probability = count / length
       acc - probability * :math.log2(probability)
     end)
+  end
+
+  defp validation_enabled?(opts), do: Keyword.get(opts, :validate, true) != false
+
+  defp confidence_floor(opts, key, default) do
+    case Keyword.get(opts, key, default) do
+      value when is_number(value) and value >= 0.0 and value <= 1.0 -> value
+      _ -> default
+    end
+  end
+
+  defp positive_integer_option(opts, key, default) do
+    case Keyword.get(opts, key, default) do
+      value when is_integer(value) and value > 0 -> value
+      _ -> default
+    end
+  end
+
+  defp entropy_option(opts, key, default) do
+    case Keyword.get(opts, key, default) do
+      value when is_number(value) and value >= 0.0 -> value
+      _ -> default
+    end
   end
 end

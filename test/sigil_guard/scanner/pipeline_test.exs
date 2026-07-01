@@ -187,6 +187,26 @@ defmodule SigilGuard.Scanner.PipelineTest do
                Scanner.scan("CUSTOM_1234", patterns: patterns, min_confidence: 0.7)
     end
 
+    test "falls back to conservative scanner options when thresholds are malformed" do
+      assert {:hit, [hit]} =
+               Scanner.scan("secret=R7v9K2mQ4xZ8pL6n",
+                 generic_secret_min_length: "long",
+                 generic_secret_min_entropy: :strict,
+                 min_confidence: "high",
+                 token_min_entropy: "strict"
+               )
+
+      assert hit.name == "generic_secret"
+      assert hit.validated
+    end
+
+    test "keeps validation enabled for malformed validation toggles" do
+      assert {:ok, "secret=aaaaaaaa"} = Scanner.scan("secret=aaaaaaaa", validate: "false")
+
+      assert {:hit, [hit]} = Scanner.scan("secret=aaaaaaaa", validate: false)
+      refute hit.validated
+    end
+
     test "accepts custom scanner pipeline modules" do
       patterns = Patterns.compile([%{name: "x", category: "t", severity: :low, pattern: "x"}])
 
