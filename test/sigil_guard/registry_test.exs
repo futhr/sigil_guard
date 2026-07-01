@@ -334,6 +334,40 @@ defmodule SigilGuard.RegistryTest do
       assert {:error, :missing_did} = Registry.resolve_key("did:sigil:alice", url: url)
     end
 
+    test "rejects malformed resolved identity statuses", %{bypass: bypass, url: url} do
+      Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "did" => "did:sigil:alice",
+            "status" => false,
+            "public_key" => public_key_b64u()
+          })
+        )
+      end)
+
+      assert {:error, :invalid_status} = Registry.resolve_key("did:sigil:alice", url: url)
+
+      Bypass.expect_once(bypass, "GET", "/identities/did%3Asigil%3Aalice", fn conn ->
+        Plug.Conn.resp(
+          conn,
+          200,
+          Jason.encode!(%{
+            "id" => "did:sigil:alice",
+            "status" => false,
+            "publicKey" => [%{"publicKeyBase64" => public_key_b64()}]
+          })
+        )
+      end)
+
+      assert {:error, :invalid_status} =
+               Registry.resolve_key("did:sigil:alice",
+                 url: url,
+                 profile: :legacy_sigil_guard
+               )
+    end
+
     test "does not let fallback IDs mask malformed primary DIDs", %{bypass: bypass, url: url} do
       Bypass.expect_once(bypass, "GET", "/resolve/did%3Asigil%3Aalice", fn conn ->
         Plug.Conn.resp(

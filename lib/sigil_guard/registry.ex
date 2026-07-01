@@ -256,7 +256,8 @@ defmodule SigilGuard.Registry do
   end
 
   defp build_resolved_key(did, status, encoded_key, source_format) when is_binary(did) do
-    with {:ok, raw_key} <- decode_public_key(encoded_key) do
+    with {:ok, status} <- normalize_status(status),
+         {:ok, raw_key} <- decode_public_key(encoded_key) do
       {:ok,
        %{
          did: did,
@@ -269,6 +270,10 @@ defmodule SigilGuard.Registry do
   end
 
   defp build_resolved_key(_, _, _, _), do: {:error, :missing_did}
+
+  defp normalize_status(nil), do: {:ok, nil}
+  defp normalize_status(status) when is_binary(status), do: {:ok, status}
+  defp normalize_status(_), do: {:error, :invalid_status}
 
   defp decode_public_key(encoded_key) do
     decoded =
