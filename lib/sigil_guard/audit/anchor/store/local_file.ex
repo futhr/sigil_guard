@@ -221,12 +221,12 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp matching_record_result(record, digest) do
-    with true <- Anchor.digest(record) == digest,
-         :ok <- validate_anchor(record) do
+    with :ok <- validate_anchor(record),
+         true <- Anchor.digest(record) == digest do
       {:halt, {:ok, record}}
     else
-      false -> {:halt, {:error, :digest_mismatch}}
       {:error, reason} -> {:halt, {:error, reason}}
+      false -> {:halt, {:error, :digest_mismatch}}
     end
   end
 
