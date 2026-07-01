@@ -90,10 +90,20 @@ defmodule SigilGuard.Patterns do
     }
   ]
 
+  @compiled_built_in_patterns Enum.map(@built_in_patterns, fn raw ->
+                                %{
+                                  name: raw.name,
+                                  category: raw.category,
+                                  severity: raw.severity,
+                                  regex: Regex.compile!(raw.pattern),
+                                  replacement_hint: raw.replacement_hint
+                                }
+                              end)
+
   @doc "Return compiled built-in patterns."
   @spec built_in() :: [compiled_pattern()]
   def built_in do
-    Enum.map(@built_in_patterns, &compile_pattern/1)
+    @compiled_built_in_patterns
   end
 
   @doc """
