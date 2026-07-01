@@ -64,16 +64,17 @@ defmodule SigilGuard.Confirmation do
     context = Context.new(context)
 
     with :ok <- validate_key(key),
-         :ok <- validate_confirmable(decision) do
-      now = Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:millisecond) end)
-      ttl_ms = Keyword.get(opts, :ttl_ms, @default_ttl_ms)
-
+         :ok <- validate_confirmable(decision),
+         {:ok, now} <- issue_now(opts),
+         {:ok, ttl_ms} <- issue_ttl_ms(opts),
+         {:ok, actor} <- issue_actor(context, opts),
+         {:ok, nonce} <- issue_nonce(opts) do
       claims =
         build_claims(payload, context, decision, %{
-          actor: actor(context, opts),
+          actor: actor,
           issued_at: DateTime.to_iso8601(now),
           expires_at: expires_at(now, ttl_ms),
-          nonce: Keyword.get_lazy(opts, :nonce, &generate_nonce/0)
+          nonce: nonce
         })
 
       {:ok, encode_token(claims, key)}
@@ -199,14 +200,9 @@ defmodule SigilGuard.Confirmation do
   defp validate_claims(_), do: {:error, :invalid_token}
 
   defp validate_expiry(%{"expires_at" => expires_at}, opts) do
-    now = Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:millisecond) end)
-
-    case DateTime.from_iso8601(expires_at) do
-      {:ok, expires_at_dt, _} ->
-        if DateTime.compare(now, expires_at_dt) == :gt, do: {:error, :expired}, else: :ok
-
-      _ ->
-        {:error, :invalid_token}
+    with {:ok, now} <- issue_now(opts),
+         {:ok, expires_at_dt} <- parse_datetime(expires_at) do
+      if DateTime.compare(now, expires_at_dt) == :gt, do: {:error, :expired}, else: :ok
     end
   end
 
@@ -231,14 +227,9 @@ defmodule SigilGuard.Confirmation do
   end
 
   defp replay_ttl_ms(%{"expires_at" => expires_at}, opts) do
-    now = Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:millisecond) end)
-
-    case DateTime.from_iso8601(expires_at) do
-      {:ok, expires_at_dt, _} ->
-        {:ok, max(DateTime.diff(expires_at_dt, now, :millisecond), 1)}
-
-      _ ->
-        {:error, :invalid_token}
+    with {:ok, now} <- issue_now(opts),
+         {:ok, expires_at_dt} <- parse_datetime(expires_at) do
+      {:ok, max(DateTime.diff(expires_at_dt, now, :millisecond), 1)}
     end
   end
 
@@ -249,9 +240,46 @@ defmodule SigilGuard.Confirmation do
     if Decision.confirm?(decision), do: :ok, else: {:error, :not_confirmable}
   end
 
-  defp actor(%Context{actor: actor}, _) when is_binary(actor), do: actor
-  defp actor(%Context{identity: identity}, _) when is_binary(identity), do: identity
-  defp actor(_, opts), do: Keyword.get(opts, :actor, "unknown")
+  defp issue_now(opts) do
+    case Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:millisecond) end) do
+      %DateTime{} = now -> {:ok, now}
+      _ -> {:error, :invalid_now}
+    end
+  end
+
+  defp issue_ttl_ms(opts) do
+    case Keyword.get(opts, :ttl_ms, @default_ttl_ms) do
+      ttl_ms when is_integer(ttl_ms) and ttl_ms > 0 -> {:ok, ttl_ms}
+      _ -> {:error, :invalid_ttl}
+    end
+  end
+
+  defp issue_nonce(opts) do
+    case Keyword.get_lazy(opts, :nonce, &generate_nonce/0) do
+      nonce when is_binary(nonce) and nonce != "" -> {:ok, nonce}
+      _ -> {:error, :invalid_nonce}
+    end
+  end
+
+  defp issue_actor(%Context{actor: actor}, _) when is_binary(actor) and actor != "",
+    do: {:ok, actor}
+
+  defp issue_actor(%Context{identity: identity}, _) when is_binary(identity) and identity != "",
+    do: {:ok, identity}
+
+  defp issue_actor(_, opts) do
+    case Keyword.get(opts, :actor, "unknown") do
+      actor when is_binary(actor) and actor != "" -> {:ok, actor}
+      _ -> {:error, :invalid_actor}
+    end
+  end
+
+  defp parse_datetime(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, datetime, _} -> {:ok, datetime}
+      _ -> {:error, :invalid_token}
+    end
+  end
 
   defp expires_at(now, ttl_ms) do
     now

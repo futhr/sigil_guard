@@ -237,6 +237,29 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert claims["action_digest"] == decision.audit_metadata.action_digest
       refute token =~ "tenant-a"
     end
+
+    test "returns errors for malformed token issuance options" do
+      request = confirmable_request()
+      decision = Gateway.guard_request(request, trust_level: :medium)
+
+      assert {:error, :invalid_ttl} =
+               Gateway.issue_confirmation_token(
+                 request,
+                 [trust_level: :medium],
+                 decision,
+                 @confirmation_key,
+                 ttl_ms: "bad"
+               )
+
+      assert {:error, :invalid_nonce} =
+               Gateway.issue_confirmation_token(
+                 request,
+                 [trust_level: :medium],
+                 decision,
+                 @confirmation_key,
+                 nonce: false
+               )
+    end
   end
 
   describe "issue_signed_confirmation_token/5" do
