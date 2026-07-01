@@ -62,13 +62,23 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   def verify_document(document) when is_map(document) do
     project = Mix.Project.config()
     package = root_package(project)
+    locks = lock_entries()
+    root_dependencies = runtime_root_dependencies(project)
+    dependency_names = dependency_closure(root_dependencies, locks)
+    dependencies = dependency_packages(locks, dependency_names)
+    dependency_edges = dependency_edges(root_dependencies, dependency_names, locks)
 
     with :ok <- require_equal(document["spdxVersion"], @spdx_version, :invalid_spdx_version),
          :ok <- require_equal(document["dataLicense"], @data_license, :invalid_data_license),
          :ok <- require_equal(document["SPDXID"], "SPDXRef-DOCUMENT", :invalid_document_id),
          :ok <- require_creation_info(document["creationInfo"]),
-         :ok <- require_root_package(document["packages"], package) do
-      require_describes_relationship(document["relationships"], package)
+         :ok <- require_root_package(document["packages"], package),
+         :ok <- require_dependency_packages(document["packages"], dependencies),
+         :ok <- require_describes_relationship(document["relationships"], package) do
+      require_dependency_relationships(
+        document["relationships"],
+        dependency_relationships(package, dependency_edges)
+      )
     end
   end
 
@@ -287,16 +297,17 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
       }
     ]
 
-    dependency_relationships =
-      Enum.map(dependency_edges, fn {parent, child} ->
-        %{
-          "spdxElementId" => relationship_package_id(root, parent),
-          "relationshipType" => "DEPENDS_ON",
-          "relatedSpdxElement" => package_id(Atom.to_string(child))
-        }
-      end)
+    describes ++ dependency_relationships(root, dependency_edges)
+  end
 
-    describes ++ dependency_relationships
+  defp dependency_relationships(root, dependency_edges) do
+    Enum.map(dependency_edges, fn {parent, child} ->
+      %{
+        "spdxElementId" => relationship_package_id(root, parent),
+        "relationshipType" => "DEPENDS_ON",
+        "relatedSpdxElement" => package_id(Atom.to_string(child))
+      }
+    end)
   end
 
   defp require_creation_info(%{"created" => created, "creators" => creators})
@@ -329,6 +340,36 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
   defp root_package?(_, _), do: false
 
+  defp require_dependency_packages(packages, dependencies) when is_list(packages) do
+    Enum.reduce_while(dependencies, :ok, fn dependency, :ok ->
+      case dependency_package_status(packages, dependency) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp require_dependency_packages(_, _), do: {:error, :invalid_packages}
+
+  defp dependency_package_status(packages, dependency) do
+    cond do
+      Enum.any?(packages, &(&1 == dependency)) ->
+        :ok
+
+      Enum.any?(packages, &same_spdx_id?(&1, dependency)) ->
+        {:error, :invalid_dependency_package}
+
+      true ->
+        {:error, :missing_dependency_package}
+    end
+  end
+
+  defp same_spdx_id?(%{"SPDXID" => candidate_id}, %{"SPDXID" => expected_id}) do
+    candidate_id == expected_id
+  end
+
+  defp same_spdx_id?(_, _), do: false
+
   defp require_describes_relationship(relationships, package) when is_list(relationships) do
     if Enum.any?(relationships, &describes_root?(&1, package)) do
       :ok
@@ -346,6 +387,17 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   end
 
   defp describes_root?(_, _), do: false
+
+  defp require_dependency_relationships(relationships, dependencies)
+       when is_list(relationships) do
+    if Enum.all?(dependencies, &(&1 in relationships)) do
+      :ok
+    else
+      {:error, :missing_dependency_relationship}
+    end
+  end
+
+  defp require_dependency_relationships(_, _), do: {:error, :invalid_relationships}
 
   defp require_equal(actual, expected, _) when actual == expected, do: :ok
   defp require_equal(_, _, reason), do: {:error, reason}

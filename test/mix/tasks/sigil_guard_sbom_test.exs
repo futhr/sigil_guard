@@ -89,6 +89,46 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
 
       assert {:error, :missing_describes_relationship} = Sbom.verify_document(sbom)
     end
+
+    test "rejects tampered dependency packages" do
+      sbom =
+        [created_at: @created_at, git_revision: @git_revision]
+        |> Sbom.generate()
+        |> update_in(["packages"], fn packages ->
+          Enum.map(packages, fn
+            %{"name" => "jason"} = package -> %{package | "versionInfo" => "9.9.9"}
+            package -> package
+          end)
+        end)
+
+      assert {:error, :invalid_dependency_package} = Sbom.verify_document(sbom)
+    end
+
+    test "rejects missing dependency packages" do
+      sbom =
+        [created_at: @created_at, git_revision: @git_revision]
+        |> Sbom.generate()
+        |> update_in(["packages"], fn packages ->
+          Enum.reject(packages, &(&1["name"] == "jason"))
+        end)
+
+      assert {:error, :missing_dependency_package} = Sbom.verify_document(sbom)
+    end
+
+    test "rejects missing dependency relationships" do
+      sbom =
+        [created_at: @created_at, git_revision: @git_revision]
+        |> Sbom.generate()
+        |> update_in(["relationships"], fn relationships ->
+          Enum.reject(relationships, fn relationship ->
+            relationship["spdxElementId"] == "SPDXRef-Package-sigil-guard" and
+              relationship["relationshipType"] == "DEPENDS_ON" and
+              relationship["relatedSpdxElement"] == "SPDXRef-Package-jason"
+          end)
+        end)
+
+      assert {:error, :missing_dependency_relationship} = Sbom.verify_document(sbom)
+    end
   end
 
   describe "verify_file/1" do
