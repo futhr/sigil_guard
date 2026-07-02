@@ -1,0 +1,91 @@
+[
+  {
+    "name": "rfc_property_sorting_sample",
+    "kind": "term",
+    "input": {
+      "€": "Euro Sign",
+      "\r": "Carriage Return",
+      "דּ": "Hebrew Letter Dalet With Dagesh",
+      "1": "One",
+      "😀": "Emoji: Grinning Face",
+      "": "Control",
+      "ö": "Latin Small Letter O With Diaeresis"
+    },
+    "expected": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+  },
+  {
+    "name": "surrogate_pair_sorts_before_bmp_ligature",
+    "kind": "term",
+    "input": {
+      "ﬀ": "ligature",
+      "😀": "emoji"
+    },
+    "expected": "{\"😀\":\"emoji\",\"ﬀ\":\"ligature\"}"
+  },
+  {
+    "name": "nfc_nfd_twin_keys_are_distinct",
+    "kind": "term",
+    "input": {
+      "é": "nfc",
+      "é": "nfd"
+    },
+    "expected": "{\"é\":\"nfd\",\"é\":\"nfc\"}"
+  },
+  {
+    "name": "deeply_nested_structure",
+    "kind": "term",
+    "input": {
+      "z": [
+        {
+          "b": [
+            {
+              "😀": "emoji",
+              "ﬀ": "ligature"
+            }
+          ],
+          "a": {
+            "safe_max": 9007199254740991,
+            "safe_min": -9007199254740991
+          }
+        }
+      ],
+      "a": true
+    },
+    "expected": "{\"a\":true,\"z\":[{\"a\":{\"safe_max\":9007199254740991,\"safe_min\":-9007199254740991},\"b\":[{\"😀\":\"emoji\",\"ﬀ\":\"ligature\"}]}]}"
+  },
+  {
+    "name": "minus_zero_float",
+    "kind": "float_hex",
+    "hex": "8000000000000000",
+    "expected": "0"
+  },
+  {
+    "name": "ten_to_twenty_one_exponent_boundary",
+    "kind": "float_hex",
+    "hex": "444b1ae4d6e2ef50",
+    "expected": "1e+21"
+  },
+  {
+    "name": "safe_integer_upper_bound",
+    "kind": "term",
+    "input": 9007199254740991,
+    "expected": "9007199254740991"
+  },
+  {
+    "name": "integer_above_safe_range",
+    "kind": "error",
+    "input": 9007199254740992,
+    "expected_error": "unsupported_number_range"
+  },
+  {
+    "name": "invalid_utf8_string",
+    "kind": "invalid_utf8_hex",
+    "hex": "FF",
+    "expected_error": "invalid_map"
+  },
+  {
+    "name": "atom_string_key_collision",
+    "kind": "atom_string_collision",
+    "expected_error": "invalid_map"
+  }
+]
