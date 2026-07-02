@@ -16,6 +16,51 @@ were derived from primary-source research and adversarially verified against
 those sources; do not reopen a closed decision without a superseding
 research note.
 
+## Orientation (Read First)
+
+Working knowledge for whoever builds this out. Read once, then start at M1.01.
+
+**v0.2.x versus v3.** The current `lib/` is the released 0.2.x runtime; v3 is
+a deliberate breaking rewrite, not an incremental patch. The Rust/NIF backend
+is already gone and stays gone (`CLAUDE.md` rule 1) - ignore any NIF, rustler,
+precompiled-binary, or `SIGIL_GUARD_BUILD` references in history. Do not carry
+the v0.2 `Registry`, `Envelope`, `Profile`, `protocol_profile`, or
+`registry_*` surfaces into v3; they are deleted in M6 with 1:1 migration
+mappings in `MIGRATING-3.0.md`. Legacy golden vectors move to
+`test/fixtures/historical/` as migration evidence, not v3 proofs.
+
+**The reference consumer contract.** One production agent runtime embeds
+SigilGuard (Elixir `~> 1.19`, OTP 27+), pinned `~> 0.1` today, moving to
+`~> 3.0` only after the release-candidate gate. It depends on the stable
+contracts in decision **D17**: `scan/1`, `scan_and_redact/1`,
+`policy_verdict/3`, the `Identity` / `Signer` / `Vault` behaviours,
+`Signer.Ed25519.{new/1, sign_with/2, verify/3}`, and the `%Audit{}` struct
+fields - all kept byte-identical in v3 (hit maps extend additively only). The
+host supplies three init secrets via config: an audit HMAC key, an Ed25519
+signer seed, and a vault master key.
+`test/sigil_guard/conformance/consumer_contracts_test.exs` (task M1.02)
+encodes these as executable assertions and MUST stay green at every milestone
+exit - it is the tier-1 regression gate.
+
+**Naming and privacy.** Never write the private consumer project's name, or
+its internal module names, into any repository file (`CLAUDE.md` rule 11).
+Refer to it only as "the reference consumer"; neutralize example identifiers
+(e.g. `host:operator:42`). Maintain this in every new file.
+
+**Release mechanics.** `git_ops` manages versioning at release (a `feat`
+commit implies a minor bump) but CANNOT derive `3.0.0-rc.1` from 0.2.x
+history - the jump to the release candidate is a manual version set (D11, M8),
+verified afterward with `mix git_ops.release --dry-run` resuming cleanly.
+`~> 3.0` does not resolve a pre-release; consumers pin `"3.0.0-rc.1"` exactly
+during the soak. Sequence: `0.2.1` metadata-only -> `3.0.0-rc.1` -> soak plus
+a blocking reference-consumer validation -> `3.0.0`.
+
+**Gate and conventions.** Canonical gate `mix check --no-retry` (full list in
+`CLAUDE.md`); coverage >= 95%; run `mix credo --strict` before each commit.
+Security modules need negative/tamper/replay/expiration/malformed tests
+(`CLAUDE.md` rule 9). Conventional commits, no AI attribution or co-author
+trailers (rule 10); the maintainer pushes manually.
+
 ## Progress Summary
 
 | Milestone | Total | Complete | In Progress | Planned |
