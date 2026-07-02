@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 12 | 0 | 7 |
+| M1 - Core groundwork | 19 | 13 | 0 | 6 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **64** | **0** | **164** |
+| **Total** | **228** | **65** | **0** | **163** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -416,7 +416,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `:invalid_signature`; unresolved keyids are tolerated (witness
     cosigning support).
   - Tests: negative, tamper, replay, expiration, malformed.
-- [ ] M1.13 `Attestation.from_decision/3`.
+- [x] M1.13 `Attestation.from_decision/3`.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Public API
     Sketch (from_decision/3).
   - AC: phase-to-type closed map (`:inbound_user -> :model_ingress`,

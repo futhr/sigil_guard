@@ -8,9 +8,12 @@ defmodule SigilGuard.Attestation do
   digest computation.
   """
 
+  alias SigilGuard.Attestation.AgentPredicate
   alias SigilGuard.Attestation.Digest
   alias SigilGuard.Attestation.Envelope
+  alias SigilGuard.Attestation.Statement
   alias SigilGuard.Canonical.JCS
+  alias SigilGuard.Context
   alias SigilGuard.ReplayStore
   alias SigilGuard.TrustProfile
 
@@ -41,6 +44,14 @@ defmodule SigilGuard.Attestation do
     "agent_response" => :agent_response
   }
 
+  @phase_statement_types %{
+    inbound_user: :model_ingress,
+    tool_request: :tool_request,
+    tool_result: :tool_result,
+    outbound_model: :model_egress,
+    repo_change: :repo_change
+  }
+
   @type payload :: map()
   @type envelope :: map()
   @type sign_error ::
@@ -68,6 +79,18 @@ defmodule SigilGuard.Attestation do
           | :expired_attestation
           | :replay_detected
 
+  @type from_decision_error ::
+          :unknown_statement_type
+          | :invalid_payload
+          | :invalid_context
+          | :invalid_phase
+          | :invalid_sink
+          | :invalid_origin
+          | :invalid_trust_level
+          | :invalid_trust_zone
+          | :invalid_audience
+          | :invalid_metadata
+
   @doc """
   Sign a decoded SigilGuard Statement as a DSSE envelope.
   """
@@ -88,6 +111,45 @@ defmodule SigilGuard.Attestation do
   end
 
   def sign(_, _, _), do: {:error, :invalid_payload}
+
+  @doc """
+  Build a SigilGuard Statement from a runtime decision, context, and payload.
+  """
+  @spec from_decision(SigilGuard.Decision.t(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, map()} | {:error, from_decision_error()}
+  def from_decision(decision, context, opts \\ [])
+
+  def from_decision(%SigilGuard.Decision{} = decision, context, opts) when is_list(opts) do
+    with {:ok, payload} <- required_payload(opts),
+         {:ok, context} <- normalize_context(context),
+         {:ok, statement_type} <- decision_statement_type(context, opts),
+         {:ok, actor_id} <- context_actor_id(context),
+         {:ok, now} <- attestation_now(opts),
+         {:ok, ttl_ms} <- attestation_ttl_ms(opts),
+         {:ok, predicate_type} <- TrustProfile.predicate_type(statement_type),
+         {:ok, digests} <- Digest.digests(statement_type, payload, context, opts),
+         {:ok, predicate} <-
+           decision_predicate(%{
+             statement_type: statement_type,
+             decision: decision,
+             context: context,
+             payload: payload,
+             actor_id: actor_id,
+             now: now,
+             ttl_ms: ttl_ms,
+             opts: opts
+           }),
+         {:ok, statement} <- Statement.build(predicate_type, predicate, digests),
+         {:ok, statement} <- TrustProfile.validate(statement) do
+      {:ok, statement}
+    else
+      {:error, :invalid_profile} -> {:error, :invalid_payload}
+      {:error, :unsupported_number_range} -> {:error, :invalid_payload}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def from_decision(_, _, _), do: {:error, :invalid_payload}
 
   @doc """
   Verify a DSSE-wrapped SigilGuard Statement.
@@ -252,6 +314,130 @@ defmodule SigilGuard.Attestation do
     predicate = Map.get(statement, "predicate", %{})
     Map.put(statement, "predicate", Map.put(predicate, key, value))
   end
+
+  defp required_payload(opts) do
+    case Keyword.fetch(opts, :payload) do
+      {:ok, payload} when is_map(payload) -> {:ok, payload}
+      {:ok, _} -> {:error, :invalid_payload}
+      :error -> {:error, :invalid_payload}
+    end
+  end
+
+  defp normalize_context(%Context{} = context) do
+    with :ok <- Context.validate(context), do: {:ok, context}
+  end
+
+  defp normalize_context(context) when is_map(context) or is_list(context) do
+    normalized = Context.new(context)
+
+    with :ok <- Context.validate(normalized), do: {:ok, normalized}
+  end
+
+  defp normalize_context(_), do: {:error, :invalid_context}
+
+  defp decision_statement_type(context, opts) do
+    case Keyword.fetch(opts, :statement_type) do
+      {:ok, statement_type} -> normalize_statement_type(statement_type)
+      :error -> Map.fetch(@phase_statement_types, context.phase)
+    end
+  end
+
+  defp normalize_statement_type(statement_type) when is_atom(statement_type) do
+    if statement_type in Map.values(@statement_types) do
+      {:ok, statement_type}
+    else
+      {:error, :unknown_statement_type}
+    end
+  end
+
+  defp normalize_statement_type(statement_type) when is_binary(statement_type) do
+    case Map.fetch(@statement_types, statement_type) do
+      {:ok, statement_type} -> {:ok, statement_type}
+      :error -> {:error, :unknown_statement_type}
+    end
+  end
+
+  defp normalize_statement_type(_), do: {:error, :unknown_statement_type}
+
+  defp context_actor_id(%Context{actor: actor}) when is_binary(actor) and actor != "",
+    do: {:ok, actor}
+
+  defp context_actor_id(%Context{identity: identity}) when is_binary(identity) and identity != "",
+    do: {:ok, identity}
+
+  defp context_actor_id(_), do: {:error, :invalid_payload}
+
+  defp attestation_now(opts) do
+    case Keyword.get(opts, :now, DateTime.utc_now()) do
+      %DateTime{} = now -> {:ok, now}
+      _ -> {:error, :invalid_payload}
+    end
+  end
+
+  defp attestation_ttl_ms(opts) do
+    ttl_ms =
+      Keyword.get(opts, :ttl_ms, Application.get_env(:sigil_guard, :attestation_ttl_ms, 300_000))
+
+    if is_integer(ttl_ms) and ttl_ms > 0 do
+      {:ok, ttl_ms}
+    else
+      {:error, :invalid_payload}
+    end
+  end
+
+  defp decision_predicate(source) do
+    predicate =
+      %{
+        "profile" => TrustProfile.profile_id(),
+        "statement_type" => Atom.to_string(source.statement_type),
+        "actor" => %{
+          "id" => source.actor_id,
+          "trust_level" => Atom.to_string(source.context.trust_level)
+        },
+        "verdict" => predicate_verdict(source.decision),
+        "action" => Atom.to_string(source.decision.action),
+        "risk_level" => Atom.to_string(source.decision.risk_level),
+        "issued_at" => DateTime.to_iso8601(source.now),
+        "expires_at" =>
+          DateTime.add(source.now, source.ttl_ms, :millisecond) |> DateTime.to_iso8601()
+      }
+      |> maybe_put("reason", source.decision.reason)
+      |> maybe_put("nonce", Keyword.get(source.opts, :nonce))
+      |> maybe_put("evidence", Keyword.get(source.opts, :evidence))
+
+    with {:ok, extension} <- agent_extension(source, predicate) do
+      {:ok, Map.merge(predicate, extension)}
+    end
+  end
+
+  defp predicate_verdict(%{action: :quarantine}), do: "quarantine"
+  defp predicate_verdict(%{verdict: :allowed}), do: "allow"
+  defp predicate_verdict(%{verdict: :blocked}), do: "block"
+  defp predicate_verdict(%{verdict: {:confirm, _}}), do: "confirm"
+  defp predicate_verdict(_), do: "block"
+
+  defp agent_extension(%{statement_type: :agent_request} = source, predicate) do
+    opts =
+      source.opts
+      |> Keyword.put_new(:peer_trust, source.context.trust_level)
+      |> Keyword.put(:verdict, predicate["verdict"])
+
+    AgentPredicate.build_request(source.payload, opts)
+  end
+
+  defp agent_extension(%{statement_type: :agent_response} = source, _) do
+    opts =
+      source.opts
+      |> Keyword.put_new(:peer_trust, source.context.trust_level)
+      |> Keyword.put_new(:quarantined, source.decision.action == :quarantine)
+
+    AgentPredicate.build_response(source.payload, opts)
+  end
+
+  defp agent_extension(_, _), do: {:ok, %{}}
+
+  defp maybe_put(map, _, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp unsigned_payload(envelope) do
     with {:ok, fields} <- envelope_fields(envelope),
