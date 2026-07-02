@@ -81,8 +81,8 @@ defmodule SigilGuard.MixProject do
   end
 
   defp description do
-    "SIGIL Protocol integration for Elixir — sensitivity scanning, envelope signing, " <>
-      "policy enforcement, tamper-evident auditing, and registry client with a native Elixir runtime."
+    "Native Elixir security runtime for MCP and agent tool boundaries: scanning, " <>
+      "envelope contracts, policy, audit evidence, and signed trust bundles."
   end
 
   defp package do
@@ -91,10 +91,11 @@ defmodule SigilGuard.MixProject do
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,
-        "SIGIL Protocol" => "https://sigil-protocol.org/"
+        "Historical upstream SIGIL repository" => "https://github.com/sigil-eu/sigil"
       },
       files: ~w[
         lib
+        docs
         .formatter.exs
         mix.exs
         README.md
