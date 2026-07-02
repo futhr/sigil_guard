@@ -52,6 +52,7 @@ defmodule SigilGuard.MixProject do
       # Core
       {:finch, "~> 0.19"},
       {:jason, "~> 1.4"},
+      {:nimble_options, "~> 1.1"},
       {:telemetry, "~> 1.0"},
 
       # Code quality
@@ -182,6 +183,7 @@ defmodule SigilGuard.MixProject do
         Runtime: [
           SigilGuard.Application,
           SigilGuard.Config,
+          SigilGuard.ConfigError,
           SigilGuard.ReplayStore,
           SigilGuard.Telemetry
         ]

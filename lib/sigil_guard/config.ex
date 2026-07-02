@@ -66,6 +66,110 @@ defmodule SigilGuard.Config do
   @default_protocol_profile :auto
   @default_bundle_max_age_seconds nil
   @default_bundle_clock_skew_seconds 60
+  @default_attestation_ttl_ms 300_000
+  @default_max_skew_ms 60_000
+  @default_replay_ttl_ms 300_000
+
+  @removed_keys [
+    :backend,
+    :protocol_profile,
+    :registry_url,
+    :registry_ttl_ms,
+    :registry_timeout_ms,
+    :registry_retry_ms,
+    :registry_enabled,
+    :registry_require_signed_bundles,
+    :registry_bundle_public_keys,
+    :registry_bundle_max_age_seconds,
+    :registry_bundle_clock_skew_seconds
+  ]
+
+  @schema [
+    trust_bundle: [
+      type: {:custom, __MODULE__, :validate_trust_bundle_source, []},
+      default: :none,
+      doc: "Local trust-bundle source. The default `:none` disables bundle loading."
+    ],
+    scanner_patterns: [
+      type: {:in, [:built_in, :bundle]},
+      default: :built_in,
+      doc: "Scanner pattern source. Use `:built_in` or `:bundle`."
+    ],
+    http_client: [
+      type: {:or, [:atom, nil]},
+      default: nil,
+      doc: "Host-provided HTTP client module for audit anchor stores."
+    ],
+    attestation_ttl_ms: [
+      type: :pos_integer,
+      default: @default_attestation_ttl_ms,
+      doc: "Attestation time-to-live in milliseconds."
+    ],
+    max_skew_ms: [
+      type: :non_neg_integer,
+      default: @default_max_skew_ms,
+      doc: "Maximum accepted clock skew in milliseconds."
+    ],
+    replay_ttl_ms: [
+      type: :pos_integer,
+      default: @default_replay_ttl_ms,
+      doc: "Replay cache time-to-live in milliseconds."
+    ],
+    vault_master_key: [
+      type: {:or, [:string, nil]},
+      default: nil,
+      doc: "Optional base64-encoded vault master key."
+    ]
+  ]
+
+  @schema_keys Keyword.keys(@schema)
+
+  @doc """
+  Validate the v3 SigilGuard configuration surface.
+
+  Unknown keys and removed v2 keys raise `SigilGuard.ConfigError` with a
+  migration-guide pointer. The returned keyword list includes schema defaults.
+  """
+  @spec validate!() :: keyword()
+  def validate! do
+    :sigil_guard
+    |> Application.get_all_env()
+    |> validate!()
+  end
+
+  @doc """
+  Validate explicit SigilGuard configuration options.
+  """
+  @spec validate!(keyword()) :: keyword()
+  def validate!(opts) when is_list(opts) do
+    with :ok <- reject_removed_keys(opts),
+         :ok <- reject_unknown_keys(opts),
+         :ok <- reject_legacy_values(opts),
+         {:ok, validated} <- NimbleOptions.validate(opts, @schema),
+         normalized <- normalize_validated_options(validated),
+         :ok <- validate_cross_options(normalized) do
+      normalized
+    else
+      {:error, %SigilGuard.ConfigError{} = error} ->
+        raise error
+
+      {:error, %NimbleOptions.ValidationError{} = error} ->
+        key = validation_key(error)
+        raise SigilGuard.ConfigError.new(key, validation_reason(error), error.message)
+    end
+  end
+
+  def validate!(_) do
+    raise SigilGuard.ConfigError.new(:sigil_guard, :invalid_config, "expected a keyword list")
+  end
+
+  @doc """
+  Return generated documentation for the v3 configuration schema.
+  """
+  @spec schema_docs() :: String.t()
+  def schema_docs do
+    NimbleOptions.docs(@schema)
+  end
 
   @doc "Return the configured legacy envelope compatibility profile."
   @spec protocol_profile() :: SigilGuard.Profile.t()
@@ -142,4 +246,78 @@ defmodule SigilGuard.Config do
   def scanner_patterns do
     Application.get_env(:sigil_guard, :scanner_patterns, :built_in)
   end
+
+  @doc false
+  @spec validate_trust_bundle_source(term()) :: {:ok, term()} | {:error, String.t()}
+  def validate_trust_bundle_source(:none), do: {:ok, :none}
+  def validate_trust_bundle_source({:path, path} = source) when is_binary(path), do: {:ok, source}
+
+  def validate_trust_bundle_source({:application, app, path} = source)
+      when is_atom(app) and is_binary(path) do
+    {:ok, source}
+  end
+
+  def validate_trust_bundle_source(_) do
+    {:error, "expected :none, {:path, path}, or {:application, app, path}"}
+  end
+
+  defp reject_removed_keys(opts) do
+    case Enum.find(opts, fn {key, _} -> key in @removed_keys end) do
+      {key, _} ->
+        {:error,
+         SigilGuard.ConfigError.new(key, :legacy_contract_removed, "legacy config key removed")}
+
+      nil ->
+        :ok
+    end
+  end
+
+  defp reject_unknown_keys(opts) do
+    case Enum.find(opts, fn {key, _} -> key not in @schema_keys end) do
+      {key, _} ->
+        {:error, SigilGuard.ConfigError.new(key, :unknown_config_key, "unknown config key")}
+
+      nil ->
+        :ok
+    end
+  end
+
+  defp reject_legacy_values(opts) do
+    case Keyword.fetch(opts, :scanner_patterns) do
+      {:ok, :registry} ->
+        {:error,
+         SigilGuard.ConfigError.new(
+           :scanner_patterns,
+           :legacy_contract_removed,
+           "legacy :registry pattern source removed"
+         )}
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp validate_cross_options(opts) do
+    if opts[:scanner_patterns] == :bundle and opts[:trust_bundle] == :none do
+      {:error,
+       SigilGuard.ConfigError.new(
+         :scanner_patterns,
+         :invalid_config,
+         ":bundle scanner patterns require a configured :trust_bundle"
+       )}
+    else
+      :ok
+    end
+  end
+
+  defp normalize_validated_options(validated) when is_map(validated), do: Map.to_list(validated)
+  defp normalize_validated_options(validated), do: validated
+
+  defp validation_key(%NimbleOptions.ValidationError{key: key}) when is_atom(key), do: key
+
+  defp validation_reason(%NimbleOptions.ValidationError{keys_path: [key | _]}) do
+    if key in @schema_keys, do: :invalid_config, else: :unknown_config_key
+  end
+
+  defp validation_reason(_), do: :invalid_config
 end

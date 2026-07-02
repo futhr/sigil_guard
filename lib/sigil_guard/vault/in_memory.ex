@@ -46,6 +46,12 @@ defmodule SigilGuard.Vault.InMemory do
   @table :sigil_guard_vault
   @aad "sigil_guard_vault_v1"
   @master_key_bytes 32
+  @start_schema [
+    master_key: [
+      type: {:custom, __MODULE__, :validate_master_key_option, []},
+      doc: "Raw 32-byte AES-256-GCM master key."
+    ]
+  ]
 
   # -- Client API --
 
@@ -54,6 +60,18 @@ defmodule SigilGuard.Vault.InMemory do
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
+
+  @doc """
+  Return generated documentation for start options.
+  """
+  @spec start_options_docs() :: String.t()
+  def start_options_docs do
+    NimbleOptions.docs(@start_schema)
+  end
+
+  @doc false
+  @spec validate_master_key_option(term()) :: {:ok, term()}
+  def validate_master_key_option(master_key), do: {:ok, master_key}
 
   @impl SigilGuard.Vault
   def encrypt(plaintext, description) do
@@ -88,8 +106,8 @@ defmodule SigilGuard.Vault.InMemory do
   def init(opts) do
     Process.flag(:sensitive, true)
 
-    with :ok <- validate_opts(opts),
-         {:ok, master_key} <- master_key(opts) do
+    with {:ok, validated} <- validate_start_options(opts),
+         {:ok, master_key} <- master_key(validated) do
       table = :ets.new(@table, [:named_table, :set, :private])
       {:ok, %{table: table, master_key: master_key}}
     else
@@ -192,11 +210,22 @@ defmodule SigilGuard.Vault.InMemory do
     "vault_" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
   end
 
-  defp validate_opts(opts) when is_list(opts) do
-    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+  defp validate_start_options(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      validate_start_keyword_options(opts)
+    else
+      {:error, :invalid_options}
+    end
   end
 
-  defp validate_opts(_), do: {:error, :invalid_options}
+  defp validate_start_options(_), do: {:error, :invalid_options}
+
+  defp validate_start_keyword_options(opts) do
+    case NimbleOptions.validate(opts, @start_schema) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, %NimbleOptions.ValidationError{}} -> {:error, :invalid_options}
+    end
+  end
 
   defp master_key(opts) do
     case Keyword.fetch(opts, :master_key) do

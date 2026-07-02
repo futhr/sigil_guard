@@ -187,6 +187,7 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
                MapSet.new([
                  "SPDXRef-Package-finch",
                  "SPDXRef-Package-jason",
+                 "SPDXRef-Package-nimble-options",
                  "SPDXRef-Package-telemetry"
                ])
 

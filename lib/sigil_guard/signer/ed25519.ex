@@ -33,6 +33,13 @@ defmodule SigilGuard.Signer.Ed25519 do
   use Agent
 
   @private_key_bytes 32
+  @start_schema [
+    private_key: [
+      type: {:custom, __MODULE__, :validate_private_key_option, []},
+      required: true,
+      doc: "Raw 32-byte Ed25519 seed."
+    ]
+  ]
 
   @type t :: %__MODULE__{
           private_key: binary(),
@@ -62,12 +69,25 @@ defmodule SigilGuard.Signer.Ed25519 do
   """
   @spec start_link(keyword()) :: Agent.on_start()
   def start_link(opts) do
-    with :ok <- validate_opts(opts),
-         {:ok, private_key} <- private_key(opts) do
+    with {:ok, validated} <- validate_start_options(opts),
+         {:ok, private_key} <- validate_private_key(validated[:private_key]) do
       signer = new(private_key)
       Agent.start_link(fn -> signer end, name: __MODULE__)
     end
   end
+
+  @doc """
+  Return generated documentation for start options.
+  """
+  @spec start_options_docs() :: String.t()
+  def start_options_docs do
+    NimbleOptions.docs(@start_schema)
+  end
+
+  @doc false
+  @spec validate_private_key_option(term()) :: {:ok, binary()} | {:error, String.t()}
+  def validate_private_key_option(private_key) when is_binary(private_key), do: {:ok, private_key}
+  def validate_private_key_option(_), do: {:error, "expected a binary Ed25519 seed"}
 
   @impl SigilGuard.Signer
   def sign(message) do
@@ -92,16 +112,30 @@ defmodule SigilGuard.Signer.Ed25519 do
     :crypto.verify(:eddsa, :none, message, signature, [public_key, :ed25519])
   end
 
-  defp validate_opts(opts) when is_list(opts) do
-    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+  defp validate_start_options(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      validate_start_keyword_options(opts)
+    else
+      {:error, :invalid_options}
+    end
   end
 
-  defp validate_opts(_), do: {:error, :invalid_options}
+  defp validate_start_options(_), do: {:error, :invalid_options}
 
-  defp private_key(opts) do
-    case Keyword.fetch(opts, :private_key) do
-      {:ok, private_key} -> validate_private_key(private_key)
-      :error -> {:error, :missing_private_key}
+  defp validate_start_keyword_options(opts) do
+    case NimbleOptions.validate(opts, @start_schema) do
+      {:ok, validated} ->
+        {:ok, validated}
+
+      {:error, %NimbleOptions.ValidationError{key: :private_key, message: message}} ->
+        if String.contains?(message, "required") do
+          {:error, :missing_private_key}
+        else
+          {:error, :invalid_private_key}
+        end
+
+      {:error, %NimbleOptions.ValidationError{}} ->
+        {:error, :invalid_options}
     end
   end
 

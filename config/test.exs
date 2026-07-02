@@ -1,7 +1,6 @@
 import Config
 
 config :sigil_guard,
-  backend: :elixir,
-  registry_enabled: false
+  trust_bundle: :none
 
 config :logger, level: :warning

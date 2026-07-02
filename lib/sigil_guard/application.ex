@@ -21,6 +21,7 @@ defmodule SigilGuard.Application do
 
   @impl Application
   def start(_, _) do
+    SigilGuard.Config.validate!()
     SigilGuard.Policy.ensure_rate_table()
     SigilGuard.ReplayStore.ensure_table()
 

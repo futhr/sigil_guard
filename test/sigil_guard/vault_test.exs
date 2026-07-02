@@ -199,6 +199,13 @@ defmodule SigilGuard.VaultTest do
       assert_start_link_error(:invalid_options, :bad)
       assert_start_link_error(:invalid_options, [:bad])
     end
+
+    test "documents start options from the NimbleOptions schema" do
+      docs = InMemory.start_options_docs()
+
+      assert docs =~ ":master_key"
+      assert docs =~ "AES-256-GCM"
+    end
   end
 
   describe "format_status/1" do

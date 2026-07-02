@@ -136,5 +136,12 @@ defmodule SigilGuard.SignerTest do
 
       refute Process.whereis(Ed25519)
     end
+
+    test "documents start options from the NimbleOptions schema" do
+      docs = Ed25519.start_options_docs()
+
+      assert docs =~ ":private_key"
+      assert docs =~ "Ed25519"
+    end
   end
 end

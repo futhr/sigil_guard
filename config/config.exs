@@ -1,17 +1,12 @@
 import Config
 
 config :sigil_guard,
-  backend: :elixir,
-  protocol_profile: :auto,
-  registry_url: nil,
-  registry_ttl_ms: :timer.hours(1),
-  registry_timeout_ms: 5_000,
-  registry_retry_ms: :timer.minutes(1),
-  registry_enabled: false,
-  registry_require_signed_bundles: false,
-  registry_bundle_public_keys: %{},
-  registry_bundle_max_age_seconds: nil,
-  registry_bundle_clock_skew_seconds: 60,
-  scanner_patterns: :built_in
+  trust_bundle: :none,
+  scanner_patterns: :built_in,
+  http_client: nil,
+  attestation_ttl_ms: 300_000,
+  max_skew_ms: 60_000,
+  replay_ttl_ms: 300_000,
+  vault_master_key: nil
 
 import_config "#{config_env()}.exs"

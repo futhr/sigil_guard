@@ -4,91 +4,145 @@ defmodule SigilGuard.ConfigTest do
   use ExUnit.Case, async: false
 
   alias SigilGuard.Config
+  alias SigilGuard.ConfigError
+
+  @env_keys [
+    :scanner_patterns,
+    :backend,
+    :protocol_profile,
+    :registry_url,
+    :registry_ttl_ms,
+    :registry_timeout_ms,
+    :registry_retry_ms,
+    :registry_enabled,
+    :registry_require_signed_bundles,
+    :registry_bundle_public_keys,
+    :registry_bundle_max_age_seconds,
+    :registry_bundle_clock_skew_seconds,
+    :trust_bundle,
+    :http_client,
+    :attestation_ttl_ms,
+    :max_skew_ms,
+    :replay_ttl_ms,
+    :vault_master_key
+  ]
 
   setup do
-    original_patterns = Application.get_env(:sigil_guard, :scanner_patterns)
-    original_backend = Application.get_env(:sigil_guard, :backend)
-    original_profile = Application.get_env(:sigil_guard, :protocol_profile)
-    original_url = Application.get_env(:sigil_guard, :registry_url)
-    original_ttl = Application.get_env(:sigil_guard, :registry_ttl_ms)
-    original_timeout = Application.get_env(:sigil_guard, :registry_timeout_ms)
-    original_retry = Application.get_env(:sigil_guard, :registry_retry_ms)
-    original_enabled = Application.get_env(:sigil_guard, :registry_enabled)
-    original_require_signed = Application.get_env(:sigil_guard, :registry_require_signed_bundles)
-    original_bundle_keys = Application.get_env(:sigil_guard, :registry_bundle_public_keys)
-
-    original_bundle_max_age =
-      Application.get_env(:sigil_guard, :registry_bundle_max_age_seconds)
-
-    original_bundle_clock_skew =
-      Application.get_env(:sigil_guard, :registry_bundle_clock_skew_seconds)
+    original = Map.new(@env_keys, &{&1, Application.fetch_env(:sigil_guard, &1)})
 
     on_exit(fn ->
-      if original_patterns,
-        do: Application.put_env(:sigil_guard, :scanner_patterns, original_patterns),
-        else: Application.delete_env(:sigil_guard, :scanner_patterns)
-
-      if original_backend,
-        do: Application.put_env(:sigil_guard, :backend, original_backend),
-        else: Application.delete_env(:sigil_guard, :backend)
-
-      if original_profile,
-        do: Application.put_env(:sigil_guard, :protocol_profile, original_profile),
-        else: Application.delete_env(:sigil_guard, :protocol_profile)
-
-      if original_url,
-        do: Application.put_env(:sigil_guard, :registry_url, original_url),
-        else: Application.delete_env(:sigil_guard, :registry_url)
-
-      if original_ttl,
-        do: Application.put_env(:sigil_guard, :registry_ttl_ms, original_ttl),
-        else: Application.delete_env(:sigil_guard, :registry_ttl_ms)
-
-      if original_timeout,
-        do: Application.put_env(:sigil_guard, :registry_timeout_ms, original_timeout),
-        else: Application.delete_env(:sigil_guard, :registry_timeout_ms)
-
-      if original_retry,
-        do: Application.put_env(:sigil_guard, :registry_retry_ms, original_retry),
-        else: Application.delete_env(:sigil_guard, :registry_retry_ms)
-
-      if original_enabled,
-        do: Application.put_env(:sigil_guard, :registry_enabled, original_enabled),
-        else: Application.delete_env(:sigil_guard, :registry_enabled)
-
-      if original_require_signed,
-        do:
-          Application.put_env(
-            :sigil_guard,
-            :registry_require_signed_bundles,
-            original_require_signed
-          ),
-        else: Application.delete_env(:sigil_guard, :registry_require_signed_bundles)
-
-      if original_bundle_keys,
-        do: Application.put_env(:sigil_guard, :registry_bundle_public_keys, original_bundle_keys),
-        else: Application.delete_env(:sigil_guard, :registry_bundle_public_keys)
-
-      if is_nil(original_bundle_max_age),
-        do: Application.delete_env(:sigil_guard, :registry_bundle_max_age_seconds),
-        else:
-          Application.put_env(
-            :sigil_guard,
-            :registry_bundle_max_age_seconds,
-            original_bundle_max_age
-          )
-
-      if is_nil(original_bundle_clock_skew),
-        do: Application.delete_env(:sigil_guard, :registry_bundle_clock_skew_seconds),
-        else:
-          Application.put_env(
-            :sigil_guard,
-            :registry_bundle_clock_skew_seconds,
-            original_bundle_clock_skew
-          )
+      Enum.each(original, fn
+        {key, {:ok, value}} -> Application.put_env(:sigil_guard, key, value)
+        {key, :error} -> Application.delete_env(:sigil_guard, key)
+      end)
     end)
 
     :ok
+  end
+
+  describe "validate!/1" do
+    test "validates the v3 closed configuration surface through NimbleOptions" do
+      validated = Config.validate!([])
+
+      assert Keyword.fetch!(validated, :trust_bundle) == :none
+      assert Keyword.fetch!(validated, :scanner_patterns) == :built_in
+      assert Keyword.fetch!(validated, :http_client) == nil
+      assert Keyword.fetch!(validated, :attestation_ttl_ms) == 300_000
+      assert Keyword.fetch!(validated, :max_skew_ms) == 60_000
+      assert Keyword.fetch!(validated, :replay_ttl_ms) == 300_000
+      assert Keyword.fetch!(validated, :vault_master_key) == nil
+    end
+
+    test "accepts configured v3 values" do
+      opts = [
+        trust_bundle: {:path, "priv/sigil_guard/trust_bundle.json"},
+        scanner_patterns: :bundle,
+        http_client: SigilGuard.TestHTTPClient,
+        attestation_ttl_ms: 60_000,
+        max_skew_ms: 0,
+        replay_ttl_ms: 120_000,
+        vault_master_key: Base.encode64(:crypto.strong_rand_bytes(32))
+      ]
+
+      assert Config.validate!(opts) == opts
+    end
+
+    test "raises typed errors for unknown keys" do
+      assert_raise ConfigError, ~r/:unknown.*unknown_config_key.*MIGRATING-3\.0\.md/, fn ->
+        Config.validate!(unknown: true)
+      end
+    end
+
+    test "raises typed errors for removed keys" do
+      assert_raise ConfigError,
+                   ~r/:registry_url.*legacy_contract_removed.*MIGRATING-3\.0\.md/,
+                   fn ->
+                     Config.validate!(registry_url: "https://custom.example.com")
+                   end
+    end
+
+    test "raises typed errors for removed values" do
+      assert_raise ConfigError,
+                   ~r/:scanner_patterns.*legacy_contract_removed.*MIGRATING-3\.0\.md/,
+                   fn ->
+                     Config.validate!(scanner_patterns: :registry)
+                   end
+    end
+
+    test "raises typed errors for bad value types" do
+      error =
+        assert_raise ConfigError, fn ->
+          Config.validate!(vault_master_key: 123)
+        end
+
+      assert error.key == :vault_master_key
+      assert error.reason == :invalid_config
+      assert error.message =~ "MIGRATING-3.0.md"
+    end
+
+    test "raises typed errors for out-of-range values" do
+      assert_raise ConfigError,
+                   ~r/:attestation_ttl_ms.*invalid_config.*MIGRATING-3\.0\.md/,
+                   fn ->
+                     Config.validate!(attestation_ttl_ms: 0)
+                   end
+    end
+
+    test "raises typed errors for invalid trust bundle sources" do
+      assert_raise ConfigError, ~r/:trust_bundle.*invalid_config.*MIGRATING-3\.0\.md/, fn ->
+        Config.validate!(trust_bundle: 123)
+      end
+    end
+
+    test "raises typed errors for invalid cross-option combinations" do
+      assert_raise ConfigError,
+                   ~r/:scanner_patterns.*invalid_config.*MIGRATING-3\.0\.md/,
+                   fn ->
+                     Config.validate!(scanner_patterns: :bundle)
+                   end
+    end
+
+    test "raises typed errors for non-keyword config" do
+      assert_raise ConfigError, ~r/:sigil_guard.*invalid_config.*MIGRATING-3\.0\.md/, fn ->
+        Config.validate!(:bad)
+      end
+    end
+
+    test "generates schema documentation" do
+      docs = Config.schema_docs()
+
+      assert docs =~ ":attestation_ttl_ms"
+      assert docs =~ ":scanner_patterns"
+    end
+  end
+
+  describe "validate!/0" do
+    test "validates application environment" do
+      clear_v3_config()
+      Application.put_env(:sigil_guard, :attestation_ttl_ms, 30_000)
+
+      assert Keyword.fetch!(Config.validate!(), :attestation_ttl_ms) == 30_000
+    end
   end
 
   describe "backend/0" do
@@ -241,6 +295,12 @@ defmodule SigilGuard.ConfigTest do
     test "returns configured clock skew" do
       Application.put_env(:sigil_guard, :registry_bundle_clock_skew_seconds, 10)
       assert Config.registry_bundle_clock_skew_seconds() == 10
+    end
+  end
+
+  defp clear_v3_config do
+    for key <- @env_keys do
+      Application.delete_env(:sigil_guard, key)
     end
   end
 end
