@@ -22,6 +22,7 @@
     {:dialyzer, command: "mix dialyzer"},
 
     # Documentation
+    {:docs_lint, command: "mix sigil.docs_lint"},
     {:doctor, command: "mix doctor"},
     {:ex_doc, command: "mix docs"},
 
