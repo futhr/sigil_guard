@@ -54,6 +54,7 @@ defmodule SigilGuard do
   - `SigilGuard.Runtime.Stream` — Chunk-safe streaming sanitization
   - `SigilGuard.MCP.Gateway` — MCP-shaped request/result guard helpers
   - `SigilGuard.Confirmation` — Action-bound approval tokens
+  - `SigilGuard.Attestation` — V3 attestation metadata helpers
   - `SigilGuard.Policy` — Risk classification and trust gating
   - `SigilGuard.Audit` — Tamper-evident audit chain
   - `SigilGuard.Audit.Export` — Portable signed checkpoint + anchor packages

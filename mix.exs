@@ -132,6 +132,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Envelope,
           SigilGuard.Policy,
           SigilGuard.Confirmation,
+          SigilGuard.Attestation,
           SigilGuard.Attestation.AgentPredicate,
           SigilGuard.Attestation.Envelope,
           SigilGuard.Attestation.Statement,
