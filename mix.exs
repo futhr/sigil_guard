@@ -132,6 +132,8 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Envelope,
           SigilGuard.Policy,
           SigilGuard.Confirmation,
+          SigilGuard.Attestation.Envelope,
+          SigilGuard.Canonical.JCS,
           SigilGuard.Context,
           SigilGuard.Decision,
           SigilGuard.Identity,
