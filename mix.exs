@@ -8,7 +8,7 @@ defmodule SigilGuard.MixProject do
     [
       app: :sigil_guard,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),

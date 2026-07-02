@@ -62,6 +62,8 @@ in-process library is a better fit.
 
 ## Installation
 
+SigilGuard v3 requires Elixir 1.18 or later.
+
 ```elixir
 def deps do
   [
