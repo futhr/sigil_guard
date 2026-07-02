@@ -36,6 +36,11 @@ policy, scanning, audit, vault, and trust-bundle primitives they can embed.
    tamper, replay, expiration, and malformed-input tests.
 10. Never add AI attribution, co-author trailers, or generated-by comments to
     commits or source files.
+11. Never write the name of the private consumer project, or its internal
+    module names, into any repository file (source, docs, comments, tests,
+    fixtures, commits). Refer to the production consumer only as "the
+    reference consumer". See the Orientation section of
+    `docs/tasks/sigil-tasks.md`.
 
 ## Current Architecture
 
