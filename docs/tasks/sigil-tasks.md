@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 11 | 0 | 8 |
+| M1 - Core groundwork | 19 | 12 | 0 | 7 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **63** | **0** | **165** |
+| **Total** | **228** | **64** | **0** | **164** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -402,7 +402,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     types; the context digest includes `sandbox_id` and `isolation_level`;
     all digests are lowercase-hex SHA-256 over compact JCS bytes.
   - Tests: golden vectors, negative, malformed.
-- [ ] M1.12 `Attestation.sign/3` and `Attestation.verify/3`.
+- [x] M1.12 `Attestation.sign/3` and `Attestation.verify/3`.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Public API
     Sketch; Error Handling.
   - AC: `sign/3` uses `SigilGuard.Signer`, defaults keyid to the derived
