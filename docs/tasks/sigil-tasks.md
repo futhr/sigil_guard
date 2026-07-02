@@ -66,8 +66,8 @@ trailers (rule 10); the maintainer pushes manually.
 | Milestone | Total | Complete | In Progress | Planned |
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
-| M0 - Decision lock and docs foundation | 22 | 21 | 0 | 1 |
-| M1 - Core groundwork | 19 | 0 | 0 | 19 |
+| M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
+| M1 - Core groundwork | 19 | 6 | 0 | 13 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **51** | **0** | **177** |
+| **Total** | **228** | **58** | **0** | **170** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -241,7 +241,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
 - [x] M0.20 Root README status/roadmap block (0.2.x current, v3.0 planned
       breaking release) plus legacy trust-bundle bullet disambiguation.
 - [x] M0.21 Rewrite `docs/tasks/sigil-tasks.md` as this v3 checklist.
-- [ ] M0.22 Add `mix sigil.docs_lint` dev task.
+- [x] M0.22 Add `mix sigil.docs_lint` dev task.
   - Spec: `docs/specs/README.md` (catalogue rules); this file, Mandatory
     Gates.
   - AC: one mix task consolidates the doc checks: spec-drift check (every
@@ -264,14 +264,14 @@ Deferred section is post-3.0.0 parking; neither is counted here.
 > vectors committed for all eight statement types; `:nimble_options`
 > adopted and validating the config surface.
 
-- [ ] M1.01 Raise the Elixir floor to `~> 1.18`.
+- [x] M1.01 Raise the Elixir floor to `~> 1.18`.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - V3 Configuration
     Surface; `docs/specs/SP.12-legacy-remote-bundle-adapter-contracts.md` -
     Dependency Removal (D9).
   - AC: `mix.exs` declares `elixir: "~> 1.18"`; the CI matrix floor row is
     Elixir 1.18 and compiles green; README requirements match.
   - Tests: full suite green on the 1.18 floor row in CI.
-- [ ] M1.02 Consumer-contracts conformance module (tier-1 gate).
+- [x] M1.02 Consumer-contracts conformance module (tier-1 gate).
   - Spec: `docs/specs/SP.07-runtime-gate-and-streaming-contracts.md` -
     Stability Guarantees (D17).
   - AC: `test/sigil_guard/conformance/consumer_contracts_test.exs` encodes
@@ -291,7 +291,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     and MUST change in the same commit as any contract change.
   - Tests: property (verdict matrix), golden vectors (Ed25519), negative
     (foreign verdict/hit shapes fail).
-- [ ] M1.03 Adopt `:nimble_options` for config/option validation; keep
+- [x] M1.03 Adopt `:nimble_options` for config/option validation; keep
     `:jason`.
   - Spec: `docs/specs/SP.12-legacy-remote-bundle-adapter-contracts.md` -
     Dependency Removal (D9); `docs/specs/SP.01-sigilguard-trust-profile.md`
@@ -304,7 +304,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
   - Tests: schema-validation negative tests (unknown key, bad value type,
     out-of-range) return typed errors that name `MIGRATING-3.0.md` for
     removed keys.
-- [ ] M1.04 `SigilGuard.Canonical.JCS` encoder (RFC 8785, ~200 LOC).
+- [x] M1.04 `SigilGuard.Canonical.JCS` encoder (RFC 8785, ~200 LOC).
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - JCS Constraints
     (Normative); Public API Sketch.
   - AC: `lib/sigil_guard/canonical/jcs.ex` implements `encode/1` with
@@ -314,7 +314,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `{:error, :unsupported_number_range}`; non-JSON-representable terms and
     post-normalization key collisions return `{:error, :invalid_map}`.
   - Tests: golden vectors (RFC 8785 appendix), negative, malformed.
-- [ ] M1.05 JCS property tests and adversarial corpus.
+- [x] M1.05 JCS property tests and adversarial corpus.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - JCS Constraints
     (Normative); `docs/research/R.02-attestation-envelope-and-canonical-encoding.md`
     (JCS pitfalls).
@@ -323,7 +323,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     (astral-plane and surrogate-order cases); the R.02 adversarial corpus
     is committed as fixtures and passes.
   - Tests: property, golden vectors, malformed.
-- [ ] M1.06 DSSE envelope encode/decode with PAE and multi-signature.
+- [x] M1.06 DSSE envelope encode/decode with PAE and multi-signature.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Attestation
     Envelope And Canonical Encoding (DSSE Envelope; Pre-Authentication
     Encoding (PAE)).
