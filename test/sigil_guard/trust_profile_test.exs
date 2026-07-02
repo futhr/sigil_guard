@@ -1,6 +1,7 @@
 defmodule SigilGuard.TrustProfileTest do
   use ExUnit.Case, async: true
 
+  alias SigilGuard.Attestation.AgentPredicate
   alias SigilGuard.Attestation.Statement
   alias SigilGuard.TrustProfile
 
@@ -18,6 +19,7 @@ defmodule SigilGuard.TrustProfileTest do
   @digest_a String.duplicate("a", 64)
   @digest_b String.duplicate("b", 64)
   @digest_c String.duplicate("c", 64)
+  @request_action_digest String.duplicate("d", 64)
 
   describe "profile_id/0" do
     test "returns the v1 agent trust profile id" do
@@ -104,6 +106,20 @@ defmodule SigilGuard.TrustProfileTest do
              |> put_in(["predicate", "statement_type"], :tool_request)
              |> TrustProfile.validate() == {:error, :invalid_payload}
     end
+
+    test "rejects malformed A2A predicate extensions" do
+      assert {:ok, request_statement} = valid_statement(:agent_request)
+
+      assert request_statement
+             |> put_in(["predicate", "tool"], %{"name" => "forbidden"})
+             |> TrustProfile.validate() == {:error, :invalid_payload}
+
+      assert {:ok, response_statement} = valid_statement(:agent_response)
+
+      assert response_statement
+             |> put_in(["predicate", "delegation_chain"], [%{"actor" => "agent"}])
+             |> TrustProfile.validate() == {:error, :invalid_payload}
+    end
   end
 
   defp valid_statement(statement_type) do
@@ -117,9 +133,55 @@ defmodule SigilGuard.TrustProfileTest do
   end
 
   defp predicate(statement_type) do
+    statement_type
+    |> base_predicate()
+    |> Map.merge(predicate_extension(statement_type))
+  end
+
+  defp base_predicate(statement_type) do
     %{
       "profile" => TrustProfile.profile_id(),
-      "statement_type" => Atom.to_string(statement_type)
+      "statement_type" => Atom.to_string(statement_type),
+      "verdict" => "quarantine"
+    }
+  end
+
+  defp predicate_extension(:agent_request) do
+    {:ok, extension} =
+      AgentPredicate.build_request(agent_request_payload(),
+        peer_trust: :low,
+        verdict: :quarantine
+      )
+
+    extension
+  end
+
+  defp predicate_extension(:agent_response) do
+    {:ok, extension} =
+      AgentPredicate.build_response(agent_response_payload(),
+        peer_trust: :low,
+        request_action_digest: @request_action_digest,
+        quarantined: false
+      )
+
+    extension
+  end
+
+  defp predicate_extension(_), do: %{}
+
+  defp agent_request_payload do
+    %{
+      "peer_agent" => "spiffe://agents/responder",
+      "capability" => "summarize",
+      "arguments" => %{"topic" => "build"}
+    }
+  end
+
+  defp agent_response_payload do
+    %{
+      "peer_agent" => "spiffe://agents/responder",
+      "capability" => "summarize",
+      "status" => "ok"
     }
   end
 end

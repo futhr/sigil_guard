@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 8 | 0 | 11 |
+| M1 - Core groundwork | 19 | 9 | 0 | 10 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **60** | **0** | **168** |
+| **Total** | **228** | **61** | **0** | **167** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -360,7 +360,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     version fails `:unsupported_profile_version`; no `String.to_atom/1` on
     external input anywhere in the dispatch path.
   - Tests: negative, malformed.
-- [ ] M1.09 A2A predicate extension fields for `agent_request` and
+- [x] M1.09 A2A predicate extension fields for `agent_request` and
       `agent_response`.
   - Spec: `docs/specs/SP.13-agent-to-agent-trust-statements.md` - Agent
     Request And Agent Response Predicates;

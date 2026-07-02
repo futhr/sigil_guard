@@ -8,6 +8,7 @@ defmodule SigilGuard.TrustProfile do
   statement-type constraints without deriving atoms from external strings.
   """
 
+  alias SigilGuard.Attestation.AgentPredicate
   alias SigilGuard.Attestation.Statement
 
   @profile_id "sigil_guard_agent_trust/v1"
@@ -75,9 +76,10 @@ defmodule SigilGuard.TrustProfile do
   @spec validate(map()) :: {:ok, map()} | {:error, validate_error()}
   def validate(statement) do
     with {:ok, statement} <- Statement.parse(statement),
-         {:ok, _, type_string} <- registry_entry(statement["predicateType"]),
+         {:ok, statement_type, type_string} <- registry_entry(statement["predicateType"]),
          :ok <- validate_profile(statement["predicate"]["profile"]),
-         :ok <- validate_statement_type_field(statement["predicate"], type_string) do
+         :ok <- validate_statement_type_field(statement["predicate"], type_string),
+         :ok <- validate_statement_predicate(statement_type, statement["predicate"]) do
       {:ok, statement}
     else
       {:error, reason} -> {:error, reason}
@@ -113,4 +115,14 @@ defmodule SigilGuard.TrustProfile do
       :error -> {:error, :invalid_payload}
     end
   end
+
+  defp validate_statement_predicate(:agent_request, predicate) do
+    AgentPredicate.validate(:agent_request, predicate)
+  end
+
+  defp validate_statement_predicate(:agent_response, predicate) do
+    AgentPredicate.validate(:agent_response, predicate)
+  end
+
+  defp validate_statement_predicate(_, _), do: :ok
 end
