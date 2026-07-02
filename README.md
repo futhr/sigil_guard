@@ -10,14 +10,14 @@
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
-[Architecture](https://github.com/futhr/sigil_guard/blob/main/docs/README.md) ·
-[Roadmap](#status-and-roadmap)
+[Capabilities](#capabilities) ·
+[Architecture](docs/README.md)
 
 ---
 
 SigilGuard sits between a language model and the tools it can reach. It decides
 whether a tool call, a tool result, or a model output is allowed to cross a
-given boundary — and it produces signed, tamper-evident evidence of every
+given boundary, and it produces signed, tamper-evident evidence of every
 decision. It runs in-process on the BEAM: no sidecar, no proxy hop, no network
 call on the decision path.
 
@@ -25,53 +25,37 @@ The problem it addresses is the one every agent deployment eventually hits: a
 model with access to private data, exposure to untrusted content, and the
 ability to act or communicate outward is one poisoned tool description or
 prompt-injected result away from doing real damage. Model-level guardrails help
-but are probabilistic. SigilGuard adds the deterministic layer underneath —
-signed trust material, capability manifests pinned by digest, source-to-sink
-policy, and human-in-the-loop confirmation bound to the exact action.
+but are probabilistic. SigilGuard is the deterministic layer underneath: signed
+trust material, capability manifests pinned by digest, source-to-sink policy,
+and human-in-the-loop confirmation bound to the exact action.
 
 ## Why embedded
 
-The market answer to MCP security is mostly proxies, gateways, and cloud
-scanners — a separate service in the request path. That buys latency, an extra
-operational surface, and a trust boundary of its own. For a team already on
-Elixir, an in-process library is a better fit:
+The common answer to MCP security is a proxy, a gateway, or a cloud scanner: a
+separate service in the request path. That buys latency, an extra operational
+surface, and a trust boundary of its own. For a team already on Elixir, an
+in-process library is a better fit.
 
 - **Deterministic core.** Policy decisions are code, not a model call. Same
   inputs, same verdict, every time.
-- **Signed evidence, locally.** A tamper-evident HMAC + Merkle audit chain with
-  signed checkpoints and portable exports, held in your app — not a vendor's log.
+- **Signed evidence, locally.** A tamper-evident HMAC and Merkle audit chain,
+  with signed checkpoints, inclusion and consistency proofs, and portable
+  exports, held in your app rather than a vendor's log.
 - **No sidecar.** OTP-supervised, sub-millisecond on the decision path, and
   offline by default. Trust material ships with your release.
-
-## Status and Roadmap
-
-The `0.2.x` line is the current released series. The next major release,
-**v3.0 — the Agent Trust Profile**, is a deliberate breaking rewrite around
-signed attestations, embedded trust bundles, capability manifests, a
-deterministic boundary policy kernel, agent-to-agent trust, and verifiable
-audit evidence.
-
-The v3 design is complete and documented: the
-[architecture map](https://github.com/futhr/sigil_guard/blob/main/docs/README.md),
-the [specs](https://github.com/futhr/sigil_guard/blob/main/docs/specs/README.md)
-(`SP.01`–`SP.15`), the
-[research and decisions](https://github.com/futhr/sigil_guard/blob/main/docs/research/README.md)
-(`R.01`–`R.07`), and the
-[execution checklist](https://github.com/futhr/sigil_guard/blob/main/docs/tasks/sigil-tasks.md).
-The consumer-facing API shown below is stable and carries forward unchanged;
-migration for the surfaces that do change will ship as `MIGRATING-3.0.md`.
 
 ## Capabilities
 
 | Capability | What it does |
 |------------|--------------|
-| **Sensitivity scanner** | Staged detection and redaction of secrets and credentials, with confidence and boundary-aware enrichment. |
+| **Sensitivity scanner** | Staged detection and redaction of secrets and credentials, with confidence scoring and boundary-aware enrichment. |
 | **Boundary policy kernel** | Deterministic source-to-sink decisions over phase, origin, sink, actor, trust zone, and sandbox identity. |
 | **MCP / tool gateway** | Transport-agnostic guards for tool requests and results, with capability manifests pinned by digest. |
-| **Confirmation tokens** | Short-lived human-approval grants bound to the exact action, payload, and context — never a fuzzy intent. |
-| **Streaming sanitizer** | Chunk-safe holdback so a secret split across output chunks is never emitted early. |
-| **Tamper-evident audit** | HMAC-linked event chains, Merkle checkpoints with inclusion/consistency proofs, signed exports, and external anchoring. |
+| **Signed attestations** | Canonical, DSSE-enveloped statements binding an actor, tool, action, payload, and context to a verdict. |
 | **Trust bundles** | Signed, local trust material — roots, keys, policies, patterns, tool manifests, and revocations — verified offline. |
+| **Confirmation tokens** | Short-lived human-approval grants bound to the exact action, payload, and context, never a fuzzy intent. |
+| **Streaming sanitizer** | Chunk-safe holdback so a secret split across output chunks is never emitted early. |
+| **Tamper-evident audit** | HMAC-linked event chains, Merkle checkpoints with inclusion and consistency proofs, signed exports, and external anchoring. |
 | **Agent-to-agent trust** | Signed agent cards and delegation-chain validation for inter-agent calls. |
 | **Vault** | AES-256-GCM secret storage behind a swappable behaviour (KMS, HSM, external vault). |
 | **Telemetry** | `:telemetry` events plus OpenTelemetry-style attribute mapping for every decision. |
@@ -81,7 +65,7 @@ migration for the surfaces that do change will ship as `MIGRATING-3.0.md`.
 ```elixir
 def deps do
   [
-    {:sigil_guard, "~> 0.2"}
+    {:sigil_guard, "~> 3.0"}
   ]
 end
 ```
@@ -102,7 +86,6 @@ decision =
     trust_level: :high
   )
 
-:blocked = decision.verdict
 :block = decision.action
 
 # Redact before the same content reaches the model.
@@ -133,10 +116,8 @@ Scanning and policy are also available on their own:
 The gate is transport-agnostic: an MCP server, an agent loop, or a gateway
 calls it before tool execution, after tool results, and before outbound writes,
 without pulling any specific MCP adapter into the core. The MCP gateway,
-attestation signing, confirmation flow, and audit chain build on this same
-decision — see the [architecture map](https://github.com/futhr/sigil_guard/blob/main/docs/README.md)
-and the [specs](https://github.com/futhr/sigil_guard/blob/main/docs/specs/README.md)
-for the full surface.
+attestation signing, confirmation flow, trust bundles, and audit chain build on
+this same decision. The [architecture](docs/README.md) covers the full surface.
 
 ## Extension Points
 
@@ -149,15 +130,16 @@ SigilGuard plugs into them through behaviours:
 | `SigilGuard.Vault` | Encrypted storage | HashiCorp Vault, AWS KMS, database |
 | `SigilGuard.Audit.Logger` | Audit persistence | Database, file, external service |
 | `SigilGuard.Identity` | Trust and identity context | Your auth system |
+| `SigilGuard.HTTPClient` | Outbound HTTP for anchor stores | Req, Finch, or your own client |
 
 ## Telemetry
 
 SigilGuard emits `:telemetry` events for scanning, gate decisions, MCP
-requests, policy verdicts, and audit logging. Each decision event carries the
-sanitized boundary metadata — phase, actor, origin, sink, tool, trust zone,
-verdict, and digests — with raw payloads kept out by default. Use
-`SigilGuard.Telemetry.otel_attributes/3` (or `attach_otel_forwarder/3`) to map
-them into OpenTelemetry-style attributes.
+requests, policy verdicts, trust-bundle verification, and audit logging. Each
+decision event carries the sanitized boundary metadata — phase, actor, origin,
+sink, tool, trust zone, verdict, and digests — with raw payloads kept out by
+default. Use `SigilGuard.Telemetry.otel_attributes/3` to map them into
+OpenTelemetry-style attributes under the `sigilguard.*` namespace.
 
 ## Development
 
@@ -174,12 +156,10 @@ mix sigil_guard.sbom --output dist/sigil_guard.spdx.json
 Coverage is held at or above 95%, and security modules carry negative, tamper,
 replay, expiration, and malformed-input tests.
 
-## Documentation
+## Architecture
 
-- [Architecture map](https://github.com/futhr/sigil_guard/blob/main/docs/README.md) — module topology, boundary flows, and the v3 design.
-- [Specs](https://github.com/futhr/sigil_guard/blob/main/docs/specs/README.md) — the implementable `SP.01`–`SP.15` contracts.
-- [Research](https://github.com/futhr/sigil_guard/blob/main/docs/research/README.md) — decisions and their primary sources.
-- [Task list](https://github.com/futhr/sigil_guard/blob/main/docs/tasks/sigil-tasks.md) — the v3 execution checklist and decision log.
+The [architecture overview](docs/README.md) maps the component layers, the
+module topology, and the runtime, MCP, and audit-evidence flows, with diagrams.
 
 ## References
 
