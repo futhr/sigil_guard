@@ -70,6 +70,7 @@ defmodule SigilGuard.MixProject do
       {:excoveralls, "~> 0.18", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:mox, "~> 1.1", only: :test},
+      {:stream_data, "~> 1.3", only: :test},
 
       # Benchmarks
       {:benchee, "~> 1.3", only: :dev, runtime: false},
