@@ -143,7 +143,8 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Profile,
           SigilGuard.Quarantine,
           SigilGuard.RepoPolicy,
-          SigilGuard.RepoPolicy.Decision
+          SigilGuard.RepoPolicy.Decision,
+          SigilGuard.TrustProfile
         ],
         "Runtime Gate": [
           SigilGuard.Runtime.Gate,
