@@ -134,6 +134,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Confirmation,
           SigilGuard.Attestation,
           SigilGuard.Attestation.AgentPredicate,
+          SigilGuard.Attestation.Digest,
           SigilGuard.Attestation.Envelope,
           SigilGuard.Attestation.Statement,
           SigilGuard.Canonical.JCS,
