@@ -1,0 +1,31 @@
+# SigilGuard Quality Gates
+
+Run these before handoff or commit:
+
+```bash
+git diff --check
+mix format --check-formatted
+mix compile --warnings-as-errors
+mix credo --strict
+mix sobelow --config --compact
+mix deps.audit
+mix test --cover
+mix doctor
+mix dialyzer
+mix docs
+mix check --no-retry
+```
+
+Also run local scans for forbidden inspiration-project terms and dead public
+protocol/registry URLs without committing those literal strings to repo text.
+
+Coverage must stay at or above 95%.
+
+Security work also needs focused tests for:
+
+- malformed input.
+- tampering.
+- replay.
+- expiry.
+- quarantine.
+- compatibility behavior.
