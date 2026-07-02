@@ -1,6 +1,6 @@
 defmodule SigilGuard.Audit do
   @moduledoc """
-  Tamper-evident audit logging for the SIGIL protocol.
+  Tamper-evident audit logging for SigilGuard runtime decisions.
 
   Provides structured audit events with HMAC-SHA256 chain integrity.
   Each event's HMAC incorporates the previous event's HMAC, forming a

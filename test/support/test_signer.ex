@@ -8,7 +8,7 @@ defmodule SigilGuard.TestSigner do
 
   ## Usage
 
-      envelope = SigilGuard.sign_envelope("did:sigil:test", :allowed,
+      envelope = SigilGuard.sign_envelope("did:example:test", :allowed,
         signer: SigilGuard.TestSigner
       )
 

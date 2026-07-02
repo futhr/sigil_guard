@@ -1,17 +1,17 @@
 defmodule SigilGuard.Registry.Cache do
   @moduledoc """
-  GenServer-based TTL cache for SIGIL registry data.
+  GenServer-based TTL cache for explicit legacy remote-bundle data.
 
-  Fetches pattern bundles on startup and refreshes them periodically based
-  on the configured TTL. On fetch failure, retains the last known good
-  bundle, tracks the data source for observability, and retries after
-  `:registry_retry_ms` instead of waiting out the full TTL.
+  Fetches compatibility pattern bundles on startup and refreshes them
+  periodically based on the configured TTL. On fetch failure, retains the last
+  known good bundle, tracks the data source for observability, and retries
+  after `:registry_retry_ms` instead of waiting out the full TTL.
 
   ## Source Tracking
 
   The cache tracks where its current data came from:
 
-    * `:registry` — freshly fetched from the SIGIL registry
+    * `:registry` — freshly fetched from the configured legacy endpoint
     * `:fallback` — last fetch failed; serving built-in patterns (if no
       fetch ever succeeded) or the last known good bundle
     * `:quarantine` — fetched bundle failed provenance verification; serving
@@ -28,7 +28,7 @@ defmodule SigilGuard.Registry.Cache do
         registry_bundle_public_keys: %{},
         registry_bundle_max_age_seconds: nil,
         registry_bundle_clock_skew_seconds: 60,
-        registry_url: "https://registry.sigil-protocol.org"
+        registry_url: "https://internal.example/sigil-compat"
 
   ## Process Model
 
@@ -90,7 +90,7 @@ defmodule SigilGuard.Registry.Cache do
 
   # -- Client API --
 
-  @doc "Start the registry cache GenServer."
+  @doc "Start the legacy remote-bundle cache GenServer."
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -124,7 +124,7 @@ defmodule SigilGuard.Registry.Cache do
     GenServer.call(__MODULE__, :status)
   end
 
-  @doc "Force a refresh of the cached patterns from the registry."
+  @doc "Force a refresh of the cached patterns from the configured legacy endpoint."
   @spec refresh() :: :ok
   def refresh do
     GenServer.cast(__MODULE__, :refresh)
@@ -229,7 +229,7 @@ defmodule SigilGuard.Registry.Cache do
 
       {:quarantine, quarantine} ->
         Logger.warning(
-          "[SigilGuard.Registry.Cache] Quarantined registry bundle: #{inspect(quarantine.reason)}"
+          "[SigilGuard.Registry.Cache] Quarantined remote bundle: #{inspect(quarantine.reason)}"
         )
 
         quarantine(state, quarantine)
@@ -254,7 +254,7 @@ defmodule SigilGuard.Registry.Cache do
         total_count = length(merged)
 
         msg =
-          "[SigilGuard.Registry.Cache] Fetched #{reg_count} registry patterns, #{total_count} total after merge"
+          "[SigilGuard.Registry.Cache] Fetched #{reg_count} remote patterns, #{total_count} total after merge"
 
         Logger.info(msg)
 

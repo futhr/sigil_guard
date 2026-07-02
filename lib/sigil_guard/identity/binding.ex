@@ -2,7 +2,7 @@ defmodule SigilGuard.Identity.Binding do
   @moduledoc """
   Identity binding linking a provider credential to a trust level.
 
-  Tracks the SIGIL protocol identity-binding shape used for trust assertions.
+  Tracks the identity-binding shape used for trust assertions.
 
   ## Fields
 

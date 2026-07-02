@@ -1,6 +1,6 @@
 defmodule SigilGuard.Vault do
   @moduledoc """
-  Secure vaulting behaviour and utilities for the SIGIL protocol.
+  Secure vaulting behaviour and utilities for SigilGuard runtimes.
 
   Provides an interface for encrypting, decrypting, and managing sensitive
   values (API keys, tokens, credentials) that should never appear in logs

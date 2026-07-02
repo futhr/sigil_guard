@@ -2,7 +2,7 @@ defmodule SigilGuard.Audit.ExecutionResult do
   @moduledoc """
   Typed execution result for audit events.
 
-  Tracks the SIGIL protocol execution-result shape used in audit events.
+  Tracks the execution-result shape used in audit events.
 
   ## Fields
 

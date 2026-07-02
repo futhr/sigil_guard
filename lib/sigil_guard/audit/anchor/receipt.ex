@@ -9,7 +9,7 @@ defmodule SigilGuard.Audit.Anchor.Receipt do
   verifies in strict mode.
 
   Top-level `"signature"` metadata is excluded from canonical bytes, matching
-  the checkpoint and registry-bundle signing pattern.
+  the checkpoint and compatibility-bundle signing pattern.
   """
 
   @signature_algorithm "Ed25519"

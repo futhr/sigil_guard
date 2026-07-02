@@ -2,8 +2,8 @@ defmodule SigilGuard.Patterns do
   @moduledoc """
   Pattern compilation and management for sensitivity scanning.
 
-  Provides built-in patterns for common credential and secret formats,
-  plus support for loading patterns from SIGIL registry bundles.
+  Provides built-in patterns for common credential and secret formats, plus
+  support for loading patterns from explicit compatibility bundles.
 
   ## Built-in Patterns
 
@@ -16,11 +16,11 @@ defmodule SigilGuard.Patterns do
     * Private key headers (RSA, EC, OpenSSH)
     * Generic secret/password/token assignments
 
-  ## Registry Patterns
+  ## Compatibility Bundle Patterns
 
-  When the SIGIL registry is enabled, patterns from `GET /patterns/bundle`
-  are merged with built-in patterns. Registry patterns take precedence
-  on name collision.
+  When the legacy remote-bundle cache is enabled, patterns from
+  `GET /patterns/bundle` are merged with built-in patterns. Remote bundle
+  patterns take precedence on name collision after provenance checks pass.
   """
 
   @type scan_hit :: %{
@@ -109,7 +109,7 @@ defmodule SigilGuard.Patterns do
   @doc """
   Compile a list of raw pattern maps into executable patterns.
 
-  Accepts both built-in format (with `:pattern` key) and registry bundle
+  Accepts both built-in format (with `:pattern` key) and compatibility bundle
   format (with `"regex"` key).
   """
   @spec compile([map()]) :: [compiled_pattern()]
@@ -120,7 +120,7 @@ defmodule SigilGuard.Patterns do
   end
 
   @doc """
-  Parse a SIGIL registry bundle response into pattern maps.
+  Parse a compatibility bundle response into pattern maps.
 
   Expected format:
   ```json

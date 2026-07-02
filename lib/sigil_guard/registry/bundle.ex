@@ -2,17 +2,17 @@ defmodule SigilGuard.Registry.Bundle do
   @moduledoc """
   Pattern-bundle provenance, digesting, signing, and quarantine checks.
 
-  Registry bundles are executable scanner configuration. This module gives
-  registry consumers a deterministic provenance boundary:
+  Compatibility bundles are executable scanner configuration. This module gives
+  legacy remote-bundle consumers a deterministic provenance boundary:
 
     * canonical bundle bytes exclude top-level provenance/signature metadata
     * digests are SHA-256 over canonical bytes
     * signatures are Ed25519 signatures over canonical bytes
     * invalid signed bundles return quarantine metadata instead of patterns
 
-  Unsigned bundles are accepted by default for compatibility with older
-  registries. Set `require_signature: true` when a deployment has configured
-  trusted bundle public keys.
+  Unsigned bundles are accepted by default for compatibility with older callers.
+  Set `require_signature: true` when a deployment has configured trusted bundle
+  public keys.
   """
 
   @metadata_keys ~w(provenance signature signatures)
@@ -57,7 +57,7 @@ defmodule SigilGuard.Registry.Bundle do
   end
 
   @doc """
-  Sign a registry bundle using a `SigilGuard.Signer` module.
+  Sign a compatibility bundle using a `SigilGuard.Signer` module.
 
   Options:
 

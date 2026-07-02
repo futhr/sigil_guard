@@ -1,6 +1,6 @@
 defmodule SigilGuard.Signer do
   @moduledoc """
-  Behaviour for signing operations in the SIGIL protocol.
+  Behaviour for signing operations in SigilGuard envelopes and attestations.
 
   Implementations produce Ed25519 signatures over canonical envelope bytes.
   The two required callbacks are `c:sign/1` and `c:public_key/0`.
@@ -9,7 +9,7 @@ defmodule SigilGuard.Signer do
 
   Pass your signer module to envelope operations:
 
-      SigilGuard.sign_envelope("did:sigil:example", :allowed,
+      SigilGuard.sign_envelope("did:example:agent", :allowed,
         signer: MyApp.HsmSigner
       )
 

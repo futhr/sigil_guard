@@ -2,7 +2,7 @@ defmodule SigilGuard.Audit.Actor do
   @moduledoc """
   Typed actor information for audit events.
 
-  Tracks the SIGIL protocol actor shape used in audit events.
+  Tracks the actor shape used in audit events.
 
   ## Fields
 

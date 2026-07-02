@@ -7,13 +7,13 @@ defmodule SigilGuard.Application do
   lives as long as the application.
 
   Starts the supervision tree that manages optional runtime services.
-  When registry support is enabled (`config :sigil_guard, registry_enabled: true`),
-  this starts:
+  When legacy remote-bundle support is enabled
+  (`config :sigil_guard, registry_enabled: true`), this starts:
 
     * `Finch` HTTP client pool (as `SigilGuard.Finch`)
-    * `SigilGuard.Registry.Cache` GenServer for TTL-cached pattern bundles
+    * `SigilGuard.Registry.Cache` GenServer for TTL-cached compatibility bundles
 
-  When the registry is disabled (the default), no child processes are
+  When remote-bundle support is disabled (the default), no child processes are
   started and SigilGuard operates as a purely functional library.
   """
 

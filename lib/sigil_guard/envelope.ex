@@ -2,7 +2,7 @@ defmodule SigilGuard.Envelope do
   @moduledoc """
   SIGIL envelope implementation for MCP JSON-RPC `_sigil` metadata.
 
-  Implements the envelope format defined by the SIGIL protocol:
+  Implements SigilGuard's existing envelope contract:
   - Canonical bytes: lexicographic key order, compact JSON, no whitespace,
     excluding `signature` and `reason`
   - Ed25519 signature, base64url-encoded (no padding)
@@ -15,7 +15,7 @@ defmodule SigilGuard.Envelope do
 
   Signing requires a module implementing `SigilGuard.Signer`:
 
-      envelope = SigilGuard.Envelope.sign("did:sigil:abc", :allowed, signer: MySigner)
+      envelope = SigilGuard.Envelope.sign("did:example:agent", :allowed, signer: MySigner)
 
   New envelopes emit lowercase verdicts by default. Use
   `profile: :legacy_sigil_guard` or

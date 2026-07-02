@@ -1,8 +1,8 @@
 defmodule SigilGuard.Audit.EventType do
   @moduledoc """
-  Audit event types defined by the SIGIL protocol.
+  Audit event types used by SigilGuard.
 
-  These atoms map to the SIGIL protocol audit event vocabulary.
+  These atoms preserve the existing audit event vocabulary for consumers.
   Use these atoms as the `type` field when creating audit events for protocol compliance.
 
   ## Event Types

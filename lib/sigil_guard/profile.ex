@@ -1,13 +1,12 @@
 defmodule SigilGuard.Profile do
   @moduledoc """
-  Protocol compatibility profiles for SIGIL wire behavior.
+  Compatibility profiles for existing envelope wire behavior.
 
-  SigilGuard historically emitted title-cased envelope verdicts while the
-  SIGIL reference profile and draft examples use lowercase verdicts. Registry DID
-  resolution has a similar split between `/identities/:did` and
-  `/resolve/:did`. This module keeps those differences explicit so signing,
-  verification, and registry lookup do not hide protocol drift behind
-  heuristics.
+  SigilGuard historically emitted title-cased envelope verdicts while later
+  reference examples use lowercase verdicts. Legacy DID resolution has a similar
+  split between `/identities/:did` and `/resolve/:did`. This module keeps those
+  differences explicit so signing, verification, and compatibility lookup do not
+  hide drift behind heuristics.
   """
 
   @type t ::
@@ -51,7 +50,7 @@ defmodule SigilGuard.Profile do
   def require_blocked_reason_on_verify?(:sigil_spec_draft_2026_02), do: true
   def require_blocked_reason_on_verify?(_), do: false
 
-  @doc "Registry DID-resolution endpoints to try, in order."
+  @doc "Legacy DID-resolution endpoints to try, in order."
   @spec registry_identity_endpoints(t()) :: [registry_endpoint()]
   def registry_identity_endpoints(:legacy_sigil_guard), do: [:identities, :resolve]
   def registry_identity_endpoints(:sigil_spec_draft_2026_02), do: [:resolve]

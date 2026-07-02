@@ -1,12 +1,12 @@
 defmodule SigilGuard do
   @moduledoc """
-  SIGIL Protocol integration for Elixir.
+  Native Elixir security runtime for MCP and agent tool boundaries.
 
   SigilGuard provides composable security layers for MCP (Model Context
   Protocol) tool calls and AI agent interactions:
 
   1. **Sensitivity Scanning** — Detect credentials, API keys, and secrets in text
-  2. **Envelope Signing** — Ed25519-signed `_sigil` metadata for tamper detection
+  2. **Envelope Signing** — Ed25519-signed metadata for tamper detection
   3. **Policy Enforcement** — Risk classification with trust-gated access control
   4. **Tamper-Evident Audit** — HMAC-SHA256 chain for immutable audit logs
   5. **Secure Vaulting** — Encrypted storage for sensitive values
@@ -49,7 +49,7 @@ defmodule SigilGuard do
   - `SigilGuard.Scanner` — Sensitivity scanning engine
   - `SigilGuard.Scanner.Pipeline` — Staged scanner validation/enrichment pipeline
   - `SigilGuard.Patterns` — Pattern compilation and management
-  - `SigilGuard.Envelope` — SIGIL envelope signing and verification
+  - `SigilGuard.Envelope` — Existing envelope signing and verification
   - `SigilGuard.Runtime.Gate` — Boundary-aware tool/runtime decisions
   - `SigilGuard.Runtime.Stream` — Chunk-safe streaming sanitization
   - `SigilGuard.MCP.Gateway` — MCP-shaped request/result guard helpers
@@ -60,9 +60,9 @@ defmodule SigilGuard do
   - `SigilGuard.Vault` — Secure secret storage
   - `SigilGuard.Identity` — Trust level hierarchy
   - `SigilGuard.Signer` — Cryptographic signing behaviour
-  - `SigilGuard.Registry` — SIGIL registry REST client
-  - `SigilGuard.Registry.Bundle` — Signed registry bundle provenance checks
-  - `SigilGuard.Registry.Cache` — Registry data caching
+  - `SigilGuard.Registry` — Legacy remote-bundle compatibility adapter
+  - `SigilGuard.Registry.Bundle` — Signed compatibility bundle provenance checks
+  - `SigilGuard.Registry.Cache` — Optional remote-bundle data caching
 
   """
 

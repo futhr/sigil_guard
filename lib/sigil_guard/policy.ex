@@ -1,6 +1,6 @@
 defmodule SigilGuard.Policy do
   @moduledoc """
-  Risk classification and trust-gated policy enforcement for the SIGIL protocol.
+  Risk classification and trust-gated policy enforcement for SigilGuard.
 
   Maps actions to risk levels and evaluates whether a given trust level is
   sufficient to proceed. Supports configurable risk mappings, confirmation
