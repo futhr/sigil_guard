@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 15 | 0 | 4 |
+| M1 - Core groundwork | 19 | 16 | 0 | 3 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **67** | **0** | **161** |
+| **Total** | **228** | **68** | **0** | **160** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -447,7 +447,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
   - AC: nonce reuse fails `:replay_detected`; `now > expires_at + skew`
     or `issued_at > now + skew` fails `:expired_attestation`.
   - Tests: replay, expiration (skew boundary +/- 1 ms cases).
-- [ ] M1.16 Digest tamper matrix tests.
+- [x] M1.16 Digest tamper matrix tests.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Error Handling;
     Acceptance Criteria.
   - AC: mutating the guarded payload, context, or action inputs each fails

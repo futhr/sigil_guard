@@ -15,6 +15,7 @@ defmodule SigilGuard.AttestationSignVerifyTest do
   @expires_at "2026-07-03T12:05:00.000Z"
   @payload %{"method" => "tools/call", "params" => %{"name" => "repo_file_write"}}
   @context %{phase: :tool_request, origin: :user, sink: :tool, tool: "repo_file_write"}
+  @manifest_digest String.duplicate("d", 64)
 
   setup do
     ReplayStore.clear()
@@ -90,6 +91,41 @@ defmodule SigilGuard.AttestationSignVerifyTest do
                context: @context,
                now: @now
              ) == {:error, :digest_mismatch}
+    end
+
+    test "rejects payload, context, action, and manifest tampering" do
+      assert {:ok, statement} = valid_statement(%{}, manifest_digest: @manifest_digest)
+      assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
+
+      trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      assert Attestation.verify(envelope, trust_material,
+               payload: Map.put(@payload, "id", 43),
+               context: @context,
+               manifest_digest: @manifest_digest,
+               now: @now
+             ) == {:error, :digest_mismatch}
+
+      assert Attestation.verify(envelope, trust_material,
+               payload: @payload,
+               context: Map.put(@context, :sink, :repo),
+               manifest_digest: @manifest_digest,
+               now: @now
+             ) == {:error, :digest_mismatch}
+
+      assert Attestation.verify(envelope, trust_material,
+               payload: put_in(@payload, ["params", "name"], "other_tool"),
+               context: @context,
+               manifest_digest: @manifest_digest,
+               now: @now
+             ) == {:error, :digest_mismatch}
+
+      assert Attestation.verify(envelope, trust_material,
+               payload: @payload,
+               context: @context,
+               manifest_digest: String.duplicate("e", 64),
+               now: @now
+             ) == {:error, :manifest_digest_mismatch}
     end
 
     test "rejects expired attestations" do
@@ -214,9 +250,9 @@ defmodule SigilGuard.AttestationSignVerifyTest do
     end
   end
 
-  defp valid_statement(predicate_overrides \\ %{}) do
+  defp valid_statement(predicate_overrides \\ %{}, digest_opts \\ []) do
     {:ok, predicate_type} = TrustProfile.predicate_type(:tool_request)
-    {:ok, digests} = Digest.digests(:tool_request, @payload, @context)
+    {:ok, digests} = Digest.digests(:tool_request, @payload, @context, digest_opts)
 
     predicate =
       Map.merge(
