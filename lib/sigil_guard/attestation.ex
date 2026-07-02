@@ -599,26 +599,56 @@ defmodule SigilGuard.Attestation do
   end
 
   defp validate_freshness(statement, opts) do
-    case Map.get(statement["predicate"], "expires_at") do
-      nil -> :ok
-      expires_at -> validate_expiry(expires_at, Keyword.get(opts, :now, DateTime.utc_now()))
+    with {:ok, now} <- verify_now(opts),
+         {:ok, max_skew_ms} <- max_skew_ms(opts),
+         {:ok, issued_at, expires_at} <- freshness_times(statement) do
+      cond do
+        not DateTime.before?(issued_at, expires_at) ->
+          {:error, :invalid_payload}
+
+        DateTime.after?(now, DateTime.add(expires_at, max_skew_ms, :millisecond)) ->
+          {:error, :expired_attestation}
+
+        DateTime.after?(issued_at, DateTime.add(now, max_skew_ms, :millisecond)) ->
+          {:error, :expired_attestation}
+
+        true ->
+          :ok
+      end
     end
   end
 
-  defp validate_expiry(expires_at, %DateTime{} = now) when is_binary(expires_at) do
-    case DateTime.from_iso8601(expires_at) do
-      {:ok, expires_at, _} ->
-        if DateTime.compare(expires_at, now) == :gt, do: :ok, else: {:error, :expired_attestation}
-
-      {:error, _} ->
-        {:error, :invalid_payload}
+  defp verify_now(opts) do
+    case Keyword.get(opts, :now, DateTime.utc_now()) do
+      %DateTime{} = now -> {:ok, now}
+      _ -> {:error, :invalid_payload}
     end
   end
 
-  defp validate_expiry(_, _), do: {:error, :invalid_payload}
+  defp max_skew_ms(opts) do
+    configured_non_negative_integer(opts, :max_skew_ms, :max_skew_ms, 60_000)
+  end
+
+  defp freshness_times(statement) do
+    predicate = statement["predicate"]
+
+    with {:ok, issued_at} <- parse_required_datetime(Map.get(predicate, "issued_at")),
+         {:ok, expires_at} <- parse_required_datetime(Map.get(predicate, "expires_at")) do
+      {:ok, issued_at, expires_at}
+    end
+  end
+
+  defp parse_required_datetime(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, datetime, _} -> {:ok, datetime}
+      {:error, _} -> {:error, :invalid_payload}
+    end
+  end
+
+  defp parse_required_datetime(_), do: {:error, :invalid_payload}
 
   defp maybe_consume_nonce(statement, opts) do
-    if Keyword.get(opts, :consume, false) do
+    if Keyword.get(opts, :replay, Keyword.get(opts, :consume, false)) do
       consume_nonce(statement, opts)
     else
       :ok
@@ -630,10 +660,30 @@ defmodule SigilGuard.Attestation do
 
     with actor when is_binary(actor) <- actor_id(predicate),
          nonce when is_binary(nonce) <- Map.get(predicate, "nonce"),
-         ttl_ms when is_integer(ttl_ms) and ttl_ms > 0 <- Keyword.get(opts, :ttl_ms, 300_000) do
+         {:ok, ttl_ms} <- replay_ttl_ms(predicate, opts) do
       ReplayStore.check_and_put("attestation:" <> actor, nonce, ttl_ms)
     else
       _ -> {:error, :invalid_payload}
+    end
+  end
+
+  defp replay_ttl_ms(predicate, opts) do
+    cond do
+      Keyword.has_key?(opts, :replay_ttl_ms) ->
+        configured_positive_integer(opts, :replay_ttl_ms, :replay_ttl_ms, 300_000)
+
+      Keyword.has_key?(opts, :ttl_ms) ->
+        configured_positive_integer(opts, :ttl_ms, :replay_ttl_ms, 300_000)
+
+      true ->
+        remaining_lifetime_ms(predicate, opts)
+    end
+  end
+
+  defp remaining_lifetime_ms(predicate, opts) do
+    with {:ok, now} <- verify_now(opts),
+         {:ok, expires_at} <- parse_required_datetime(Map.get(predicate, "expires_at")) do
+      {:ok, max(DateTime.diff(expires_at, now, :millisecond), 1)}
     end
   end
 
@@ -641,6 +691,26 @@ defmodule SigilGuard.Attestation do
     case Map.get(predicate, "actor") do
       %{"id" => id} when is_binary(id) -> id
       _ -> nil
+    end
+  end
+
+  defp configured_positive_integer(opts, opt_key, config_key, default) do
+    value = Keyword.get(opts, opt_key, Application.get_env(:sigil_guard, config_key, default))
+
+    if is_integer(value) and value > 0 do
+      {:ok, value}
+    else
+      {:error, :invalid_payload}
+    end
+  end
+
+  defp configured_non_negative_integer(opts, opt_key, config_key, default) do
+    value = Keyword.get(opts, opt_key, Application.get_env(:sigil_guard, config_key, default))
+
+    if is_integer(value) and value >= 0 do
+      {:ok, value}
+    else
+      {:error, :invalid_payload}
     end
   end
 

@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 14 | 0 | 5 |
+| M1 - Core groundwork | 19 | 15 | 0 | 4 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **66** | **0** | **162** |
+| **Total** | **228** | **67** | **0** | **161** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -438,7 +438,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
   - AC: the `tool_request` vector reproduces the spec's worked example,
     including the manifest digest of the SP.03 `repo_file_write` fixture.
   - Tests: golden vectors (byte-identity round trips for every type).
-- [ ] M1.15 Replay and expiry semantics for attestations.
+- [x] M1.15 Replay and expiry semantics for attestations.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Replay And
     Expiry Semantics.
   - AC: defaults `attestation_ttl_ms: 300_000`, `max_skew_ms: 60_000`,

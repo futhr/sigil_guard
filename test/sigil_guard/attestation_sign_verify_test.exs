@@ -93,11 +93,67 @@ defmodule SigilGuard.AttestationSignVerifyTest do
     end
 
     test "rejects expired attestations" do
-      assert {:ok, statement} = valid_statement(%{"expires_at" => "2026-07-03T11:59:00.000Z"})
+      assert {:ok, statement} =
+               valid_statement(%{
+                 "issued_at" => "2026-07-03T11:00:00.000Z",
+                 "expires_at" => "2026-07-03T11:59:00.000Z"
+               })
+
       assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
 
-      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()}, now: @now) ==
-               {:error, :expired_attestation}
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now,
+               max_skew_ms: 0
+             ) == {:error, :expired_attestation}
+    end
+
+    test "honors expiration skew boundaries" do
+      assert {:ok, statement} =
+               valid_statement(%{
+                 "issued_at" => "2026-07-03T11:00:00.000Z",
+                 "expires_at" => "2026-07-03T11:59:00.000Z"
+               })
+
+      assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now,
+               max_skew_ms: 60_000
+             ) == {:ok, statement}
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: DateTime.add(@now, 1, :millisecond),
+               max_skew_ms: 60_000
+             ) == {:error, :expired_attestation}
+    end
+
+    test "rejects future-issued and inverted lifetime attestations" do
+      assert {:ok, future_statement} =
+               valid_statement(%{
+                 "issued_at" => "2026-07-03T12:01:00.001Z",
+                 "expires_at" => "2026-07-03T12:05:00.000Z"
+               })
+
+      assert {:ok, future_envelope} =
+               Attestation.sign(future_statement, TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(future_envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now,
+               max_skew_ms: 60_000
+             ) == {:error, :expired_attestation}
+
+      assert {:ok, inverted_statement} =
+               valid_statement(%{
+                 "issued_at" => "2026-07-03T12:05:00.000Z",
+                 "expires_at" => "2026-07-03T12:05:00.000Z"
+               })
+
+      assert {:ok, inverted_envelope} =
+               Attestation.sign(inverted_statement, TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(inverted_envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now
+             ) == {:error, :invalid_payload}
     end
 
     test "can consume attestation nonces for replay protection" do
@@ -105,6 +161,19 @@ defmodule SigilGuard.AttestationSignVerifyTest do
       assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
 
       opts = [now: @now, consume: true, ttl_ms: 60_000]
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()}, opts) ==
+               {:ok, statement}
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()}, opts) ==
+               {:error, :replay_detected}
+    end
+
+    test "uses replay option and remaining lifetime ttl for nonce protection" do
+      assert {:ok, statement} = valid_statement(%{"nonce" => "replay-option-nonce"})
+      assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
+
+      opts = [now: @now, replay: true]
 
       assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()}, opts) ==
                {:ok, statement}
