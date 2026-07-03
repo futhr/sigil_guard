@@ -41,6 +41,7 @@ defmodule SigilGuard.ToolGateway do
           | :token_passthrough_denied
           | :sandbox_required
           | :invalid_attestation
+          | :invalid_payload
           | :invalid_confirmation_token
           | :missing_confirmation_key
           | :confirmation_failed
@@ -100,6 +101,79 @@ defmodule SigilGuard.ToolGateway do
 
   def verify_manifest(_, _), do: {:error, :unknown_manifest}
 
+  @doc """
+  Guard a tool result before it is returned to the model.
+  """
+  @spec guard_result(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
+  def guard_result(result, context \\ %{}, opts \\ []) do
+    payload = result_payload(result)
+    result_context = result_context(result, context)
+
+    case request_action_digest(opts) do
+      :ok ->
+        result
+        |> MCP.Gateway.guard_result(context, opts)
+        |> put_result_binding_metadata(opts)
+
+      {:error, reason} ->
+        deny(reason, payload, result_context)
+    end
+  end
+
+  @doc """
+  Guard a tool request and return the v2 JSON-RPC-compatible tuple shape.
+  """
+  @spec guarded_request(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_request(request, context \\ %{}, opts \\ []) do
+    decision = guard_request(request, context, opts)
+
+    if executable?(decision) do
+      {:ok, decision}
+    else
+      {:error, response_for_decision(decision, nil, opts), decision}
+    end
+  end
+
+  @doc """
+  Guard a tool result and return the v2 JSON-RPC-compatible tuple shape.
+  """
+  @spec guarded_result(term(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, map(), Decision.t()} | {:error, map(), Decision.t()}
+  def guarded_result(result, context \\ %{}, opts \\ []) do
+    decision = guard_result(result, context, opts)
+
+    if executable?(decision) do
+      {:ok, MCP.Gateway.response_for_decision(decision, nil, opts), decision}
+    else
+      {:error, response_for_decision(decision, nil, opts), decision}
+    end
+  end
+
+  @doc "Return the v2 JSON-RPC-compatible decision response."
+  @spec response_for_decision(Decision.t(), term(), keyword()) :: map()
+  def response_for_decision(%Decision{} = decision, id \\ nil, opts \\ []) do
+    MCP.Gateway.response_for_decision(decision, id, opts)
+  end
+
+  @doc "Start the v2 result stream sanitizer."
+  @spec stream_result(Context.t() | map() | keyword(), keyword()) :: SigilGuard.Runtime.Stream.t()
+  def stream_result(context \\ %{}, opts \\ []), do: MCP.Gateway.stream_result(context, opts)
+
+  @doc "Guard one result stream chunk using the v2 tuple shape."
+  @spec guarded_result_chunk(SigilGuard.Runtime.Stream.t(), String.t(), keyword()) ::
+          {SigilGuard.Runtime.Stream.t(),
+           {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
+  def guarded_result_chunk(stream, chunk, opts \\ []),
+    do: MCP.Gateway.guarded_result_chunk(stream, chunk, opts)
+
+  @doc "Flush a guarded result stream using the v2 tuple shape."
+  @spec finish_guarded_result_stream(SigilGuard.Runtime.Stream.t(), keyword()) ::
+          {SigilGuard.Runtime.Stream.t(),
+           {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
+  def finish_guarded_result_stream(stream, opts \\ []),
+    do: MCP.Gateway.finish_guarded_result_stream(stream, opts)
+
   defp resolve_manifest(nil, opts) do
     if require_manifest?(opts) do
       {:error, :unknown_manifest}
@@ -112,6 +186,19 @@ defmodule SigilGuard.ToolGateway do
     case manifest_entry(tool, opts) do
       {:ok, entry} -> normalize_manifest_entry(tool, entry)
       :error -> maybe_allow_missing_manifest(opts)
+    end
+  end
+
+  defp request_action_digest(opts) do
+    case Keyword.fetch(opts, :request_action_digest) do
+      {:ok, digest} when is_binary(digest) ->
+        if digest =~ ~r/^[0-9a-f]{64}$/, do: :ok, else: {:error, :invalid_payload}
+
+      {:ok, _} ->
+        {:error, :invalid_payload}
+
+      :error ->
+        :ok
     end
   end
 
@@ -545,6 +632,30 @@ defmodule SigilGuard.ToolGateway do
     %{decision | audit_metadata: metadata}
   end
 
+  defp put_result_binding_metadata(%Decision{} = decision, opts) do
+    metadata =
+      decision.audit_metadata
+      |> maybe_put_request_action_digest(Keyword.get(opts, :request_action_digest))
+      |> Map.put(:scanner_summary, %{
+        hit_count: length(decision.hits),
+        indicator_count: length(decision.indicators),
+        indicator_ids: Enum.map(decision.indicators, & &1.id)
+      })
+      |> Map.put(:quarantine_status, quarantine_status(decision))
+
+    %{decision | audit_metadata: metadata}
+  end
+
+  defp maybe_put_request_action_digest(metadata, digest) when is_binary(digest),
+    do: Map.put(metadata, :request_action_digest, digest)
+
+  defp maybe_put_request_action_digest(metadata, _), do: metadata
+
+  defp quarantine_status(%Decision{action: :quarantine}), do: :quarantined
+  defp quarantine_status(%Decision{verdict: {:confirm, _}, indicators: [_ | _]}), do: :confirm
+  defp quarantine_status(%Decision{indicators: [_ | _]}), do: :suspicious
+  defp quarantine_status(_), do: :safe
+
   defp request_context(request, context) do
     tool = tool_name(request)
     action = action_name(request)
@@ -561,8 +672,36 @@ defmodule SigilGuard.ToolGateway do
     |> Context.new()
   end
 
+  defp result_context(result, context) do
+    tool = tool_name(result)
+    action = action_name(result)
+
+    %{
+      phase: :tool_result,
+      origin: :tool,
+      sink: :model,
+      tool: context_field(tool),
+      action: action_field(action, tool),
+      mcp_server: context_field(mcp_server(result))
+    }
+    |> Map.merge(context_overrides(context))
+    |> Context.new()
+  end
+
   defp request_payload(request) do
     payload = strip_guard_metadata(request)
+    tool = tool_name(payload)
+    action = action_name(payload)
+
+    %{
+      tool: context_field(tool),
+      action: action_field(action, tool),
+      text: text_payload(payload)
+    }
+  end
+
+  defp result_payload(result) do
+    payload = strip_guard_metadata(result)
     tool = tool_name(payload)
     action = action_name(payload)
 
@@ -697,6 +836,9 @@ defmodule SigilGuard.ToolGateway do
 
   defp invalid_payload_field?(@invalid_payload_field), do: true
   defp invalid_payload_field?(_), do: false
+
+  defp executable?(%Decision{verdict: :allowed, action: action}), do: action in [:allow, :redact]
+  defp executable?(%Decision{}), do: false
 
   defp context_overrides(%Context{} = context), do: Map.from_struct(context)
 
