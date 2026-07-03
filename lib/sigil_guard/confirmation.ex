@@ -14,15 +14,17 @@ defmodule SigilGuard.Confirmation do
   with `SigilGuard.ReplayStore`.
   """
 
+  alias SigilGuard.Attestation.Digest
   alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.ReplayStore
 
-  @version 1
-  @token_type "sigil_guard.confirmation.v1"
+  @version 2
+  @token_type "sigil_guard.confirmation.v2"
   @default_ttl_ms 300_000
   @min_key_bytes 16
   @sha256_regex ~r/^[0-9a-f]{64}$/
+  @nonce_regex ~r/^[0-9a-f]{32}$/
 
   @type claims :: %{
           required(String.t()) => String.t() | integer()
@@ -94,11 +96,13 @@ defmodule SigilGuard.Confirmation do
          {:ok, actor} <- issue_actor(context, opts),
          {:ok, nonce} <- issue_nonce(opts),
          {:ok, manifest_digest} <- issue_manifest_digest(opts),
-         {:ok, action_digest} <- fetch_action_digest(payload, context) do
+         {:ok, digests} <- confirmation_digests(payload, context) do
       claims =
         build_claims(decision, %{
           actor: actor,
-          action_digest: action_digest,
+          action_digest: digests.action_digest,
+          payload_digest: digests.payload_digest,
+          context_digest: digests.context_digest,
           manifest_digest: manifest_digest,
           issued_at: DateTime.to_iso8601(now),
           expires_at: expires_at(now, ttl_ms),
@@ -155,6 +159,8 @@ defmodule SigilGuard.Confirmation do
       "alg" => "HS256",
       "actor" => attrs.actor,
       "action_digest" => attrs.action_digest,
+      "payload_digest" => attrs.payload_digest,
+      "context_digest" => attrs.context_digest,
       "decision" => "confirm",
       "action" => Atom.to_string(decision.action),
       "reason" => decision.reason || "",
@@ -170,8 +176,8 @@ defmodule SigilGuard.Confirmation do
   defp maybe_put_manifest_digest(claims, digest), do: Map.put(claims, "manifest_digest", digest)
 
   defp encode_token(claims, key) do
-    body = Jason.encode!(claims)
-    signature = sign_claims(claims, key)
+    body = canonical_bytes(claims)
+    signature = sign_bytes(body, key)
 
     [
       Base.url_encode64(body, padding: false),
@@ -186,6 +192,7 @@ defmodule SigilGuard.Confirmation do
       [body_b64u, signature_b64u] ->
         with {:ok, body} <- decode_b64u(body_b64u),
              {:ok, claims} <- Jason.decode(body),
+             :ok <- validate_canonical_body(body, claims),
              {:ok, signature} <- decode_b64u(signature_b64u) do
           {:ok, claims, signature}
         else
@@ -200,7 +207,10 @@ defmodule SigilGuard.Confirmation do
   defp decode_b64u(value), do: Base.url_decode64(value, padding: false)
 
   defp verify_signature(claims, signature, key) do
-    expected = sign_claims(claims, key)
+    expected =
+      claims
+      |> canonical_bytes()
+      |> sign_bytes(key)
 
     if secure_compare(expected, signature) do
       :ok
@@ -209,28 +219,62 @@ defmodule SigilGuard.Confirmation do
     end
   end
 
-  defp sign_claims(claims, key) do
-    :crypto.mac(:hmac, :sha256, key, canonical_bytes(claims))
+  defp validate_canonical_body(body, claims) do
+    if secure_compare(body, canonical_bytes(claims)), do: :ok, else: {:error, :invalid_token}
   end
 
-  defp validate_claims(%{
-         "v" => @version,
-         "typ" => @token_type,
-         "alg" => "HS256",
-         "actor" => actor,
-         "action_digest" => digest,
-         "decision" => "confirm",
-         "action" => action,
-         "issued_at" => issued_at,
-         "expires_at" => expires_at,
-         "nonce" => nonce
-       })
-       when is_binary(actor) and is_binary(digest) and is_binary(action) and
-              is_binary(issued_at) and is_binary(expires_at) and is_binary(nonce) do
-    :ok
+  defp sign_bytes(bytes, key), do: :crypto.mac(:hmac, :sha256, key, bytes)
+
+  defp validate_claims(
+         %{
+           "v" => @version,
+           "typ" => @token_type,
+           "alg" => "HS256",
+           "decision" => "confirm"
+         } = claims
+       ) do
+    with {:ok, fields} <- claim_fields(claims),
+         :ok <- validate_claim_digests(fields) do
+      validate_claim_nonce(fields.nonce)
+    end
   end
 
   defp validate_claims(_), do: {:error, :invalid_token}
+
+  defp claim_fields(claims) do
+    fields = %{
+      actor: Map.get(claims, "actor"),
+      action: Map.get(claims, "action"),
+      action_digest: Map.get(claims, "action_digest"),
+      payload_digest: Map.get(claims, "payload_digest"),
+      context_digest: Map.get(claims, "context_digest"),
+      issued_at: Map.get(claims, "issued_at"),
+      expires_at: Map.get(claims, "expires_at"),
+      nonce: Map.get(claims, "nonce")
+    }
+
+    if Enum.all?(fields, fn {_, value} -> is_binary(value) end) do
+      {:ok, fields}
+    else
+      {:error, :invalid_token}
+    end
+  end
+
+  defp validate_claim_digests(fields) do
+    if valid_sha256?(fields.action_digest) and valid_sha256?(fields.payload_digest) and
+         valid_sha256?(fields.context_digest) do
+      :ok
+    else
+      {:error, :invalid_token}
+    end
+  end
+
+  defp validate_claim_nonce(nonce) do
+    if valid_nonce_claim?(nonce), do: :ok, else: {:error, :invalid_token}
+  end
+
+  defp valid_sha256?(value), do: value =~ @sha256_regex
+  defp valid_nonce_claim?(nonce), do: nonce =~ @nonce_regex
 
   defp validate_expiry(%{"expires_at" => expires_at}, opts) do
     with {:ok, now} <- issue_now(opts),
@@ -239,13 +283,20 @@ defmodule SigilGuard.Confirmation do
     end
   end
 
-  defp validate_digest(%{"action_digest" => digest} = claims, payload, context, opts) do
-    with {:ok, expected} <- fetch_action_digest(payload, context) do
-      if secure_compare(expected, digest) do
-        validate_manifest_digest(claims, opts)
-      else
-        {:error, :digest_mismatch}
-      end
+  defp validate_digest(claims, payload, context, opts) do
+    with {:ok, expected} <- confirmation_digests(payload, context),
+         :ok <- validate_digest_claim(claims, "action_digest", expected.action_digest),
+         :ok <- validate_digest_claim(claims, "payload_digest", expected.payload_digest),
+         :ok <- validate_digest_claim(claims, "context_digest", expected.context_digest) do
+      validate_manifest_digest(claims, opts)
+    end
+  end
+
+  defp validate_digest_claim(claims, key, expected) do
+    case Map.fetch(claims, key) do
+      {:ok, ^expected} -> :ok
+      {:ok, digest} when is_binary(digest) -> {:error, :digest_mismatch}
+      _ -> {:error, :invalid_token}
     end
   end
 
@@ -267,7 +318,7 @@ defmodule SigilGuard.Confirmation do
   end
 
   defp maybe_consume_nonce(claims, opts) do
-    if Keyword.get(opts, :consume, false) do
+    if Keyword.get(opts, :consume, true) do
       consume_nonce(claims, opts)
     else
       :ok
@@ -310,8 +361,31 @@ defmodule SigilGuard.Confirmation do
 
   defp issue_nonce(opts) do
     case Keyword.get_lazy(opts, :nonce, &generate_nonce/0) do
-      nonce when is_binary(nonce) and nonce != "" -> {:ok, nonce}
-      _ -> {:error, :invalid_nonce}
+      nonce when is_binary(nonce) ->
+        if nonce =~ @nonce_regex, do: {:ok, nonce}, else: {:error, :invalid_nonce}
+
+      _ ->
+        {:error, :invalid_nonce}
+    end
+  end
+
+  defp confirmation_digests(payload, context) do
+    context = Context.new(context)
+    statement_type = context.phase
+
+    with {:ok, action_digest} <- fetch_action_digest(payload, context),
+         {:ok, payload_digest} <- Digest.payload_digest(payload),
+         {:ok, context_digest} <- Digest.context_digest(statement_type, context) do
+      {:ok,
+       %{
+         action_digest: action_digest,
+         payload_digest: payload_digest,
+         context_digest: context_digest
+       }}
+    else
+      {:error, :unsupported_number_range} -> {:error, :invalid_payload}
+      {:error, :unknown_statement_type} -> {:error, :invalid_payload}
+      {:error, reason} -> {:error, reason}
     end
   end
 

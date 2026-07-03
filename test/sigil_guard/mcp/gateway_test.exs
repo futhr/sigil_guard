@@ -227,7 +227,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                  decision,
                  @confirmation_key,
                  now: @now,
-                 nonce: "gateway-confirm-nonce"
+                 nonce: String.duplicate("b", 32)
                )
 
       [body_b64u, _] = String.split(token, ".", parts: 2)
@@ -282,7 +282,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                  @confirmation_key,
                  public_keys: public_keys(),
                  now: @now,
-                 nonce: "signed-confirm-nonce"
+                 nonce: String.duplicate("c", 32)
                )
 
       assert {:ok, confirmed} =
@@ -328,7 +328,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                  decision,
                  @confirmation_key,
                  now: @now,
-                 nonce: "gateway-result-confirm-nonce"
+                 nonce: String.duplicate("d", 32)
                )
 
       [body_b64u, _] = String.split(token, ".", parts: 2)
@@ -1453,7 +1453,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                decision,
                @confirmation_key,
                now: @now,
-               nonce: "gateway-confirm-nonce",
+               nonce: String.duplicate("e", 32),
                ttl_ms: 300_000
              )
 
@@ -1470,7 +1470,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                decision,
                @confirmation_key,
                now: @now,
-               nonce: "gateway-result-confirm-nonce",
+               nonce: String.duplicate("f", 32),
                ttl_ms: 300_000
              )
 
@@ -1500,7 +1500,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                @confirmation_key,
                public_keys: public_keys(),
                now: @now,
-               nonce: "signed-gateway-confirm-nonce",
+               nonce: String.duplicate("1", 32),
                ttl_ms: 300_000
              )
 

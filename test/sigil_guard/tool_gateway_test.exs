@@ -252,7 +252,7 @@ defmodule SigilGuard.ToolGatewayTest do
                  @confirmation_key,
                  now: @now,
                  manifest: decision.audit_metadata.manifest_digest,
-                 nonce: "tool-gateway-confirmation-nonce"
+                 nonce: String.duplicate("9", 32)
                )
 
       confirmed =
@@ -836,7 +836,7 @@ defmodule SigilGuard.ToolGatewayTest do
                  @confirmation_key,
                  now: @now,
                  manifest: old_decision.audit_metadata.manifest_digest,
-                 nonce: "tool-gateway-stale-manifest-nonce"
+                 nonce: String.duplicate("a", 32)
                )
 
       assert {:ok, [_]} =
