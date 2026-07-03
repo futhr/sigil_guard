@@ -68,14 +68,14 @@ trailers (rule 10); the maintainer pushes manually.
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
-| M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
+| M2 - Embedded trust bundles | 16 | 1 | 0 | 15 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **71** | **0** | **157** |
+| **Total** | **228** | **72** | **0** | **156** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -480,7 +480,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
 > negative verification matrix green; no-network test green for all source
 > classes and `dev_bundle/1`.
 
-- [ ] M2.01 `SigilGuard.TrustBundle` public module.
+- [x] M2.01 `SigilGuard.TrustBundle` public module.
   - Spec: `docs/specs/SP.02-embedded-trust-bundles.md` - Public API Sketch.
   - AC: `load/1,2`, `verify/2`, `dev_bundle/1`, and section accessors
     `patterns/1`, `policies/1`, `tools/1`, `identity_issuers/1` (empty list

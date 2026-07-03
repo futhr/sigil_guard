@@ -193,6 +193,9 @@ defmodule SigilGuard.MixProject do
           SigilGuard.ConfigError,
           SigilGuard.ReplayStore,
           SigilGuard.Telemetry
+        ],
+        "Trust Bundles": [
+          SigilGuard.TrustBundle
         ]
       ],
       source_ref: "v#{@version}",
