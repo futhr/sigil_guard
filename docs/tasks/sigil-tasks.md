@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 16 | 0 | 3 |
+| M1 - Core groundwork | 19 | 17 | 0 | 2 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **68** | **0** | **160** |
+| **Total** | **228** | **69** | **0** | **159** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -454,7 +454,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `:digest_mismatch` (three classes); a mutated manifest fails
     `:manifest_digest_mismatch`.
   - Tests: tamper (all four digest classes).
-- [ ] M1.17 Malformed-envelope and malformed-statement negatives.
+- [x] M1.17 Malformed-envelope and malformed-statement negatives.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Error Handling.
   - AC: fuzz-style malformed inputs (non-map envelope, non-string
     payloadType, empty or mistyped `signatures`, truncated base64,

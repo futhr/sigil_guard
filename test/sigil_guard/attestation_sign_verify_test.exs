@@ -248,6 +248,46 @@ defmodule SigilGuard.AttestationSignVerifyTest do
       assert Attestation.verify(%{"payload" => "x"}, %{"trusted" => TrustedSigner.public_key()}) ==
                {:error, :invalid_envelope}
     end
+
+    test "returns taxonomy atoms for malformed envelope shapes" do
+      assert {:ok, statement} = valid_statement()
+      assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
+      trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      cases = [
+        {"non-map envelope", "bad", :invalid_envelope},
+        {"non-string payloadType", %{envelope | "payloadType" => 42}, :invalid_envelope},
+        {"wrong payloadType", %{envelope | "payloadType" => "application/json"},
+         :invalid_payload_type},
+        {"empty signatures", %{envelope | "signatures" => []}, :invalid_envelope},
+        {"mistyped signatures", %{envelope | "signatures" => "bad"}, :invalid_envelope},
+        {"mistyped signature entry", %{envelope | "signatures" => ["bad"]}, :invalid_envelope},
+        {"truncated payload base64", %{envelope | "payload" => "not base64!"}, :invalid_base64},
+        {
+          "truncated signature base64",
+          %{envelope | "signatures" => [%{"keyid" => "trusted", "sig" => "not base64!"}]},
+          :invalid_base64
+        }
+      ]
+
+      for {label, malformed, reason} <- cases do
+        assert Attestation.verify(malformed, trust_material, now: @now) == {:error, reason},
+               label
+      end
+    end
+
+    test "returns taxonomy atoms for signed non-Statement JSON payloads" do
+      trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      assert Attestation.verify(signed_payload!(~s({"bad":true})), trust_material, now: @now) ==
+               {:error, :invalid_profile}
+
+      assert Attestation.verify(signed_payload!(~s(["bad"])), trust_material, now: @now) ==
+               {:error, :invalid_profile}
+
+      assert Attestation.verify(signed_payload!("not json"), trust_material, now: @now) ==
+               {:error, :invalid_profile}
+    end
   end
 
   defp valid_statement(predicate_overrides \\ %{}, digest_opts \\ []) do
@@ -269,6 +309,11 @@ defmodule SigilGuard.AttestationSignVerifyTest do
       )
 
     Statement.build(predicate_type, predicate, digests)
+  end
+
+  defp signed_payload!(payload) do
+    {:ok, envelope} = Envelope.sign(payload, TrustedSigner, keyid: "trusted")
+    envelope
   end
 
   defmodule TrustedSigner do
