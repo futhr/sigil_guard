@@ -1,6 +1,7 @@
 defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
   use ExUnit.Case, async: false
 
+  alias __MODULE__.OldBundleSigner
   alias __MODULE__.SuccessorSigner
   alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Canonical.JCS
@@ -156,6 +157,41 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
     assert TrustBundle.load({:map, genesis}, now: @now) == {:error, :sequence_below_floor}
   end
 
+  test "signer compromise ceremony revokes old key and keeps revocation irreversible" do
+    genesis = read_json(["rotation", "genesis.json"])
+    successor = read_json(["rotation", "successor.json"])
+    genesis_document = envelope_document(genesis)
+    old_bundle_keyid = read_json(["rotation", "expected.json"])["keyids"]["bundle"]
+
+    revoking_successor =
+      successor
+      |> envelope_document()
+      |> Map.put("revocations", [
+        %{"kind" => "key", "id" => old_bundle_keyid, "revoked_at" => "2026-07-02T12:00:00.000Z"}
+      ])
+      |> signed_successor()
+
+    assert {:ok, %TrustBundle{sequence: 1}} = TrustBundle.load({:map, genesis}, now: @now)
+
+    assert {:ok, %TrustBundle{sequence: 2, root_version: 2}} =
+             TrustBundle.load({:map, revoking_successor}, now: @now)
+
+    assert Cache.floor("example-org-trust") == 2
+    assert {:error, _} = TrustBundle.load({:map, genesis}, now: @now)
+
+    reauthorized_old_key =
+      successor
+      |> envelope_document()
+      |> Map.drop(["revocations"])
+      |> Map.put("sequence", "3")
+      |> Map.put("rollback_floor", "3")
+      |> put_in(["roles", "delegates"], [old_bundle_role(old_bundle_keyid)])
+      |> put_in(["keys", old_bundle_keyid], genesis_document["keys"][old_bundle_keyid])
+      |> signed_old_bundle()
+
+    assert TrustBundle.verify(reauthorized_old_key, now: @now) == {:error, :revoked_key}
+  end
+
   defp read_json(path) when is_list(path) do
     path
     |> then(&Path.join([@fixtures | &1]))
@@ -181,8 +217,16 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
   end
 
   defp signed_successor(document) do
+    signed_document(document, SuccessorSigner)
+  end
+
+  defp signed_old_bundle(document) do
+    signed_document(document, OldBundleSigner)
+  end
+
+  defp signed_document(document, signer) do
     {:ok, payload} = JCS.encode(document)
-    {:ok, envelope} = Envelope.sign_many(payload, [SuccessorSigner])
+    {:ok, envelope} = Envelope.sign_many(payload, [signer])
     envelope
   end
 
@@ -211,6 +255,15 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
     end)
   end
 
+  defp old_bundle_role(keyid) do
+    %{
+      "name" => "bundle",
+      "keyids" => [keyid],
+      "threshold" => 1,
+      "expires_at" => "2026-10-01T12:00:00.000Z"
+    }
+  end
+
   defp old_root_signature(rotation) do
     expected = read_json(["rotation", "expected.json"])
     old_root_keyid = expected["keyids"]["root"]
@@ -236,6 +289,25 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
   defmodule SuccessorSigner do
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x99>>, 32)
+
+    @impl SigilGuard.Signer
+    def sign(message), do: :crypto.sign(:eddsa, :none, message, [private_key(), :ed25519])
+
+    @impl SigilGuard.Signer
+    def public_key do
+      {public_key, _} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+      public_key
+    end
+
+    defp private_key do
+      {_, private_key} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+      private_key
+    end
+  end
+
+  defmodule OldBundleSigner do
+    @behaviour SigilGuard.Signer
+    @seed :binary.copy(<<0xBB>>, 32)
 
     @impl SigilGuard.Signer
     def sign(message), do: :crypto.sign(:eddsa, :none, message, [private_key(), :ed25519])

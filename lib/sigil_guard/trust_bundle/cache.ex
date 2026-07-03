@@ -54,7 +54,7 @@ defmodule SigilGuard.TrustBundle.Cache do
     ensure_table()
 
     case :ets.lookup(@table, bundle_id) do
-      [{^bundle_id, bundle, _, _, _}] -> {:ok, bundle}
+      [{^bundle_id, bundle, _, _, _, _}] -> {:ok, bundle}
       [] -> :error
     end
   end
@@ -65,9 +65,20 @@ defmodule SigilGuard.TrustBundle.Cache do
     ensure_table()
 
     case :ets.lookup(@table, bundle_id) do
-      [{^bundle_id, _, _, nil, _}] -> :error
-      [{^bundle_id, _, _, pin, _}] -> {:ok, pin}
+      [{^bundle_id, _, _, nil, _, _}] -> :error
+      [{^bundle_id, _, _, pin, _, _}] -> {:ok, pin}
       [] -> :error
+    end
+  end
+
+  @doc false
+  @spec revoked_keyids(bundle_id :: String.t()) :: MapSet.t(String.t())
+  def revoked_keyids(bundle_id) when is_binary(bundle_id) do
+    ensure_table()
+
+    case :ets.lookup(@table, bundle_id) do
+      [{^bundle_id, _, _, _, _, revoked}] -> revoked
+      [] -> MapSet.new()
     end
   end
 
@@ -79,7 +90,7 @@ defmodule SigilGuard.TrustBundle.Cache do
     ensure_table()
 
     case :ets.lookup(@table, bundle_id) do
-      [{^bundle_id, _, _, _, digests}] -> Map.fetch(digests, root_version)
+      [{^bundle_id, _, _, _, digests, _}] -> Map.fetch(digests, root_version)
       [] -> :error
     end
   end
@@ -99,7 +110,7 @@ defmodule SigilGuard.TrustBundle.Cache do
 
     case :ets.lookup(@table, bundle_id) do
       [] -> put_new(bundle)
-      [{^bundle_id, cached, floor, _, _}] -> put_existing(bundle, cached, floor)
+      [{^bundle_id, cached, floor, _, _, revoked}] -> put_existing(bundle, cached, floor, revoked)
     end
   end
 
@@ -113,7 +124,7 @@ defmodule SigilGuard.TrustBundle.Cache do
     ensure_table()
 
     case :ets.lookup(@table, bundle_id) do
-      [{^bundle_id, _, floor, _, _}] -> floor
+      [{^bundle_id, _, floor, _, _, _}] -> floor
       [] -> 0
     end
   end
@@ -131,13 +142,14 @@ defmodule SigilGuard.TrustBundle.Cache do
 
     :ets.insert(
       @table,
-      {bundle.bundle_id, bundle, floor, build_root_pin(bundle), rotation_digests(bundle)}
+      {bundle.bundle_id, bundle, floor, build_root_pin(bundle), rotation_digests(bundle),
+       collect_revoked_keyids(bundle)}
     )
 
     {:ok, bundle}
   end
 
-  defp put_existing(bundle, cached, floor) do
+  defp put_existing(bundle, cached, floor, revoked) do
     cond do
       same_snapshot?(bundle, cached) ->
         {:ok, cached}
@@ -156,7 +168,8 @@ defmodule SigilGuard.TrustBundle.Cache do
 
         :ets.insert(
           @table,
-          {bundle.bundle_id, bundle, accepted, build_root_pin(cached), rotation_digests(bundle)}
+          {bundle.bundle_id, bundle, accepted, build_root_pin(cached), rotation_digests(bundle),
+           MapSet.union(revoked, collect_revoked_keyids(bundle))}
         )
 
         {:ok, bundle}
@@ -221,5 +234,13 @@ defmodule SigilGuard.TrustBundle.Cache do
       {:ok, public_key} = Base.url_decode64(encoded, padding: false)
       {keyid, public_key}
     end)
+  end
+
+  defp collect_revoked_keyids(%TrustBundle{document: document}) do
+    document
+    |> Map.get("revocations", [])
+    |> Enum.filter(&(Map.get(&1, "kind") == "key"))
+    |> Enum.map(&Map.fetch!(&1, "id"))
+    |> MapSet.new()
   end
 end

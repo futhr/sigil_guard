@@ -372,7 +372,7 @@ defmodule SigilGuard.TrustBundle.Verify do
       |> Enum.map(&Map.fetch!(&1, "id"))
       |> MapSet.new()
 
-    {:ok, revoked}
+    {:ok, MapSet.union(Cache.revoked_keyids(Map.fetch!(document, "bundle_id")), revoked)}
   end
 
   defp threshold(role, opts) do
