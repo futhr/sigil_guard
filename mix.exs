@@ -196,7 +196,8 @@ defmodule SigilGuard.MixProject do
         ],
         "Trust Bundles": [
           SigilGuard.TrustBundle,
-          SigilGuard.TrustBundle.Schema
+          SigilGuard.TrustBundle.Schema,
+          SigilGuard.TrustBundle.Verify
         ]
       ],
       source_ref: "v#{@version}",

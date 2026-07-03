@@ -10,6 +10,8 @@ defmodule SigilGuard.TrustBundle do
   accessors from SP.02.
   """
 
+  alias SigilGuard.TrustBundle.Verify
+
   @typedoc "Closed set of supported trust-bundle loading sources."
   @type source ::
           :none
@@ -99,12 +101,14 @@ defmodule SigilGuard.TrustBundle do
   @doc """
   Verify a decoded DSSE trust-bundle envelope.
 
-  Later M2 tasks replace this fail-closed placeholder with the SP.02 schema,
-  threshold, expiry, revocation, and rollback pipeline.
+  This verifies the envelope, schema, bundle role, signature threshold,
+  revocations, and freshness checks implemented in SP.02. Loading sources,
+  cache rollback checks, quarantine records, and rotation-chain walking are
+  staged in later trust-bundle modules.
   """
   @spec verify(envelope :: map(), opts :: keyword()) :: {:ok, t()} | {:error, verify_error()}
   def verify(envelope, opts \\ [])
-  def verify(_, opts) when is_list(opts), do: {:error, :invalid_bundle_format}
+  def verify(envelope, opts) when is_list(opts), do: Verify.verify(envelope, opts)
   def verify(_, _), do: {:error, :invalid_bundle_format}
 
   @doc """

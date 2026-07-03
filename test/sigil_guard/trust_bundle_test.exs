@@ -37,13 +37,13 @@ defmodule SigilGuard.TrustBundleTest do
       assert TrustBundle.identity_issuers(bundle) == []
     end
 
-    test "load source constructors fail closed until verification is installed" do
+    test "load source constructors route decoded envelopes to verification" do
       envelope = %{"payload" => "encoded"}
 
-      assert TrustBundle.load({:map, envelope}) == {:error, :invalid_bundle_format}
+      assert TrustBundle.load({:map, envelope}) == {:error, :invalid_envelope}
 
       assert TrustBundle.load({:binary, Jason.encode!(envelope)}) ==
-               {:error, :invalid_bundle_format}
+               {:error, :invalid_envelope}
 
       assert TrustBundle.load(:none) == {:error, :invalid_source}
       assert TrustBundle.load({:binary, "not json"}) == {:error, :invalid_source}
@@ -54,9 +54,9 @@ defmodule SigilGuard.TrustBundleTest do
       assert TrustBundle.load({:file, "/tmp/bundle.json"}, :bad_opts) == {:error, :invalid_source}
     end
 
-    test "verify and dev bundle APIs fail closed" do
-      assert TrustBundle.verify(%{"payload" => "encoded"}) == {:error, :invalid_bundle_format}
-      assert TrustBundle.verify("bad") == {:error, :invalid_bundle_format}
+    test "verify routes malformed envelopes through SP.01 errors and dev bundle fails closed" do
+      assert TrustBundle.verify(%{"payload" => "encoded"}) == {:error, :invalid_envelope}
+      assert TrustBundle.verify("bad") == {:error, :invalid_envelope}
       assert TrustBundle.verify(%{}, :bad_opts) == {:error, :invalid_bundle_format}
 
       assert TrustBundle.dev_bundle(seed: :crypto.strong_rand_bytes(32)) ==
