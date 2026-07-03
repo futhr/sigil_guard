@@ -245,9 +245,9 @@ defmodule SigilGuard.ToolGatewayTest do
       assert {:confirm, _} = decision.verdict
 
       assert {:ok, token} =
-               Confirmation.issue(
-                 request_payload(),
-                 request_context(),
+               ToolGateway.issue_confirmation(
+                 request(),
+                 sandbox_context(),
                  decision,
                  @confirmation_key,
                  now: @now,
@@ -255,19 +255,74 @@ defmodule SigilGuard.ToolGatewayTest do
                  nonce: String.duplicate("9", 32)
                )
 
+      confirmed_request = Attestation.attach_confirmation(request(), token)
+
       confirmed =
-        ToolGateway.guard_request(request(), sandbox_context(),
+        ToolGateway.guard_request(confirmed_request, sandbox_context(),
           manifests: %{"repo_file_write" => suspicious_manifest()},
           require_manifest: true,
-          confirmation_token: token,
           confirmation_key: @confirmation_key,
-          consume_confirmation: false,
           now: @now
         )
 
       assert confirmed.verdict == :allowed
       assert confirmed.reason == "Confirmation token accepted"
       assert confirmed.audit_metadata.confirmation_status == :accepted
+
+      replay =
+        ToolGateway.guard_request(confirmed_request, sandbox_context(),
+          manifests: %{"repo_file_write" => suspicious_manifest()},
+          require_manifest: true,
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert replay.verdict == :blocked
+      assert replay.audit_metadata.confirmation_reason == :replay_detected
+    end
+
+    test "returns typed errors when issuing confirmations fails" do
+      decision = %Decision{
+        verdict: :allowed,
+        action: :allow,
+        phase: :tool_request,
+        risk_level: :low,
+        trust_level: :high
+      }
+
+      assert ToolGateway.issue_confirmation(
+               request(),
+               sandbox_context(),
+               decision,
+               @confirmation_key
+             ) ==
+               {:error, :not_confirmable}
+
+      assert ToolGateway.issue_confirmation(request(), sandbox_context(), decision, "short") ==
+               {:error, :invalid_key}
+
+      confirmable = %Decision{
+        decision
+        | verdict: {:confirm, "review"},
+          action: :confirm,
+          reason: "review"
+      }
+
+      assert ToolGateway.issue_confirmation(
+               request(),
+               sandbox_context(),
+               confirmable,
+               @confirmation_key,
+               direction: :bad
+             ) == {:error, :invalid_payload}
+
+      assert ToolGateway.issue_confirmation(
+               request(),
+               sandbox_context(),
+               confirmable,
+               @confirmation_key,
+               nonce: "bad"
+             ) == {:error, :invalid_nonce}
     end
 
     test "blocks malformed confirmation options for suspicious-parameter decisions" do
@@ -1143,6 +1198,46 @@ defmodule SigilGuard.ToolGatewayTest do
       assert decision.action == :quarantine
       assert decision.audit_metadata.quarantine_status == :quarantined
       assert :ignore_instructions in decision.audit_metadata.scanner_summary.indicator_ids
+    end
+
+    test "issues result confirmations and releases only sanitized output" do
+      decision =
+        ToolGateway.guard_result(
+          quarantined_result(),
+          [trust_level: :high],
+          request_action_digest: @request_action_digest
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.action == :quarantine
+
+      assert {:ok, token} =
+               ToolGateway.issue_confirmation(
+                 quarantined_result(),
+                 [trust_level: :high],
+                 decision,
+                 @confirmation_key,
+                 direction: :result,
+                 now: @now,
+                 nonce: String.duplicate("b", 32)
+               )
+
+      confirmed_result = Attestation.attach_confirmation(quarantined_result(), token)
+
+      confirmed =
+        ToolGateway.guard_result(
+          confirmed_result,
+          [trust_level: :high],
+          request_action_digest: @request_action_digest,
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert confirmed.verdict == :allowed
+      assert confirmed.action == :redact
+      assert confirmed.reason == "Confirmation token accepted; sanitized result released"
+      assert confirmed.audit_metadata.release_status == :confirmed_sanitized
+      refute confirmed.sanitized_text =~ "system prompt"
     end
 
     test "keeps guarded result and stream tuple shapes" do

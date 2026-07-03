@@ -49,6 +49,15 @@ defmodule SigilGuard.ToolGateway do
 
   @type attest_error :: Attestation.from_decision_error() | Attestation.sign_error()
 
+  @type confirmation_issue_error ::
+          :invalid_key
+          | :not_confirmable
+          | :invalid_ttl
+          | :invalid_actor
+          | :invalid_nonce
+          | :invalid_now
+          | :invalid_payload
+
   @doc """
   Guard a tool request using manifest checks before runtime policy evaluation.
 
@@ -79,7 +88,7 @@ defmodule SigilGuard.ToolGateway do
       |> MCP.Gateway.guard_request(context, opts)
       |> put_manifest_metadata(capability)
       |> maybe_force_suspicious_confirmation(payload, request_context, capability, opts)
-      |> maybe_apply_confirmation(payload, request_context, opts)
+      |> maybe_apply_confirmation(payload, request_context, request, opts)
     else
       {:error, reason} -> deny(reason, payload, request_context)
     end
@@ -185,6 +194,34 @@ defmodule SigilGuard.ToolGateway do
   def attest_result(_, _, _), do: {:error, :invalid_payload}
 
   @doc """
+  Issue a v2 confirmation token for a confirm-required tool request or result.
+
+  Pass `direction: :request` (default) for tool calls and `direction: :result`
+  for tool output. The token is bound to the same normalized payload and context
+  shape used by `guard_request/3` or `guard_result/3`.
+  """
+  @spec issue_confirmation(
+          term(),
+          Context.t() | map() | keyword(),
+          Decision.t(),
+          binary(),
+          keyword()
+        ) ::
+          {:ok, String.t()} | {:error, confirmation_issue_error()}
+  def issue_confirmation(payload, context, %Decision{} = decision, key, opts \\ []) do
+    with {:ok, direction} <- confirmation_direction(opts) do
+      payload
+      |> confirmation_payload(direction)
+      |> Confirmation.issue(
+        confirmation_context(payload, context, direction),
+        decision,
+        key,
+        confirmation_issue_opts(opts)
+      )
+    end
+  end
+
+  @doc """
   Guard a tool result before it is returned to the model.
   """
   @spec guard_result(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
@@ -197,6 +234,7 @@ defmodule SigilGuard.ToolGateway do
         result
         |> MCP.Gateway.guard_result(context, opts)
         |> put_result_binding_metadata(opts)
+        |> maybe_apply_result_confirmation(payload, result_context, result, opts)
 
       {:error, reason} ->
         deny(reason, payload, result_context)
@@ -282,6 +320,41 @@ defmodule SigilGuard.ToolGateway do
 
       :error ->
         :ok
+    end
+  end
+
+  defp confirmation_direction(opts) do
+    case Keyword.get(opts, :direction, :request) do
+      direction when direction in [:request, :result] -> {:ok, direction}
+      _ -> {:error, :invalid_payload}
+    end
+  end
+
+  defp confirmation_payload(payload, :request), do: request_payload(payload)
+  defp confirmation_payload(payload, :result), do: result_payload(payload)
+
+  defp confirmation_context(payload, context, :request), do: request_context(payload, context)
+  defp confirmation_context(payload, context, :result), do: result_context(payload, context)
+
+  defp confirmation_issue_opts(opts) do
+    opts
+    |> Keyword.take([:actor, :ttl_ms, :now, :nonce])
+    |> maybe_put_issue_manifest(opts)
+  end
+
+  defp maybe_put_issue_manifest(issue_opts, opts) do
+    cond do
+      is_binary(Keyword.get(opts, :manifest)) ->
+        Keyword.put(issue_opts, :manifest, Keyword.fetch!(opts, :manifest))
+
+      match?(%CapabilityManifest{}, Keyword.get(opts, :manifest)) ->
+        Keyword.put(issue_opts, :manifest, Keyword.fetch!(opts, :manifest).digest)
+
+      is_binary(Keyword.get(opts, :manifest_digest)) ->
+        Keyword.put(issue_opts, :manifest, Keyword.fetch!(opts, :manifest_digest))
+
+      true ->
+        issue_opts
     end
   end
 
@@ -756,9 +829,10 @@ defmodule SigilGuard.ToolGateway do
          %Decision{verdict: {:confirm, _}} = decision,
          payload,
          context,
+         token_source,
          opts
        ) do
-    case confirmation_token(opts) do
+    case confirmation_token(opts, token_source) do
       {:ok, token} ->
         verify_confirmation(decision, payload, context, token, opts)
 
@@ -773,15 +847,29 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  defp maybe_apply_confirmation(%Decision{} = decision, _, _, _), do: decision
+  defp maybe_apply_confirmation(%Decision{} = decision, _, _, _, _), do: decision
 
-  defp confirmation_token(opts) do
+  defp maybe_apply_result_confirmation(
+         %Decision{verdict: {:confirm, _}} = decision,
+         payload,
+         context,
+         token_source,
+         opts
+       ) do
+    decision
+    |> maybe_apply_confirmation(payload, context, token_source, opts)
+    |> release_confirmed_result()
+  end
+
+  defp maybe_apply_result_confirmation(%Decision{} = decision, _, _, _, _), do: decision
+
+  defp confirmation_token(opts, token_source) do
     case Keyword.get(opts, :confirmation, :honor) do
       :off ->
         :off
 
       :honor ->
-        confirmation_token_option(opts)
+        confirmation_token_option(opts, token_source)
 
       true ->
         :error
@@ -794,11 +882,11 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  defp confirmation_token_option(opts) do
+  defp confirmation_token_option(opts, token_source) do
     case Keyword.fetch(opts, :confirmation_token) do
       {:ok, token} when is_binary(token) -> {:ok, token}
       {:ok, _} -> {:error, :invalid_confirmation_token}
-      :error -> :error
+      :error -> Attestation.fetch_confirmation(token_source)
     end
   end
 
@@ -855,6 +943,28 @@ defmodule SigilGuard.ToolGateway do
         audit_metadata: metadata
     }
   end
+
+  defp release_confirmed_result(
+         %Decision{
+           verdict: :allowed,
+           audit_metadata: %{quarantine_status: :quarantined} = metadata
+         } = decision
+       ) do
+    released_metadata =
+      Map.merge(metadata, %{
+        action: :redact,
+        release_status: :confirmed_sanitized
+      })
+
+    %{
+      decision
+      | action: :redact,
+        reason: "Confirmation token accepted; sanitized result released",
+        audit_metadata: released_metadata
+    }
+  end
+
+  defp release_confirmed_result(%Decision{} = decision), do: decision
 
   defp confirmation_failure_decision(%Decision{} = decision, reason) do
     metadata =
