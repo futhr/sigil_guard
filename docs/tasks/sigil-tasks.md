@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 13 | 0 | 9 |
+| M3 - Manifests, gateway, and agent trust | 22 | 14 | 0 | 8 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **100** | **0** | **128** |
+| **Total** | **228** | **101** | **0** | **127** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -771,7 +771,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     (confirmation/attestation opt combinations) with identical return
     shapes; parity tests cover every row.
   - Tests: parity suite (facade vs `ToolGateway`), negative.
-- [ ] M3.14 JSON-RPC error registry `-32050..-32056` (D19).
+- [x] M3.14 JSON-RPC error registry `-32050..-32056` (D19).
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - JSON-RPC Error
     Registry.
   - AC: v3 renumbers gateway rejection codes from v0.2's `-32001..-32003`

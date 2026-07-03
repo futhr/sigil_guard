@@ -1401,7 +1401,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert {:confirm, _} = decision.verdict
       assert response["id"] == "confirm-1"
-      assert response["error"]["code"] == -32_002
+      assert response["error"]["code"] == -32_051
       assert response["error"]["data"]["action_digest"] == decision.audit_metadata.action_digest
     end
   end

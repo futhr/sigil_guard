@@ -24,9 +24,13 @@ defmodule SigilGuard.ToolGateway.Base do
     :confirmation_token,
     "confirmation_token"
   ]
-  @blocked_code -32_001
-  @confirm_code -32_002
-  @quarantine_code -32_003
+  @blocked_code -32_050
+  @confirm_code -32_051
+  @quarantine_code -32_052
+  @manifest_drift_code -32_053
+  @unknown_manifest_code -32_054
+  @invalid_attestation_code -32_055
+  @sandbox_required_code -32_056
   @invalid_payload_field false
 
   @doc """
@@ -1023,15 +1027,25 @@ defmodule SigilGuard.ToolGateway.Base do
     }
   end
 
-  defp error_code(%Decision{action: :quarantine}), do: @quarantine_code
-  defp error_code(%Decision{verdict: {:confirm, _}}), do: @confirm_code
-  defp error_code(%Decision{}), do: @blocked_code
+  defp error_code(%Decision{} = decision) do
+    case error_kind(decision) do
+      :quarantined -> @quarantine_code
+      :confirmation_required -> @confirm_code
+      :manifest_drift -> @manifest_drift_code
+      :unknown_manifest -> @unknown_manifest_code
+      :invalid_attestation -> @invalid_attestation_code
+      :sandbox_required -> @sandbox_required_code
+      :blocked -> @blocked_code
+    end
+  end
 
   defp error_message(%Decision{action: :quarantine}), do: "SigilGuard quarantined MCP content"
   defp error_message(%Decision{verdict: {:confirm, _}}), do: "SigilGuard requires confirmation"
   defp error_message(%Decision{}), do: "SigilGuard blocked MCP content"
 
   defp error_data(%Decision{} = decision, opts) do
+    metadata = decision.audit_metadata || %{}
+
     base =
       %{
         "status" => error_status(decision),
@@ -1043,13 +1057,15 @@ defmodule SigilGuard.ToolGateway.Base do
         "hit_count" => length(decision.hits),
         "indicator_ids" => Enum.map(decision.indicators, &Atom.to_string(&1.id)),
         "content_hash" => decision.content_hash,
-        "action_digest" => decision.audit_metadata[:action_digest],
-        "scanner_error" => error_value(decision.audit_metadata[:scanner_error]),
-        "confirmation_status" => error_value(decision.audit_metadata[:confirmation_status]),
-        "confirmation_reason" => error_value(decision.audit_metadata[:confirmation_reason])
+        "action_digest" => metadata[:action_digest],
+        "evidence" => evidence_data(metadata[:evidence]),
+        "scanner_error" => error_value(metadata[:scanner_error]),
+        "confirmation_status" => error_value(metadata[:confirmation_status]),
+        "confirmation_reason" => error_value(metadata[:confirmation_reason])
       }
       |> Enum.reject(fn {_, value} -> is_nil(value) end)
       |> Map.new()
+      |> Map.merge(registry_data(error_kind(decision), decision, metadata))
 
     if Keyword.get(opts, :include_sanitized, false) and is_binary(decision.sanitized_text) do
       Map.put(base, "sanitized_text", decision.sanitized_text)
@@ -1058,9 +1074,111 @@ defmodule SigilGuard.ToolGateway.Base do
     end
   end
 
-  defp error_status(%Decision{action: :quarantine}), do: "quarantined"
-  defp error_status(%Decision{verdict: {:confirm, _}}), do: "confirmation_required"
-  defp error_status(%Decision{}), do: "blocked"
+  defp error_kind(%Decision{action: :quarantine}), do: :quarantined
+  defp error_kind(%Decision{verdict: {:confirm, _}}), do: :confirmation_required
+
+  defp error_kind(%Decision{audit_metadata: metadata}) when is_map(metadata) do
+    case metadata[:deny_reason] do
+      reason
+      when reason in [
+             :manifest_digest_mismatch,
+             :schema_digest_mismatch,
+             :suspicious_required_param
+           ] ->
+        :manifest_drift
+
+      reason when reason in [:unknown_manifest, :manifest_expired] ->
+        :unknown_manifest
+
+      :invalid_attestation ->
+        :invalid_attestation
+
+      :sandbox_required ->
+        :sandbox_required
+
+      _ ->
+        :blocked
+    end
+  end
+
+  defp error_kind(%Decision{}), do: :blocked
+
+  defp error_status(%Decision{} = decision) do
+    decision
+    |> error_kind()
+    |> Atom.to_string()
+  end
+
+  defp registry_data(:manifest_drift, _, metadata) do
+    %{
+      "tool" => metadata[:tool],
+      "server" => metadata[:mcp_server] || metadata[:server],
+      "expected_manifest_digest" =>
+        metadata[:expected_manifest_digest] || metadata[:manifest_digest],
+      "received_manifest_digest" => metadata[:received_manifest_digest],
+      "drifted_fields" => drifted_fields(metadata)
+    }
+    |> compact_data()
+  end
+
+  defp registry_data(:unknown_manifest, _, metadata) do
+    %{
+      "tool" => metadata[:tool],
+      "server" => metadata[:mcp_server] || metadata[:server],
+      "manifest_status" => manifest_status(metadata),
+      "expires_at" => metadata[:expires_at]
+    }
+    |> compact_data()
+  end
+
+  defp registry_data(:invalid_attestation, _, metadata) do
+    %{
+      "attestation_error" =>
+        error_value(
+          metadata[:attestation_error] || metadata[:verify_error] || metadata[:deny_reason]
+        )
+    }
+    |> compact_data()
+  end
+
+  defp registry_data(:sandbox_required, _, metadata) do
+    %{
+      "tool" => metadata[:tool],
+      "required_isolation" => metadata[:required_isolation],
+      "received_isolation" => metadata[:received_isolation],
+      "sandbox_id_present" => metadata[:sandbox_id_present]
+    }
+    |> compact_data()
+  end
+
+  defp registry_data(_, _, _), do: %{}
+
+  defp drifted_fields(%{drifted_fields: fields}) when is_list(fields),
+    do: Enum.map(fields, &error_value/1)
+
+  defp drifted_fields(%{deny_reason: :schema_digest_mismatch}), do: ["schema"]
+  defp drifted_fields(%{deny_reason: :suspicious_required_param}), do: ["suspicious_params"]
+  defp drifted_fields(%{deny_reason: :manifest_digest_mismatch}), do: ["manifest"]
+  defp drifted_fields(_), do: nil
+
+  defp manifest_status(%{deny_reason: :manifest_expired}), do: "expired"
+  defp manifest_status(_), do: "unknown"
+
+  defp evidence_data(evidence) when is_list(evidence) do
+    Enum.map(evidence, fn
+      %{kind: kind, ref: ref} -> %{"kind" => error_value(kind), "ref" => ref}
+      %{"kind" => kind, "ref" => ref} -> %{"kind" => error_value(kind), "ref" => ref}
+      other -> other
+    end)
+  end
+
+  defp evidence_data(_), do: nil
+
+  defp compact_data(data) do
+    data
+    |> Enum.reject(fn {_, value} -> is_nil(value) end)
+    |> Map.new()
+  end
 
   defp error_value(nil), do: nil
   defp error_value(value) when is_atom(value), do: Atom.to_string(value)

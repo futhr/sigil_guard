@@ -103,6 +103,7 @@ defmodule SigilGuard.MixProject do
         README.md
         LICENSE
         CHANGELOG.md
+        MIGRATING-3.0.md
       ],
       maintainers: ["Tobias Bohwalli <hi@futhr.io>"]
     ]
@@ -114,6 +115,7 @@ defmodule SigilGuard.MixProject do
       extras: [
         "README.md": [title: "Overview"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
+        "MIGRATING-3.0.md": [title: "Migrating to 3.0"],
         "CHANGELOG.md": [title: "Changelog"],
         "CONTRIBUTING.md": [title: "Contributing"],
         "AGENTS.md": [title: "AI Agents"],
@@ -122,7 +124,7 @@ defmodule SigilGuard.MixProject do
       groups_for_extras: [
         "Getting Started": ~r/README/,
         Performance: ~r/benchmarks/,
-        Reference: ~r/CHANGELOG|CONTRIBUTING|AGENTS|LICENSE/
+        Reference: ~r/MIGRATING|CHANGELOG|CONTRIBUTING|AGENTS|LICENSE/
       ],
       groups_for_modules: [
         "Core API": [
