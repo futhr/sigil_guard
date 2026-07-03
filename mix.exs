@@ -195,7 +195,8 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Telemetry
         ],
         "Trust Bundles": [
-          SigilGuard.TrustBundle
+          SigilGuard.TrustBundle,
+          SigilGuard.TrustBundle.Schema
         ]
       ],
       source_ref: "v#{@version}",

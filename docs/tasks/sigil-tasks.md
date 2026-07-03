@@ -68,14 +68,14 @@ trailers (rule 10); the maintainer pushes manually.
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
-| M2 - Embedded trust bundles | 16 | 1 | 0 | 15 |
+| M2 - Embedded trust bundles | 16 | 2 | 0 | 14 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **72** | **0** | **156** |
+| **Total** | **228** | **73** | **0** | **155** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -488,7 +488,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     (`bundle_id`, `sequence`, `root_version`, `digest`, `document`,
     `envelope`, `dev?`, `source`).
   - Tests: golden vectors, negative.
-- [ ] M2.02 `TrustBundle.Schema` document validation over shared JCS/DSSE.
+- [x] M2.02 `TrustBundle.Schema` document validation over shared JCS/DSSE.
   - Spec: `docs/specs/SP.02-embedded-trust-bundles.md` - Data Model;
     Signing And Canonical Form.
   - AC: bundle and rotation documents validate against the schema; no
