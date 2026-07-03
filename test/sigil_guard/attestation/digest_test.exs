@@ -59,6 +59,26 @@ defmodule SigilGuard.Attestation.DigestTest do
       assert Digest.payload_digest(list_payload) == {:ok, sha256(canonical_list)}
     end
 
+    test "keeps digests identical across agent and legacy metadata namespaces" do
+      payload = %{
+        "name" => "repo_file_write",
+        "params" => %{"arguments" => %{"path" => "README.md"}}
+      }
+
+      agent_payload =
+        payload
+        |> Map.put("_agent_trust", %{"payload" => "ignored"})
+        |> Map.put("_agent_confirmation", "confirm.token")
+
+      legacy_payload =
+        payload
+        |> Map.put("_sigil", %{"payload" => "ignored"})
+        |> Map.put("_sigil_confirmation", "confirm.token")
+
+      assert Digest.payload_digest(agent_payload) == Digest.payload_digest(legacy_payload)
+      assert Digest.payload_digest(agent_payload) == Digest.payload_digest(payload)
+    end
+
     test "rejects malformed payload classes" do
       assert Digest.payload_digest({:bad}) == {:error, :invalid_payload}
       assert Digest.payload_digest(<<255>>) == {:error, :invalid_payload}

@@ -19,11 +19,14 @@ defmodule SigilGuard.AttestationTest do
 
       assert Attestation.fetch(%{"_agent_trust" => @envelope}) == {:ok, @envelope}
       assert Attestation.fetch(%{_agent_trust: @envelope}) == {:ok, @envelope}
+      assert Attestation.fetch(%{"_sigil" => @envelope}) == {:ok, @envelope}
+      assert Attestation.fetch(%{_sigil: @envelope}) == {:ok, @envelope}
     end
 
     test "returns error for absent or malformed trust metadata" do
       assert Attestation.fetch(%{}) == :error
       assert Attestation.fetch(%{"_agent_trust" => "bad"}) == :error
+      assert Attestation.fetch(%{"_sigil" => "bad"}) == :error
       assert Attestation.fetch("bad") == :error
     end
 
@@ -49,11 +52,14 @@ defmodule SigilGuard.AttestationTest do
 
       assert Attestation.fetch_confirmation(%{"_agent_confirmation" => @token}) == {:ok, @token}
       assert Attestation.fetch_confirmation(%{_agent_confirmation: @token}) == {:ok, @token}
+      assert Attestation.fetch_confirmation(%{"_sigil_confirmation" => @token}) == {:ok, @token}
+      assert Attestation.fetch_confirmation(%{_sigil_confirmation: @token}) == {:ok, @token}
     end
 
     test "returns error for absent or malformed confirmation metadata" do
       assert Attestation.fetch_confirmation(%{}) == :error
       assert Attestation.fetch_confirmation(%{"_agent_confirmation" => %{}}) == :error
+      assert Attestation.fetch_confirmation(%{"_sigil_confirmation" => %{}}) == :error
       assert Attestation.fetch_confirmation("bad") == :error
     end
 
@@ -69,7 +75,7 @@ defmodule SigilGuard.AttestationTest do
   end
 
   describe "strip_metadata/1" do
-    test "removes exactly the six reserved keys at root and params level" do
+    test "removes agent and transition metadata keys at root and params level" do
       payload = %{
         "_agent_trust" => @envelope,
         :_agent_trust => %{"atom" => true},
@@ -77,24 +83,28 @@ defmodule SigilGuard.AttestationTest do
         :_agent_confirmation => "atom-token",
         "confirmation_token" => "legacy-token",
         :confirmation_token => "atom-legacy-token",
-        "_sigil" => "legacy-user-content",
+        "_sigil" => @envelope,
+        :_sigil => @envelope,
+        "_sigil_confirmation" => @token,
+        :_sigil_confirmation => @token,
         "params" => %{
           "_agent_trust" => @envelope,
           :_agent_confirmation => "nested-token",
           "confirmation_token" => "nested-legacy-token",
-          "_sigil_confirmation" => "legacy-user-content",
+          "_sigil" => @envelope,
+          "_sigil_confirmation" => @token,
           "arguments" => %{"confirmation_token" => "user-content"}
         },
         :params => %{
           :_agent_trust => @envelope,
-          "_agent_confirmation" => "nested-token"
+          "_agent_confirmation" => "nested-token",
+          :_sigil => @envelope,
+          :_sigil_confirmation => @token
         }
       }
 
       assert Attestation.strip_metadata(payload) == %{
-               "_sigil" => "legacy-user-content",
                "params" => %{
-                 "_sigil_confirmation" => "legacy-user-content",
                  "arguments" => %{"confirmation_token" => "user-content"}
                },
                params: %{}
@@ -103,8 +113,11 @@ defmodule SigilGuard.AttestationTest do
 
     test "strips each map element in list payloads" do
       payload = [
-        %{"value" => 1, "_agent_trust" => @envelope},
-        %{"value" => 2, "params" => %{"confirmation_token" => @token}},
+        %{"value" => 1, "_agent_trust" => @envelope, "_sigil" => @envelope},
+        %{
+          "value" => 2,
+          "params" => %{"confirmation_token" => @token, "_sigil_confirmation" => @token}
+        },
         "unchanged"
       ]
 
@@ -144,6 +157,8 @@ defmodule SigilGuard.AttestationTest do
             |> Attestation.attach(envelope)
             |> Attestation.attach_confirmation(token)
             |> Map.put(:confirmation_token, token)
+            |> Map.put("_sigil", envelope)
+            |> Map.put("_sigil_confirmation", token)
             |> put_params_metadata(envelope, token)
 
           assert Attestation.strip_metadata(attached) == stripped
@@ -161,6 +176,8 @@ defmodule SigilGuard.AttestationTest do
           |> Map.put("_agent_trust", envelope)
           |> Map.put(:_agent_confirmation, token)
           |> Map.put("confirmation_token", token)
+          |> Map.put("_sigil", envelope)
+          |> Map.put("_sigil_confirmation", token)
 
         Map.put(payload, "params", params)
 

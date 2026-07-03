@@ -281,6 +281,41 @@ defmodule SigilGuard.ToolGatewayTest do
       assert replay.audit_metadata.confirmation_reason == :replay_detected
     end
 
+    test "accepts transition legacy confirmation metadata" do
+      opts = [
+        manifests: %{"repo_file_write" => suspicious_manifest()},
+        require_manifest: true
+      ]
+
+      decision = ToolGateway.guard_request(request(), sandbox_context(), opts)
+
+      assert {:confirm, _} = decision.verdict
+
+      assert {:ok, token} =
+               ToolGateway.issue_confirmation(
+                 request(),
+                 sandbox_context(),
+                 decision,
+                 @confirmation_key,
+                 now: @now,
+                 manifest: decision.audit_metadata.manifest_digest,
+                 nonce: String.duplicate("c", 32)
+               )
+
+      legacy_request = Map.put(request(), "_sigil_confirmation", token)
+
+      confirmed =
+        ToolGateway.guard_request(legacy_request, sandbox_context(),
+          manifests: %{"repo_file_write" => suspicious_manifest()},
+          require_manifest: true,
+          confirmation_key: @confirmation_key,
+          now: @now
+        )
+
+      assert confirmed.verdict == :allowed
+      assert confirmed.audit_metadata.confirmation_status == :accepted
+    end
+
     test "returns typed errors when issuing confirmations fails" do
       decision = %Decision{
         verdict: :allowed,
@@ -533,6 +568,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
     test "verifies present attestations for optional and required modes" do
       request = Map.put(request(), "_agent_trust", %{})
+      legacy_request = Map.put(request(), "_sigil", %{})
 
       optional =
         ToolGateway.guard_request(request, sandbox_context(),
@@ -548,6 +584,14 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert optional.audit_metadata.deny_reason == :invalid_attestation
       assert required.audit_metadata.deny_reason == :invalid_attestation
+
+      legacy =
+        ToolGateway.guard_request(legacy_request, sandbox_context(),
+          manifests: %{"repo_file_write" => manifest()},
+          attestation: :optional
+        )
+
+      assert legacy.audit_metadata.deny_reason == :invalid_attestation
     end
 
     test "accepts stronger sandbox isolation and context structs" do

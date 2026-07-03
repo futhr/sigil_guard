@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 11 | 0 | 11 |
+| M3 - Manifests, gateway, and agent trust | 22 | 12 | 0 | 10 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **98** | **0** | **130** |
+| **Total** | **228** | **99** | **0** | **129** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -754,7 +754,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `:invalid_ttl`, `:invalid_actor`, `:invalid_nonce`, `:invalid_now`,
     `:invalid_payload`).
   - Tests: negative, replay, expiration.
-- [ ] M3.12 Transition dual-strip of `_sigil*` alongside `_agent_*`.
+- [x] M3.12 Transition dual-strip of `_sigil*` alongside `_agent_*`.
   - Spec: `docs/specs/SP.08-mcp-gateway-and-confirmation-contracts.md` -
     Metadata Namespace; `docs/specs/SP.03-mcp-attestation-gateway.md` -
     Implementation Roadmap (M3).
