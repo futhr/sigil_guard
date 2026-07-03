@@ -1398,6 +1398,38 @@ defmodule SigilGuard.ToolGatewayTest do
       refute confirmed.sanitized_text =~ "system prompt"
     end
 
+    test "returns quarantine errors without raw output unless sanitized output is requested" do
+      assert {:error, response, decision} =
+               ToolGateway.guarded_result(
+                 quarantined_result(),
+                 [trust_level: :high],
+                 request_action_digest: @request_action_digest
+               )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.action == :quarantine
+      assert response["error"]["code"] == -32_052
+      assert response["error"]["data"]["status"] == "quarantined"
+      refute Map.has_key?(response["error"]["data"], "sanitized_text")
+      refute inspect(response) =~ "Ignore previous instructions"
+      refute inspect(response) =~ "system prompt"
+
+      assert {:error, sanitized_response, _} =
+               ToolGateway.guarded_result(
+                 quarantined_result(),
+                 [trust_level: :high],
+                 request_action_digest: @request_action_digest,
+                 include_sanitized: true
+               )
+
+      assert sanitized_response["error"]["data"]["sanitized_text"] =~ "[QUARANTINED]"
+
+      refute sanitized_response["error"]["data"]["sanitized_text"] =~
+               "Ignore previous instructions"
+
+      refute sanitized_response["error"]["data"]["sanitized_text"] =~ "system prompt"
+    end
+
     test "keeps guarded result and stream tuple shapes" do
       assert {:ok, response, decision} =
                ToolGateway.guarded_result(

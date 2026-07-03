@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 16 | 0 | 6 |
+| M3 - Manifests, gateway, and agent trust | 22 | 17 | 0 | 5 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **103** | **0** | **125** |
+| **Total** | **228** | **104** | **0** | **124** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -801,7 +801,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `-32056` with `required_isolation`, `received_isolation`, and
     `sandbox_id_present`.
   - Tests: negative (per isolation level), malformed.
-- [ ] M3.17 Poisoned and quarantined tool-result handling tests.
+- [x] M3.17 Poisoned and quarantined tool-result handling tests.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Threat Coverage
     And Host-Owned Exclusions (TM.02); `-32052` registry row.
   - AC: poisoned/quarantined results produce quarantine decisions with
