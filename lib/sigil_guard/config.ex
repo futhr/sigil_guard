@@ -250,15 +250,21 @@ defmodule SigilGuard.Config do
   @doc false
   @spec validate_trust_bundle_source(term()) :: {:ok, term()} | {:error, String.t()}
   def validate_trust_bundle_source(:none), do: {:ok, :none}
-  def validate_trust_bundle_source({:path, path} = source) when is_binary(path), do: {:ok, source}
+  def validate_trust_bundle_source({:file, path} = source) when is_binary(path), do: {:ok, source}
 
-  def validate_trust_bundle_source({:application, app, path} = source)
+  def validate_trust_bundle_source({:map, envelope} = source) when is_map(envelope),
+    do: {:ok, source}
+
+  def validate_trust_bundle_source({:binary, bytes} = source) when is_binary(bytes),
+    do: {:ok, source}
+
+  def validate_trust_bundle_source({:priv, app, path} = source)
       when is_atom(app) and is_binary(path) do
     {:ok, source}
   end
 
   def validate_trust_bundle_source(_) do
-    {:error, "expected :none, {:path, path}, or {:application, app, path}"}
+    {:error, "expected :none, {:file, path}, {:priv, app, path}, {:map, map}, or {:binary, bin}"}
   end
 
   defp reject_removed_keys(opts) do

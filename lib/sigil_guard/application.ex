@@ -22,11 +22,12 @@ defmodule SigilGuard.Application do
 
   @impl Application
   def start(_, _) do
-    SigilGuard.Config.validate!()
+    config = SigilGuard.Config.validate!()
     SigilGuard.Policy.ensure_rate_table()
     SigilGuard.ReplayStore.ensure_table()
     SigilGuard.TrustBundle.Cache.ensure_table()
     SigilGuard.TrustBundle.Quarantine.ensure_table()
+    SigilGuard.TrustBundle.load_configured!(config)
 
     children =
       if SigilGuard.Config.registry_enabled?() do

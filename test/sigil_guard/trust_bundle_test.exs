@@ -93,16 +93,20 @@ defmodule SigilGuard.TrustBundleTest do
       before_ports = current_process_ports()
 
       assert {:ok, %TrustBundle{source: {:map, ^envelope}}} =
-               TrustBundle.load({:map, envelope}, now: @now, quarantine: false)
+               TrustBundle.load({:map, envelope}, now: @now, quarantine: false, cache: false)
 
       assert {:ok, %TrustBundle{source: {:binary, ^encoded}}} =
-               TrustBundle.load({:binary, encoded}, now: @now, quarantine: false)
+               TrustBundle.load({:binary, encoded}, now: @now, quarantine: false, cache: false)
 
       assert {:ok, %TrustBundle{source: {:file, ^file_path}}} =
-               TrustBundle.load({:file, file_path}, now: @now, quarantine: false)
+               TrustBundle.load({:file, file_path}, now: @now, quarantine: false, cache: false)
 
       assert {:ok, %TrustBundle{source: {:priv, :sigil_guard, ^priv_rel}}} =
-               TrustBundle.load({:priv, :sigil_guard, priv_rel}, now: @now, quarantine: false)
+               TrustBundle.load({:priv, :sigil_guard, priv_rel},
+                 now: @now,
+                 quarantine: false,
+                 cache: false
+               )
 
       assert {:ok, %TrustBundle{source: :none}} =
                TrustBundle.verify(envelope, now: @now, quarantine: false)

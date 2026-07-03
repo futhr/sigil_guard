@@ -68,14 +68,14 @@ trailers (rule 10); the maintainer pushes manually.
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
-| M2 - Embedded trust bundles | 16 | 6 | 0 | 10 |
+| M2 - Embedded trust bundles | 16 | 7 | 0 | 9 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **77** | **0** | **151** |
+| **Total** | **228** | **78** | **0** | **150** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -538,7 +538,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `{:error, :invalid_source}` before verification; exactly one source
     per call, no merging; an explicit source wins over configuration.
   - Tests: negative, malformed (per source class).
-- [ ] M2.07 Boot wiring for the `:trust_bundle` config key.
+- [x] M2.07 Boot wiring for the `:trust_bundle` config key.
   - Spec: `docs/specs/SP.02-embedded-trust-bundles.md` - Loading Sources
     (Precedence); `docs/specs/SP.01-sigilguard-trust-profile.md` - V3
     Configuration Surface.

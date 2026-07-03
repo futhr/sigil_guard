@@ -37,10 +37,10 @@ defmodule SigilGuard.TrustBundle.VerifyTest do
       encoded = Jason.encode!(envelope)
 
       assert {:ok, %TrustBundle{source: {:map, ^envelope}}} =
-               TrustBundle.load({:map, envelope}, now: @now)
+               TrustBundle.load({:map, envelope}, now: @now, cache: false)
 
       assert {:ok, %TrustBundle{source: {:binary, ^encoded}}} =
-               TrustBundle.load({:binary, encoded}, now: @now)
+               TrustBundle.load({:binary, encoded}, now: @now, cache: false)
 
       assert {:ok, %TrustBundle{source: {:file, "/tmp/bundle.json"}}} =
                Verify.verify(envelope, now: @now, source: {:file, "/tmp/bundle.json"})

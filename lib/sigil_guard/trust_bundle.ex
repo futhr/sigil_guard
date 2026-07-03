@@ -10,6 +10,8 @@ defmodule SigilGuard.TrustBundle do
   accessors from SP.02.
   """
 
+  alias SigilGuard.ConfigError
+  alias SigilGuard.TrustBundle.Cache
   alias SigilGuard.TrustBundle.Quarantine
   alias SigilGuard.TrustBundle.Verify
 
@@ -77,7 +79,7 @@ defmodule SigilGuard.TrustBundle do
   def load(source, opts \\ [])
 
   def load({:map, envelope}, opts) when is_map(envelope) and is_list(opts) do
-    verify(envelope, Keyword.put_new(opts, :source, {:map, envelope}))
+    load_envelope(envelope, {:map, envelope}, opts)
   end
 
   def load({:binary, bytes}, opts) when is_binary(bytes) and is_list(opts) do
@@ -112,13 +114,72 @@ defmodule SigilGuard.TrustBundle do
 
   def load(_, _), do: {:error, :invalid_source}
 
+  @doc false
+  @spec load_configured!(keyword(), keyword()) :: :ok | no_return()
+  def load_configured!(config, opts \\ [])
+
+  def load_configured!(config, opts) when is_list(config) and is_list(opts) do
+    config
+    |> Keyword.get(:trust_bundle, :none)
+    |> load_configured_source!(opts)
+  end
+
+  def load_configured!(_, _) do
+    raise ConfigError.new(:trust_bundle, :invalid_config, "expected validated configuration")
+  end
+
   defp load_binary(bytes, source, opts) do
     case Jason.decode(bytes) do
       {:ok, envelope} when is_map(envelope) ->
-        verify(envelope, Keyword.put_new(opts, :source, source))
+        load_envelope(envelope, source, opts)
 
       _ ->
         quarantine_error(:invalid_source, %{source: source}, opts)
+    end
+  end
+
+  defp load_envelope(envelope, source, opts) do
+    envelope
+    |> verify(Keyword.put_new(opts, :source, source))
+    |> cache_loaded(opts)
+  end
+
+  defp cache_loaded({:ok, bundle}, opts) do
+    if Keyword.get(opts, :cache, true) do
+      case Cache.put(bundle) do
+        {:ok, _} -> {:ok, bundle}
+        {:error, reason} -> quarantine_error(reason, cache_error_info(bundle), opts)
+      end
+    else
+      {:ok, bundle}
+    end
+  end
+
+  defp cache_loaded({:error, _} = error, _), do: error
+
+  defp cache_error_info(bundle) do
+    %{
+      bundle_id: bundle.bundle_id,
+      bundle_digest: bundle.digest,
+      sequence: bundle.sequence,
+      document: bundle.document,
+      envelope: bundle.envelope
+    }
+  end
+
+  defp load_configured_source!(:none, _), do: :ok
+
+  defp load_configured_source!(source, opts) do
+    case load(source, opts) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        raise ConfigError.new(
+                :trust_bundle,
+                :invalid_config,
+                "configured trust bundle failed with #{inspect(reason)}"
+              )
     end
   end
 

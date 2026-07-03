@@ -55,7 +55,7 @@ defmodule SigilGuard.ConfigTest do
 
     test "accepts configured v3 values" do
       opts = [
-        trust_bundle: {:path, "priv/sigil_guard/trust_bundle.json"},
+        trust_bundle: {:file, "priv/sigil_guard/trust_bundle.json"},
         scanner_patterns: :bundle,
         http_client: SigilGuard.TestHTTPClient,
         attestation_ttl_ms: 60_000,
@@ -65,6 +65,12 @@ defmodule SigilGuard.ConfigTest do
       ]
 
       assert Config.validate!(opts) == opts
+    end
+
+    test "rejects removed trust bundle source constructors" do
+      assert_raise ConfigError, ~r/:trust_bundle.*invalid_config.*MIGRATING-3\.0\.md/, fn ->
+        Config.validate!(trust_bundle: {:path, "priv/sigil_guard/trust_bundle.json"})
+      end
     end
 
     test "raises typed errors for unknown keys" do
