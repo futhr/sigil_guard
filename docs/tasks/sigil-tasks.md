@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 2 | 0 | 20 |
+| M3 - Manifests, gateway, and agent trust | 22 | 3 | 0 | 19 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **89** | **0** | **139** |
+| **Total** | **228** | **90** | **0** | **138** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -659,7 +659,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     and its digest equals the value referenced by the SP.01 `tool_request`
     golden vector (M1.14).
   - Tests: golden vectors, tamper, malformed.
-- [ ] M3.03 Suspicious required parameters (schema-injection indicators).
+- [x] M3.03 Suspicious required parameters (schema-injection indicators).
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Suspicious
     Required Parameters.
   - AC: `suspicious_params` is recomputed deterministically from the
