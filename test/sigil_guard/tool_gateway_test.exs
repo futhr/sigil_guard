@@ -281,6 +281,63 @@ defmodule SigilGuard.ToolGatewayTest do
       assert replay.audit_metadata.confirmation_reason == :replay_detected
     end
 
+    test "rejects confirmation tokens when the approved request binding changes" do
+      opts = [
+        manifests: %{"repo_file_write" => suspicious_manifest()},
+        require_manifest: true
+      ]
+
+      decision = ToolGateway.guard_request(request(), sandbox_context(), opts)
+
+      assert {:confirm, _} = decision.verdict
+
+      assert {:ok, token} =
+               ToolGateway.issue_confirmation(
+                 request(),
+                 sandbox_context(),
+                 decision,
+                 @confirmation_key,
+                 now: @now,
+                 manifest: decision.audit_metadata.manifest_digest,
+                 nonce: String.duplicate("8", 32)
+               )
+
+      changed_request =
+        request()
+        |> put_in(["params", "arguments", "content"], "changed after approval")
+        |> Attestation.attach_confirmation(token)
+
+      signed_request = Attestation.attach_confirmation(request(), token)
+      changed_manifest = Map.put(suspicious_manifest(), "version", "1.4.3")
+
+      cases = [
+        {changed_request, sandbox_context(), suspicious_manifest(), :digest_mismatch},
+        {signed_request, Keyword.put(sandbox_context(), :sink, :external), suspicious_manifest(),
+         :digest_mismatch},
+        {signed_request, Keyword.put(sandbox_context(), :actor, "spiffe://agents/other"),
+         suspicious_manifest(), :digest_mismatch},
+        {signed_request, high_context("container", sandbox_id: "sandbox-2"),
+         suspicious_manifest(), :digest_mismatch},
+        {signed_request, high_context("vm"), suspicious_manifest(), :digest_mismatch},
+        {signed_request, sandbox_context(), changed_manifest, :manifest_digest_mismatch}
+      ]
+
+      for {request, context, manifest, reason} <- cases do
+        rejected =
+          ToolGateway.guard_request(request, context,
+            manifests: %{"repo_file_write" => manifest},
+            require_manifest: true,
+            confirmation_key: @confirmation_key,
+            consume_confirmation: false,
+            now: @now
+          )
+
+        assert rejected.verdict == :blocked
+        assert rejected.audit_metadata.deny_reason == :confirmation_failed
+        assert rejected.audit_metadata.confirmation_reason == reason
+      end
+    end
+
     test "accepts transition legacy confirmation metadata" do
       opts = [
         manifests: %{"repo_file_write" => suspicious_manifest()},
@@ -1585,9 +1642,16 @@ defmodule SigilGuard.ToolGatewayTest do
   end
 
   defp high_context(isolation_level) do
+    high_context(isolation_level, sandbox_id: "sandbox-1")
+  end
+
+  defp high_context(isolation_level, opts) do
     [
       trust_level: :high,
-      metadata: %{sandbox_id: "sandbox-1", isolation_level: isolation_level}
+      metadata: %{
+        sandbox_id: Keyword.fetch!(opts, :sandbox_id),
+        isolation_level: isolation_level
+      }
     ]
   end
 
