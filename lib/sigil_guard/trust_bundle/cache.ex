@@ -112,6 +112,9 @@ defmodule SigilGuard.TrustBundle.Cache do
       bundle.sequence < floor ->
         {:error, :sequence_below_floor}
 
+      root_version_below_cached?(bundle, cached) ->
+        {:error, :sequence_below_floor}
+
       true ->
         accepted = accepted_floor(floor, bundle)
         :ets.insert(@table, {bundle.bundle_id, bundle, accepted})
@@ -121,6 +124,10 @@ defmodule SigilGuard.TrustBundle.Cache do
 
   defp same_snapshot?(bundle, cached) do
     bundle.sequence == cached.sequence and bundle.digest == cached.digest
+  end
+
+  defp root_version_below_cached?(bundle, cached) do
+    bundle.root_version < cached.root_version
   end
 
   defp accepted_floor(floor, bundle) do

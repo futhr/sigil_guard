@@ -37,7 +37,7 @@ defmodule SigilGuard.TrustBundle.CacheTest do
       assert Cache.floor("example-org-trust") == 3
     end
 
-    test "rejects stale, lower-floor, and same-sequence different-digest bundles" do
+    test "rejects lower sequence, lower floor, and same-sequence different-digest bundles" do
       assert Cache.put(bundle(sequence: 5, rollback_floor: 5, digest: "first")) ==
                {:ok, bundle(sequence: 5, rollback_floor: 5, digest: "first")}
 
@@ -50,6 +50,18 @@ defmodule SigilGuard.TrustBundle.CacheTest do
       assert Cache.floor("example-org-trust") == 5
       assert Cache.get("missing") == :error
       assert Cache.floor("missing") == 0
+    end
+
+    test "rejects root versions below the accepted root version" do
+      accepted = bundle(sequence: 5, root_version: 3, digest: "root-v3")
+      stale_root = bundle(sequence: 6, root_version: 2, digest: "root-v2")
+      advancing_root = bundle(sequence: 6, root_version: 4, digest: "root-v4")
+
+      assert Cache.put(accepted) == {:ok, accepted}
+      assert Cache.put(stale_root) == {:error, :sequence_below_floor}
+      assert Cache.get("example-org-trust") == {:ok, accepted}
+      assert Cache.put(advancing_root) == {:ok, advancing_root}
+      assert Cache.get("example-org-trust") == {:ok, advancing_root}
     end
 
     test "accepts an advancing sequence and keeps the floor monotonic" do
