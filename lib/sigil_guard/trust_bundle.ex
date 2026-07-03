@@ -32,7 +32,6 @@ defmodule SigilGuard.TrustBundle do
           | :invalid_payload_type
           | :invalid_base64
           | :duplicate_keyid
-          | :unsupported_number_range
 
   @typedoc "Trust-bundle verification errors."
   @type verify_error ::

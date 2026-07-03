@@ -412,7 +412,7 @@ defmodule SigilGuard.TrustBundle do
 
   @type shared_envelope_error ::   # SP.01 taxonomy, by reference
           :invalid_envelope | :invalid_payload_type | :invalid_base64
-          | :duplicate_keyid | :unsupported_number_range
+          | :duplicate_keyid
 
   @type verify_error ::
           shared_envelope_error()
@@ -548,8 +548,8 @@ the signed field, not the attack); `:expired_bundle` becomes
 `:unsigned_bundle` become `:invalid_envelope` (unsigned bundles do not
 exist in v3; a DSSE envelope without signatures is structurally invalid per
 SP.01). Shared SP.01 atoms (`:invalid_envelope`, `:invalid_payload_type`,
-`:invalid_base64`, `:duplicate_keyid`, `:unsupported_profile_version`,
-`:unsupported_number_range`) are reused by reference, never redefined.
+`:invalid_base64`, `:duplicate_keyid`, `:unsupported_profile_version`) are
+reused by reference, never redefined.
 
 | Error | Trigger | Recovery | User Impact |
 |-------|---------|----------|-------------|
