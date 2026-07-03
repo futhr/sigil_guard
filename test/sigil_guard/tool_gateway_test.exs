@@ -1,6 +1,8 @@
 defmodule SigilGuard.ToolGatewayTest do
   use ExUnit.Case, async: false
 
+  alias __MODULE__.TrustedSigner
+  alias SigilGuard.Attestation
   alias SigilGuard.CapabilityManifest
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
@@ -878,6 +880,189 @@ defmodule SigilGuard.ToolGatewayTest do
     end
   end
 
+  describe "attest_request/3 and attest_result/3" do
+    test "signs request attestations bound to payload, context, manifest, resource, and scopes" do
+      context = attestation_request_context()
+      assert {:ok, capability} = CapabilityManifest.new(manifest())
+
+      decision =
+        ToolGateway.guard_request(request(), context,
+          manifests: %{"repo_file_write" => capability},
+          require_manifest: true
+        )
+
+      assert {:ok, envelope} =
+               ToolGateway.attest_request(decision, context,
+                 payload: request(),
+                 signer: TrustedSigner,
+                 keyid: "trusted",
+                 now: @now,
+                 nonce: "request-attestation-nonce",
+                 manifest: capability,
+                 resource: "mcp://repo-mcp",
+                 audience: "repo-mcp",
+                 scopes: ["repo:write", "repo:read"]
+               )
+
+      trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      assert {:ok, statement} =
+               Attestation.verify(envelope, trust_material,
+                 payload: request(),
+                 context: context,
+                 manifest_digest: capability.digest,
+                 now: @now
+               )
+
+      predicate = statement["predicate"]
+      assert predicate["statement_type"] == "tool_request"
+      assert predicate["tool"]["name"] == "repo_file_write"
+      assert predicate["tool"]["manifest_digest"] == capability.digest
+
+      assert predicate["resource"] == %{
+               "uri" => "mcp://repo-mcp",
+               "audience" => "repo-mcp",
+               "scope" => "repo:read repo:write"
+             }
+    end
+
+    test "signs result attestations with request back-reference and scan summaries" do
+      output_schema = %{"type" => "object", "properties" => %{"ok" => %{"type" => "boolean"}}}
+
+      assert {:ok, capability} =
+               CapabilityManifest.new(Map.put(manifest(), "output_schema", output_schema))
+
+      context = attestation_result_context()
+
+      decision =
+        ToolGateway.guard_result(result(), context, request_action_digest: @request_action_digest)
+
+      assert {:ok, envelope} =
+               ToolGateway.attest_result(decision, context,
+                 payload: result(),
+                 signer: TrustedSigner,
+                 keyid: "trusted",
+                 now: @now,
+                 nonce: "result-attestation-nonce",
+                 manifest: capability,
+                 request_action_digest: @request_action_digest
+               )
+
+      trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      assert {:ok, statement} =
+               Attestation.verify(envelope, trust_material,
+                 payload: result(),
+                 context: context,
+                 manifest_digest: capability.digest,
+                 request_action_digest: @request_action_digest,
+                 now: @now
+               )
+
+      predicate = statement["predicate"]
+      assert predicate["statement_type"] == "tool_result"
+      assert predicate["request_action_digest"] == @request_action_digest
+      assert predicate["output_schema_sha256"] == capability.output_schema_sha256
+      assert predicate["boundary"] == %{"sink" => "model"}
+      assert predicate["quarantine"] == %{"status" => "none", "indicator_ids" => []}
+      assert predicate["scanner"] == %{"hit_count" => 0, "redacted" => false}
+    end
+
+    test "rejects malformed attestation helper inputs" do
+      decision = %Decision{
+        verdict: :allowed,
+        action: :allow,
+        phase: :tool_result,
+        risk_level: :low,
+        trust_level: :high
+      }
+
+      assert ToolGateway.attest_request(:bad, attestation_request_context(),
+               payload: request(),
+               signer: TrustedSigner,
+               now: @now
+             ) == {:error, :invalid_payload}
+
+      assert ToolGateway.attest_request(decision, attestation_request_context(),
+               payload: request(),
+               now: @now
+             ) == {:error, :invalid_signer}
+
+      assert ToolGateway.attest_request(decision, attestation_request_context(),
+               payload: request(),
+               signer: String,
+               now: @now
+             ) == {:error, :invalid_signer}
+
+      assert ToolGateway.attest_result(decision, attestation_result_context(), :bad_opts) ==
+               {:error, :invalid_payload}
+
+      assert ToolGateway.attest_result(decision, attestation_result_context(),
+               payload: result(),
+               signer: TrustedSigner,
+               now: @now
+             ) == {:error, :invalid_payload}
+
+      assert ToolGateway.attest_result(decision, attestation_result_context(),
+               payload: result(),
+               signer: TrustedSigner,
+               now: @now,
+               request_action_digest: @request_action_digest,
+               output_schema_sha256: "bad"
+             ) == {:error, :invalid_payload}
+
+      assert ToolGateway.attest_result(decision, attestation_result_context(),
+               payload: result(),
+               signer: TrustedSigner,
+               now: @now,
+               request_action_digest: @request_action_digest,
+               scanner_hit_count: -1
+             ) == {:error, :invalid_payload}
+    end
+
+    test "marks quarantined result attestations with indicator evidence" do
+      decision = %Decision{
+        verdict: :blocked,
+        action: :quarantine,
+        phase: :tool_result,
+        risk_level: :high,
+        trust_level: :high,
+        indicators: [%{id: "prompt-injection"}],
+        audit_metadata: %{
+          quarantine_status: :quarantined,
+          scanner_summary: %{hit_count: 1, indicator_ids: ["prompt-injection"]}
+        }
+      }
+
+      assert {:ok, envelope} =
+               ToolGateway.attest_result(decision, attestation_result_context(),
+                 payload: result(),
+                 signer: TrustedSigner,
+                 keyid: "trusted",
+                 now: @now,
+                 request_action_digest: @request_action_digest,
+                 redacted: true
+               )
+
+      assert {:ok, statement} =
+               Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+                 payload: result(),
+                 context: attestation_result_context(),
+                 request_action_digest: @request_action_digest,
+                 now: @now
+               )
+
+      assert statement["predicate"]["verdict"] == "quarantine"
+
+      assert statement["predicate"]["quarantine"] == %{
+               "status" => "quarantined",
+               "indicator_ids" => ["prompt-injection"]
+             }
+
+      assert statement["predicate"]["scanner"] == %{"hit_count" => 1, "redacted" => true}
+    end
+  end
+
   describe "guard_result/3" do
     test "keeps guarded request tuple shapes" do
       assert {:ok, %Decision{} = allowed} =
@@ -1089,6 +1274,31 @@ defmodule SigilGuard.ToolGatewayTest do
 
   defp sandbox_context, do: high_context("container")
 
+  defp attestation_request_context do
+    [
+      actor: "spiffe://agents/requester",
+      trust_level: :high,
+      origin: :model,
+      sink: :tool,
+      mcp_server: "repo-mcp",
+      tool: "repo_file_write",
+      resource_uri: "mcp://repo-mcp"
+    ]
+  end
+
+  defp attestation_result_context do
+    [
+      phase: :tool_result,
+      actor: "spiffe://agents/requester",
+      trust_level: :high,
+      origin: :tool,
+      sink: :model,
+      mcp_server: "repo-mcp",
+      tool: "repo_file_write",
+      resource_uri: "mcp://repo-mcp"
+    ]
+  end
+
   defp high_context(isolation_level) do
     [
       trust_level: :high,
@@ -1107,5 +1317,27 @@ defmodule SigilGuard.ToolGatewayTest do
     |> Path.join("manifest.json")
     |> File.read!()
     |> Jason.decode!()
+  end
+
+  defmodule TrustedSigner do
+    @behaviour SigilGuard.Signer
+
+    @seed :crypto.hash(:sha256, "sigilguard-tool-gateway-attestation")
+
+    @impl SigilGuard.Signer
+    def sign(message) do
+      {_, private_key} = keypair()
+      :crypto.sign(:eddsa, :none, message, [private_key, :ed25519])
+    end
+
+    @impl SigilGuard.Signer
+    def public_key do
+      {public_key, _} = keypair()
+      public_key
+    end
+
+    defp keypair do
+      :crypto.generate_key(:eddsa, :ed25519, @seed)
+    end
   end
 end

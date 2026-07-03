@@ -39,6 +39,123 @@ defmodule SigilGuard.AttestationFromDecisionTest do
       assert subject_names(statement) == ["action", "payload", "context"]
     end
 
+    test "adds tool request resource mirrors from map contexts and string scopes" do
+      context = %{
+        phase: :tool_request,
+        actor: "spiffe://agents/requester",
+        trust_level: :medium,
+        origin: :model,
+        sink: :tool,
+        tool: "repo_file_write",
+        mcp_server: "repo-mcp",
+        resource_uri: "mcp://repo-mcp"
+      }
+
+      assert {:ok, statement} =
+               Attestation.from_decision(
+                 decision(verdict: {:confirm, "review"}, action: :confirm),
+                 context,
+                 payload: @payload,
+                 statement_type: "tool_request",
+                 now: @now,
+                 manifest_digest: String.duplicate("d", 64),
+                 audience: "repo-mcp",
+                 scopes: "repo:write"
+               )
+
+      predicate = statement["predicate"]
+      assert predicate["verdict"] == "confirm"
+
+      assert predicate["tool"] == %{
+               "name" => "repo_file_write",
+               "mcp_server" => "repo-mcp",
+               "manifest_digest" => String.duplicate("d", 64)
+             }
+
+      assert predicate["resource"] == %{
+               "uri" => "mcp://repo-mcp",
+               "audience" => "repo-mcp",
+               "scope" => "repo:write"
+             }
+    end
+
+    test "adds released sanitized result status from explicit result opts" do
+      context = %{
+        phase: :tool_result,
+        actor: "spiffe://agents/requester",
+        trust_level: :medium,
+        origin: :tool,
+        sink: :model,
+        tool: "repo_file_write"
+      }
+
+      assert {:ok, statement} =
+               Attestation.from_decision(decision(action: :redact, phase: :tool_result), context,
+                 payload: @payload,
+                 now: @now,
+                 request_action_digest: String.duplicate("a", 64),
+                 quarantine_status: :released_sanitized,
+                 indicator_ids: ["z", :ignored, "a"],
+                 scanner_hit_count: 2
+               )
+
+      assert statement["predicate"]["quarantine"] == %{
+               "status" => "released_sanitized",
+               "indicator_ids" => ["a", "z"]
+             }
+
+      assert statement["predicate"]["scanner"] == %{"hit_count" => 2, "redacted" => true}
+    end
+
+    test "builds result predicates from decision fallback metadata" do
+      context = [
+        phase: :tool_result,
+        actor: "spiffe://agents/requester",
+        trust_level: :medium,
+        origin: :tool,
+        sink: :model,
+        tool: "repo_file_write"
+      ]
+
+      decision =
+        decision(action: :allow, phase: :tool_result)
+        |> Map.put(:hits, [%{name: "secret"}])
+        |> Map.put(:indicators, [%{"id" => "detected-indicator"}])
+
+      assert {:ok, statement} =
+               Attestation.from_decision(decision, context,
+                 payload: @payload,
+                 now: @now,
+                 request_action_digest: String.duplicate("b", 64),
+                 output_schema_sha256: nil
+               )
+
+      predicate = statement["predicate"]
+      refute Map.has_key?(predicate, "output_schema_sha256")
+
+      assert predicate["quarantine"] == %{
+               "status" => "none",
+               "indicator_ids" => ["detected-indicator"]
+             }
+
+      assert predicate["scanner"] == %{"hit_count" => 1, "redacted" => false}
+    end
+
+    test "omits empty tool request mirrors" do
+      context = %{@context | tool: nil, mcp_server: nil, resource_uri: nil}
+
+      assert {:ok, statement} =
+               Attestation.from_decision(decision(), context,
+                 payload: @payload,
+                 now: @now,
+                 scopes: []
+               )
+
+      predicate = statement["predicate"]
+      refute Map.has_key?(predicate, "tool")
+      assert predicate["resource"] == %{"audience" => :internal}
+    end
+
     test "explicit statement type wins over phase-derived type" do
       payload = %{"repository" => "repo", "operation" => "write", "paths" => ["b.ex", "a.ex"]}
 
@@ -189,6 +306,28 @@ defmodule SigilGuard.AttestationFromDecisionTest do
                ttl_ms: 0
              ) ==
                {:error, :invalid_payload}
+
+      result_context = %{@context | phase: :tool_result, origin: :tool, sink: :model}
+
+      assert Attestation.from_decision(decision(phase: :tool_result), result_context,
+               payload: @payload,
+               now: @now,
+               request_action_digest: "bad"
+             ) == {:error, :invalid_payload}
+
+      assert Attestation.from_decision(decision(phase: :tool_result), result_context,
+               payload: @payload,
+               now: @now,
+               request_action_digest: String.duplicate("c", 64),
+               output_schema_sha256: :bad
+             ) == {:error, :invalid_payload}
+
+      assert Attestation.from_decision(decision(phase: :tool_result), result_context,
+               payload: @payload,
+               now: @now,
+               request_action_digest: String.duplicate("c", 64),
+               redacted: :bad
+             ) == {:error, :invalid_payload}
     end
   end
 

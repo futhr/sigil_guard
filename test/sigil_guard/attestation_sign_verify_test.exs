@@ -303,6 +303,46 @@ defmodule SigilGuard.AttestationSignVerifyTest do
       assert Attestation.verify(%{"payload" => "x"}, %{"trusted" => TrustedSigner.public_key()}) ==
                {:error, :invalid_envelope}
 
+      malformed_signature = %{
+        "payload" => envelope["payload"],
+        "payloadType" => envelope["payloadType"],
+        "signatures" => [%{"keyid" => "trusted"}]
+      }
+
+      assert Attestation.verify(malformed_signature, %{"trusted" => TrustedSigner.public_key()}) ==
+               {:error, :invalid_envelope}
+
+      invalid_payload_type = %{envelope | "payloadType" => "application/json"}
+
+      assert Attestation.verify(invalid_payload_type, %{"trusted" => TrustedSigner.public_key()}) ==
+               {:error, :invalid_payload_type}
+
+      duplicate_keyid = %{
+        envelope
+        | "signatures" => envelope["signatures"] ++ envelope["signatures"]
+      }
+
+      assert Attestation.verify(duplicate_keyid, %{"trusted" => TrustedSigner.public_key()}) ==
+               {:error, :duplicate_keyid}
+
+      invalid_base64 = %{envelope | "payload" => "not base64!"}
+
+      assert Attestation.verify(invalid_base64, %{"trusted" => TrustedSigner.public_key()}) ==
+               {:error, :invalid_base64}
+
+      assert {:ok, list_payload_envelope} =
+               Envelope.sign("[1,2,3]", TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(list_payload_envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now
+             ) == {:error, :invalid_profile}
+
+      assert {:ok, non_json_envelope} = Envelope.sign("not-json", TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(non_json_envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now
+             ) == {:error, :invalid_profile}
+
       assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
                expected_payload_sha256: :bad,
                now: @now

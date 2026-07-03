@@ -47,6 +47,8 @@ defmodule SigilGuard.ToolGateway do
           | :missing_confirmation_key
           | :confirmation_failed
 
+  @type attest_error :: Attestation.from_decision_error() | Attestation.sign_error()
+
   @doc """
   Guard a tool request using manifest checks before runtime policy evaluation.
 
@@ -147,6 +149,40 @@ defmodule SigilGuard.ToolGateway do
   end
 
   def verify_list_changed(_, _), do: {:error, :invalid_manifest}
+
+  @doc """
+  Build and sign a `tool_request` attestation envelope.
+  """
+  @spec attest_request(Decision.t(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, map()} | {:error, attest_error()}
+  def attest_request(decision, context, opts \\ [])
+
+  def attest_request(%Decision{} = decision, context, opts) when is_list(opts) do
+    with {:ok, signer} <- required_attestation_signer(opts),
+         opts <- attestation_opts(opts, :tool_request),
+         {:ok, statement} <- Attestation.from_decision(decision, context, opts) do
+      Attestation.sign(statement, signer, opts)
+    end
+  end
+
+  def attest_request(_, _, _), do: {:error, :invalid_payload}
+
+  @doc """
+  Build and sign a `tool_result` attestation envelope.
+  """
+  @spec attest_result(Decision.t(), Context.t() | map() | keyword(), keyword()) ::
+          {:ok, map()} | {:error, attest_error()}
+  def attest_result(decision, context, opts \\ [])
+
+  def attest_result(%Decision{} = decision, context, opts) when is_list(opts) do
+    with {:ok, signer} <- required_attestation_signer(opts),
+         opts <- attestation_opts(opts, :tool_result),
+         {:ok, statement} <- Attestation.from_decision(decision, context, opts) do
+      Attestation.sign(statement, signer, opts)
+    end
+  end
+
+  def attest_result(_, _, _), do: {:error, :invalid_payload}
 
   @doc """
   Guard a tool result before it is returned to the model.
@@ -632,10 +668,40 @@ defmodule SigilGuard.ToolGateway do
 
   defp maybe_put_manifest_digest(opts, %CapabilityManifest{digest: digest})
        when is_binary(digest) do
-    Keyword.put(opts, :manifest, digest)
+    Keyword.put(opts, :manifest_digest, digest)
   end
 
   defp maybe_put_manifest_digest(opts, _), do: opts
+
+  defp required_attestation_signer(opts) do
+    case Keyword.get(opts, :signer) do
+      signer when is_atom(signer) -> {:ok, signer}
+      _ -> {:error, :invalid_signer}
+    end
+  end
+
+  defp attestation_opts(opts, statement_type) do
+    opts
+    |> Keyword.put(:statement_type, statement_type)
+    |> normalize_attestation_manifest()
+  end
+
+  defp normalize_attestation_manifest(opts) do
+    case Keyword.get(opts, :manifest) do
+      %CapabilityManifest{} = capability ->
+        opts
+        |> Keyword.put(:manifest_digest, capability.digest)
+        |> maybe_put_output_schema_sha256(capability.output_schema_sha256)
+
+      _ ->
+        opts
+    end
+  end
+
+  defp maybe_put_output_schema_sha256(opts, digest) when is_binary(digest),
+    do: Keyword.put_new(opts, :output_schema_sha256, digest)
+
+  defp maybe_put_output_schema_sha256(opts, _), do: opts
 
   defp maybe_force_suspicious_confirmation(%Decision{verdict: :blocked} = decision, _, _, _, _) do
     decision

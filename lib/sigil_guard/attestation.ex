@@ -23,6 +23,7 @@ defmodule SigilGuard.Attestation do
   @confirmation_atom_key :_agent_confirmation
   @confirmation_token_key "confirmation_token"
   @confirmation_token_atom_key :confirmation_token
+  @sha256_regex ~r/^[0-9a-f]{64}$/
 
   @strip_keys [
     @trust_key,
@@ -405,7 +406,7 @@ defmodule SigilGuard.Attestation do
       |> maybe_put("nonce", Keyword.get(source.opts, :nonce))
       |> maybe_put("evidence", Keyword.get(source.opts, :evidence))
 
-    with {:ok, extension} <- agent_extension(source, predicate) do
+    with {:ok, extension} <- predicate_extension(source, predicate) do
       {:ok, Map.merge(predicate, extension)}
     end
   end
@@ -416,7 +417,30 @@ defmodule SigilGuard.Attestation do
   defp predicate_verdict(%{verdict: {:confirm, _}}), do: "confirm"
   defp predicate_verdict(_), do: "block"
 
-  defp agent_extension(%{statement_type: :agent_request} = source, predicate) do
+  defp predicate_extension(%{statement_type: :tool_request} = source, _) do
+    {:ok,
+     %{}
+     |> maybe_put("tool", tool_predicate(source))
+     |> maybe_put("resource", resource_predicate(source))}
+  end
+
+  defp predicate_extension(%{statement_type: :tool_result} = source, _) do
+    with {:ok, request_action_digest} <- required_digest(source.opts, :request_action_digest),
+         {:ok, output_schema_sha256} <- optional_digest(source.opts, :output_schema_sha256),
+         {:ok, quarantine} <- quarantine_predicate(source),
+         {:ok, scanner} <- scanner_predicate(source) do
+      {:ok,
+       %{
+         "boundary" => %{"sink" => Atom.to_string(source.context.sink)},
+         "request_action_digest" => request_action_digest,
+         "quarantine" => quarantine,
+         "scanner" => scanner
+       }
+       |> maybe_put("output_schema_sha256", output_schema_sha256)}
+    end
+  end
+
+  defp predicate_extension(%{statement_type: :agent_request} = source, predicate) do
     opts =
       source.opts
       |> Keyword.put_new(:peer_trust, source.context.trust_level)
@@ -425,7 +449,7 @@ defmodule SigilGuard.Attestation do
     AgentPredicate.build_request(source.payload, opts)
   end
 
-  defp agent_extension(%{statement_type: :agent_response} = source, _) do
+  defp predicate_extension(%{statement_type: :agent_response} = source, _) do
     opts =
       source.opts
       |> Keyword.put_new(:peer_trust, source.context.trust_level)
@@ -434,9 +458,131 @@ defmodule SigilGuard.Attestation do
     AgentPredicate.build_response(source.payload, opts)
   end
 
-  defp agent_extension(_, _), do: {:ok, %{}}
+  defp predicate_extension(_, _), do: {:ok, %{}}
+
+  defp tool_predicate(source) do
+    %{}
+    |> maybe_put("name", source.context.tool)
+    |> maybe_put("mcp_server", source.context.mcp_server)
+    |> maybe_put("manifest_digest", Keyword.get(source.opts, :manifest_digest))
+  end
+
+  defp resource_predicate(source) do
+    scope =
+      source.opts
+      |> Keyword.get(:scopes)
+      |> scope_string()
+
+    %{}
+    |> maybe_put("uri", Keyword.get(source.opts, :resource) || source.context.resource_uri)
+    |> maybe_put(
+      "audience",
+      Keyword.get(source.opts, :audience) || source.context.intended_audience
+    )
+    |> maybe_put("scope", scope)
+  end
+
+  defp scope_string(scopes) when is_list(scopes) do
+    scopes
+    |> Enum.filter(&is_binary/1)
+    |> Enum.sort()
+    |> Enum.join(" ")
+    |> blank_to_nil()
+  end
+
+  defp scope_string(scope) when is_binary(scope), do: blank_to_nil(scope)
+  defp scope_string(_), do: nil
+
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
+
+  defp required_digest(opts, key) do
+    case Keyword.fetch(opts, key) do
+      {:ok, digest} when is_binary(digest) ->
+        if Regex.match?(@sha256_regex, digest),
+          do: {:ok, digest},
+          else: {:error, :invalid_payload}
+
+      _ ->
+        {:error, :invalid_payload}
+    end
+  end
+
+  defp optional_digest(opts, key) do
+    case Keyword.fetch(opts, key) do
+      {:ok, digest} when is_binary(digest) ->
+        if Regex.match?(@sha256_regex, digest),
+          do: {:ok, digest},
+          else: {:error, :invalid_payload}
+
+      {:ok, nil} ->
+        {:ok, nil}
+
+      {:ok, _} ->
+        {:error, :invalid_payload}
+
+      :error ->
+        {:ok, nil}
+    end
+  end
+
+  defp quarantine_predicate(source) do
+    status =
+      source.opts
+      |> Keyword.get(:quarantine_status, source.decision.audit_metadata[:quarantine_status])
+      |> quarantine_status()
+
+    indicator_ids =
+      source.opts
+      |> Keyword.get(
+        :indicator_ids,
+        source.decision.audit_metadata[:scanner_summary][:indicator_ids]
+      )
+      |> normalize_indicator_ids(source.decision.indicators)
+
+    {:ok, %{"status" => status, "indicator_ids" => indicator_ids}}
+  end
+
+  defp quarantine_status(:quarantined), do: "quarantined"
+  defp quarantine_status(:released_sanitized), do: "released_sanitized"
+  defp quarantine_status(_), do: "none"
+
+  defp normalize_indicator_ids(ids, _) when is_list(ids) do
+    ids
+    |> Enum.filter(&is_binary/1)
+    |> Enum.sort()
+  end
+
+  defp normalize_indicator_ids(_, indicators) when is_list(indicators) do
+    indicators
+    |> Enum.map(&(Map.get(&1, :id) || Map.get(&1, "id")))
+    |> Enum.filter(&is_binary/1)
+    |> Enum.sort()
+  end
+
+  defp normalize_indicator_ids(_, _), do: []
+
+  defp scanner_predicate(source) do
+    summary = source.decision.audit_metadata[:scanner_summary] || %{}
+
+    hit_count =
+      source.opts
+      |> Keyword.get(
+        :scanner_hit_count,
+        Map.get(summary, :hit_count, length(source.decision.hits))
+      )
+
+    redacted = Keyword.get(source.opts, :redacted, source.decision.action == :redact)
+
+    if is_integer(hit_count) and hit_count >= 0 and is_boolean(redacted) do
+      {:ok, %{"hit_count" => hit_count, "redacted" => redacted}}
+    else
+      {:error, :invalid_payload}
+    end
+  end
 
   defp maybe_put(map, _, nil), do: map
+  defp maybe_put(map, _, value) when is_map(value) and map_size(value) == 0, do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp unsigned_payload(envelope) do
