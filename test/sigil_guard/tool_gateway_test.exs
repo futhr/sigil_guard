@@ -249,6 +249,7 @@ defmodule SigilGuard.ToolGatewayTest do
                  decision,
                  @confirmation_key,
                  now: @now,
+                 manifest: decision.audit_metadata.manifest_digest,
                  nonce: "tool-gateway-confirmation-nonce"
                )
 
@@ -739,6 +740,72 @@ defmodule SigilGuard.ToolGatewayTest do
              ) == {:error, :unknown_manifest}
     end
 
+    test "re-verifies refreshed tools after list_changed" do
+      assert {:ok, [%CapabilityManifest{} = capability]} =
+               ToolGateway.verify_list_changed([tools_list_entry()],
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest()},
+                 now: @now
+               )
+
+      assert capability.name == "repo_file_write"
+
+      poisoned = Map.put(tools_list_entry(), "description", "Write anywhere on disk.")
+
+      assert ToolGateway.verify_list_changed([poisoned],
+               server: "repo-mcp",
+               manifests: %{"repo_file_write" => manifest()},
+               now: @now
+             ) == {:error, :manifest_digest_mismatch}
+
+      assert ToolGateway.verify_list_changed(:not_a_list, []) == {:error, :invalid_manifest}
+    end
+
+    test "list_changed manifest drift invalidates stale approval tokens" do
+      old_manifest = suspicious_manifest()
+      new_manifest = Map.put(old_manifest, "version", "2026.7.1")
+
+      old_decision =
+        ToolGateway.guard_request(request(), sandbox_context(),
+          manifests: %{"repo_file_write" => old_manifest},
+          require_manifest: true
+        )
+
+      assert {:confirm, _} = old_decision.verdict
+
+      assert {:ok, token} =
+               Confirmation.issue(
+                 request_payload(),
+                 request_context(),
+                 old_decision,
+                 @confirmation_key,
+                 now: @now,
+                 manifest: old_decision.audit_metadata.manifest_digest,
+                 nonce: "tool-gateway-stale-manifest-nonce"
+               )
+
+      assert {:ok, [_]} =
+               ToolGateway.verify_list_changed([tools_list_entry(new_manifest)],
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => new_manifest},
+                 now: @now
+               )
+
+      stale =
+        ToolGateway.guard_request(request(), sandbox_context(),
+          manifests: %{"repo_file_write" => new_manifest},
+          require_manifest: true,
+          confirmation_token: token,
+          confirmation_key: @confirmation_key,
+          consume_confirmation: false,
+          now: @now
+        )
+
+      assert stale.verdict == :blocked
+      assert stale.audit_metadata.deny_reason == :confirmation_failed
+      assert stale.audit_metadata.confirmation_reason == :manifest_digest_mismatch
+    end
+
     test "returns named errors for unknown and malformed manifests" do
       assert ToolGateway.verify_manifest("repo_file_write", manifests: %{}) ==
                {:error, :unknown_manifest}
@@ -896,11 +963,15 @@ defmodule SigilGuard.ToolGatewayTest do
   end
 
   defp tools_list_entry do
+    tools_list_entry(manifest())
+  end
+
+  defp tools_list_entry(manifest) do
     %{
-      "name" => manifest()["name"],
-      "description" => manifest()["description"],
-      "inputSchema" => manifest()["input_schema"],
-      "annotations" => manifest()["annotations"]
+      "name" => manifest["name"],
+      "description" => manifest["description"],
+      "inputSchema" => manifest["input_schema"],
+      "annotations" => manifest["annotations"]
     }
   end
 

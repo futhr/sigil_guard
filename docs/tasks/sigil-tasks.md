@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 6 | 0 | 16 |
+| M3 - Manifests, gateway, and agent trust | 22 | 7 | 0 | 15 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **93** | **0** | **135** |
+| **Total** | **228** | **94** | **0** | **134** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -703,7 +703,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     is required; unknown tools fail `:unknown_manifest`, expired manifests
     `:manifest_expired`.
   - Tests: negative, tamper, expiration, malformed.
-- [ ] M3.07 `tools/list_changed` re-verification and approval invalidation.
+- [x] M3.07 `tools/list_changed` re-verification and approval invalidation.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Threat Coverage
     And Host-Owned Exclusions (TM.05, TM.07).
   - AC: a `list_changed` notification forces full re-verification; cached

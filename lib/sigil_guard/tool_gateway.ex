@@ -127,6 +127,28 @@ defmodule SigilGuard.ToolGateway do
   def verify_manifest(_, _), do: {:error, :unknown_manifest}
 
   @doc """
+  Verify a refreshed `tools/list` result after a `tools/list_changed` notice.
+  """
+  @spec verify_list_changed([map()], keyword()) ::
+          {:ok, [CapabilityManifest.t()]} | {:error, deny_reason()}
+  def verify_list_changed(observed_tools, opts) when is_list(observed_tools) do
+    result =
+      Enum.reduce_while(observed_tools, {:ok, []}, fn observed, {:ok, capabilities} ->
+        case verify_manifest(observed, opts) do
+          {:ok, capability} -> {:cont, {:ok, [capability | capabilities]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, capabilities} -> {:ok, Enum.reverse(capabilities)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def verify_list_changed(_, _), do: {:error, :invalid_manifest}
+
+  @doc """
   Guard a tool result before it is returned to the model.
   """
   @spec guard_result(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
@@ -717,7 +739,7 @@ defmodule SigilGuard.ToolGateway do
   defp verify_confirmation(decision, payload, context, token, opts) do
     with {:ok, key} <- confirmation_key(opts),
          {:ok, claims} <-
-           Confirmation.verify(token, payload, context, key, confirmation_opts(opts)) do
+           Confirmation.verify(token, payload, context, key, confirmation_opts(decision, opts)) do
       confirmed_decision(decision, claims)
     else
       {:error, reason} -> confirmation_failure_decision(decision, reason)
@@ -731,11 +753,21 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  defp confirmation_opts(opts) do
+  defp confirmation_opts(decision, opts) do
     opts
     |> Keyword.take([:now])
     |> Keyword.put(:consume, Keyword.get(opts, :consume_confirmation, true))
+    |> maybe_put_confirmation_manifest(decision)
   end
+
+  defp maybe_put_confirmation_manifest(opts, %Decision{
+         audit_metadata: %{manifest_digest: digest}
+       })
+       when is_binary(digest) do
+    Keyword.put(opts, :manifest, digest)
+  end
+
+  defp maybe_put_confirmation_manifest(opts, _), do: opts
 
   defp confirmed_decision(%Decision{} = decision, claims) do
     metadata =

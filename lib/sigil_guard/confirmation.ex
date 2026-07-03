@@ -9,8 +9,9 @@ defmodule SigilGuard.Confirmation do
   a different tool call, tool result, sink, actor, or trust boundary.
 
   Tokens are stateless by default. They prevent cross-action replay by binding
-  to the action digest and expiry. Pass `consume: true` to `verify/5` or
-  `valid?/5` to enforce single-use semantics with `SigilGuard.ReplayStore`.
+  to the action digest, manifest digest when present, and expiry. Pass
+  `consume: true` to `verify/5` or `valid?/5` to enforce single-use semantics
+  with `SigilGuard.ReplayStore`.
   """
 
   alias SigilGuard.Context
@@ -21,6 +22,7 @@ defmodule SigilGuard.Confirmation do
   @token_type "sigil_guard.confirmation.v1"
   @default_ttl_ms 300_000
   @min_key_bytes 16
+  @sha256_regex ~r/^[0-9a-f]{64}$/
 
   @type claims :: %{
           required(String.t()) => String.t() | integer()
@@ -78,6 +80,7 @@ defmodule SigilGuard.Confirmation do
     * `:ttl_ms` - token lifetime in milliseconds. Defaults to 5 minutes.
     * `:now` - `DateTime` used for deterministic tests.
     * `:nonce` - nonce used for deterministic tests.
+    * `:manifest` - pinned manifest digest to bind into the token.
   """
   @spec issue(term(), Context.t() | map() | keyword(), Decision.t(), binary(), keyword()) ::
           {:ok, String.t()} | {:error, term()}
@@ -90,11 +93,13 @@ defmodule SigilGuard.Confirmation do
          {:ok, ttl_ms} <- issue_ttl_ms(opts),
          {:ok, actor} <- issue_actor(context, opts),
          {:ok, nonce} <- issue_nonce(opts),
+         {:ok, manifest_digest} <- issue_manifest_digest(opts),
          {:ok, action_digest} <- fetch_action_digest(payload, context) do
       claims =
         build_claims(decision, %{
           actor: actor,
           action_digest: action_digest,
+          manifest_digest: manifest_digest,
           issued_at: DateTime.to_iso8601(now),
           expires_at: expires_at(now, ttl_ms),
           nonce: nonce
@@ -123,7 +128,7 @@ defmodule SigilGuard.Confirmation do
          :ok <- verify_signature(claims, signature, key),
          :ok <- validate_claims(claims),
          :ok <- validate_expiry(claims, opts),
-         :ok <- validate_digest(claims, payload, context),
+         :ok <- validate_digest(claims, payload, context, opts),
          :ok <- maybe_consume_nonce(claims, opts) do
       {:ok, claims}
     end
@@ -144,7 +149,7 @@ defmodule SigilGuard.Confirmation do
   end
 
   defp build_claims(decision, attrs) do
-    %{
+    claims = %{
       "v" => @version,
       "typ" => @token_type,
       "alg" => "HS256",
@@ -157,7 +162,12 @@ defmodule SigilGuard.Confirmation do
       "expires_at" => attrs.expires_at,
       "nonce" => attrs.nonce
     }
+
+    maybe_put_manifest_digest(claims, attrs.manifest_digest)
   end
+
+  defp maybe_put_manifest_digest(claims, nil), do: claims
+  defp maybe_put_manifest_digest(claims, digest), do: Map.put(claims, "manifest_digest", digest)
 
   defp encode_token(claims, key) do
     body = Jason.encode!(claims)
@@ -229,9 +239,30 @@ defmodule SigilGuard.Confirmation do
     end
   end
 
-  defp validate_digest(%{"action_digest" => digest}, payload, context) do
+  defp validate_digest(%{"action_digest" => digest} = claims, payload, context, opts) do
     with {:ok, expected} <- fetch_action_digest(payload, context) do
-      if secure_compare(expected, digest), do: :ok, else: {:error, :digest_mismatch}
+      if secure_compare(expected, digest) do
+        validate_manifest_digest(claims, opts)
+      else
+        {:error, :digest_mismatch}
+      end
+    end
+  end
+
+  defp validate_manifest_digest(%{"manifest_digest" => digest}, opts) when is_binary(digest) do
+    case expected_manifest_digest(opts) do
+      {:ok, ^digest} -> :ok
+      {:ok, _} -> {:error, :manifest_digest_mismatch}
+      :none -> {:error, :manifest_digest_mismatch}
+      {:error, _} -> {:error, :manifest_digest_mismatch}
+    end
+  end
+
+  defp validate_manifest_digest(%{}, opts) do
+    case expected_manifest_digest(opts) do
+      :none -> :ok
+      {:ok, _} -> {:error, :manifest_digest_mismatch}
+      {:error, _} -> {:error, :manifest_digest_mismatch}
     end
   end
 
@@ -281,6 +312,30 @@ defmodule SigilGuard.Confirmation do
     case Keyword.get_lazy(opts, :nonce, &generate_nonce/0) do
       nonce when is_binary(nonce) and nonce != "" -> {:ok, nonce}
       _ -> {:error, :invalid_nonce}
+    end
+  end
+
+  defp issue_manifest_digest(opts) do
+    case Keyword.get(opts, :manifest) do
+      nil -> {:ok, nil}
+      digest when is_binary(digest) -> validate_manifest_digest_value(digest)
+      _ -> {:error, :invalid_payload}
+    end
+  end
+
+  defp expected_manifest_digest(opts) do
+    case Keyword.get(opts, :manifest) do
+      nil -> :none
+      digest when is_binary(digest) -> validate_manifest_digest_value(digest)
+      _ -> {:error, :invalid_payload}
+    end
+  end
+
+  defp validate_manifest_digest_value(digest) do
+    if digest =~ @sha256_regex do
+      {:ok, digest}
+    else
+      {:error, :invalid_payload}
     end
   end
 
