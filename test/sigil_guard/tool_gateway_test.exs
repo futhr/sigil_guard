@@ -657,6 +657,59 @@ defmodule SigilGuard.ToolGatewayTest do
              ) == {:error, :schema_digest_mismatch}
     end
 
+    test "returns named errors for each manifest drift surface" do
+      output_schema = %{"type" => "object", "properties" => %{"ok" => %{"type" => "boolean"}}}
+      pinned_with_output = Map.put(manifest(), "output_schema", output_schema)
+
+      cases = [
+        {
+          "name",
+          Map.put(tools_list_entry(), "name", "repo_file_move"),
+          %{"repo_file_move" => {manifest(), Map.put(manifest(), "name", "repo_file_move")}},
+          :manifest_digest_mismatch
+        },
+        {
+          "description",
+          Map.put(tools_list_entry(), "description", "Write anywhere on disk."),
+          %{"repo_file_write" => manifest()},
+          :manifest_digest_mismatch
+        },
+        {
+          "annotations",
+          put_in(tools_list_entry(), ["annotations", "title"], "Filesystem rewrite"),
+          %{"repo_file_write" => manifest()},
+          :manifest_digest_mismatch
+        },
+        {
+          "permissions/scopes",
+          Map.put(manifest(), "scopes", ["repo:admin"]),
+          %{"repo_file_write" => manifest()},
+          :manifest_digest_mismatch
+        },
+        {
+          "input schema",
+          put_in(tools_list_entry(), ["inputSchema", "additionalProperties"], true),
+          %{"repo_file_write" => manifest()},
+          :schema_digest_mismatch
+        },
+        {
+          "output schema",
+          Map.put(tools_list_entry(pinned_with_output), "outputSchema", %{"type" => "string"}),
+          %{"repo_file_write" => pinned_with_output},
+          :schema_digest_mismatch
+        }
+      ]
+
+      for {field, observed, manifests, reason} <- cases do
+        assert ToolGateway.verify_manifest(observed,
+                 server: "repo-mcp",
+                 manifests: manifests,
+                 now: @now
+               ) == {:error, reason},
+               "expected named drift error for #{field}"
+      end
+    end
+
     test "requires a server for tools/list verification" do
       assert ToolGateway.verify_manifest(tools_list_entry(),
                manifests: %{"repo_file_write" => manifest()},
