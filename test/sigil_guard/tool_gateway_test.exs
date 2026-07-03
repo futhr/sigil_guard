@@ -482,8 +482,15 @@ defmodule SigilGuard.ToolGatewayTest do
           require_manifest: true
         )
 
+      response = ToolGateway.response_for_decision(decision, "missing-sandbox")
+
       assert decision.verdict == :blocked
       assert decision.audit_metadata.deny_reason == :sandbox_required
+      assert response["error"]["code"] == -32_056
+      assert response["error"]["data"]["tool"] == "repo_file_write"
+      assert response["error"]["data"]["required_isolation"] == "container"
+      assert response["error"]["data"]["sandbox_id_present"] == false
+      refute Map.has_key?(response["error"]["data"], "received_isolation")
     end
 
     test "allows manifests that do not require sandbox identity" do
@@ -510,6 +517,14 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert decision.verdict == :blocked
       assert decision.audit_metadata.deny_reason == :sandbox_required
+      assert decision.audit_metadata.received_isolation == "container"
+
+      response = ToolGateway.response_for_decision(decision, "weak-sandbox")
+
+      assert response["error"]["code"] == -32_056
+      assert response["error"]["data"]["required_isolation"] == "remote_attested"
+      assert response["error"]["data"]["received_isolation"] == "container"
+      assert response["error"]["data"]["sandbox_id_present"] == true
     end
 
     test "blocks token passthrough, resource, and audience mismatches before runtime" do
@@ -535,6 +550,28 @@ defmodule SigilGuard.ToolGatewayTest do
       assert token_passthrough.audit_metadata.deny_reason == :token_passthrough_denied
       assert resource.audit_metadata.deny_reason == :resource_mismatch
       assert audience.audit_metadata.deny_reason == :audience_mismatch
+
+      passthrough_response = ToolGateway.response_for_decision(token_passthrough, "passthrough")
+      resource_response = ToolGateway.response_for_decision(resource, "resource")
+      audience_response = ToolGateway.response_for_decision(audience, "audience")
+
+      assert passthrough_response["error"]["code"] == -32_050
+      assert passthrough_response["error"]["data"]["status"] == "blocked"
+      assert passthrough_response["error"]["data"]["reason"] =~ "token_passthrough_denied"
+      assert token_passthrough.audit_metadata.audience == "host-app"
+      assert token_passthrough.audit_metadata.self_resource == "host-app"
+
+      assert resource_response["error"]["code"] == -32_050
+      assert resource_response["error"]["data"]["status"] == "blocked"
+      assert resource_response["error"]["data"]["reason"] =~ "resource_mismatch"
+      assert resource.audit_metadata.server == "repo-mcp"
+      assert resource.audit_metadata.resource == "other-server"
+
+      assert audience_response["error"]["code"] == -32_050
+      assert audience_response["error"]["data"]["status"] == "blocked"
+      assert audience_response["error"]["data"]["reason"] =~ "audience_mismatch"
+      assert audience.audit_metadata.audience == "other-server"
+      assert audience.audit_metadata.accepted_audiences == ["repo-mcp"]
     end
 
     test "accepts matching resource and audience checks" do

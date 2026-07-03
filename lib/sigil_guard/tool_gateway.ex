@@ -90,7 +90,7 @@ defmodule SigilGuard.ToolGateway do
       |> maybe_force_suspicious_confirmation(payload, request_context, capability, opts)
       |> maybe_apply_confirmation(payload, request_context, request, opts)
     else
-      {:error, reason} -> deny(reason, payload, request_context)
+      {:error, denial} -> deny(denial, payload, request_context)
     end
   end
 
@@ -643,7 +643,12 @@ defmodule SigilGuard.ToolGateway do
 
     if present?(audience) and present?(self_resource) and
          audience_contains?(audience, self_resource) do
-      {:error, :token_passthrough_denied}
+      {:error,
+       {:token_passthrough_denied,
+        %{
+          audience: audience,
+          self_resource: self_resource
+        }}}
     else
       :ok
     end
@@ -653,7 +658,7 @@ defmodule SigilGuard.ToolGateway do
     case Keyword.get(opts, :resource) do
       nil -> :ok
       ^server -> :ok
-      _ -> {:error, :resource_mismatch}
+      resource -> {:error, {:resource_mismatch, %{server: server, resource: resource}}}
     end
   end
 
@@ -668,7 +673,13 @@ defmodule SigilGuard.ToolGateway do
         if Enum.any?(List.wrap(audience), &(&1 in accepted)) do
           :ok
         else
-          {:error, :audience_mismatch}
+          {:error,
+           {:audience_mismatch,
+            %{
+              audience: audience,
+              accepted_audiences: accepted,
+              server: server
+            }}}
         end
     end
   end
@@ -679,7 +690,10 @@ defmodule SigilGuard.ToolGateway do
   defp require_sandbox(nil, _), do: :ok
   defp require_sandbox(%CapabilityManifest{sandbox: %{"required" => false}}, _), do: :ok
 
-  defp require_sandbox(%CapabilityManifest{sandbox: %{"min_isolation" => min_isolation}}, context) do
+  defp require_sandbox(
+         %CapabilityManifest{name: tool, sandbox: %{"min_isolation" => min_isolation}},
+         context
+       ) do
     metadata = context.metadata
     sandbox_id = metadata[:sandbox_id] || metadata["sandbox_id"]
     isolation_level = metadata[:isolation_level] || metadata["isolation_level"]
@@ -687,11 +701,28 @@ defmodule SigilGuard.ToolGateway do
     if present?(sandbox_id) and isolation_sufficient?(isolation_level, min_isolation) do
       :ok
     else
-      {:error, :sandbox_required}
+      {:error,
+       {:sandbox_required,
+        sandbox_denial_metadata(tool, min_isolation, isolation_level, sandbox_id)}}
     end
   end
 
-  defp require_sandbox(%CapabilityManifest{}, _), do: {:error, :sandbox_required}
+  defp require_sandbox(%CapabilityManifest{name: tool}, context) do
+    metadata = context.metadata
+    sandbox_id = metadata[:sandbox_id] || metadata["sandbox_id"]
+    isolation_level = metadata[:isolation_level] || metadata["isolation_level"]
+
+    {:error, {:sandbox_required, sandbox_denial_metadata(tool, nil, isolation_level, sandbox_id)}}
+  end
+
+  defp sandbox_denial_metadata(tool, required_isolation, isolation_level, sandbox_id) do
+    %{
+      tool: tool,
+      required_isolation: required_isolation,
+      received_isolation: isolation_level,
+      sandbox_id_present: present?(sandbox_id)
+    }
+  end
 
   defp isolation_sufficient?(received, required) do
     isolation_rank(received) >= isolation_rank(required)
@@ -1007,7 +1038,8 @@ defmodule SigilGuard.ToolGateway do
     }
   end
 
-  defp deny(reason, payload, context) do
+  defp deny(denial, payload, context) do
+    {reason, denial_metadata} = denial_metadata(denial)
     content_hash = hash_text(payload.text || "")
 
     %Decision{
@@ -1021,27 +1053,35 @@ defmodule SigilGuard.ToolGateway do
       indicators: [],
       sanitized_text: nil,
       content_hash: content_hash,
-      audit_metadata: %{
-        phase: context.phase,
-        actor: context.actor,
-        identity: context.identity,
-        origin: context.origin,
-        sink: context.sink,
-        tool: context.tool,
-        mcp_server: context.mcp_server,
-        resource_uri: context.resource_uri,
-        trust_zone: context.trust_zone,
-        trust_level: context.trust_level,
-        risk_level: :high,
-        verdict: :blocked,
-        action: :block,
-        deny_reason: reason,
-        hit_count: 0,
-        indicator_count: 0,
-        content_hash: content_hash
-      }
+      audit_metadata:
+        %{
+          phase: context.phase,
+          actor: context.actor,
+          identity: context.identity,
+          origin: context.origin,
+          sink: context.sink,
+          tool: context.tool,
+          mcp_server: context.mcp_server,
+          resource_uri: context.resource_uri,
+          trust_zone: context.trust_zone,
+          trust_level: context.trust_level,
+          risk_level: :high,
+          verdict: :blocked,
+          action: :block,
+          deny_reason: reason,
+          hit_count: 0,
+          indicator_count: 0,
+          content_hash: content_hash
+        }
+        |> Map.merge(denial_metadata)
     }
   end
+
+  defp denial_metadata({reason, metadata}) when is_atom(reason) and is_map(metadata) do
+    {reason, Map.put(metadata, :deny_reason, reason)}
+  end
+
+  defp denial_metadata(reason) when is_atom(reason), do: {reason, %{deny_reason: reason}}
 
   defp put_manifest_metadata(%Decision{} = decision, nil), do: decision
 

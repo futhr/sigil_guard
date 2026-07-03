@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 14 | 0 | 8 |
+| M3 - Manifests, gateway, and agent trust | 22 | 16 | 0 | 6 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **101** | **0** | **127** |
+| **Total** | **228** | **103** | **0** | **125** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -783,7 +783,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     documented `data` shape with nil fields omitted; the v0.2 → v3 code
     change is recorded in `MIGRATING-3.0.md`.
   - Tests: negative (per code), golden shape assertions.
-- [ ] M3.15 Passthrough, audience, and resource denials.
+- [x] M3.15 Passthrough, audience, and resource denials.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Public API Sketch
     (check order step 3); Threat Coverage And Host-Owned Exclusions
     (TM.06, TM.07).
@@ -793,7 +793,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     manifest `server` nor any `audience` entry fails `:audience_mismatch`;
     each maps to its documented JSON-RPC code.
   - Tests: negative, tamper.
-- [ ] M3.16 Sandbox-required denial for privileged tools.
+- [x] M3.16 Sandbox-required denial for privileged tools.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - CapabilityManifest
     Canonical Form (sandbox binding); JSON-RPC Error Registry (-32056).
   - AC: `sandbox.required: true` with a context missing `sandbox_id` or
