@@ -81,20 +81,28 @@ defmodule SigilGuard.TrustBundle do
   end
 
   def load({:binary, bytes}, opts) when is_binary(bytes) and is_list(opts) do
-    case Jason.decode(bytes) do
-      {:ok, envelope} when is_map(envelope) ->
-        verify(envelope, Keyword.put_new(opts, :source, {:binary, bytes}))
+    load_binary(bytes, {:binary, bytes}, opts)
+  end
 
-      _ ->
-        quarantine_error(:invalid_source, %{source: {:binary, bytes}}, opts)
+  # sobelow_skip ["Traversal.FileModule"]
+  def load({:file, path}, opts) when is_binary(path) and is_list(opts) do
+    case File.read(path) do
+      {:ok, bytes} -> load_binary(bytes, {:file, path}, opts)
+      {:error, _} -> quarantine_error(:invalid_source, %{source: {:file, path}}, opts)
     end
   end
 
-  def load({:file, path}, opts) when is_binary(path) and is_list(opts),
-    do: quarantine_error(:invalid_source, %{source: {:file, path}}, opts)
+  # sobelow_skip ["Traversal.FileModule"]
+  def load({:priv, app, rel}, opts) when is_atom(app) and is_binary(rel) and is_list(opts) do
+    path = Application.app_dir(app, Path.join("priv", rel))
 
-  def load({:priv, app, rel}, opts) when is_atom(app) and is_binary(rel) and is_list(opts),
-    do: quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
+    case File.read(path) do
+      {:ok, bytes} -> load_binary(bytes, {:priv, app, rel}, opts)
+      {:error, _} -> quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
+    end
+  rescue
+    ArgumentError -> quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
+  end
 
   def load(:none, opts) when is_list(opts),
     do: quarantine_error(:invalid_source, %{source: :none}, opts)
@@ -103,6 +111,16 @@ defmodule SigilGuard.TrustBundle do
     do: quarantine_error(:invalid_source, %{source: source}, opts)
 
   def load(_, _), do: {:error, :invalid_source}
+
+  defp load_binary(bytes, source, opts) do
+    case Jason.decode(bytes) do
+      {:ok, envelope} when is_map(envelope) ->
+        verify(envelope, Keyword.put_new(opts, :source, source))
+
+      _ ->
+        quarantine_error(:invalid_source, %{source: source}, opts)
+    end
+  end
 
   @doc """
   Verify a decoded DSSE trust-bundle envelope.

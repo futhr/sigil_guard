@@ -68,14 +68,14 @@ trailers (rule 10); the maintainer pushes manually.
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
-| M2 - Embedded trust bundles | 16 | 5 | 0 | 11 |
+| M2 - Embedded trust bundles | 16 | 6 | 0 | 10 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **76** | **0** | **152** |
+| **Total** | **228** | **77** | **0** | **151** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -530,7 +530,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `sequence`, ISO 8601 UTC ms `quarantined_at`, and SP.01-shaped
     `evidence` refs; `list/0,1` filters by bundle id.
   - Tests: negative (one record per failure class), malformed.
-- [ ] M2.06 Four loading sources plus `:invalid_source`.
+- [x] M2.06 Four loading sources plus `:invalid_source`.
   - Spec: `docs/specs/SP.02-embedded-trust-bundles.md` - Loading Sources.
   - AC: `{:file, path}`, `{:priv, app, rel}`, `{:map, map}`, and
     `{:binary, bin}` load and verify; `:none`, unreadable files/resources,
