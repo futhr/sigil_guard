@@ -6,6 +6,7 @@ defmodule SigilGuard.AgentTrustFixtureGenerator do
   alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Attestation.Statement
   alias SigilGuard.Canonical.JCS
+  alias SigilGuard.CapabilityManifest
   alias SigilGuard.TrustProfile
 
   @types [
@@ -301,40 +302,39 @@ defmodule SigilGuard.AgentTrustFixtureGenerator do
   end
 
   defp repo_file_write_manifest_digest do
-    {:ok, digest} =
-      %{
-        "allowed_sink_zones" => ["semi_trusted", "trusted"],
-        "allowed_source_zones" => ["semi_trusted", "trusted"],
-        "annotations_sha256" =>
-          sha256_jcs(%{"destructiveHint" => false, "title" => "Repo File Write"}),
-        "description_sha256" =>
-          sha256_bytes("Write one UTF-8 text file inside the repository working tree."),
-        "expires_at" => "2027-01-01T00:00:00.000Z",
-        "input_schema_sha256" =>
-          sha256_jcs(%{
-            "$schema" => "https://json-schema.org/draft/2020-12/schema",
-            "additionalProperties" => false,
-            "properties" => %{"content" => %{"type" => "string"}, "path" => %{"type" => "string"}},
-            "required" => ["content", "path"],
-            "type" => "object"
-          }),
-        "input_sensitivity" => "internal",
-        "issuer_keyid" => Envelope.keyid(__MODULE__.SeedSigner.public_key()),
-        "manifest_format" => "sigil_guard_capability_manifest/v1",
-        "name" => "repo_file_write",
-        "network_access" => "none",
-        "output_sensitivity" => "internal",
-        "reversibility" => "reversible",
-        "sandbox" => %{"min_isolation" => "container", "required" => true},
-        "scopes" => ["repo:write"],
-        "server" => "repo-mcp",
-        "side_effects" => ["write"],
-        "suspicious_params" => [],
-        "version" => "1.4.2"
-      }
-      |> Digest.manifest_digest()
+    {:ok, digest} = CapabilityManifest.digest(repo_file_write_manifest())
 
     digest
+  end
+
+  defp repo_file_write_manifest do
+    %{
+      "allowed_sink_zones" => ["semi_trusted", "trusted"],
+      "allowed_source_zones" => ["semi_trusted", "trusted"],
+      "annotations" => %{"destructiveHint" => false, "title" => "Repo File Write"},
+      "description" => "Write one UTF-8 text file inside the repository working tree.",
+      "expires_at" => "2027-01-01T00:00:00.000Z",
+      "input_schema" => %{
+        "$schema" => "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties" => false,
+        "properties" => %{"content" => %{"type" => "string"}, "path" => %{"type" => "string"}},
+        "required" => ["content", "path"],
+        "type" => "object"
+      },
+      "input_sensitivity" => "internal",
+      "issuer_keyid" => Envelope.keyid(__MODULE__.SeedSigner.public_key()),
+      "manifest_format" => "sigil_guard_capability_manifest/v1",
+      "name" => "repo_file_write",
+      "network_access" => "none",
+      "output_sensitivity" => "internal",
+      "reversibility" => "reversible",
+      "sandbox" => %{"min_isolation" => "container", "required" => true},
+      "scopes" => ["repo:write"],
+      "server" => "repo-mcp",
+      "side_effects" => ["write"],
+      "suspicious_params" => [],
+      "version" => "1.4.2"
+    }
   end
 
   defp expected(vector, statement_json, pae, envelope) do
@@ -372,11 +372,6 @@ defmodule SigilGuard.AgentTrustFixtureGenerator do
 
   defp stringify_value(value) when is_atom(value), do: Atom.to_string(value)
   defp stringify_value(value), do: value
-
-  defp sha256_jcs(value) do
-    {:ok, bytes} = JCS.encode(value)
-    sha256_bytes(bytes)
-  end
 
   defp sha256_bytes(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
 
