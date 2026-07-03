@@ -7,6 +7,7 @@ defmodule SigilGuard.ToolGateway do
   before runtime execution.
   """
 
+  alias SigilGuard.Attestation
   alias SigilGuard.CapabilityManifest
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
@@ -32,9 +33,14 @@ defmodule SigilGuard.ToolGateway do
           :unknown_manifest
           | :invalid_manifest
           | :manifest_digest_mismatch
+          | :manifest_expired
           | :schema_digest_mismatch
           | :suspicious_required_param
-          | :missing_sandbox
+          | :resource_mismatch
+          | :audience_mismatch
+          | :token_passthrough_denied
+          | :sandbox_required
+          | :invalid_attestation
           | :invalid_confirmation_token
           | :missing_confirmation_key
           | :confirmation_failed
@@ -47,11 +53,13 @@ defmodule SigilGuard.ToolGateway do
     * `:manifests` - map of tool name to pinned manifest, or `{pinned, observed}`
       tuples when the observed manifest is supplied separately.
     * `:require_manifest` - block unknown tools when no manifest resolves.
+      Defaults to `true` when manifests are configured, otherwise `false`.
     * `:allow_suspicious_params` - explicit boundary-policy escape hatch for
       disclosed suspicious required parameters.
-    * `:confirmation` - confirmation token to apply to a confirmation decision.
-    * `:confirmation_key`, `:consume_confirmation`, `:now` - forwarded to token
-      verification.
+    * `:attestation` - `:off`, `:optional`, or `:required`.
+    * `:confirmation` - `:honor` or `:off`; defaults to `:honor`.
+    * `:confirmation_token`, `:confirmation_key`, `:consume_confirmation`,
+      `:now` - forwarded to token verification.
   """
   @spec guard_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_request(request, context \\ %{}, opts \\ []) do
@@ -59,7 +67,10 @@ defmodule SigilGuard.ToolGateway do
     request_context = request_context(request, context)
 
     with {:ok, capability} <- resolve_manifest(payload.tool, opts),
-         :ok <- require_sandbox(capability) do
+         :ok <- manifest_freshness(capability, opts),
+         :ok <- passthrough_resource_audience(capability, opts),
+         :ok <- require_sandbox(capability, request_context),
+         :ok <- verify_inbound_attestation(request, payload, request_context, capability, opts) do
       request
       |> MCP.Gateway.guard_request(context, opts)
       |> put_manifest_metadata(capability)
@@ -90,7 +101,7 @@ defmodule SigilGuard.ToolGateway do
   def verify_manifest(_, _), do: {:error, :unknown_manifest}
 
   defp resolve_manifest(nil, opts) do
-    if Keyword.get(opts, :require_manifest, false) do
+    if require_manifest?(opts) do
       {:error, :unknown_manifest}
     else
       {:ok, nil}
@@ -105,7 +116,7 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp maybe_allow_missing_manifest(opts) do
-    if Keyword.get(opts, :require_manifest, false) do
+    if require_manifest?(opts) do
       {:error, :unknown_manifest}
     else
       {:ok, nil}
@@ -116,6 +127,12 @@ defmodule SigilGuard.ToolGateway do
     opts
     |> Keyword.get(:manifests, %{})
     |> fetch_manifest(tool)
+  end
+
+  defp require_manifest?(opts) do
+    Keyword.get_lazy(opts, :require_manifest, fn ->
+      Keyword.has_key?(opts, :manifests) or Keyword.has_key?(opts, :trust_bundle)
+    end)
   end
 
   defp fetch_manifest(manifests, tool) when is_map(manifests) do
@@ -167,9 +184,153 @@ defmodule SigilGuard.ToolGateway do
   defp matching_tool_name(tool, %CapabilityManifest{name: tool}), do: :ok
   defp matching_tool_name(_, _), do: {:error, :manifest_digest_mismatch}
 
-  defp require_sandbox(nil), do: :ok
-  defp require_sandbox(%CapabilityManifest{sandbox: %{"required" => true}}), do: :ok
-  defp require_sandbox(%CapabilityManifest{}), do: {:error, :missing_sandbox}
+  defp manifest_freshness(nil, _), do: :ok
+
+  defp manifest_freshness(%CapabilityManifest{expires_at: expires_at}, opts) do
+    with {:ok, expires_at, _} <- DateTime.from_iso8601(expires_at),
+         {:ok, now} <- now(opts) do
+      max_skew_ms = Keyword.get(opts, :max_skew_ms, 0)
+      expires_at = DateTime.add(expires_at, max_skew_ms, :millisecond)
+
+      if DateTime.compare(now, expires_at) == :gt do
+        {:error, :manifest_expired}
+      else
+        :ok
+      end
+    else
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp now(opts) do
+    case Keyword.get(opts, :now, DateTime.utc_now(:millisecond)) do
+      %DateTime{} = now -> {:ok, now}
+      _ -> {:error, :invalid_now}
+    end
+  end
+
+  defp passthrough_resource_audience(nil, _), do: :ok
+
+  defp passthrough_resource_audience(%CapabilityManifest{} = capability, opts) do
+    with :ok <- token_passthrough(opts),
+         :ok <- resource_match(capability, opts) do
+      audience_match(capability, opts)
+    end
+  end
+
+  defp token_passthrough(opts) do
+    audience = Keyword.get(opts, :audience)
+    self_resource = Keyword.get(opts, :self_resource)
+
+    if present?(audience) and present?(self_resource) and
+         audience_contains?(audience, self_resource) do
+      {:error, :token_passthrough_denied}
+    else
+      :ok
+    end
+  end
+
+  defp resource_match(%CapabilityManifest{server: server}, opts) do
+    case Keyword.get(opts, :resource) do
+      nil -> :ok
+      ^server -> :ok
+      _ -> {:error, :resource_mismatch}
+    end
+  end
+
+  defp audience_match(%CapabilityManifest{server: server, audience: manifest_audience}, opts) do
+    case Keyword.get(opts, :audience) do
+      nil ->
+        :ok
+
+      audience ->
+        accepted = [server | List.wrap(manifest_audience || [])]
+
+        if Enum.any?(List.wrap(audience), &(&1 in accepted)) do
+          :ok
+        else
+          {:error, :audience_mismatch}
+        end
+    end
+  end
+
+  defp audience_contains?(audience, value), do: value in List.wrap(audience)
+  defp present?(value), do: value not in [nil, ""]
+
+  defp require_sandbox(nil, _), do: :ok
+  defp require_sandbox(%CapabilityManifest{sandbox: %{"required" => false}}, _), do: :ok
+
+  defp require_sandbox(%CapabilityManifest{sandbox: %{"min_isolation" => min_isolation}}, context) do
+    metadata = context.metadata
+    sandbox_id = metadata[:sandbox_id] || metadata["sandbox_id"]
+    isolation_level = metadata[:isolation_level] || metadata["isolation_level"]
+
+    if present?(sandbox_id) and isolation_sufficient?(isolation_level, min_isolation) do
+      :ok
+    else
+      {:error, :sandbox_required}
+    end
+  end
+
+  defp require_sandbox(%CapabilityManifest{}, _), do: {:error, :sandbox_required}
+
+  defp isolation_sufficient?(received, required) do
+    isolation_rank(received) >= isolation_rank(required)
+  end
+
+  defp isolation_rank("container"), do: 1
+  defp isolation_rank("vm"), do: 2
+  defp isolation_rank("remote_attested"), do: 3
+  defp isolation_rank(_), do: 0
+
+  defp verify_inbound_attestation(request, payload, context, capability, opts) do
+    case Keyword.get(opts, :attestation, :off) do
+      :off ->
+        :ok
+
+      :optional ->
+        case Attestation.fetch(request) do
+          {:ok, envelope} ->
+            verify_attestation_envelope(envelope, payload, context, capability, opts)
+
+          :error ->
+            :ok
+        end
+
+      :required ->
+        case Attestation.fetch(request) do
+          {:ok, envelope} ->
+            verify_attestation_envelope(envelope, payload, context, capability, opts)
+
+          :error ->
+            {:error, :invalid_attestation}
+        end
+
+      _ ->
+        {:error, :invalid_attestation}
+    end
+  end
+
+  defp verify_attestation_envelope(envelope, payload, context, capability, opts) do
+    verify_opts =
+      opts
+      |> Keyword.take([:now, :max_skew_ms])
+      |> Keyword.put(:payload, payload)
+      |> Keyword.put(:context, context)
+      |> maybe_put_manifest_digest(capability)
+
+    case Attestation.verify(envelope, Keyword.get(opts, :trust_material, %{}), verify_opts) do
+      {:ok, _} -> :ok
+      {:error, _} -> {:error, :invalid_attestation}
+    end
+  end
+
+  defp maybe_put_manifest_digest(opts, %CapabilityManifest{digest: digest})
+       when is_binary(digest) do
+    Keyword.put(opts, :manifest, digest)
+  end
+
+  defp maybe_put_manifest_digest(opts, _), do: opts
 
   defp maybe_force_suspicious_confirmation(%Decision{verdict: :blocked} = decision, _, _, _, _) do
     decision
@@ -230,6 +391,9 @@ defmodule SigilGuard.ToolGateway do
       {:ok, token} ->
         verify_confirmation(decision, payload, context, token, opts)
 
+      :off ->
+        decision
+
       :error ->
         decision
 
@@ -241,8 +405,26 @@ defmodule SigilGuard.ToolGateway do
   defp maybe_apply_confirmation(%Decision{} = decision, _, _, _), do: decision
 
   defp confirmation_token(opts) do
-    case Keyword.fetch(opts, :confirmation) do
-      {:ok, true} -> :error
+    case Keyword.get(opts, :confirmation, :honor) do
+      :off ->
+        :off
+
+      :honor ->
+        confirmation_token_option(opts)
+
+      true ->
+        :error
+
+      token when is_binary(token) ->
+        {:ok, token}
+
+      _ ->
+        {:error, :invalid_confirmation_token}
+    end
+  end
+
+  defp confirmation_token_option(opts) do
+    case Keyword.fetch(opts, :confirmation_token) do
       {:ok, token} when is_binary(token) -> {:ok, token}
       {:ok, _} -> {:error, :invalid_confirmation_token}
       :error -> :error
