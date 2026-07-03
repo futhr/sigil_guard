@@ -117,6 +117,45 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
              TrustBundle.load({:map, successor}, now: @now)
   end
 
+  test "rotation chain rejects forked roots in-chain and against cached digests" do
+    genesis = read_json(["rotation", "genesis.json"])
+    successor = read_json(["rotation", "successor.json"])
+    forked_rotation = read_json(["rotation", "forked-2.json"])
+    genesis_root = root_pin(envelope_document(genesis))
+
+    in_chain_fork =
+      successor
+      |> envelope_document()
+      |> put_in(["rotation_chain"], [rotation(successor), forked_rotation])
+      |> signed_successor()
+
+    assert TrustBundle.verify(in_chain_fork, now: @now, genesis_root: genesis_root) ==
+             {:error, :forked_root_chain}
+
+    assert {:ok, %TrustBundle{root_version: 1}} = TrustBundle.load({:map, genesis}, now: @now)
+    assert {:ok, %TrustBundle{root_version: 2}} = TrustBundle.load({:map, successor}, now: @now)
+
+    cached_fork =
+      successor
+      |> envelope_document()
+      |> put_in(["rotation_chain"], [forked_rotation])
+      |> signed_successor()
+
+    assert TrustBundle.verify(cached_fork, now: @now) == {:error, :forked_root_chain}
+  end
+
+  test "pre-rotation bundles replay below the accepted floor" do
+    genesis = read_json(["rotation", "genesis.json"])
+    successor = read_json(["rotation", "successor.json"])
+
+    assert {:ok, %TrustBundle{sequence: 1}} = TrustBundle.load({:map, genesis}, now: @now)
+
+    assert {:ok, %TrustBundle{sequence: 2, root_version: 2}} =
+             TrustBundle.load({:map, successor}, now: @now)
+
+    assert TrustBundle.load({:map, genesis}, now: @now) == {:error, :sequence_below_floor}
+  end
+
   defp read_json(path) when is_list(path) do
     path
     |> then(&Path.join([@fixtures | &1]))
@@ -145,6 +184,13 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
     {:ok, payload} = JCS.encode(document)
     {:ok, envelope} = Envelope.sign_many(payload, [SuccessorSigner])
     envelope
+  end
+
+  defp rotation(envelope) do
+    envelope
+    |> envelope_document()
+    |> Map.fetch!("rotation_chain")
+    |> List.first()
   end
 
   defp root_pin(document) do

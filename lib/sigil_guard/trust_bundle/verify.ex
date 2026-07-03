@@ -235,21 +235,63 @@ defmodule SigilGuard.TrustBundle.Verify do
         {:error, :sequence_below_floor}
 
       true ->
-        with {:ok, terminal} <- walk_rotations(chain, genesis) do
+        with {:ok, terminal} <- walk_rotations(chain, genesis, Map.fetch!(document, "bundle_id")) do
           terminal_root_matches?(terminal, current_root)
         end
     end
   end
 
-  defp walk_rotations([], _), do: {:error, :invalid_bundle_format}
+  defp walk_rotations([], _, _), do: {:error, :invalid_bundle_format}
 
-  defp walk_rotations(chain, genesis) when is_list(chain) do
-    Enum.reduce_while(chain, {:ok, genesis}, fn envelope, {:ok, previous} ->
-      case verify_rotation(envelope, previous) do
-        {:ok, next_root} -> {:cont, {:ok, next_root}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
+  defp walk_rotations(chain, genesis, bundle_id) when is_list(chain) do
+    result =
+      Enum.reduce_while(chain, {:ok, genesis, %{}}, fn envelope, {:ok, previous, seen} ->
+        with {:ok, version, digest} <- rotation_version_digest(envelope),
+             :ok <- reject_forked_rotation(bundle_id, version, digest, seen),
+             {:ok, next_root} <- verify_rotation(envelope, previous) do
+          {:cont, {:ok, next_root, Map.put(seen, version, digest)}}
+        else
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, terminal, _} -> {:ok, terminal}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp rotation_version_digest(envelope) do
+    with {:ok, fields} <- envelope_fields(envelope),
+         {:ok, payload} <- decode_base64(fields.payload),
+         {:ok, document} <- decode_document(payload),
+         {:ok, :rotation, document} <- Schema.validate(document) do
+      {:ok, positive_integer!(Map.fetch!(document, "root_version")), document_digest(document)}
+    else
+      {:ok, :bundle, _} -> {:error, :invalid_bundle_format}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp reject_forked_rotation(bundle_id, version, digest, seen) do
+    cond do
+      Map.get(seen, version) not in [nil, digest] ->
+        {:error, :forked_root_chain}
+
+      cached_rotation_forked?(bundle_id, version, digest) ->
+        {:error, :forked_root_chain}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp cached_rotation_forked?(bundle_id, version, digest) do
+    case Cache.rotation_digest(bundle_id, version) do
+      {:ok, ^digest} -> false
+      {:ok, _} -> true
+      :error -> false
+    end
   end
 
   defp verify_rotation(envelope, previous) do
