@@ -148,6 +148,20 @@ defmodule SigilGuard.Attestation.StatementTest do
                  %{"name" => "context", "digest" => %{"sha256" => @digest_c}}
                ]
              }) == {:error, :invalid_profile}
+
+      assert Statement.parse(%{
+               "_type" => Statement.statement_type(),
+               "predicateType" => @predicate_type,
+               "predicate" => predicate(),
+               "subject" => "bad"
+             }) == {:error, :invalid_profile}
+
+      assert Statement.parse(%{
+               "_type" => Statement.statement_type(),
+               "predicateType" => @predicate_type,
+               "predicate" => predicate(),
+               "subject" => ["bad"]
+             }) == {:error, :invalid_profile}
     end
   end
 

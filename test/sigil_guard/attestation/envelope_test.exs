@@ -2,6 +2,10 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
   use ExUnit.Case, async: true
 
   alias __MODULE__.MissingSigner
+  alias __MODULE__.RaisingPublicKeySigner
+  alias __MODULE__.RaisingSignatureSigner
+  alias __MODULE__.ShortPublicKeySigner
+  alias __MODULE__.ShortSignatureSigner
   alias __MODULE__.SignerA
   alias __MODULE__.SignerB
   alias SigilGuard.Attestation.Envelope
@@ -51,6 +55,20 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
                Envelope.sign_many("payload", [{SignerA, "a-key"}, {SignerB, "b-key"}])
 
       assert Envelope.verify(envelope, %{"a-key" => SignerA.public_key()}) == {:ok, "payload"}
+    end
+
+    test "accepts bare signer modules and atom-key envelope shapes" do
+      assert {:ok, envelope} = Envelope.sign_many("payload", [SignerA])
+      [signature] = envelope["signatures"]
+      keyid = signature["keyid"]
+
+      atom_envelope = %{
+        payload: envelope["payload"],
+        payloadType: envelope["payloadType"],
+        signatures: [%{keyid: keyid, sig: signature["sig"]}]
+      }
+
+      assert Envelope.verify(atom_envelope, %{keyid => SignerA.public_key()}) == {:ok, "payload"}
     end
 
     test "returns unknown_key_id when no signature key resolves" do
@@ -103,6 +121,15 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
                },
                %{}
              ) == {:error, :invalid_envelope}
+
+      assert Envelope.verify(
+               %{
+                 "payload" => "x",
+                 "payloadType" => Envelope.payload_type(),
+                 "signatures" => ["bad"]
+               },
+               %{}
+             ) == {:error, :invalid_envelope}
     end
 
     test "rejects wrong payloadType" do
@@ -125,6 +152,9 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
 
       assert Envelope.verify(tampered, %{"a-key" => SignerA.public_key()}) ==
                {:error, :invalid_base64}
+
+      assert Envelope.verify(%{envelope | "payload" => 42}, %{"a-key" => SignerA.public_key()}) ==
+               {:error, :invalid_envelope}
     end
 
     test "rejects duplicate keyids before verification" do
@@ -140,6 +170,31 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
 
       assert Envelope.verify(envelope, "bad") == {:error, :missing_trust_bundle}
     end
+
+    test "rejects malformed public keys and short signatures as invalid signatures" do
+      assert {:ok, envelope} = Envelope.sign("payload", SignerA, keyid: "a-key")
+
+      assert Envelope.verify(envelope, %{"a-key" => :bad}) == {:error, :invalid_signature}
+
+      assert Envelope.verify(envelope, %{
+               "a-key" => Base.url_encode64("too-short", padding: false)
+             }) == {:error, :invalid_signature}
+
+      assert Envelope.verify(envelope, %{"a-key" => "not base64!"}) ==
+               {:error, :invalid_signature}
+
+      [signature] = envelope["signatures"]
+
+      short_signature = %{
+        envelope
+        | "signatures" => [
+            %{signature | "sig" => Base.url_encode64("too-short", padding: false)}
+          ]
+      }
+
+      assert Envelope.verify(short_signature, %{"a-key" => SignerA.public_key()}) ==
+               {:error, :invalid_signature}
+    end
   end
 
   describe "sign/3 negatives" do
@@ -147,6 +202,12 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
       assert Envelope.sign(:not_binary, SignerA) == {:error, :invalid_envelope}
       assert Envelope.sign("payload", MissingSigner) == {:error, :invalid_signer}
       assert Envelope.sign_many("payload", []) == {:error, :invalid_envelope}
+      assert Envelope.sign_many("payload", ["bad"]) == {:error, :invalid_signer}
+      assert Envelope.sign("payload", SignerA, keyid: "") == {:error, :invalid_signer}
+      assert Envelope.sign("payload", ShortPublicKeySigner) == {:error, :invalid_signer}
+      assert Envelope.sign("payload", RaisingPublicKeySigner) == {:error, :invalid_signer}
+      assert Envelope.sign("payload", ShortSignatureSigner) == {:error, :invalid_signer}
+      assert Envelope.sign("payload", RaisingSignatureSigner) == {:error, :invalid_signer}
     end
   end
 
@@ -195,5 +256,55 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
   end
 
   defmodule MissingSigner do
+  end
+
+  defmodule ShortPublicKeySigner do
+    @behaviour SigilGuard.Signer
+
+    @impl SigilGuard.Signer
+    def sign(_), do: :binary.copy(<<0>>, 64)
+
+    @impl SigilGuard.Signer
+    def public_key, do: "too-short"
+  end
+
+  defmodule RaisingPublicKeySigner do
+    @behaviour SigilGuard.Signer
+
+    @impl SigilGuard.Signer
+    def sign(_), do: :binary.copy(<<0>>, 64)
+
+    @impl SigilGuard.Signer
+    def public_key, do: raise("boom")
+  end
+
+  defmodule ShortSignatureSigner do
+    @behaviour SigilGuard.Signer
+
+    @seed :crypto.hash(:sha256, "sigilguard-short-signature")
+
+    @impl SigilGuard.Signer
+    def sign(_), do: "too-short"
+
+    @impl SigilGuard.Signer
+    def public_key do
+      {public_key, _} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+      public_key
+    end
+  end
+
+  defmodule RaisingSignatureSigner do
+    @behaviour SigilGuard.Signer
+
+    @seed :crypto.hash(:sha256, "sigilguard-raising-signature")
+
+    @impl SigilGuard.Signer
+    def sign(_), do: raise("boom")
+
+    @impl SigilGuard.Signer
+    def public_key do
+      {public_key, _} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+      public_key
+    end
   end
 end

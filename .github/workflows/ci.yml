@@ -54,6 +54,10 @@ jobs:
       - name: Run tests
         run: mix test
 
+      - name: Run coverage gate
+        if: matrix.elixir == '1.18' && matrix.otp == '28'
+        run: mix test --cover
+
       - name: Generate coverage report
         if: matrix.elixir == '1.18' && matrix.otp == '28'
         run: mix coveralls.lcov

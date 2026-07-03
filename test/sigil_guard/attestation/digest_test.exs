@@ -29,6 +29,10 @@ defmodule SigilGuard.Attestation.DigestTest do
                {:error, :invalid_payload}
 
       assert Digest.normalize(%{"bad" => self()}) == {:error, :invalid_payload}
+      assert Digest.normalize(%{<<255>> => "bad-key"}) == {:error, :invalid_payload}
+      assert Digest.normalize(%{"bad-list" => [self()]}) == {:error, :invalid_payload}
+      assert Digest.normalize(%{"bad-struct" => DateTime.utc_now()}) == {:error, :invalid_payload}
+      assert Digest.normalize(1.5) == {:ok, 1.5}
     end
   end
 
@@ -93,6 +97,51 @@ defmodule SigilGuard.Attestation.DigestTest do
 
       assert {:ok, with_sandbox} = Digest.context_digest(:tool_request, context)
       refute with_sandbox == without_sandbox
+    end
+
+    test "accepts keyword context extras and rejects unknown statement types" do
+      context = [
+        phase: :model_ingress,
+        origin: :user,
+        source: "chat",
+        actor: "spiffe://agents/requester",
+        identity: "did:example:agent",
+        trust_zone: :workspace,
+        mcp_server: "local",
+        resource_uri: "memory://1"
+      ]
+
+      assert {:ok, preimage} = Digest.context_preimage(:model_ingress, context)
+      assert preimage["actor"] == "spiffe://agents/requester"
+      assert preimage["identity"] == "did:example:agent"
+      assert preimage["mcp_server"] == "local"
+      assert preimage["resource_uri"] == "memory://1"
+
+      assert Digest.context_preimage(:unknown, context) == {:error, :unknown_statement_type}
+    end
+
+    test "accepts atom-key context maps for every shared context field" do
+      context = %{
+        actor: "spiffe://agents/requester",
+        identity: "did:example:agent",
+        trust_level: :high,
+        phase: :tool_request,
+        origin: :user,
+        sink: :tool,
+        trust_zone: :trusted,
+        mcp_server: "local",
+        tool: "repo_file_write",
+        resource_uri: "memory://1",
+        intended_audience: :tool
+      }
+
+      assert {:ok, preimage} = Digest.context_preimage(:tool_request, context)
+      assert preimage["actor"] == "spiffe://agents/requester"
+      assert preimage["identity"] == "did:example:agent"
+      assert preimage["trust_level"] == :high
+      assert preimage["phase"] == :tool_request
+      assert preimage["trust_zone"] == :trusted
+      assert preimage["mcp_server"] == "local"
     end
   end
 
@@ -247,12 +296,126 @@ defmodule SigilGuard.Attestation.DigestTest do
                {:error, :invalid_payload}
 
       assert Digest.action_preimage(
+               :repo_change,
+               %{
+                 "repository" => %{"owner" => "sigil"},
+                 "operation" => true,
+                 "paths" => ["README.md"]
+               },
+               %{},
+               []
+             ) ==
+               {:ok,
+                %{
+                  "statement_type" => "repo_change",
+                  "repository" => %{"owner" => "sigil"},
+                  "operation" => true,
+                  "paths" => ["README.md"]
+                }}
+
+      assert Digest.action_preimage(
+               :repo_change,
+               %{
+                 "repository" => ["sigil_guard"],
+                 "operation" => 1,
+                 "paths" => ["README.md"]
+               },
+               %{},
+               []
+             ) ==
+               {:ok,
+                %{
+                  "statement_type" => "repo_change",
+                  "repository" => ["sigil_guard"],
+                  "operation" => 1,
+                  "paths" => ["README.md"]
+                }}
+
+      assert Digest.action_preimage(
                :agent_response,
                %{"peer_agent" => "a", "capability" => "c"},
                %{},
                []
              ) ==
                {:error, :invalid_payload}
+
+      assert Digest.action_preimage(:unknown, %{}, %{}, []) == {:error, :unknown_statement_type}
+
+      assert Digest.action_preimage(:tool_request, "bad", %{}, []) == {:error, :invalid_payload}
+
+      assert Digest.action_preimage(
+               :tool_request,
+               %{"method" => "tools/call", "arguments" => %{"path" => "README.md"}},
+               %{tool: :repo_file_write},
+               []
+             ) ==
+               {:ok,
+                %{
+                  "statement_type" => "tool_request",
+                  "tool" => "repo_file_write",
+                  "method" => "tools/call",
+                  "arguments" => %{"path" => "README.md"}
+                }}
+
+      assert Digest.action_preimage(:tool_result, %{}, %{}, request_action_digest: "bad") ==
+               {:error, :invalid_payload}
+
+      assert Digest.action_preimage(:model_ingress, %{}, %{origin: ""}, []) ==
+               {:error, :invalid_payload}
+
+      assert Digest.action_preimage(:model_egress, %{}, %{sink: ""}, []) ==
+               {:error, :invalid_payload}
+
+      assert_raise FunctionClauseError, fn ->
+        Digest.action_preimage(:model_ingress, %{}, :bad_context, [])
+      end
+
+      assert Digest.action_preimage(
+               :model_ingress,
+               %{},
+               %{"origin" => "user", "unexpected" => "ignored"},
+               []
+             ) == {:ok, %{"statement_type" => "model_ingress", "origin" => "user"}}
+
+      assert Digest.action_preimage(
+               :release,
+               %{"package" => "sigil_guard", "version" => "3.0.0", "artifacts" => []},
+               %{},
+               []
+             ) == {:error, :invalid_payload}
+
+      assert Digest.action_preimage(
+               :release,
+               %{
+                 "package" => "sigil_guard",
+                 "version" => "3.0.0",
+                 "artifacts" => [%{"name" => "bad.tar"}]
+               },
+               %{},
+               []
+             ) == {:error, :invalid_payload}
+
+      assert Digest.action_preimage(
+               :release,
+               %{
+                 "package" => "sigil_guard",
+                 "version" => "3.0.0",
+                 "artifacts" => [%{"name" => "bad.tar", "sha256" => "bad"}]
+               },
+               %{},
+               []
+             ) == {:error, :invalid_payload}
+
+      assert Digest.action_preimage(
+               :release,
+               %{
+                 "package" => "sigil_guard",
+                 "version" => "3.0.0",
+                 "artifacts" => ["bad"]
+               },
+               %{},
+               []
+             ) == {:error, :invalid_payload}
     end
   end
 
@@ -269,6 +432,21 @@ defmodule SigilGuard.Attestation.DigestTest do
 
       assert {:ok, model_digests} = Digest.digests(:model_ingress, %{}, %{origin: :user}, [])
       refute Map.has_key?(model_digests, "manifest")
+
+      assert {:ok, manifest_digests} =
+               Digest.digests(:tool_request, payload, context, manifest: %{"name" => "bundle"})
+
+      assert Map.has_key?(manifest_digests, "manifest")
+
+      assert Digest.digests(:tool_request, payload, context, manifest_digest: :bad) ==
+               {:error, :invalid_payload}
+    end
+  end
+
+  describe "manifest_digest/1" do
+    test "hashes manifest strings and rejects malformed manifest classes" do
+      assert Digest.manifest_digest("manifest") == {:ok, sha256("manifest")}
+      assert Digest.manifest_digest(:bad) == {:error, :invalid_payload}
     end
   end
 

@@ -56,6 +56,23 @@ defmodule SigilGuard.AttestationSignVerifyTest do
 
       assert get_in(verified, ["predicate", "issued_at"]) == DateTime.to_iso8601(@now)
       assert get_in(verified, ["predicate", "nonce"]) == "n-1"
+
+      assert {:ok, string_now_envelope} =
+               Attestation.sign(statement, TrustedSigner,
+                 keyid: "explicit",
+                 now: DateTime.to_iso8601(@now),
+                 nonce: "n-2"
+               )
+
+      assert {:ok, string_now_verified} =
+               Attestation.verify(
+                 string_now_envelope,
+                 %{"explicit" => TrustedSigner.public_key()},
+                 now: @now
+               )
+
+      assert get_in(string_now_verified, ["predicate", "issued_at"]) == DateTime.to_iso8601(@now)
+      assert get_in(string_now_verified, ["predicate", "nonce"]) == "n-2"
     end
 
     test "tolerates unresolved witness signatures when one signature resolves" do
@@ -98,6 +115,13 @@ defmodule SigilGuard.AttestationSignVerifyTest do
       assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
 
       trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      assert Attestation.verify(envelope, trust_material,
+               payload: @payload,
+               context: @context,
+               manifest_digest: @manifest_digest,
+               now: @now
+             ) == {:ok, statement}
 
       assert Attestation.verify(envelope, trust_material,
                payload: Map.put(@payload, "id", 43),
@@ -205,6 +229,33 @@ defmodule SigilGuard.AttestationSignVerifyTest do
                {:error, :replay_detected}
     end
 
+    test "rejects malformed replay protection inputs" do
+      assert {:ok, missing_actor_statement} =
+               valid_statement(%{
+                 "actor" => %{"trust_level" => "medium"},
+                 "nonce" => "missing-actor"
+               })
+
+      assert {:ok, missing_actor_envelope} =
+               Attestation.sign(missing_actor_statement, TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(
+               missing_actor_envelope,
+               %{"trusted" => TrustedSigner.public_key()},
+               now: @now,
+               replay: true
+             ) == {:error, :invalid_payload}
+
+      assert {:ok, statement} = valid_statement(%{"nonce" => "bad-replay-ttl"})
+      assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now,
+               replay: true,
+               replay_ttl_ms: 0
+             ) == {:error, :invalid_payload}
+    end
+
     test "uses replay option and remaining lifetime ttl for nonce protection" do
       assert {:ok, statement} = valid_statement(%{"nonce" => "replay-option-nonce"})
       assert {:ok, envelope} = Attestation.sign(statement, TrustedSigner, keyid: "trusted")
@@ -224,6 +275,10 @@ defmodule SigilGuard.AttestationSignVerifyTest do
       assert Attestation.sign("bad", TrustedSigner) == {:error, :invalid_payload}
       assert {:ok, statement} = valid_statement()
       assert Attestation.sign(statement, MissingSigner) == {:error, :invalid_signer}
+
+      assert {:ok, ignored_now_envelope} = Attestation.sign(statement, TrustedSigner, now: :bad)
+      assert {:ok, default_envelope} = Attestation.sign(statement, TrustedSigner)
+      assert ignored_now_envelope["payload"] == default_envelope["payload"]
     end
 
     test "rejects missing or unresolvable trust material" do
@@ -247,6 +302,20 @@ defmodule SigilGuard.AttestationSignVerifyTest do
 
       assert Attestation.verify(%{"payload" => "x"}, %{"trusted" => TrustedSigner.public_key()}) ==
                {:error, :invalid_envelope}
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               expected_payload_sha256: :bad,
+               now: @now
+             ) == {:error, :pae_mismatch}
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: "bad-now"
+             ) == {:error, :invalid_payload}
+
+      assert Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
+               now: @now,
+               max_skew_ms: -1
+             ) == {:error, :invalid_payload}
     end
 
     test "returns taxonomy atoms for malformed envelope shapes" do

@@ -67,7 +67,7 @@ trailers (rule 10); the maintainer pushes manually.
 |-----------|-------|----------|-------------|---------|
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 18 | 0 | 1 |
+| M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 0 | 0 | 16 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
@@ -75,7 +75,7 @@ trailers (rule 10); the maintainer pushes manually.
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **70** | **0** | **158** |
+| **Total** | **228** | **71** | **0** | **157** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -466,7 +466,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
   - AC: a test enumerates every SP.01 taxonomy atom and asserts each is
     produced by at least one test in the suite.
   - Tests: negative (meta-assertion over the ledger).
-- [ ] M1.19 Coverage trend gate in CI.
+- [x] M1.19 Coverage trend gate in CI.
   - Spec: this file - Mandatory Gates For Every Commit.
   - AC: CI fails whenever `mix test --cover` reports below 95%; the
     threshold lives in the coverage tool configuration, not an ad hoc

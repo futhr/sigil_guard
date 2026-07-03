@@ -102,8 +102,55 @@ defmodule SigilGuard.AttestationFromDecisionTest do
       assert predicate["capability"] == "summarize"
     end
 
+    test "supports agent response extension fields" do
+      payload = %{
+        "peer_agent" => "spiffe://agents/responder",
+        "capability" => "summarize",
+        "status" => "error"
+      }
+
+      assert {:ok, statement} =
+               Attestation.from_decision(decision(action: :quarantine), @context,
+                 payload: payload,
+                 statement_type: :agent_response,
+                 now: @now,
+                 request_action_digest: String.duplicate("a", 64),
+                 peer_trust: :medium
+               )
+
+      predicate = statement["predicate"]
+      assert predicate["statement_type"] == "agent_response"
+      assert predicate["status"] == "error"
+      assert predicate["request_action_digest"] == String.duplicate("a", 64)
+      assert predicate["quarantined"] == true
+    end
+
+    test "maps blocked and confirmation decisions into predicate verdicts" do
+      for {decision, verdict} <- [
+            {decision(verdict: :blocked, action: :block), "block"},
+            {decision(verdict: {:confirm, "token"}, action: :confirm), "confirm"}
+          ] do
+        assert {:ok, statement} =
+                 Attestation.from_decision(decision, @context,
+                   payload: @payload,
+                   now: @now
+                 )
+
+        assert get_in(statement, ["predicate", "verdict"]) == verdict
+      end
+    end
+
     test "rejects malformed inputs" do
+      assert Attestation.from_decision(%{}, @context, payload: @payload, now: @now) ==
+               {:error, :invalid_payload}
+
+      assert Attestation.from_decision(decision(), @context, :bad_opts) ==
+               {:error, :invalid_payload}
+
       assert Attestation.from_decision(decision(), @context, now: @now) ==
+               {:error, :invalid_payload}
+
+      assert Attestation.from_decision(decision(), @context, payload: "bad", now: @now) ==
                {:error, :invalid_payload}
 
       assert Attestation.from_decision(decision(), %{@context | actor: nil, identity: nil},
@@ -124,6 +171,17 @@ defmodule SigilGuard.AttestationFromDecisionTest do
                statement_type: :unknown,
                now: @now
              ) == {:error, :unknown_statement_type}
+
+      assert Attestation.from_decision(decision(), @context,
+               payload: @payload,
+               statement_type: 42,
+               now: @now
+             ) == {:error, :unknown_statement_type}
+
+      assert Attestation.from_decision(decision(), @context,
+               payload: @payload,
+               now: "bad-now"
+             ) == {:error, :invalid_payload}
 
       assert Attestation.from_decision(decision(), @context,
                payload: @payload,

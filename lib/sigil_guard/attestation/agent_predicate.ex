@@ -399,6 +399,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   defp sha256_hex(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
 
   defp atom_key("arguments"), do: :arguments
+  defp atom_key("actor"), do: :actor
   defp atom_key("card_digest"), do: :card_digest
   defp atom_key("capability"), do: :capability
   defp atom_key("delegation_chain"), do: :delegation_chain
