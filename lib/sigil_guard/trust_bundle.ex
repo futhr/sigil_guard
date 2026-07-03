@@ -10,6 +10,7 @@ defmodule SigilGuard.TrustBundle do
   accessors from SP.02.
   """
 
+  alias SigilGuard.TrustBundle.Quarantine
   alias SigilGuard.TrustBundle.Verify
 
   @typedoc "Closed set of supported trust-bundle loading sources."
@@ -85,17 +86,22 @@ defmodule SigilGuard.TrustBundle do
         verify(envelope, Keyword.put_new(opts, :source, {:binary, bytes}))
 
       _ ->
-        {:error, :invalid_source}
+        quarantine_error(:invalid_source, %{source: {:binary, bytes}}, opts)
     end
   end
 
   def load({:file, path}, opts) when is_binary(path) and is_list(opts),
-    do: {:error, :invalid_source}
+    do: quarantine_error(:invalid_source, %{source: {:file, path}}, opts)
 
   def load({:priv, app, rel}, opts) when is_atom(app) and is_binary(rel) and is_list(opts),
-    do: {:error, :invalid_source}
+    do: quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
 
-  def load(:none, opts) when is_list(opts), do: {:error, :invalid_source}
+  def load(:none, opts) when is_list(opts),
+    do: quarantine_error(:invalid_source, %{source: :none}, opts)
+
+  def load(source, opts) when is_list(opts),
+    do: quarantine_error(:invalid_source, %{source: source}, opts)
+
   def load(_, _), do: {:error, :invalid_source}
 
   @doc """
@@ -108,7 +114,14 @@ defmodule SigilGuard.TrustBundle do
   """
   @spec verify(envelope :: map(), opts :: keyword()) :: {:ok, t()} | {:error, verify_error()}
   def verify(envelope, opts \\ [])
-  def verify(envelope, opts) when is_list(opts), do: Verify.verify(envelope, opts)
+
+  def verify(envelope, opts) when is_list(opts) do
+    case Verify.verify(envelope, opts) do
+      {:ok, bundle} -> {:ok, bundle}
+      {:error, reason} -> quarantine_error(reason, %{envelope: envelope}, opts)
+    end
+  end
+
   def verify(_, _), do: {:error, :invalid_bundle_format}
 
   @doc """
@@ -144,5 +157,20 @@ defmodule SigilGuard.TrustBundle do
       {:ok, section} when is_list(section) -> section
       _ -> []
     end
+  end
+
+  defp quarantine_error(reason, info, opts) do
+    if Keyword.get(opts, :quarantine, true) do
+      Quarantine.record(reason, quarantine_info(info, opts))
+    end
+
+    {:error, reason}
+  end
+
+  defp quarantine_info(info, opts) do
+    opts
+    |> Keyword.take([:evidence, :now])
+    |> Map.new()
+    |> Map.merge(info)
   end
 end

@@ -26,6 +26,7 @@ defmodule SigilGuard.Application do
     SigilGuard.Policy.ensure_rate_table()
     SigilGuard.ReplayStore.ensure_table()
     SigilGuard.TrustBundle.Cache.ensure_table()
+    SigilGuard.TrustBundle.Quarantine.ensure_table()
 
     children =
       if SigilGuard.Config.registry_enabled?() do
