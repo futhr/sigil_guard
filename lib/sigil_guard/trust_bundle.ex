@@ -10,6 +10,8 @@ defmodule SigilGuard.TrustBundle do
   accessors from SP.02.
   """
 
+  alias SigilGuard.Attestation.Envelope
+  alias SigilGuard.Canonical.JCS
   alias SigilGuard.ConfigError
   alias SigilGuard.Telemetry
   alias SigilGuard.TrustBundle.Cache
@@ -221,12 +223,27 @@ defmodule SigilGuard.TrustBundle do
   @doc """
   Build, sign, verify, and cache a development-only trust bundle.
 
-  The bootstrap implementation lands with the dedicated SP.02 development
-  bundle task. Until then the API fails closed.
+  This helper is for development and tests only. It creates a short-lived
+  bundle with `provenance.issuer_class` set to `"dev"`.
+
+      iex> seed = :binary.copy(<<1>>, 32)
+      ...> {:ok, bundle} = SigilGuard.TrustBundle.dev_bundle(seed: seed, cache: false)
+      ...> {bundle.dev?, bundle.source, bundle.sequence, bundle.root_version}
+      {true, :dev, 1, 1}
   """
   @spec dev_bundle(keyword()) :: {:ok, t()} | {:error, load_error()}
   def dev_bundle(opts \\ [])
-  def dev_bundle(opts) when is_list(opts), do: {:error, :invalid_bundle_format}
+
+  def dev_bundle(opts) when is_list(opts) do
+    with {:ok, seed} <- dev_seed(opts),
+         {:ok, now} <- dev_now(opts),
+         {:ok, ttl_ms} <- dev_ttl_ms(opts),
+         {:ok, sections} <- dev_sections(opts),
+         {:ok, envelope} <- dev_envelope(seed, now, ttl_ms, sections) do
+      load({:map, envelope}, dev_load_opts(opts))
+    end
+  end
+
   def dev_bundle(_), do: {:error, :invalid_bundle_format}
 
   @doc "Return verified scanner pattern sections, or an empty list when absent."
@@ -252,6 +269,127 @@ defmodule SigilGuard.TrustBundle do
       _ -> []
     end
   end
+
+  defp dev_seed(opts) do
+    case Keyword.get_lazy(opts, :seed, fn -> :crypto.strong_rand_bytes(32) end) do
+      seed when is_binary(seed) and byte_size(seed) == 32 -> {:ok, seed}
+      _ -> {:error, :invalid_bundle_format}
+    end
+  end
+
+  defp dev_now(opts) do
+    case Keyword.get_lazy(opts, :now, fn -> DateTime.utc_now(:millisecond) end) do
+      %DateTime{} = now -> {:ok, DateTime.truncate(now, :millisecond)}
+      _ -> {:error, :invalid_bundle_format}
+    end
+  end
+
+  defp dev_ttl_ms(opts) do
+    case Keyword.get(opts, :ttl_ms, 3_600_000) do
+      ttl_ms when is_integer(ttl_ms) and ttl_ms > 0 -> {:ok, ttl_ms}
+      _ -> {:error, :invalid_bundle_format}
+    end
+  end
+
+  defp dev_sections(opts) do
+    [:patterns, :policies, :tools, :identity_issuers]
+    |> Enum.reduce_while({:ok, %{}}, fn key, {:ok, sections} ->
+      case Keyword.fetch(opts, key) do
+        {:ok, section} when is_list(section) ->
+          {:cont, {:ok, Map.put(sections, to_string(key), section)}}
+
+        {:ok, _} ->
+          {:halt, {:error, :invalid_bundle_format}}
+
+        :error ->
+          {:cont, {:ok, sections}}
+      end
+    end)
+  end
+
+  defp dev_load_opts(opts) do
+    opts
+    |> Keyword.put(:source, :dev)
+    |> Keyword.put(:quarantine, false)
+  end
+
+  defp dev_envelope(seed, now, ttl_ms, sections) do
+    bundle_seed = :crypto.hash(:sha256, seed)
+    root_public_key = public_key(seed)
+    bundle_public_key = public_key(bundle_seed)
+    bundle_keyid = Envelope.keyid(bundle_public_key)
+
+    document = dev_document(sections, now, ttl_ms, root_public_key, bundle_public_key)
+
+    with {:ok, payload} <- JCS.encode(document),
+         {:ok, signature} <- dev_signature(payload, bundle_seed, bundle_keyid) do
+      {:ok,
+       %{
+         "payload" => encode_base64url(payload),
+         "payloadType" => Envelope.payload_type(),
+         "signatures" => [signature]
+       }}
+    end
+  end
+
+  defp dev_document(sections, now, ttl_ms, root_public_key, bundle_public_key) do
+    root_keyid = Envelope.keyid(root_public_key)
+    bundle_keyid = Envelope.keyid(bundle_public_key)
+    expires_at = DateTime.add(now, ttl_ms, :millisecond)
+    role_expires_at = expires_at
+    root_expires_at = DateTime.add(now, ttl_ms, :millisecond)
+
+    %{
+      "profile" => "sigil_guard_trust_bundle/v1",
+      "bundle_id" => "sigilguard-dev",
+      "sequence" => "1",
+      "issued_at" => DateTime.to_iso8601(now),
+      "expires_at" => DateTime.to_iso8601(expires_at),
+      "roles" => %{
+        "root" => %{
+          "keyids" => [root_keyid],
+          "threshold" => 1,
+          "version" => "1",
+          "expires_at" => DateTime.to_iso8601(root_expires_at)
+        },
+        "delegates" => [
+          %{
+            "name" => "bundle",
+            "keyids" => [bundle_keyid],
+            "threshold" => 1,
+            "expires_at" => DateTime.to_iso8601(role_expires_at)
+          }
+        ]
+      },
+      "keys" => %{
+        root_keyid => %{"alg" => "ed25519", "public_key" => encode_base64url(root_public_key)},
+        bundle_keyid => %{"alg" => "ed25519", "public_key" => encode_base64url(bundle_public_key)}
+      },
+      "rollback_floor" => "1",
+      "provenance" => %{
+        "builder" => "SigilGuard.TrustBundle.dev_bundle/1",
+        "issuer_class" => "dev"
+      }
+    }
+    |> Map.merge(sections)
+  end
+
+  defp dev_signature(payload, seed, keyid) do
+    pae = Envelope.pae(Envelope.payload_type(), payload)
+    {_, private_key} = :crypto.generate_key(:eddsa, :ed25519, seed)
+    signature = :crypto.sign(:eddsa, :none, pae, [private_key, :ed25519])
+
+    {:ok, %{"keyid" => keyid, "sig" => encode_base64url(signature)}}
+  rescue
+    _ -> {:error, :invalid_bundle_format}
+  end
+
+  defp public_key(seed) do
+    {public_key, _} = :crypto.generate_key(:eddsa, :ed25519, seed)
+    public_key
+  end
+
+  defp encode_base64url(value), do: Base.url_encode64(value, padding: false)
 
   defp load_metadata(source) do
     %{source: source_kind(source), bundle_id: nil, result: nil, error: nil, dev: false}

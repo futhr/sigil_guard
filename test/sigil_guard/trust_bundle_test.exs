@@ -1,13 +1,22 @@
 defmodule SigilGuard.TrustBundleTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias __MODULE__.BundleSigner
   alias __MODULE__.RootSigner
   alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Canonical.JCS
   alias SigilGuard.TrustBundle
+  alias SigilGuard.TrustBundle.Cache
 
   @now ~U[2026-07-03 12:00:00.000Z]
+
+  doctest SigilGuard.TrustBundle
+
+  setup do
+    Cache.clear()
+
+    on_exit(fn -> Cache.clear() end)
+  end
 
   describe "public API shell" do
     test "exposes the SP.02 struct fields and section accessors" do
@@ -139,15 +148,73 @@ defmodule SigilGuard.TrustBundleTest do
                {:error, :invalid_source}
     end
 
-    test "verify routes malformed envelopes through SP.01 errors and dev bundle fails closed" do
+    test "verify routes malformed envelopes through SP.01 errors" do
       assert TrustBundle.verify(%{"payload" => "encoded"}) == {:error, :invalid_envelope}
       assert TrustBundle.verify("bad") == {:error, :invalid_envelope}
       assert TrustBundle.verify(%{}, :bad_opts) == {:error, :invalid_bundle_format}
+    end
 
-      assert TrustBundle.dev_bundle(seed: :crypto.strong_rand_bytes(32)) ==
-               {:error, :invalid_bundle_format}
+    test "dev_bundle builds, verifies, caches, and marks a development bundle" do
+      seed = :binary.copy(<<0x42>>, 32)
 
+      assert {:ok, bundle} =
+               TrustBundle.dev_bundle(
+                 seed: seed,
+                 now: @now,
+                 ttl_ms: 60_000,
+                 patterns: [%{"id" => "dev-pattern"}],
+                 policies: [%{"id" => "dev-policy"}],
+                 tools: [%{"name" => "dev-tool"}],
+                 identity_issuers: ["did:example:dev"]
+               )
+
+      assert %TrustBundle{
+               bundle_id: "sigilguard-dev",
+               sequence: 1,
+               root_version: 1,
+               dev?: true,
+               source: :dev
+             } = bundle
+
+      assert bundle.document["provenance"] == %{
+               "builder" => "SigilGuard.TrustBundle.dev_bundle/1",
+               "issuer_class" => "dev"
+             }
+
+      assert bundle.document["issued_at"] == "2026-07-03T12:00:00.000Z"
+      assert bundle.document["expires_at"] == "2026-07-03T12:01:00.000Z"
+      assert TrustBundle.patterns(bundle) == [%{"id" => "dev-pattern"}]
+      assert TrustBundle.policies(bundle) == [%{"id" => "dev-policy"}]
+      assert TrustBundle.tools(bundle) == [%{"name" => "dev-tool"}]
+      assert TrustBundle.identity_issuers(bundle) == ["did:example:dev"]
+
+      assert {:ok, ^bundle} = Cache.get("sigilguard-dev")
+    end
+
+    test "dev_bundle supports deterministic seeds and expires at ttl_ms" do
+      seed = :binary.copy(<<0x43>>, 32)
+
+      assert {:ok, first} = TrustBundle.dev_bundle(seed: seed, now: @now, cache: false)
+      assert {:ok, second} = TrustBundle.dev_bundle(seed: seed, now: @now, cache: false)
+      assert first.digest == second.digest
+      assert first.envelope == second.envelope
+
+      assert {:ok, expired} =
+               TrustBundle.dev_bundle(seed: seed, now: @now, ttl_ms: 1_000, cache: false)
+
+      assert TrustBundle.verify(expired.envelope,
+               now: DateTime.add(@now, 1_001, :millisecond),
+               max_skew_ms: 0,
+               quarantine: false
+             ) == {:error, :bundle_expired}
+    end
+
+    test "dev_bundle rejects malformed bootstrap options" do
       assert TrustBundle.dev_bundle(:bad_opts) == {:error, :invalid_bundle_format}
+      assert TrustBundle.dev_bundle(seed: "short") == {:error, :invalid_bundle_format}
+      assert TrustBundle.dev_bundle(now: "bad") == {:error, :invalid_bundle_format}
+      assert TrustBundle.dev_bundle(ttl_ms: 0) == {:error, :invalid_bundle_format}
+      assert TrustBundle.dev_bundle(patterns: "bad") == {:error, :invalid_bundle_format}
     end
   end
 

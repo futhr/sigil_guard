@@ -106,6 +106,29 @@ defmodule SigilGuard.TrustBundle.TelemetryTest do
     end
   end
 
+  test "dev bundle load span carries dev metadata" do
+    {handler_id, ref} = attach_events()
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    seed = :binary.copy(<<0x44>>, 32)
+
+    assert {:ok, %TrustBundle{dev?: true}} =
+             TrustBundle.dev_bundle(seed: seed, now: @now, cache: false)
+
+    assert_receive {^ref, [:sigil_guard, :trust_bundle, :load, :start], %{system_time: _}, _}
+    assert_receive {^ref, [:sigil_guard, :trust_bundle, :verify, :start], %{system_time: _}, _}
+
+    assert_receive {^ref, [:sigil_guard, :trust_bundle, :verify, :stop], %{duration: _},
+                    verify_stop}
+
+    assert_receive {^ref, [:sigil_guard, :trust_bundle, :load, :stop], %{duration: _}, load_stop}
+
+    assert verify_stop.result == :ok
+    assert load_stop.dev == true
+    assert load_stop.source == :dev
+    assert load_stop.bundle_id == "sigilguard-dev"
+  end
+
   test "telemetry event registry includes trust-bundle events" do
     assert [:sigil_guard, :trust_bundle, :load, :start] in SigilGuard.Telemetry.events()
     assert [:sigil_guard, :trust_bundle, :load, :stop] in SigilGuard.Telemetry.events()
