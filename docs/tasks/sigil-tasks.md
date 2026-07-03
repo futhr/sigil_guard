@@ -68,14 +68,14 @@ trailers (rule 10); the maintainer pushes manually.
 | F - Completed foundation and research | 30 | 30 | 0 | 0 |
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
-| M2 - Embedded trust bundles | 16 | 9 | 0 | 7 |
+| M2 - Embedded trust bundles | 16 | 10 | 0 | 6 |
 | M3 - Manifests, gateway, and agent trust | 22 | 0 | 0 | 22 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **80** | **0** | **148** |
+| **Total** | **228** | **81** | **0** | **147** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -620,7 +620,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `SigilGuard.HTTPClient`).
   - Tests: negative (port-list assertion per source class), static
     reference scan test.
-- [ ] M2.16 `[:sigil_guard, :trust_bundle, ...]` telemetry events.
+- [x] M2.16 `[:sigil_guard, :trust_bundle, ...]` telemetry events.
   - Spec: `docs/specs/SP.02-embedded-trust-bundles.md` - Telemetry And
     Observability.
   - AC: `:load` and `:verify` spans plus the `:quarantine` event fire with

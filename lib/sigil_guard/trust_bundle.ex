@@ -11,6 +11,7 @@ defmodule SigilGuard.TrustBundle do
   """
 
   alias SigilGuard.ConfigError
+  alias SigilGuard.Telemetry
   alias SigilGuard.TrustBundle.Cache
   alias SigilGuard.TrustBundle.Quarantine
   alias SigilGuard.TrustBundle.Verify
@@ -78,16 +79,25 @@ defmodule SigilGuard.TrustBundle do
   @spec load(source(), keyword()) :: {:ok, t()} | {:error, load_error()}
   def load(source, opts \\ [])
 
-  def load({:map, envelope}, opts) when is_map(envelope) and is_list(opts) do
+  def load(source, opts) when is_list(opts) do
+    Telemetry.span([:sigil_guard, :trust_bundle, :load], load_metadata(source), fn ->
+      result = do_load(source, opts)
+      {result, load_metadata(result, source)}
+    end)
+  end
+
+  def load(_, _), do: {:error, :invalid_source}
+
+  defp do_load({:map, envelope}, opts) when is_map(envelope) do
     load_envelope(envelope, {:map, envelope}, opts)
   end
 
-  def load({:binary, bytes}, opts) when is_binary(bytes) and is_list(opts) do
+  defp do_load({:binary, bytes}, opts) when is_binary(bytes) do
     load_binary(bytes, {:binary, bytes}, opts)
   end
 
   # sobelow_skip ["Traversal.FileModule"]
-  def load({:file, path}, opts) when is_binary(path) and is_list(opts) do
+  defp do_load({:file, path}, opts) when is_binary(path) do
     case File.read(path) do
       {:ok, bytes} -> load_binary(bytes, {:file, path}, opts)
       {:error, _} -> quarantine_error(:invalid_source, %{source: {:file, path}}, opts)
@@ -95,7 +105,7 @@ defmodule SigilGuard.TrustBundle do
   end
 
   # sobelow_skip ["Traversal.FileModule"]
-  def load({:priv, app, rel}, opts) when is_atom(app) and is_binary(rel) and is_list(opts) do
+  defp do_load({:priv, app, rel}, opts) when is_atom(app) and is_binary(rel) do
     path = Application.app_dir(app, Path.join("priv", rel))
 
     case File.read(path) do
@@ -106,13 +116,11 @@ defmodule SigilGuard.TrustBundle do
     ArgumentError -> quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
   end
 
-  def load(:none, opts) when is_list(opts),
+  defp do_load(:none, opts),
     do: quarantine_error(:invalid_source, %{source: :none}, opts)
 
-  def load(source, opts) when is_list(opts),
+  defp do_load(source, opts),
     do: quarantine_error(:invalid_source, %{source: source}, opts)
-
-  def load(_, _), do: {:error, :invalid_source}
 
   @doc false
   @spec load_configured!(keyword(), keyword()) :: :ok | no_return()
@@ -195,13 +203,20 @@ defmodule SigilGuard.TrustBundle do
   def verify(envelope, opts \\ [])
 
   def verify(envelope, opts) when is_list(opts) do
+    Telemetry.span([:sigil_guard, :trust_bundle, :verify], verify_metadata(envelope), fn ->
+      result = do_verify(envelope, opts)
+      {result, verify_metadata(result, envelope)}
+    end)
+  end
+
+  def verify(_, _), do: {:error, :invalid_bundle_format}
+
+  defp do_verify(envelope, opts) do
     case Verify.verify(envelope, opts) do
       {:ok, bundle} -> {:ok, bundle}
       {:error, reason} -> quarantine_error(reason, %{envelope: envelope}, opts)
     end
   end
-
-  def verify(_, _), do: {:error, :invalid_bundle_format}
 
   @doc """
   Build, sign, verify, and cache a development-only trust bundle.
@@ -237,6 +252,103 @@ defmodule SigilGuard.TrustBundle do
       _ -> []
     end
   end
+
+  defp load_metadata(source) do
+    %{source: source_kind(source), bundle_id: nil, result: nil, error: nil, dev: false}
+  end
+
+  defp load_metadata({:ok, bundle}, _) do
+    %{
+      source: source_kind(bundle.source),
+      bundle_id: bundle.bundle_id,
+      result: :ok,
+      error: nil,
+      dev: bundle.dev?
+    }
+  end
+
+  defp load_metadata({:error, reason}, source) do
+    %{source: source_kind(source), bundle_id: nil, result: :error, error: reason, dev: false}
+  end
+
+  defp verify_metadata(envelope) do
+    envelope
+    |> envelope_document()
+    |> verify_document_metadata()
+    |> Map.merge(%{result: nil, error: nil})
+  end
+
+  defp verify_metadata({:ok, bundle}, _) do
+    %{
+      bundle_id: bundle.bundle_id,
+      sequence: bundle.sequence,
+      root_version: bundle.root_version,
+      result: :ok,
+      error: nil
+    }
+  end
+
+  defp verify_metadata({:error, reason}, envelope) do
+    envelope
+    |> envelope_document()
+    |> verify_document_metadata()
+    |> Map.merge(%{result: :error, error: reason})
+  end
+
+  defp verify_document_metadata(%{"bundle_id" => bundle_id} = document) do
+    %{
+      bundle_id: bundle_id,
+      sequence: positive_integer(Map.get(document, "sequence")),
+      root_version: positive_integer(get_in(document, ["roles", "root", "version"]))
+    }
+  end
+
+  defp verify_document_metadata(_), do: %{bundle_id: nil, sequence: nil, root_version: nil}
+
+  defp envelope_document(%{} = envelope) do
+    with payload when is_binary(payload) <-
+           Map.get(envelope, "payload") || Map.get(envelope, :payload),
+         {:ok, bytes} <- decode_base64(payload),
+         {:ok, %{} = document} <- Jason.decode(bytes) do
+      document
+    else
+      _ -> nil
+    end
+  end
+
+  defp envelope_document(_), do: nil
+
+  defp decode_base64(value) when is_binary(value) do
+    [
+      &Base.url_decode64(&1, padding: false),
+      &Base.url_decode64(&1, padding: true),
+      &Base.decode64(&1, padding: false),
+      &Base.decode64(&1, padding: true)
+    ]
+    |> Enum.reduce_while(:error, fn decoder, :error ->
+      case decoder.(value) do
+        {:ok, bytes} -> {:halt, {:ok, bytes}}
+        :error -> {:cont, :error}
+      end
+    end)
+  end
+
+  defp positive_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {integer, ""} when integer > 0 -> integer
+      _ -> nil
+    end
+  end
+
+  defp positive_integer(_), do: nil
+
+  defp source_kind(:dev), do: :dev
+  defp source_kind({:file, _}), do: :file
+  defp source_kind({:priv, _, _}), do: :priv
+  defp source_kind({:map, _}), do: :map
+  defp source_kind({:binary, _}), do: :binary
+  defp source_kind(:none), do: :none
+  defp source_kind(_), do: :invalid
 
   defp quarantine_error(reason, info, opts) do
     if Keyword.get(opts, :quarantine, true) do

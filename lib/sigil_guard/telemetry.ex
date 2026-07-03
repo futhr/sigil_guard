@@ -78,6 +78,17 @@ defmodule SigilGuard.Telemetry do
       anchor_storage: String.t() | nil, anchor_uri_scheme: String.t() | nil,
       outcome: :ok | :error, error_reason: atom | nil}`
 
+    * `[:sigil_guard, :trust_bundle, :load | :verify, :start | :stop | :exception]`
+      Measurements: `%{system_time: integer}` (start), `%{duration: integer}` (stop)
+      Metadata: `%{source: atom, bundle_id: String.t() | nil, sequence: pos_integer() | nil,
+      root_version: pos_integer() | nil, result: :ok | :error | nil, error: atom() | nil,
+      dev: boolean()}`
+
+    * `[:sigil_guard, :trust_bundle, :quarantine]`
+      Measurements: `%{count: pos_integer()}`
+      Metadata: `%{reason: atom(), bundle_id: String.t() | nil,
+      bundle_digest: String.t() | nil, dev: boolean()}`
+
   """
 
   @events [
@@ -101,7 +112,14 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :audit, :anchor_store, :fetch, :exception],
     [:sigil_guard, :audit, :anchor_store, :verify, :start],
     [:sigil_guard, :audit, :anchor_store, :verify, :stop],
-    [:sigil_guard, :audit, :anchor_store, :verify, :exception]
+    [:sigil_guard, :audit, :anchor_store, :verify, :exception],
+    [:sigil_guard, :trust_bundle, :load, :start],
+    [:sigil_guard, :trust_bundle, :load, :stop],
+    [:sigil_guard, :trust_bundle, :load, :exception],
+    [:sigil_guard, :trust_bundle, :verify, :start],
+    [:sigil_guard, :trust_bundle, :verify, :stop],
+    [:sigil_guard, :trust_bundle, :verify, :exception],
+    [:sigil_guard, :trust_bundle, :quarantine]
   ]
 
   @attribute_map %{
@@ -113,6 +131,8 @@ defmodule SigilGuard.Telemetry do
     anchor_storage: "sigil.audit.anchor.storage",
     anchor_store: "sigil.audit.anchor.store",
     anchor_uri_scheme: "sigil.audit.anchor.uri_scheme",
+    bundle_digest: "sigil.trust_bundle.digest",
+    bundle_id: "sigil.trust_bundle.id",
     confirmation_actor: "sigil.confirmation.actor",
     confirmation_expires_at: "sigil.confirmation.expires_at",
     confirmation_issued_at: "sigil.confirmation.issued_at",
@@ -122,6 +142,7 @@ defmodule SigilGuard.Telemetry do
     content_hash: "sigil.security.content_hash",
     count: "sigil.registry.count",
     endpoint: "sigil.registry.endpoint",
+    error: "sigil.error.reason",
     envelope_reason: "sigil.envelope.reason",
     envelope_status: "sigil.envelope.status",
     error_reason: "sigil.error.reason",
@@ -149,10 +170,14 @@ defmodule SigilGuard.Telemetry do
     scanner_validate: "sigil.scanner.validate",
     sink: "sigil.security.sink",
     source: "sigil.registry.source",
+    sequence: "sigil.trust_bundle.sequence",
     tool: "sigil.security.tool.name",
     trust_level: "sigil.security.trust_level",
     trust_required: "sigil.security.trust_required",
     trust_zone: "sigil.security.trust_zone",
+    root_version: "sigil.trust_bundle.root_version",
+    dev: "sigil.trust_bundle.dev",
+    reason: "sigil.error.reason",
     url: "url.full",
     verdict: "sigil.security.verdict"
   }
