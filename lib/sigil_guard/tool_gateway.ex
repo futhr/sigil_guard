@@ -13,6 +13,7 @@ defmodule SigilGuard.ToolGateway do
   alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.MCP
+  alias SigilGuard.TrustBundle
 
   @known_context_keys Map.keys(%Context{})
   @invalid_payload_field false
@@ -85,18 +86,42 @@ defmodule SigilGuard.ToolGateway do
   @doc """
   Verify an observed manifest against the configured manifest set.
   """
-  @spec verify_manifest(String.t(), keyword()) ::
+  @spec verify_manifest(String.t() | map(), keyword()) ::
           {:ok, CapabilityManifest.t()}
           | {:error,
              :unknown_manifest
              | :invalid_manifest
+             | :manifest_expired
              | :manifest_digest_mismatch
              | :schema_digest_mismatch
              | :suspicious_required_param}
+  def verify_manifest(observed, opts) when is_map(observed) do
+    opts = Keyword.put(opts, :require_manifest, true)
+
+    with {:ok, server} <- required_server(opts),
+         {:ok, tool} <- observed_tool_name(observed),
+         {:ok, pinned} <- resolve_manifest(tool, opts),
+         :ok <- matching_server(server, pinned),
+         {:ok, observed_manifest} <- observed_manifest(observed, pinned),
+         :ok <- CapabilityManifest.verify(pinned, observed_manifest),
+         {:ok, capability} <- manifest_struct(observed_manifest),
+         :ok <- manifest_freshness(capability, opts) do
+      {:ok, capability}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def verify_manifest(tool, opts) when is_binary(tool) do
     opts = Keyword.put(opts, :require_manifest, true)
 
-    resolve_manifest(tool, opts)
+    with {:ok, capability} <- resolve_manifest(tool, opts),
+         :ok <- maybe_match_server(capability, opts),
+         :ok <- manifest_freshness(capability, opts) do
+      {:ok, capability}
+    else
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   def verify_manifest(_, _), do: {:error, :unknown_manifest}
@@ -211,9 +236,14 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp manifest_entry(tool, opts) do
-    opts
-    |> Keyword.get(:manifests, %{})
-    |> fetch_manifest(tool)
+    server = Keyword.get(opts, :server)
+    manifests = Keyword.get(opts, :manifests, %{})
+    trust_bundle = Keyword.get(opts, :trust_bundle)
+
+    case fetch_manifest(manifests, tool, server) do
+      {:ok, _} = entry -> entry
+      :error -> fetch_bundle_manifest(trust_bundle, tool, server)
+    end
   end
 
   defp require_manifest?(opts) do
@@ -222,7 +252,7 @@ defmodule SigilGuard.ToolGateway do
     end)
   end
 
-  defp fetch_manifest(manifests, tool) when is_map(manifests) do
+  defp fetch_manifest(manifests, tool, server) when is_map(manifests) do
     atom_tool =
       try do
         {:ok, String.to_existing_atom(tool)}
@@ -231,6 +261,9 @@ defmodule SigilGuard.ToolGateway do
       end
 
     cond do
+      present?(server) and Map.has_key?(manifests, {server, tool}) ->
+        {:ok, Map.fetch!(manifests, {server, tool})}
+
       Map.has_key?(manifests, tool) ->
         {:ok, Map.fetch!(manifests, tool)}
 
@@ -242,7 +275,36 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  defp fetch_manifest(_, _), do: :error
+  defp fetch_manifest(_, _, _), do: :error
+
+  defp fetch_bundle_manifest(%TrustBundle{} = bundle, tool, server) do
+    bundle
+    |> TrustBundle.tools()
+    |> fetch_manifest_from_list(tool, server)
+  end
+
+  defp fetch_bundle_manifest(%{"tools" => tools}, tool, server) when is_list(tools),
+    do: fetch_manifest_from_list(tools, tool, server)
+
+  defp fetch_bundle_manifest(%{tools: tools}, tool, server) when is_list(tools),
+    do: fetch_manifest_from_list(tools, tool, server)
+
+  defp fetch_bundle_manifest(tools, tool, server) when is_list(tools),
+    do: fetch_manifest_from_list(tools, tool, server)
+
+  defp fetch_bundle_manifest(_, _, _), do: :error
+
+  defp fetch_manifest_from_list(tools, tool, server) do
+    Enum.find_value(tools, :error, fn entry ->
+      with {:ok, capability} <- manifest_struct(entry),
+           :ok <- matching_tool_name(tool, capability),
+           :ok <- optional_matching_server(server, capability) do
+        {:ok, entry}
+      else
+        _ -> false
+      end
+    end)
+  end
 
   defp normalize_manifest_entry(tool, {pinned, observed}) do
     with {:ok, pinned} <- manifest_struct(pinned),
@@ -270,6 +332,140 @@ defmodule SigilGuard.ToolGateway do
 
   defp matching_tool_name(tool, %CapabilityManifest{name: tool}), do: :ok
   defp matching_tool_name(_, _), do: {:error, :manifest_digest_mismatch}
+
+  defp required_server(opts) do
+    case Keyword.get(opts, :server) do
+      server when is_binary(server) and server != "" -> {:ok, server}
+      _ -> {:error, :unknown_manifest}
+    end
+  end
+
+  defp maybe_match_server(%CapabilityManifest{} = capability, opts) do
+    case Keyword.get(opts, :server) do
+      nil -> :ok
+      server -> matching_server(server, capability)
+    end
+  end
+
+  defp optional_matching_server(nil, _), do: :ok
+  defp optional_matching_server("", _), do: :ok
+  defp optional_matching_server(server, capability), do: matching_server(server, capability)
+
+  defp matching_server(server, %CapabilityManifest{server: server}), do: :ok
+  defp matching_server(_, _), do: {:error, :unknown_manifest}
+
+  defp observed_tool_name(observed) do
+    case observed_field(observed, "name", :name) do
+      name when is_binary(name) and name != "" -> {:ok, name}
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp observed_manifest(observed, %CapabilityManifest{} = pinned) do
+    if carried_manifest?(observed) do
+      normalize_observed_carried_manifest(observed)
+    else
+      observed_list_manifest(observed, pinned)
+    end
+  end
+
+  defp carried_manifest?(observed) do
+    manifest_format = observed_field(observed, "manifest_format", :manifest_format)
+
+    is_binary(manifest_format)
+  end
+
+  defp normalize_observed_carried_manifest(observed) do
+    observed
+    |> Map.new(fn
+      {:inputSchema, value} -> {"input_schema", value}
+      {"inputSchema", value} -> {"input_schema", value}
+      {:outputSchema, value} -> {"output_schema", value}
+      {"outputSchema", value} -> {"output_schema", value}
+      {key, value} when is_atom(key) -> {Atom.to_string(key), value}
+      pair -> pair
+    end)
+    |> then(&{:ok, &1})
+  end
+
+  defp observed_list_manifest(observed, %CapabilityManifest{} = pinned) do
+    with {:ok, name} <- required_observed_string(observed, "name", :name),
+         {:ok, description} <- required_observed_string(observed, "description", :description),
+         {:ok, input_schema} <- required_observed_map(observed, "inputSchema", :input_schema),
+         {:ok, output_schema} <- optional_observed_map(observed, "outputSchema", :output_schema),
+         {:ok, annotations} <- optional_observed_map(observed, "annotations", :annotations),
+         :ok <- required_when_pinned("outputSchema", output_schema, pinned.output_schema),
+         :ok <- required_when_pinned("annotations", annotations, pinned.annotations) do
+      manifest =
+        pinned
+        |> pinned_manifest_map()
+        |> Map.put("name", name)
+        |> Map.put("description", description)
+        |> Map.put("input_schema", input_schema)
+        |> maybe_put_observed("output_schema", output_schema)
+        |> maybe_put_observed("annotations", annotations)
+
+      {:ok, manifest}
+    end
+  end
+
+  defp pinned_manifest_map(%CapabilityManifest{} = pinned) do
+    pinned
+    |> Map.from_struct()
+    |> Map.drop([
+      :annotations_sha256,
+      :description_sha256,
+      :digest,
+      :input_schema_sha256,
+      :output_schema_sha256,
+      :preimage
+    ])
+    |> Enum.reduce(%{}, fn
+      {_, nil}, acc -> acc
+      {key, value}, acc -> Map.put(acc, Atom.to_string(key), value)
+    end)
+  end
+
+  defp observed_field(map, string_key, atom_key) do
+    snake_key = Atom.to_string(atom_key)
+
+    cond do
+      Map.has_key?(map, string_key) -> Map.fetch!(map, string_key)
+      Map.has_key?(map, snake_key) -> Map.fetch!(map, snake_key)
+      Map.has_key?(map, atom_key) -> Map.fetch!(map, atom_key)
+      true -> nil
+    end
+  end
+
+  defp required_observed_string(map, string_key, atom_key) do
+    case observed_field(map, string_key, atom_key) do
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp required_observed_map(map, string_key, atom_key) do
+    case observed_field(map, string_key, atom_key) do
+      value when is_map(value) -> {:ok, value}
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp optional_observed_map(map, string_key, atom_key) do
+    case observed_field(map, string_key, atom_key) do
+      nil -> {:ok, nil}
+      value when is_map(value) -> {:ok, value}
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp required_when_pinned(_, value, pinned) when is_map(value) and is_map(pinned), do: :ok
+  defp required_when_pinned(_, nil, nil), do: :ok
+  defp required_when_pinned(_, value, nil) when is_map(value), do: :ok
+  defp required_when_pinned(_, nil, pinned) when is_map(pinned), do: {:error, :invalid_manifest}
+
+  defp maybe_put_observed(manifest, _, nil), do: manifest
+  defp maybe_put_observed(manifest, key, value), do: Map.put(manifest, key, value)
 
   defp manifest_freshness(nil, _), do: :ok
 

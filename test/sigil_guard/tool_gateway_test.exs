@@ -7,6 +7,7 @@ defmodule SigilGuard.ToolGatewayTest do
   alias SigilGuard.Decision
   alias SigilGuard.ReplayStore
   alias SigilGuard.ToolGateway
+  alias SigilGuard.TrustBundle
 
   @fixture Path.expand("../fixtures/capability_manifest/repo_file_write", __DIR__)
   @confirmation_key :crypto.hash(:sha256, "tool-gateway-confirmation-test-key")
@@ -157,6 +158,21 @@ defmodule SigilGuard.ToolGatewayTest do
         ToolGateway.guard_request(request(), sandbox_context(),
           manifests: %{"repo_file_write" => {manifest(), manifest()}},
           require_manifest: true
+        )
+
+      assert decision.verdict == :allowed
+      assert decision.audit_metadata.manifest_name == "repo_file_write"
+    end
+
+    test "resolves manifests from trust bundles during request guarding" do
+      bundle = %TrustBundle{document: %{"tools" => [manifest()]}}
+
+      decision =
+        ToolGateway.guard_request(request(), sandbox_context(),
+          trust_bundle: bundle,
+          server: "repo-mcp",
+          require_manifest: true,
+          now: @now
         )
 
       assert decision.verdict == :allowed
@@ -501,6 +517,228 @@ defmodule SigilGuard.ToolGatewayTest do
       assert capability.name == "repo_file_write"
     end
 
+    test "verifies tools/list entries before model exposure" do
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(tools_list_entry(),
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest()},
+                 now: @now
+               )
+
+      assert capability.name == "repo_file_write"
+      assert capability.server == "repo-mcp"
+      assert capability.description == tools_list_entry()["description"]
+      assert capability.annotations == tools_list_entry()["annotations"]
+    end
+
+    test "verifies carried manifests before model exposure" do
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(manifest(),
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest()},
+                 now: @now
+               )
+
+      assert capability.digest
+    end
+
+    test "normalizes carried manifest camel-case and atom keys" do
+      observed =
+        manifest()
+        |> Map.put(:inputSchema, manifest()["input_schema"])
+        |> Map.put("outputSchema", %{"type" => "object"})
+        |> Map.put(:output_schema, %{"type" => "object"})
+        |> Map.delete("input_schema")
+
+      pinned = Map.put(manifest(), "output_schema", %{"type" => "object"})
+
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(observed,
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => pinned},
+                 now: @now
+               )
+
+      assert capability.output_schema == %{"type" => "object"}
+    end
+
+    test "verifies server-qualified manifest map entries" do
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest("repo_file_write",
+                 server: "repo-mcp",
+                 manifests: %{{"repo-mcp", "repo_file_write"} => manifest()},
+                 now: @now
+               )
+
+      assert capability.server == "repo-mcp"
+    end
+
+    test "accepts tools/list snake-case twins" do
+      observed =
+        tools_list_entry()
+        |> Map.put("input_schema", tools_list_entry()["inputSchema"])
+        |> Map.put("annotations", tools_list_entry()["annotations"])
+        |> Map.delete("inputSchema")
+
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(observed,
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest()},
+                 now: @now
+               )
+
+      assert capability.input_schema == manifest()["input_schema"]
+    end
+
+    test "accepts tools/list entries without optional annotations when unpinned" do
+      manifest = Map.delete(manifest(), "annotations")
+      observed = Map.delete(tools_list_entry(), "annotations")
+
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(observed,
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest},
+                 now: @now
+               )
+
+      assert capability.annotations == nil
+    end
+
+    test "verifies tools/list entries with output schemas" do
+      schema = %{"type" => "object"}
+      manifest = Map.put(manifest(), "output_schema", schema)
+      observed = Map.put(tools_list_entry(), "outputSchema", schema)
+
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(observed,
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest},
+                 now: @now
+               )
+
+      assert capability.output_schema == schema
+    end
+
+    test "rejects malformed tools/list field shapes" do
+      malformed = [
+        Map.put(tools_list_entry(), "name", ""),
+        Map.put(tools_list_entry(), "description", 123),
+        Map.put(tools_list_entry(), "inputSchema", "bad"),
+        Map.put(tools_list_entry(), "annotations", "bad")
+      ]
+
+      for observed <- malformed do
+        assert ToolGateway.verify_manifest(observed,
+                 server: "repo-mcp",
+                 manifests: %{"repo_file_write" => manifest()},
+                 now: @now
+               ) == {:error, :invalid_manifest}
+      end
+    end
+
+    test "detects poisoned tools/list descriptions before invocation" do
+      observed = Map.put(tools_list_entry(), "description", "Write anywhere on disk.")
+
+      assert ToolGateway.verify_manifest(observed,
+               server: "repo-mcp",
+               manifests: %{"repo_file_write" => manifest()},
+               now: @now
+             ) == {:error, :manifest_digest_mismatch}
+    end
+
+    test "detects carried manifest schema tampering" do
+      observed = put_in(manifest(), ["input_schema", "additionalProperties"], true)
+
+      assert ToolGateway.verify_manifest(observed,
+               server: "repo-mcp",
+               manifests: %{"repo_file_write" => manifest()},
+               now: @now
+             ) == {:error, :schema_digest_mismatch}
+    end
+
+    test "requires a server for tools/list verification" do
+      assert ToolGateway.verify_manifest(tools_list_entry(),
+               manifests: %{"repo_file_write" => manifest()},
+               now: @now
+             ) == {:error, :unknown_manifest}
+    end
+
+    test "rejects tools/list entries from the wrong server" do
+      assert ToolGateway.verify_manifest(tools_list_entry(),
+               server: "other-mcp",
+               manifests: %{"repo_file_write" => manifest()},
+               now: @now
+             ) == {:error, :unknown_manifest}
+    end
+
+    test "rejects expired tools/list manifests" do
+      expired = Map.put(manifest(), "expires_at", "2020-01-01T00:00:00.000Z")
+
+      assert ToolGateway.verify_manifest(tools_list_entry(),
+               server: "repo-mcp",
+               manifests: %{"repo_file_write" => expired},
+               now: @now
+             ) == {:error, :manifest_expired}
+    end
+
+    test "rejects expired named manifests" do
+      expired = Map.put(manifest(), "expires_at", "2020-01-01T00:00:00.000Z")
+
+      assert ToolGateway.verify_manifest("repo_file_write",
+               server: "repo-mcp",
+               manifests: %{"repo_file_write" => expired},
+               now: @now
+             ) == {:error, :manifest_expired}
+    end
+
+    test "resolves tools/list manifests from trust bundles" do
+      bundle = %TrustBundle{document: %{"tools" => [manifest()]}}
+
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(tools_list_entry(),
+                 server: "repo-mcp",
+                 trust_bundle: bundle,
+                 now: @now
+               )
+
+      assert capability.name == "repo_file_write"
+    end
+
+    test "resolves tools/list manifests from raw bundle sections" do
+      assert {:ok, %CapabilityManifest{} = from_map} =
+               ToolGateway.verify_manifest(tools_list_entry(),
+                 server: "repo-mcp",
+                 trust_bundle: %{"tools" => [manifest()]},
+                 now: @now
+               )
+
+      assert {:ok, %CapabilityManifest{} = from_list} =
+               ToolGateway.verify_manifest(tools_list_entry(),
+                 server: "repo-mcp",
+                 trust_bundle: [manifest()],
+                 now: @now
+               )
+
+      assert from_map.digest == from_list.digest
+    end
+
+    test "resolves tools/list manifests from atom-keyed raw bundle sections" do
+      assert {:ok, %CapabilityManifest{} = capability} =
+               ToolGateway.verify_manifest(tools_list_entry(),
+                 server: "repo-mcp",
+                 trust_bundle: %{tools: [manifest()]},
+                 now: @now
+               )
+
+      assert capability.name == "repo_file_write"
+
+      assert ToolGateway.verify_manifest(tools_list_entry(),
+               server: "repo-mcp",
+               trust_bundle: [],
+               now: @now
+             ) == {:error, :unknown_manifest}
+    end
+
     test "returns named errors for unknown and malformed manifests" do
       assert ToolGateway.verify_manifest("repo_file_write", manifests: %{}) ==
                {:error, :unknown_manifest}
@@ -511,6 +749,12 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert ToolGateway.verify_manifest(:repo_file_write, manifests: %{}) ==
                {:error, :unknown_manifest}
+
+      assert ToolGateway.verify_manifest(Map.delete(tools_list_entry(), "annotations"),
+               server: "repo-mcp",
+               manifests: %{"repo_file_write" => manifest()},
+               now: @now
+             ) == {:error, :invalid_manifest}
     end
   end
 
@@ -648,6 +892,15 @@ defmodule SigilGuard.ToolGatewayTest do
         "name" => "repo_file_write",
         "arguments" => %{"path" => "README.md", "content" => "hello"}
       }
+    }
+  end
+
+  defp tools_list_entry do
+    %{
+      "name" => manifest()["name"],
+      "description" => manifest()["description"],
+      "inputSchema" => manifest()["input_schema"],
+      "annotations" => manifest()["annotations"]
     }
   end
 
