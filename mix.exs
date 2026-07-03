@@ -196,6 +196,7 @@ defmodule SigilGuard.MixProject do
         ],
         "Trust Bundles": [
           SigilGuard.TrustBundle,
+          SigilGuard.TrustBundle.Cache,
           SigilGuard.TrustBundle.Schema,
           SigilGuard.TrustBundle.Verify
         ]

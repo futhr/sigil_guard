@@ -3,8 +3,9 @@ defmodule SigilGuard.Application do
   OTP application for SigilGuard.
 
   On boot, creates the default ETS table backing
-  `SigilGuard.Policy.rate_check/2` so that it is owned by a process that
-  lives as long as the application.
+  `SigilGuard.Policy.rate_check/2`, the replay store, and the trust-bundle
+  cache so that they are owned by a process that lives as long as the
+  application.
 
   Starts the supervision tree that manages optional runtime services.
   When legacy remote-bundle support is enabled
@@ -24,6 +25,7 @@ defmodule SigilGuard.Application do
     SigilGuard.Config.validate!()
     SigilGuard.Policy.ensure_rate_table()
     SigilGuard.ReplayStore.ensure_table()
+    SigilGuard.TrustBundle.Cache.ensure_table()
 
     children =
       if SigilGuard.Config.registry_enabled?() do
