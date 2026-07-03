@@ -12,7 +12,7 @@ defmodule SigilGuard.ToolGateway do
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
-  alias SigilGuard.MCP
+  alias SigilGuard.ToolGateway.Base, as: GatewayBase
   alias SigilGuard.TrustBundle
 
   @known_context_keys Map.keys(%Context{})
@@ -85,7 +85,7 @@ defmodule SigilGuard.ToolGateway do
          :ok <- require_sandbox(capability, request_context),
          :ok <- verify_inbound_attestation(request, payload, request_context, capability, opts) do
       request
-      |> MCP.Gateway.guard_request(context, opts)
+      |> GatewayBase.guard_request(context, opts)
       |> put_manifest_metadata(capability)
       |> maybe_force_suspicious_confirmation(payload, request_context, capability, opts)
       |> maybe_apply_confirmation(payload, request_context, request, opts)
@@ -232,7 +232,7 @@ defmodule SigilGuard.ToolGateway do
     case request_action_digest(opts) do
       :ok ->
         result
-        |> MCP.Gateway.guard_result(context, opts)
+        |> GatewayBase.guard_result(context, opts)
         |> put_result_binding_metadata(opts)
         |> maybe_apply_result_confirmation(payload, result_context, result, opts)
 
@@ -252,7 +252,7 @@ defmodule SigilGuard.ToolGateway do
     if executable?(decision) do
       {:ok, decision}
     else
-      {:error, response_for_decision(decision, nil, opts), decision}
+      {:error, response_for_decision(decision, request_id(request), opts), decision}
     end
   end
 
@@ -264,36 +264,41 @@ defmodule SigilGuard.ToolGateway do
   def guarded_result(result, context \\ %{}, opts \\ []) do
     decision = guard_result(result, context, opts)
 
-    if executable?(decision) do
-      {:ok, MCP.Gateway.response_for_decision(decision, nil, opts), decision}
-    else
-      {:error, response_for_decision(decision, nil, opts), decision}
+    case decision.action do
+      :allow ->
+        {:ok, GatewayBase.guarded_result(result, context, opts) |> elem(1), decision}
+
+      :redact ->
+        {:ok, GatewayBase.response_for_decision(decision, request_id(result), opts), decision}
+
+      _ ->
+        {:error, response_for_decision(decision, request_id(result), opts), decision}
     end
   end
 
   @doc "Return the v2 JSON-RPC-compatible decision response."
   @spec response_for_decision(Decision.t(), term(), keyword()) :: map()
   def response_for_decision(%Decision{} = decision, id \\ nil, opts \\ []) do
-    MCP.Gateway.response_for_decision(decision, id, opts)
+    GatewayBase.response_for_decision(decision, id, opts)
   end
 
   @doc "Start the v2 result stream sanitizer."
   @spec stream_result(Context.t() | map() | keyword(), keyword()) :: SigilGuard.Runtime.Stream.t()
-  def stream_result(context \\ %{}, opts \\ []), do: MCP.Gateway.stream_result(context, opts)
+  def stream_result(context \\ %{}, opts \\ []), do: GatewayBase.stream_result(context, opts)
 
   @doc "Guard one result stream chunk using the v2 tuple shape."
   @spec guarded_result_chunk(SigilGuard.Runtime.Stream.t(), String.t(), keyword()) ::
           {SigilGuard.Runtime.Stream.t(),
            {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
   def guarded_result_chunk(stream, chunk, opts \\ []),
-    do: MCP.Gateway.guarded_result_chunk(stream, chunk, opts)
+    do: GatewayBase.guarded_result_chunk(stream, chunk, opts)
 
   @doc "Flush a guarded result stream using the v2 tuple shape."
   @spec finish_guarded_result_stream(SigilGuard.Runtime.Stream.t(), keyword()) ::
           {SigilGuard.Runtime.Stream.t(),
            {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
   def finish_guarded_result_stream(stream, opts \\ []),
-    do: MCP.Gateway.finish_guarded_result_stream(stream, opts)
+    do: GatewayBase.finish_guarded_result_stream(stream, opts)
 
   defp resolve_manifest(nil, opts) do
     if require_manifest?(opts) do
@@ -886,7 +891,22 @@ defmodule SigilGuard.ToolGateway do
     case Keyword.fetch(opts, :confirmation_token) do
       {:ok, token} when is_binary(token) -> {:ok, token}
       {:ok, _} -> {:error, :invalid_confirmation_token}
-      :error -> Attestation.fetch_confirmation(token_source)
+      :error -> fetch_confirmation_token(token_source)
+    end
+  end
+
+  defp fetch_confirmation_token(token_source) do
+    case Attestation.fetch_confirmation(token_source) do
+      {:ok, token} -> {:ok, token}
+      :error -> fetch_nested_confirmation_token(token_source)
+    end
+  end
+
+  defp fetch_nested_confirmation_token(token_source) when is_map(token_source) do
+    case first_present_payload_term(token_source, confirmation_token_paths()) do
+      {:ok, token} when is_binary(token) -> {:ok, token}
+      {:ok, _} -> {:error, :invalid_confirmation_token}
+      :not_found -> :error
     end
   end
 
@@ -1214,6 +1234,64 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp first_payload_value(_, _), do: nil
+
+  defp request_id(payload) when is_map(payload) do
+    first_payload_term(payload, [
+      [:id],
+      ["id"],
+      [:request_id],
+      ["request_id"]
+    ])
+  end
+
+  defp request_id(_), do: nil
+
+  defp confirmation_token_paths do
+    [
+      [:_agent_confirmation],
+      ["_agent_confirmation"],
+      [:_sigil_confirmation],
+      ["_sigil_confirmation"],
+      [:confirmation_token],
+      ["confirmation_token"],
+      [:params, :_agent_confirmation],
+      [:params, "_agent_confirmation"],
+      [:params, :_sigil_confirmation],
+      [:params, "_sigil_confirmation"],
+      [:params, :confirmation_token],
+      [:params, "confirmation_token"],
+      ["params", :_agent_confirmation],
+      ["params", "_agent_confirmation"],
+      ["params", :_sigil_confirmation],
+      ["params", "_sigil_confirmation"],
+      ["params", :confirmation_token],
+      ["params", "confirmation_token"]
+    ]
+  end
+
+  defp first_payload_term(payload, paths) when is_map(payload) do
+    Enum.find_value(paths, &get_in(payload, &1))
+  end
+
+  defp first_present_payload_term(payload, paths) when is_map(payload) do
+    Enum.reduce_while(paths, :not_found, fn path, :not_found ->
+      case fetch_payload_path(payload, path) do
+        {:ok, value} -> {:halt, {:ok, value}}
+        :error -> {:cont, :not_found}
+      end
+    end)
+  end
+
+  defp fetch_payload_path(payload, []), do: {:ok, payload}
+
+  defp fetch_payload_path(payload, [key | rest]) when is_map(payload) do
+    case Map.fetch(payload, key) do
+      {:ok, value} -> fetch_payload_path(value, rest)
+      :error -> :error
+    end
+  end
+
+  defp fetch_payload_path(_, _), do: :error
 
   defp fetch_path(payload, [key]) when is_map(payload), do: Map.fetch(payload, key)
 

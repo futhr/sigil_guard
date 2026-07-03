@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 12 | 0 | 10 |
+| M3 - Manifests, gateway, and agent trust | 22 | 13 | 0 | 9 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **99** | **0** | **129** |
+| **Total** | **228** | **100** | **0** | **128** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -764,7 +764,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     carries the metadata; `_agent_*` is the only documented public form.
   - AC: the legacy read half is deleted in M6.25 (tracked there).
   - Tests: property (digest equality across namespaces), negative.
-- [ ] M3.13 `SigilGuard.MCP.Gateway` rewired as the permanent facade (D14).
+- [x] M3.13 `SigilGuard.MCP.Gateway` rewired as the permanent facade (D14).
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - MCP.Gateway
     Facade (D14).
   - AC: all twenty facade helpers delegate exactly per the spec table

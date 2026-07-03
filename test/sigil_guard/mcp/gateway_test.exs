@@ -10,6 +10,7 @@ defmodule SigilGuard.MCP.GatewayTest do
   alias SigilGuard.ReplayStore
   alias SigilGuard.Runtime.Stream
   alias SigilGuard.TestSigner
+  alias SigilGuard.ToolGateway
 
   @confirmation_key :crypto.hash(:sha256, "mcp-confirmation-test-key")
   @now ~U[2026-06-30 12:00:00.000Z]
@@ -1401,6 +1402,114 @@ defmodule SigilGuard.MCP.GatewayTest do
              ]
 
       refute inspect(response) =~ "supersecretvalue123"
+    end
+  end
+
+  describe "ToolGateway facade parity" do
+    test "delegates request helpers with the documented confirmation options" do
+      request = confirmable_request()
+      context = [trust_level: :medium]
+
+      assert Gateway.guard_request(request, context) ==
+               ToolGateway.guard_request(request, context, confirmation: :off)
+
+      assert Gateway.guard_confirmed_request(request, context) ==
+               ToolGateway.guard_request(request, context, [])
+
+      blocked = put_in(request, ["params", "arguments", "secret"], "AWS_KEY=AKIAIOSFODNN7EXAMPLE")
+
+      assert Gateway.guarded_request(blocked, context) ==
+               ToolGateway.guarded_request(blocked, context, confirmation: :off)
+
+      assert Gateway.guarded_confirmed_request(blocked, context) ==
+               ToolGateway.guarded_request(blocked, context, [])
+    end
+
+    test "delegates confirmation token issue helpers with request and result directions" do
+      request = confirmable_request()
+      request_decision = Gateway.guard_confirmed_request(request, trust_level: :medium)
+
+      request_opts = [
+        trust_level: :medium,
+        now: @now,
+        nonce: String.duplicate("7", 32)
+      ]
+
+      assert Gateway.issue_confirmation_token(
+               request,
+               [trust_level: :medium],
+               request_decision,
+               @confirmation_key,
+               request_opts
+             ) ==
+               ToolGateway.issue_confirmation(
+                 request,
+                 [trust_level: :medium],
+                 request_decision,
+                 @confirmation_key,
+                 Keyword.put(request_opts, :direction, :request)
+               )
+
+      result = prompt_injection_result()
+      result_decision = Gateway.guard_confirmed_result(result, trust_level: :high)
+      result_opts = [trust_level: :high, now: @now, nonce: String.duplicate("8", 32)]
+
+      assert Gateway.issue_result_confirmation_token(
+               result,
+               [trust_level: :high],
+               result_decision,
+               @confirmation_key,
+               result_opts
+             ) ==
+               ToolGateway.issue_confirmation(
+                 result,
+                 [trust_level: :high],
+                 result_decision,
+                 @confirmation_key,
+                 Keyword.put(result_opts, :direction, :result)
+               )
+    end
+
+    test "delegates result helpers with the documented confirmation options" do
+      result = prompt_injection_result()
+      context = [trust_level: :high]
+      opts = [include_sanitized: true]
+
+      assert Gateway.guard_result(result, context, opts) ==
+               ToolGateway.guard_result(result, context, Keyword.put(opts, :confirmation, :off))
+
+      assert Gateway.guard_confirmed_result(result, context, opts) ==
+               ToolGateway.guard_result(result, context, opts)
+
+      assert Gateway.guarded_result(result, context, opts) ==
+               ToolGateway.guarded_result(result, context, Keyword.put(opts, :confirmation, :off))
+
+      assert Gateway.guarded_confirmed_result(result, context, opts) ==
+               ToolGateway.guarded_result(result, context, opts)
+    end
+
+    test "delegates stream and response helpers without shape changes" do
+      context = [trust_level: :high]
+      opts = [id: "stream-parity"]
+
+      assert Gateway.stream_result(context) == ToolGateway.stream_result(context)
+
+      gateway_stream = Gateway.stream_result(context)
+      tool_stream = ToolGateway.stream_result(context)
+
+      assert Gateway.guarded_result_chunk(gateway_stream, "safe", opts) ==
+               ToolGateway.guarded_result_chunk(tool_stream, "safe", opts)
+
+      gateway_finished = Gateway.stream_result(context)
+      tool_finished = ToolGateway.stream_result(context)
+
+      assert Gateway.finish_guarded_result_stream(gateway_finished, opts) ==
+               ToolGateway.finish_guarded_result_stream(tool_finished, opts)
+
+      decision = Gateway.guard_request(confirmable_request(), trust_level: :medium)
+
+      assert Gateway.response_for_decision(decision, "decision-parity") ==
+               ToolGateway.response_for_decision(decision, "decision-parity")
     end
   end
 

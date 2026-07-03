@@ -360,6 +360,41 @@ defmodule SigilGuard.ToolGatewayTest do
              ) == {:error, :invalid_nonce}
     end
 
+    test "normalizes confirmation manifest options" do
+      assert {:ok, capability} = CapabilityManifest.new(suspicious_manifest())
+
+      decision =
+        ToolGateway.guard_request(request(), sandbox_context(),
+          manifests: %{"repo_file_write" => capability},
+          require_manifest: true
+        )
+
+      assert {:ok, manifest_token} =
+               ToolGateway.issue_confirmation(
+                 request(),
+                 sandbox_context(),
+                 decision,
+                 @confirmation_key,
+                 manifest: capability,
+                 now: @now,
+                 nonce: String.duplicate("d", 32)
+               )
+
+      assert {:ok, digest_token} =
+               ToolGateway.issue_confirmation(
+                 request(),
+                 sandbox_context(),
+                 decision,
+                 @confirmation_key,
+                 manifest_digest: capability.digest,
+                 now: @now,
+                 nonce: String.duplicate("e", 32)
+               )
+
+      assert is_binary(manifest_token)
+      assert is_binary(digest_token)
+    end
+
     test "blocks malformed confirmation options for suspicious-parameter decisions" do
       decision =
         ToolGateway.guard_request(request(), sandbox_context(),
@@ -592,6 +627,48 @@ defmodule SigilGuard.ToolGatewayTest do
         )
 
       assert legacy.audit_metadata.deny_reason == :invalid_attestation
+    end
+
+    test "accepts valid inbound attestations for optional and required modes" do
+      context = Map.put(request_context(), :actor, "spiffe://agents/requester")
+      assert {:ok, capability} = CapabilityManifest.new(manifest())
+
+      decision =
+        ToolGateway.guard_request(request(), context,
+          manifests: %{"repo_file_write" => capability}
+        )
+
+      assert {:ok, envelope} =
+               ToolGateway.attest_request(decision, context,
+                 payload: request_payload(),
+                 signer: TrustedSigner,
+                 keyid: "trusted",
+                 now: @now,
+                 nonce: "valid-inbound-attestation",
+                 manifest: capability
+               )
+
+      request = Map.put(request(), "_agent_trust", envelope)
+      trust_material = %{"trusted" => TrustedSigner.public_key()}
+
+      optional =
+        ToolGateway.guard_request(request, context,
+          manifests: %{"repo_file_write" => capability},
+          attestation: :optional,
+          trust_material: trust_material,
+          now: @now
+        )
+
+      required =
+        ToolGateway.guard_request(request, context,
+          manifests: %{"repo_file_write" => capability},
+          attestation: :required,
+          trust_material: trust_material,
+          now: @now
+        )
+
+      assert optional.verdict == :allowed
+      assert required.verdict == :allowed
     end
 
     test "accepts stronger sandbox isolation and context structs" do
