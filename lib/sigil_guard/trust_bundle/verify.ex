@@ -8,7 +8,9 @@ defmodule SigilGuard.TrustBundle.Verify do
   """
 
   alias SigilGuard.Attestation.Envelope
+  alias SigilGuard.Canonical.JCS
   alias SigilGuard.TrustBundle
+  alias SigilGuard.TrustBundle.Cache
   alias SigilGuard.TrustBundle.Schema
 
   @ed25519_signature_bytes 64
@@ -30,6 +32,7 @@ defmodule SigilGuard.TrustBundle.Verify do
          {:ok, payload} <- decode_base64(fields.payload),
          {:ok, document} <- decode_document(payload),
          {:ok, :bundle, document} <- Schema.validate(document),
+         :ok <- verify_rotation_chain(document, opts),
          {:ok, context} <- verification_context(document, signatures, opts),
          :ok <- reject_revoked_signatures(signatures, context.revoked_keyids),
          :ok <- verify_threshold(signatures, context, fields.payload_type, payload),
@@ -168,6 +171,155 @@ defmodule SigilGuard.TrustBundle.Verify do
       end)
 
     {:ok, public_keys}
+  end
+
+  defp verify_rotation_chain(document, opts) do
+    with {:ok, genesis} <- genesis_root(document, opts) do
+      walk_rotation_chain(document, genesis)
+    end
+  end
+
+  defp genesis_root(document, opts) do
+    case Keyword.fetch(opts, :genesis_root) do
+      {:ok, genesis} ->
+        normalize_genesis_root(genesis)
+
+      :error ->
+        cached_or_current_root(document)
+    end
+  end
+
+  defp cached_or_current_root(%{"bundle_id" => bundle_id} = document) do
+    case Cache.root_pin(bundle_id) do
+      {:ok, pin} -> {:ok, pin}
+      :error -> current_root(document)
+    end
+  end
+
+  defp current_root(document) do
+    with {:ok, keys} <- public_keys(document),
+         %{} = root <- get_in(document, ["roles", "root"]) do
+      {:ok,
+       %{
+         version: positive_integer!(Map.fetch!(root, "version")),
+         threshold: Map.fetch!(root, "threshold"),
+         keyids: Map.fetch!(root, "keyids"),
+         keys: keys
+       }}
+    end
+  end
+
+  defp normalize_genesis_root(%{
+         version: version,
+         threshold: threshold,
+         keyids: keyids,
+         keys: keys
+       })
+       when is_integer(version) and version > 0 and is_integer(threshold) and threshold > 0 and
+              is_list(keyids) and is_map(keys) do
+    {:ok, %{version: version, threshold: threshold, keyids: keyids, keys: keys}}
+  end
+
+  defp normalize_genesis_root(_), do: {:error, :invalid_bundle_format}
+
+  defp walk_rotation_chain(document, genesis) do
+    current_root = get_in(document, ["roles", "root"])
+    current_version = positive_integer!(Map.fetch!(current_root, "version"))
+    chain = Map.get(document, "rotation_chain", [])
+
+    cond do
+      current_version == genesis.version ->
+        if chain == [], do: :ok, else: {:error, :invalid_bundle_format}
+
+      current_version < genesis.version ->
+        {:error, :sequence_below_floor}
+
+      true ->
+        with {:ok, terminal} <- walk_rotations(chain, genesis) do
+          terminal_root_matches?(terminal, current_root)
+        end
+    end
+  end
+
+  defp walk_rotations([], _), do: {:error, :invalid_bundle_format}
+
+  defp walk_rotations(chain, genesis) when is_list(chain) do
+    Enum.reduce_while(chain, {:ok, genesis}, fn envelope, {:ok, previous} ->
+      case verify_rotation(envelope, previous) do
+        {:ok, next_root} -> {:cont, {:ok, next_root}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp verify_rotation(envelope, previous) do
+    with {:ok, fields} <- envelope_fields(envelope),
+         :ok <- require_payload_type(fields.payload_type),
+         {:ok, signatures} <- signature_fields(fields.signatures),
+         :ok <- reject_duplicate_keyids(signatures),
+         {:ok, payload} <- decode_base64(fields.payload),
+         {:ok, document} <- decode_document(payload),
+         {:ok, :rotation, document} <- Schema.validate(document),
+         :ok <- next_root_version?(document, previous),
+         {:ok, next} <- rotation_root(document),
+         :ok <- verify_rotation_threshold(signatures, previous, fields.payload_type, payload),
+         :ok <- verify_rotation_threshold(signatures, next, fields.payload_type, payload) do
+      {:ok, next}
+    else
+      {:ok, :bundle, _} -> {:error, :invalid_bundle_format}
+      {:error, :threshold_not_met} -> {:error, :rotation_below_threshold}
+      {:error, :unknown_key_id} -> {:error, :rotation_below_threshold}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp next_root_version?(document, previous) do
+    root_version = positive_integer!(Map.fetch!(document, "root_version"))
+
+    if root_version == previous.version + 1 do
+      :ok
+    else
+      {:error, :invalid_bundle_format}
+    end
+  end
+
+  defp rotation_root(document) do
+    with {:ok, keys} <- public_keys(document),
+         %{} = root <- get_in(document, ["roles", "root"]) do
+      {:ok,
+       %{
+         version: positive_integer!(Map.fetch!(root, "version")),
+         threshold: Map.fetch!(root, "threshold"),
+         keyids: Map.fetch!(root, "keyids"),
+         keys: keys,
+         descriptor: root,
+         digest: document_digest(document)
+       }}
+    end
+  end
+
+  defp verify_rotation_threshold(signatures, root, payload_type, payload) do
+    context = %{
+      role: %{"keyids" => root.keyids},
+      public_keys: root.keys,
+      threshold: root.threshold
+    }
+
+    verify_threshold(signatures, context, payload_type, payload)
+  end
+
+  defp terminal_root_matches?(terminal, current_root) do
+    if Map.take(terminal.descriptor, ~w(keyids threshold version expires_at)) ==
+         Map.take(current_root, ~w(keyids threshold version expires_at)) do
+      :ok
+    else
+      {:error, :invalid_bundle_format}
+    end
+  end
+
+  defp document_digest(document) do
+    {:ok, bytes} = JCS.encode(document)
+    Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
   end
 
   defp revoked_keyids(document) do

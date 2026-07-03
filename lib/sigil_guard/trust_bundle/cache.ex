@@ -12,6 +12,12 @@ defmodule SigilGuard.TrustBundle.Cache do
 
   @table :sigil_guard_trust_bundle
 
+  @type root_pin :: %{
+          version: pos_integer(),
+          threshold: pos_integer(),
+          keyids: [String.t()],
+          keys: %{String.t() => binary()}
+        }
   @type put_error :: :sequence_below_floor | :forked_root_chain
 
   @doc """
@@ -48,7 +54,32 @@ defmodule SigilGuard.TrustBundle.Cache do
     ensure_table()
 
     case :ets.lookup(@table, bundle_id) do
-      [{^bundle_id, bundle, _}] -> {:ok, bundle}
+      [{^bundle_id, bundle, _, _, _}] -> {:ok, bundle}
+      [] -> :error
+    end
+  end
+
+  @doc false
+  @spec root_pin(bundle_id :: String.t()) :: {:ok, root_pin()} | :error
+  def root_pin(bundle_id) when is_binary(bundle_id) do
+    ensure_table()
+
+    case :ets.lookup(@table, bundle_id) do
+      [{^bundle_id, _, _, nil, _}] -> :error
+      [{^bundle_id, _, _, pin, _}] -> {:ok, pin}
+      [] -> :error
+    end
+  end
+
+  @doc false
+  @spec rotation_digest(bundle_id :: String.t(), root_version :: pos_integer()) ::
+          {:ok, String.t()} | :error
+  def rotation_digest(bundle_id, root_version)
+      when is_binary(bundle_id) and is_integer(root_version) do
+    ensure_table()
+
+    case :ets.lookup(@table, bundle_id) do
+      [{^bundle_id, _, _, _, digests}] -> Map.fetch(digests, root_version)
       [] -> :error
     end
   end
@@ -68,7 +99,7 @@ defmodule SigilGuard.TrustBundle.Cache do
 
     case :ets.lookup(@table, bundle_id) do
       [] -> put_new(bundle)
-      [{^bundle_id, cached, floor}] -> put_existing(bundle, cached, floor)
+      [{^bundle_id, cached, floor, _, _}] -> put_existing(bundle, cached, floor)
     end
   end
 
@@ -82,7 +113,7 @@ defmodule SigilGuard.TrustBundle.Cache do
     ensure_table()
 
     case :ets.lookup(@table, bundle_id) do
-      [{^bundle_id, _, floor}] -> floor
+      [{^bundle_id, _, floor, _, _}] -> floor
       [] -> 0
     end
   end
@@ -97,7 +128,12 @@ defmodule SigilGuard.TrustBundle.Cache do
 
   defp put_new(bundle) do
     floor = accepted_floor(0, bundle)
-    :ets.insert(@table, {bundle.bundle_id, bundle, floor})
+
+    :ets.insert(
+      @table,
+      {bundle.bundle_id, bundle, floor, build_root_pin(bundle), rotation_digests(bundle)}
+    )
+
     {:ok, bundle}
   end
 
@@ -117,7 +153,12 @@ defmodule SigilGuard.TrustBundle.Cache do
 
       true ->
         accepted = accepted_floor(floor, bundle)
-        :ets.insert(@table, {bundle.bundle_id, bundle, accepted})
+
+        :ets.insert(
+          @table,
+          {bundle.bundle_id, bundle, accepted, build_root_pin(cached), rotation_digests(bundle)}
+        )
+
         {:ok, bundle}
     end
   end
@@ -140,4 +181,45 @@ defmodule SigilGuard.TrustBundle.Cache do
   end
 
   defp rollback_floor(_), do: 0
+
+  defp build_root_pin(
+         %TrustBundle{document: %{"roles" => %{"root" => root}, "keys" => _}} = bundle
+       ) do
+    %{
+      version: bundle.root_version,
+      threshold: Map.fetch!(root, "threshold"),
+      keyids: Map.fetch!(root, "keyids"),
+      keys: decoded_keys(bundle.document)
+    }
+  end
+
+  defp build_root_pin(_), do: nil
+
+  defp rotation_digests(bundle) do
+    bundle.document
+    |> Map.get("rotation_chain", [])
+    |> Map.new(fn envelope ->
+      document = envelope_document!(envelope)
+      {String.to_integer(Map.fetch!(document, "root_version")), document_digest!(document)}
+    end)
+  end
+
+  defp envelope_document!(envelope) do
+    envelope
+    |> Map.fetch!("payload")
+    |> Base.url_decode64!(padding: false)
+    |> Jason.decode!()
+  end
+
+  defp document_digest!(document) do
+    {:ok, bytes} = SigilGuard.Canonical.JCS.encode(document)
+    Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+  end
+
+  defp decoded_keys(%{"keys" => keys}) do
+    Map.new(keys, fn {keyid, %{"public_key" => encoded}} ->
+      {:ok, public_key} = Base.url_decode64(encoded, padding: false)
+      {keyid, public_key}
+    end)
+  end
 end
