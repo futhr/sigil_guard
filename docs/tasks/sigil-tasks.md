@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 148 / 228 tasks done (65%).** Milestones: 6 complete, 1 partial,
-3 not started. **80 tasks left.** Current milestone: **M5** (14/26, 54%).
+**Overall: 149 / 228 tasks done (65%).** Milestones: 6 complete, 1 partial,
+3 not started. **79 tasks left.** Current milestone: **M5** (15/26, 58%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 14 | 26 | 54% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 15 | 26 | 58% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **148** | **228** | **65%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **149** | **228** | **65%** | 6 done / 1 partial / 3 to go |
 
-### What's left (80 tasks)
+### What's left (79 tasks)
 
-- **M5 - 12 left:** the threat-model test suite (twelve TM families,
-  move-don't-duplicate). (M5.01-M5.14 done, through the legacy event rename.)
+- **M5 - 11 left:** the threat-model test suite TM.02-TM.12
+  (move-don't-duplicate). (M5.01-M5.15 done, incl. TM.01 injection via tool
+  results.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1439,13 +1440,22 @@ section is post-3.0.0 parking; neither is counted here.
     value, not a known-name enum) and pinned the rename + name-agnostic
     verification in SP.09.
   - Tests: negative, golden vectors (historical chain).
-- [ ] M5.15 TM.01 threat family - prompt injection via tool results.
+- [x] M5.15 TM.01 threat family - prompt injection via tool results.
   - Spec: `docs/research/R.06-agentic-threat-model-and-control-mapping.md`
     - Control Mapping row 1; Test Families; `SP.04`.
   - AC: `test/sigil_guard/threat_model/tm01_injection_via_tool_results_test.exs`
     proves result-phase scanning, streaming holdback, and sink contracts
     handle the attack fixtures at the documented claim level (mitigates).
   - Tests: negative, tamper, malformed.
+  - Done: added the TM.01 module whose `@moduledoc` cites R.06 row 1 (ASI01,
+    claim mitigates) and the sourced PR-title-hijack/exfiltration attack, and
+    references the base-control tests by exact name (no duplication). It drives
+    the controls end-to-end with the fixtures: the gate blocks an injected tool
+    result, quarantine flags `ignore_instructions`/`exfiltration_request`, the
+    sink-aware contract redacts a secret bound for an external sink, streaming
+    holdback prevents a chunk-straddling secret from being emitted, and a
+    display:none-hidden instruction is still quarantined; negatives (benign
+    result allowed, no leak) and malformed inputs are covered.
 - [ ] M5.16 TM.02 threat family - tool poisoning via descriptions/metadata.
   - Spec: `R.06` - Control Mapping row 2; `SP.03` (manifest digest
     pinning).
