@@ -148,7 +148,9 @@ defmodule SigilGuard.BoundaryPolicy do
   module or nil) and `:text` (content for the detector to analyze).
   """
   @spec evaluate(Boundary.t() | map() | keyword(), keyword()) :: Decision.t()
-  def evaluate(input, opts \\ []) do
+  def evaluate(input, opts \\ [])
+
+  def evaluate(input, opts) when is_map(input) or is_list(input) do
     boundary = Boundary.new(input)
 
     decision =
@@ -156,6 +158,13 @@ defmodule SigilGuard.BoundaryPolicy do
         :ok -> decide(boundary, opts)
         {:error, reason} -> terminal_block(boundary, reason)
       end
+
+    emit(decision)
+    decision
+  end
+
+  def evaluate(_, _) do
+    decision = terminal_block(%Boundary{}, :invalid_boundary)
 
     emit(decision)
     decision

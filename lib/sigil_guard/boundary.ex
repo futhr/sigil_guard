@@ -96,7 +96,15 @@ defmodule SigilGuard.Boundary do
   @spec new(t() | map() | keyword()) :: t()
   def new(%__MODULE__{} = boundary), do: normalize_values(boundary)
 
-  def new(fields) when is_list(fields), do: new(Map.new(fields))
+  def new(fields) when is_list(fields) do
+    try do
+      fields
+      |> Map.new()
+      |> new()
+    rescue
+      ArgumentError -> %__MODULE__{}
+    end
+  end
 
   def new(fields) when is_map(fields) do
     fields

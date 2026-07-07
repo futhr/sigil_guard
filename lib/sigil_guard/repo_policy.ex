@@ -106,9 +106,13 @@ defmodule SigilGuard.RepoPolicy do
   def compile(%__MODULE__{} = policy), do: {:ok, policy}
 
   def compile(raw) when is_list(raw) do
-    raw
-    |> Map.new()
-    |> compile()
+    try do
+      raw
+      |> Map.new()
+      |> compile()
+    rescue
+      ArgumentError -> {:error, :invalid_policy}
+    end
   end
 
   def compile(raw) when is_map(raw) do
