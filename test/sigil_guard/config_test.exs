@@ -27,6 +27,19 @@ defmodule SigilGuard.ConfigTest do
     :vault_master_key,
     :trust_mappings
   ]
+  @removed_keys [
+    :backend,
+    :protocol_profile,
+    :registry_url,
+    :registry_ttl_ms,
+    :registry_timeout_ms,
+    :registry_retry_ms,
+    :registry_enabled,
+    :registry_require_signed_bundles,
+    :registry_bundle_public_keys,
+    :registry_bundle_max_age_seconds,
+    :registry_bundle_clock_skew_seconds
+  ]
 
   setup do
     original = Map.new(@env_keys, &{&1, Application.fetch_env(:sigil_guard, &1)})
@@ -153,6 +166,40 @@ defmodule SigilGuard.ConfigTest do
     end
   end
 
+  describe "removed-key boot matrix" do
+    test "each removed key fails application boot with a migration pointer" do
+      for key <- @removed_keys do
+        clear_v3_config()
+        Application.put_env(:sigil_guard, key, removed_key_value(key))
+
+        error =
+          assert_raise ConfigError, fn ->
+            SigilGuard.Application.start(:normal, [])
+          end
+
+        assert error.key == key
+        assert error.reason == :legacy_contract_removed
+        assert error.message =~ Atom.to_string(key)
+        assert error.message =~ "MIGRATING-3.0.md"
+      end
+    end
+
+    test "legacy scanner_patterns registry value fails application boot" do
+      clear_v3_config()
+      Application.put_env(:sigil_guard, :scanner_patterns, :registry)
+
+      error =
+        assert_raise ConfigError, fn ->
+          SigilGuard.Application.start(:normal, [])
+        end
+
+      assert error.key == :scanner_patterns
+      assert error.reason == :legacy_contract_removed
+      assert error.message =~ "scanner_patterns"
+      assert error.message =~ "MIGRATING-3.0.md"
+    end
+  end
+
   describe "removed v2 accessors" do
     test "legacy config readers are not exported" do
       removed = [
@@ -222,4 +269,16 @@ defmodule SigilGuard.ConfigTest do
       Application.delete_env(:sigil_guard, key)
     end
   end
+
+  defp removed_key_value(:backend), do: :elixir
+  defp removed_key_value(:protocol_profile), do: :auto
+  defp removed_key_value(:registry_url), do: "https://registry.example"
+  defp removed_key_value(:registry_ttl_ms), do: 60_000
+  defp removed_key_value(:registry_timeout_ms), do: 5_000
+  defp removed_key_value(:registry_retry_ms), do: 1_000
+  defp removed_key_value(:registry_enabled), do: true
+  defp removed_key_value(:registry_require_signed_bundles), do: true
+  defp removed_key_value(:registry_bundle_public_keys), do: %{}
+  defp removed_key_value(:registry_bundle_max_age_seconds), do: 60
+  defp removed_key_value(:registry_bundle_clock_skew_seconds), do: 60
 end

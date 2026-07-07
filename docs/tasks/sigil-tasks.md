@@ -1806,13 +1806,19 @@ section is post-3.0.0 parking; neither is counted here.
     readers. Config tests now assert kept-key defaults/validation, removed
     key/value `ConfigError` behavior, malformed values, cross-option failure,
     and absence of legacy accessor exports.
-- [ ] M6.09 Removed-key error matrix.
+- [x] M6.09 Removed-key error matrix.
   - Spec: `SP.01` - Removed Keys; `SP.12` - V3 Removal Map.
   - AC: `:backend`, `:protocol_profile`, all nine `registry_*` keys, and
     the `scanner_patterns: :registry` value each raise
     `SigilGuard.ConfigError` at boot naming the key and
     `MIGRATING-3.0.md`.
   - Tests: negative (one boot test per removed key/value).
+  - Done: added a boot-time matrix in `ConfigTest` for `:backend`,
+    `:protocol_profile`, all nine `registry_*` keys, and
+    `scanner_patterns: :registry`. Each case clears v3 config, injects the
+    removed key/value, calls `SigilGuard.Application.start/2`, and asserts a
+    `SigilGuard.ConfigError` with the offending key, reason
+    `:legacy_contract_removed`, and `MIGRATING-3.0.md` in the message.
 - [ ] M6.10 D13 policy filename rename verification.
   - Spec: `docs/specs/SP.11-repo-policy-kernel-contracts.md` - V3 Policy
     Filenames (D13); `SP.04` - Policy Filenames.
