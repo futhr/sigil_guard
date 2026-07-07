@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 146 / 228 tasks done (64%).** Milestones: 6 complete, 1 partial,
-3 not started. **82 tasks left.** Current milestone: **M5** (12/26, 46%).
+**Overall: 147 / 228 tasks done (64%).** Milestones: 6 complete, 1 partial,
+3 not started. **81 tasks left.** Current milestone: **M5** (13/26, 50%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 12 | 26 | 46% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 13 | 26 | 50% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **146** | **228** | **64%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **147** | **228** | **64%** | 6 done / 1 partial / 3 to go |
 
-### What's left (82 tasks)
+### What's left (81 tasks)
 
-- **M5 - 14 left:** the release-provenance workflow (SLSA L3) and the
-  threat-model test suite (twelve TM families). (M5.01-M5.12 done, through the
-  HTTPClient seam and WORM/SBOM verification docs.)
+- **M5 - 13 left:** the legacy event rename and the threat-model test suite
+  (twelve TM families). (M5.01-M5.13 done, through release provenance.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1405,7 +1404,7 @@ section is post-3.0.0 parking; neither is counted here.
     and two-level verification, `gh attestation verify`, the `SigilGuard.HTTPClient`
     seam, and a `require_worm`/signed-receipt WORM anchor-store recipe - every
     command verified to execute as written.
-- [ ] M5.13 Release provenance workflow (SLSA L3).
+- [x] M5.13 Release provenance workflow (SLSA L3).
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15).
   - AC: the tagged-release workflow runs `attest-build-provenance`
@@ -1416,6 +1415,16 @@ section is post-3.0.0 parking; neither is counted here.
     consumer-side verification.
   - Tests: workflow dry-run on a test tag; negative (verify failure blocks
     publish).
+  - Done: added `mix sigil_guard.release_statement` (computes each artifact's
+    SHA-256 and emits the profile-valid `.../release/v1` statement whose action
+    digest binds the `{name, sha256}` artifacts; 100% covered). Rewired
+    `.github/workflows/publish.yml` to `--sha256`-verify the SBOM, build/sign
+    the release statement predicate via `actions/attest`, attest the tarball +
+    SBOM with `actions/attest-build-provenance`, and gate `mix hex.publish` on
+    `gh attestation verify` (failed verify blocks publish). Added a
+    consumer-side verification CI example to the release guide. (Workflow-level
+    dry-run/negative are exercised on a real tagged run; the Elixir builder is
+    unit-tested.)
 - [ ] M5.14 Rename the legacy scanner interception audit event.
   - Spec: `docs/specs/SP.09-audit-chain-and-anchor-contracts.md` - V3
     Extensions (Owned By SP.05).

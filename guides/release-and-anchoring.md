@@ -41,6 +41,28 @@ Verify the build provenance itself with the GitHub CLI, gating publish on it:
 gh attestation verify sigil_guard-3.0.0.tar --repo futhr/sigil_guard
 ```
 
+### Consumer-side verification in CI
+
+A downstream consumer gates its own build on the same evidence — provenance,
+SBOM digest, and structure — before trusting the release:
+
+```yaml
+- name: Verify sigil_guard release
+  env:
+    GH_TOKEN: ${{ github.token }}
+  run: |
+    gh attestation verify sigil_guard-3.0.0.tar --repo futhr/sigil_guard
+    gh attestation verify sigil_guard-3.0.0.spdx.json --repo futhr/sigil_guard
+    mix sigil_guard.sbom \
+      --verify sigil_guard-3.0.0.spdx.json \
+      --sha256 "$(shasum -a 256 sigil_guard-3.0.0.spdx.json | cut -d' ' -f1)"
+```
+
+The tagged-release workflow produces these subjects with
+`actions/attest-build-provenance`, signs the SP.01 `release` statement
+(`mix sigil_guard.release_statement`), and runs `gh attestation verify` itself
+before `mix hex.publish`, so a failed verification blocks the publish.
+
 ## Implementing a WORM / append-only anchor store
 
 Audit checkpoints and exports are the tamper-evidence layer; anchoring writes a

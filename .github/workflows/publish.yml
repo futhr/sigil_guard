@@ -61,7 +61,43 @@ jobs:
           mkdir -p dist
           mix hex.build --output "dist/sigil_guard-${GITHUB_REF_NAME}.tar"
           mix sigil_guard.sbom --output "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json"
-          mix sigil_guard.sbom --verify "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json"
+          SBOM_SHA256="$(shasum -a 256 "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" | cut -d' ' -f1)"
+          mix sigil_guard.sbom \
+            --verify "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" \
+            --sha256 "${SBOM_SHA256}"
+
+      - name: Build the SP.01 release statement
+        run: |
+          mix sigil_guard.release_statement \
+            --tarball "dist/sigil_guard-${GITHUB_REF_NAME}.tar" \
+            --sbom "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" \
+            --version "${GITHUB_REF_NAME#v}" \
+            --output "dist/sigil_guard-${GITHUB_REF_NAME}.release.json"
+          jq '.predicate' "dist/sigil_guard-${GITHUB_REF_NAME}.release.json" \
+            > "dist/sigil_guard-${GITHUB_REF_NAME}.release-predicate.json"
+
+      - name: Attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            dist/sigil_guard-${{ github.ref_name }}.tar
+            dist/sigil_guard-${{ github.ref_name }}.spdx.json
+
+      - name: Sign the SP.01 release statement
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/sigil_guard-${{ github.ref_name }}.tar
+          predicate-type: https://sigilguard.dev/attestation/release/v1
+          predicate-path: dist/sigil_guard-${{ github.ref_name }}.release-predicate.json
+
+      - name: Verify provenance before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify "dist/sigil_guard-${GITHUB_REF_NAME}.tar" \
+            --repo "${GITHUB_REPOSITORY}"
+          gh attestation verify "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" \
+            --repo "${GITHUB_REPOSITORY}"
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -69,17 +105,6 @@ jobs:
           name: sigil_guard-${{ github.ref_name }}-release-artifacts
           path: dist/*
           if-no-files-found: error
-
-      - name: Attest release package provenance
-        uses: actions/attest@v4
-        with:
-          subject-path: dist/sigil_guard-${{ github.ref_name }}.tar
-
-      - name: Attest release package SBOM
-        uses: actions/attest@v4
-        with:
-          subject-path: dist/sigil_guard-${{ github.ref_name }}.tar
-          sbom-path: dist/sigil_guard-${{ github.ref_name }}.spdx.json
 
       - name: Publish to Hex.pm
         env:
