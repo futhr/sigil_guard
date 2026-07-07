@@ -1876,12 +1876,17 @@ section is post-3.0.0 parking; neither is counted here.
     registry-to-trust-bundle mappings, envelope-to-attestation, profile-to-
     TrustProfile, configuration keys, expected error changes, and version
     pinning.
-- [ ] M6.14 MIGRATING: `_sigil` to `_agent_trust` before/after examples.
+- [x] M6.14 MIGRATING: `_sigil` to `_agent_trust` before/after examples.
   - Spec: `docs/specs/SP.08-mcp-gateway-and-confirmation-contracts.md` -
     Metadata Namespace.
   - AC: literal before/after payload examples; the mixed-traffic
     transition note lives only here.
   - Validation: completeness script; vocabulary scan exemption honored.
+  - Done: replaced the `MIGRATING-3.0.md` trust metadata placeholder with
+    literal JSON-RPC before/after examples mapping `_sigil` envelope metadata to
+    `_agent_trust` DSSE Agent Trust metadata under `params`, and documented the
+    mixed-traffic rollout rule that v3 treats `_sigil` as ordinary user content
+    and must not receive both metadata keys on the same endpoint.
 - [ ] M6.15 MIGRATING: `_sigil_confirmation` to `_agent_confirmation`
       before/after examples.
   - Spec: `SP.08` - Metadata Namespace.

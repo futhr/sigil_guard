@@ -46,7 +46,66 @@ fallbacks.
 ## MCP Trust Metadata
 
 Use `_agent_trust` instead of `_sigil` for Agent Trust attestations attached to
-MCP payloads. Literal before/after payload examples are filled in by M6.14.
+MCP payloads. The metadata key may appear at the JSON-RPC payload root or inside
+`params`; v3 strips `_agent_trust` from both locations before computing action
+digests. V3 does not strip `_sigil`.
+
+Before:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "call-1",
+  "method": "tools/call",
+  "params": {
+    "name": "repo_file_write",
+    "arguments": {
+      "path": "docs/guide.md",
+      "content": "updated"
+    },
+    "_sigil": {
+      "identity": "spiffe://prod.example.org/agents/release-bot",
+      "verdict": "allowed",
+      "timestamp": "2026-07-02T12:00:00.000Z",
+      "nonce": "000102030405060708090a0b0c0d0e0f",
+      "signature": "legacy-base64url-signature"
+    }
+  }
+}
+```
+
+After:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "call-1",
+  "method": "tools/call",
+  "params": {
+    "name": "repo_file_write",
+    "arguments": {
+      "path": "docs/guide.md",
+      "content": "updated"
+    },
+    "_agent_trust": {
+      "payloadType": "application/vnd.sigilguard+json",
+      "payload": "base64url-jcs-in-toto-statement",
+      "signatures": [
+        {
+          "keyid": "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8",
+          "sig": "base64url-dsse-signature"
+        }
+      ]
+    }
+  }
+}
+```
+
+Mixed-traffic rollout: do not send both metadata keys to the same v3 endpoint.
+Upgrade producers and consumers as a pair, or route v2 traffic to the old v2
+deployment until both sides emit and verify `_agent_trust`. In v3, `_sigil` is
+ordinary user content for digest purposes and can change the signed action
+digest instead of being treated as transport metadata.
 
 ## MCP Confirmation Metadata
 
