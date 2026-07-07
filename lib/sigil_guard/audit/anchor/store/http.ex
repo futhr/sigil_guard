@@ -45,6 +45,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   @default_put_path "/audit/anchors"
   @default_fetch_path "/audit/anchors/:digest"
   @default_timeout_ms 5_000
+  @default_max_body_bytes 1_048_576
   @success_statuses [200, 201, 202]
   @atom_fields %{
     "anchor" => :anchor,
@@ -67,7 +68,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
          {:ok, metadata} <- metadata(opts),
          {:ok, headers} <- headers(opts),
          {:ok, timeout} <- timeout(opts),
-         {:ok, body, response_headers} <- post_anchor(url, record, metadata, headers, timeout),
+         transport = %{url: url, headers: headers, timeout: timeout, opts: opts},
+         {:ok, body, response_headers} <- post_anchor(record, metadata, transport),
          {:ok, receipt} <- normalize_receipt(body, record, url, metadata, response_headers),
          :ok <- validate_required_worm(receipt, opts),
          :ok <- verify_required_receipt_signature(receipt, opts) do
@@ -84,7 +86,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
          {:ok, url} <- fetch_url(receipt_or_digest, opts, digest),
          {:ok, headers} <- headers(opts),
          {:ok, timeout} <- timeout(opts),
-         {:ok, body} <- get_anchor(url, headers, timeout),
+         transport = %{url: url, headers: headers, timeout: timeout, opts: opts},
+         {:ok, body} <- get_anchor(transport),
          {:ok, record} <- normalize_record(body),
          :ok <- verify_digest(record, digest) do
       {:ok, record}
@@ -261,63 +264,102 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   defp valid_header?(_), do: false
 
-  defp post_anchor(url, record, metadata, headers, timeout) do
+  # `transport` bundles the resolved `%{url, headers, timeout, opts}`.
+  defp post_anchor(record, metadata, transport) do
     body =
-      %{
+      Jason.encode!(%{
         "kind" => @put_kind,
         "version" => @version,
         "anchor_digest" => Anchor.digest(record),
         "record" => record,
         "metadata" => metadata
-      }
-      |> Jason.encode_to_iodata!()
+      })
 
-    Finch.build(:post, url, headers, body)
-    |> request_json(timeout, allow_empty?: true)
-    |> response_with_headers()
+    do_request(:post, body, transport, allow_empty?: true)
   end
 
-  defp get_anchor(url, headers, timeout) do
-    Finch.build(:get, url, headers)
-    |> request_json(timeout, allow_empty?: false)
-    |> response_body()
-  end
-
-  defp request_json(request, timeout, opts) do
-    case request(request, timeout) do
-      {:ok, %Finch.Response{status: status, body: body, headers: headers}}
-      when status in @success_statuses ->
-        with {:ok, decoded} <- decode_object(body, opts) do
-          {:ok, decoded, headers}
-        end
-
-      {:ok, %Finch.Response{status: status}} ->
-        {:error, {:http_error, status}}
-
-      {:error, reason} ->
-        {:error, normalize_request_error(reason)}
+  defp get_anchor(transport) do
+    with {:ok, decoded, _} <- do_request(:get, nil, transport, allow_empty?: false) do
+      {:ok, decoded}
     end
   end
 
-  defp request(request, timeout) do
-    Finch.request(request, SigilGuard.Finch, receive_timeout: timeout)
-  rescue
-    error in ArgumentError -> {:error, error}
-  catch
-    :exit, {:noproc, _} -> {:error, :finch_not_started}
-    :exit, reason -> {:error, {:finch_exit, reason}}
+  # Route every request through the resolved host `SigilGuard.HTTPClient` (D9):
+  # per-call, then app env, then fail closed - never a direct network call here.
+  defp do_request(method, body, transport, decode_opts) do
+    with {:ok, client} <- resolve_http_client(transport.opts),
+         {:ok, response} <- invoke_http_client(client, method, body, transport) do
+      handle_http_response(response, decode_opts, max_body_bytes(transport.opts))
+    end
   end
 
-  defp normalize_request_error(%ArgumentError{message: "unknown registry: " <> _}),
-    do: :finch_not_started
+  defp resolve_http_client(opts) do
+    client = Keyword.get(opts, :http_client) || Application.get_env(:sigil_guard, :http_client)
 
-  defp normalize_request_error(reason), do: reason
+    if is_atom(client) and not is_nil(client) and Code.ensure_loaded?(client) and
+         function_exported?(client, :request, 5) do
+      {:ok, client}
+    else
+      {:error, :http_client_not_configured}
+    end
+  end
 
-  defp response_with_headers({:ok, body, headers}), do: {:ok, body, headers}
-  defp response_with_headers({:error, reason}), do: {:error, reason}
+  defp invoke_http_client(client, method, body, transport) do
+    request_opts = [timeout: transport.timeout, max_body_bytes: max_body_bytes(transport.opts)]
 
-  defp response_body({:ok, body, _}), do: {:ok, body}
-  defp response_body({:error, reason}), do: {:error, reason}
+    case client.request(method, transport.url, transport.headers, body, request_opts) do
+      {:ok, %{status: status} = response} when is_integer(status) -> {:ok, response}
+      {:ok, _} -> {:error, {:http_client_error, :invalid_response}}
+      {:error, reason} -> {:error, {:http_client_error, reason}}
+      _ -> {:error, {:http_client_error, :invalid_response}}
+    end
+  rescue
+    _ -> {:error, {:http_client_error, :adapter_crash}}
+  catch
+    _, _ -> {:error, {:http_client_error, :adapter_crash}}
+  end
+
+  defp handle_http_response(%{status: status} = response, decode_opts, max_body_bytes)
+       when status in @success_statuses do
+    body = Map.get(response, :body, "")
+
+    cond do
+      not is_binary(body) ->
+        {:error, {:http_client_error, :invalid_response}}
+
+      byte_size(body) > max_body_bytes ->
+        {:error, :response_too_large}
+
+      true ->
+        with {:ok, decoded} <- decode_object(body, decode_opts) do
+          {:ok, decoded, normalize_response_headers(Map.get(response, :headers, []))}
+        end
+    end
+  end
+
+  defp handle_http_response(%{status: status}, _, _) do
+    {:error, {:http_error, status}}
+  end
+
+  defp normalize_response_headers(headers) when is_list(headers) do
+    Enum.flat_map(headers, fn
+      {key, value}
+      when (is_binary(key) or is_atom(key)) and (is_binary(value) or is_atom(value)) ->
+        [{to_string(key), to_string(value)}]
+
+      _ ->
+        []
+    end)
+  end
+
+  defp normalize_response_headers(_), do: []
+
+  defp max_body_bytes(opts) do
+    case Keyword.get(opts, :max_body_bytes, @default_max_body_bytes) do
+      value when is_integer(value) and value >= 0 -> value
+      _ -> @default_max_body_bytes
+    end
+  end
 
   defp decode_object("", opts) do
     if Keyword.get(opts, :allow_empty?, false), do: {:ok, %{}}, else: {:error, :invalid_body}

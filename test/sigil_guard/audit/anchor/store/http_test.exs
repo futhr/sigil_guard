@@ -19,6 +19,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
   setup do
     bypass = Bypass.open()
     start_supervised!({Finch, name: SigilGuard.Finch})
+    Application.put_env(:sigil_guard, :http_client, SigilGuard.FinchHTTPClient)
+    on_exit(fn -> Application.delete_env(:sigil_guard, :http_client) end)
     %{bypass: bypass, url: "http://localhost:#{bypass.port}"}
   end
 
@@ -765,7 +767,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
   end
 end
 
-defmodule SigilGuard.Audit.Anchor.Store.HTTPNoFinchTest do
+defmodule SigilGuard.Audit.Anchor.Store.HTTPNoClientTest do
   @moduledoc false
 
   use ExUnit.Case, async: false
@@ -773,10 +775,12 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPNoFinchTest do
   alias SigilGuard.Audit.Anchor.Store
   alias SigilGuard.Audit.Anchor.Store.HTTP
 
-  test "returns a stable error when Finch is not supervised" do
-    assert Process.whereis(SigilGuard.Finch) == nil
+  test "fails closed with :http_client_not_configured when no client is configured" do
+    # No per-call :http_client and no app-env client: the store must not silently
+    # no-op, and it makes no direct network call of its own (D9).
+    assert Application.get_env(:sigil_guard, :http_client) == nil
 
-    assert {:error, :finch_not_started} =
+    assert {:error, :http_client_not_configured} =
              Store.fetch(HTTP, String.duplicate("a", 64),
                url: "http://localhost:1",
                timeout: 1

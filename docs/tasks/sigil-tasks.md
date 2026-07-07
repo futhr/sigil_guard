@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 144 / 228 tasks done (63%).** Milestones: 6 complete, 1 partial,
-3 not started. **84 tasks left.** Current milestone: **M5** (10/26, 38%).
+**Overall: 145 / 228 tasks done (64%).** Milestones: 6 complete, 1 partial,
+3 not started. **83 tasks left.** Current milestone: **M5** (11/26, 42%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 10 | 26 | 38% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 11 | 26 | 42% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **144** | **228** | **63%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **145** | **228** | **64%** | 6 done / 1 partial / 3 to go |
 
-### What's left (84 tasks)
+### What's left (83 tasks)
 
-- **M5 - 16 left:** HTTPClient/anchor stores, provenance/SBOM, and the
-  threat-model test suite. (M5.01-M5.10: proofs, checkpoint statements,
-  cosigning, exports, privacy, OTel, CloudEvents, read/query, evidence refs.)
+- **M5 - 15 left:** WORM anchor adapter, provenance/SBOM, and the threat-model
+  test suite. (M5.01-M5.11: proofs, checkpoint statements, cosigning, exports,
+  privacy, OTel, CloudEvents, read/query, evidence refs, HTTPClient seam.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1361,7 +1361,7 @@ section is post-3.0.0 parking; neither is counted here.
     so decision, attestation predicate, and audit-event `metadata["evidence"]`
     carry the identical resolvable ref. Round-trip, negative, and tamper
     (dangling/mislabelled ref) tests included.
-- [ ] M5.11 `SigilGuard.HTTPClient` behaviour and anchor-store conversion.
+- [x] M5.11 `SigilGuard.HTTPClient` behaviour and anchor-store conversion.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` -
     SigilGuard.HTTPClient Behaviour (D9).
   - AC: the behaviour (`request/5`) exists with the documented contract:
@@ -1376,6 +1376,19 @@ section is post-3.0.0 parking; neither is counted here.
     itself leaves in M6.11); `Store.LocalFile` is unchanged.
   - Tests: negative, malformed, tamper (oversized/mangled responses),
     expiration (timeout).
+  - Done: added the `SigilGuard.HTTPClient` behaviour (`request/5`). Converted
+    `Audit.Anchor.Store.HTTP` to resolve the host client (per-call
+    `:http_client`, then app env, else `:http_client_not_configured` -
+    including a module not exporting `request/5`), pass the resolved `:timeout`
+    (default `5_000`, `:infinity` allowed) in opts with no store retries, and
+    surface adapter `{:error, reason}` as `{:http_client_error, reason}`,
+    raises/exits as `{:http_client_error, :adapter_crash}`, non-2xx as the
+    existing `{:http_error, status}`, and bodies over `:max_body_bytes`
+    (default `1_048_576`) as `:response_too_large`. Zero direct `Finch.` calls
+    remain; `Store.LocalFile` is untouched. The existing Bypass suite runs
+    through a test-support Finch adapter injected via app env, plus new contract
+    tests (resolution, error/crash/no-status surfacing, oversized/mangled body,
+    timeout pass-through) with stub adapters.
 - [ ] M5.12 WORM anchor adapter and release SBOM verification docs.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15); Security Considerations.
