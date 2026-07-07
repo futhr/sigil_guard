@@ -111,7 +111,7 @@ defmodule SigilGuard.Audit.WitnessTest do
       {:ok, proof} = Proof.consistency(ctx.events, 3)
       previous = %{statement: ctx.statement3, consistency_proof: proof}
 
-      assert {:ok, cosigned} = Witness.cosign(fresh_envelope(), Witness1, previous: previous)
+      assert {:ok, cosigned} = Witness.cosign(ctx.envelope, Witness1, previous: previous)
       assert length(cosigned["signatures"]) == 2
     end
 
@@ -120,7 +120,7 @@ defmodule SigilGuard.Audit.WitnessTest do
       {:ok, wrong_proof} = Proof.consistency(ctx.events, 4)
       previous = %{statement: ctx.statement3, consistency_proof: wrong_proof}
 
-      assert Witness.cosign(fresh_envelope(), Witness1, previous: previous) ==
+      assert Witness.cosign(ctx.envelope, Witness1, previous: previous) ==
                {:error, :inconsistent_tree}
     end
 
@@ -130,29 +130,27 @@ defmodule SigilGuard.Audit.WitnessTest do
       broken = Map.put(proof, "first_size", 0)
       previous = %{statement: ctx.statement3, consistency_proof: broken}
 
-      assert Witness.cosign(fresh_envelope(), Witness1, previous: previous) ==
+      assert Witness.cosign(ctx.envelope, Witness1, previous: previous) ==
                {:error, :out_of_range}
     end
 
-    test "a malformed :previous fails :invalid_proof" do
-      assert Witness.cosign(fresh_envelope(), Witness1, previous: %{}) == {:error, :invalid_proof}
-
-      assert Witness.cosign(fresh_envelope(), Witness1, previous: :bad) ==
-               {:error, :invalid_proof}
+    test "a malformed :previous fails :invalid_proof", ctx do
+      assert Witness.cosign(ctx.envelope, Witness1, previous: %{}) == {:error, :invalid_proof}
+      assert Witness.cosign(ctx.envelope, Witness1, previous: :bad) == {:error, :invalid_proof}
     end
 
     test "a previous statement missing its merkle root fails :invalid_proof", ctx do
       {:ok, proof} = Proof.consistency(ctx.events, 3)
       previous = %{statement: %{"predicate" => %{}}, consistency_proof: proof}
 
-      assert Witness.cosign(fresh_envelope(), Witness1, previous: previous) ==
+      assert Witness.cosign(ctx.envelope, Witness1, previous: previous) ==
                {:error, :invalid_proof}
     end
 
     test "an unreadable current envelope payload fails :invalid_envelope", ctx do
       {:ok, proof} = Proof.consistency(ctx.events, 3)
       previous = %{statement: ctx.statement3, consistency_proof: proof}
-      broken = Map.put(fresh_envelope(), "payload", "not*base64*url")
+      broken = Map.put(ctx.envelope, "payload", "not*base64*url")
       assert Witness.cosign(broken, Witness1, previous: previous) == {:error, :invalid_envelope}
     end
   end
@@ -214,12 +212,6 @@ defmodule SigilGuard.Audit.WitnessTest do
       assert Witness.verify_threshold(ctx.envelope, ctx.keys, 1) ==
                {:error, :witness_threshold_not_met}
     end
-  end
-
-  defp fresh_envelope do
-    {:ok, payload} = JCS.encode(Fixture.statement())
-    {:ok, envelope} = Envelope.sign(payload, Fixture.signer())
-    envelope
   end
 
   defp sorted(keys), do: Enum.sort(Map.keys(keys))

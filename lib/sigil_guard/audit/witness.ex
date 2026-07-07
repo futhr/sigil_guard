@@ -2,11 +2,12 @@ defmodule SigilGuard.Audit.Witness do
   @moduledoc """
   Witness cosigning and threshold verification for audit checkpoints (SP.05).
 
-  A single-signer checkpoint proves nothing against its own signer. Witness
-  cosigning is optional, offline-compatible, and additive: witnesses append a
-  `{keyid, sig}` entry over the **identical** DSSE PAE bytes of the operator's
-  checkpoint-state statement (`SigilGuard.Audit.Checkpoint.to_statement/1`),
-  never modifying the payload or the existing signatures.
+  Cosigning lets independent witnesses co-attest a checkpoint so verification no
+  longer rests on the operator's key alone. It is optional, offline-compatible,
+  and additive: witnesses append a `{keyid, sig}` entry over the **identical**
+  DSSE PAE bytes of the operator's checkpoint-state statement
+  (`SigilGuard.Audit.Checkpoint.to_statement/1`), never modifying the payload or
+  the existing signatures.
 
   When a witness holds a previously cosigned checkpoint for the same chain, it
   passes it as `:previous` and `cosign/3` verifies a consistency proof from that
@@ -20,8 +21,7 @@ defmodule SigilGuard.Audit.Witness do
   whose signatures verify; a bad or unresolved witness signature is simply not
   counted (tolerated per SP.01), and fewer than `threshold` fails
   `:witness_threshold_not_met`. Thresholds are opt-in: an unwitnessed
-  single-signature checkpoint stays valid where no threshold policy applies (the
-  caller simply does not invoke `verify_threshold/3`).
+  single-signature checkpoint stays valid where no threshold policy applies.
   """
 
   alias SigilGuard.Attestation.Envelope

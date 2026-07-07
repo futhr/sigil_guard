@@ -232,16 +232,15 @@ defmodule SigilGuard.Audit.Proof do
   defp fold_node(_, {:ok, {_, _, 0}}), do: {:halt, {:error, :proof_verification_failed}}
 
   defp fold_node(p, {:ok, {r, fn_, sn}}) do
-    result =
+    {node, fn2, sn2} =
       if rem(fn_, 2) == 1 or fn_ == sn do
-        {fn2, sn2} = shift_until_odd(fn_, sn)
-        {Checkpoint.node_hash(p, r), fn2, sn2}
+        {f, s} = shift_until_odd(fn_, sn)
+        {Checkpoint.node_hash(p, r), f, s}
       else
         {Checkpoint.node_hash(r, p), fn_, sn}
       end
 
-    {node, fn3, sn3} = result
-    {:cont, {:ok, {node, div(fn3, 2), div(sn3, 2)}}}
+    {:cont, {:ok, {node, div(fn2, 2), div(sn2, 2)}}}
   end
 
   defp finalize(root, 0, merkle_root) do
@@ -254,7 +253,8 @@ defmodule SigilGuard.Audit.Proof do
 
   defp finalize(_, _, _), do: {:error, :proof_verification_failed}
 
-  # Right-shift `fn` and `sn` together while `fn` is even and non-zero.
+  # Right-shift `fn` and `sn` together until `fn` is odd; the `!= 0` guard stops
+  # at `fn == 0` (also even) rather than recurring forever.
   defp shift_until_odd(fn_, sn) when rem(fn_, 2) == 0 and fn_ != 0,
     do: shift_until_odd(div(fn_, 2), div(sn, 2))
 

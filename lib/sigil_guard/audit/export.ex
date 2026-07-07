@@ -174,7 +174,7 @@ defmodule SigilGuard.Audit.Export do
         create_anchor(checkpoint, anchor_opts)
 
       anchor_opts when is_map(anchor_opts) ->
-        create_anchor(checkpoint, anchor_opts(anchor_opts))
+        create_anchor(checkpoint, normalize_anchor_map(anchor_opts))
 
       _ ->
         {:error, :invalid_anchor_options}
@@ -257,8 +257,8 @@ defmodule SigilGuard.Audit.Export do
     end
   end
 
-  defp anchor_opts(anchor_opts) do
-    Enum.flat_map(anchor_opts, fn
+  defp normalize_anchor_map(map) do
+    Enum.flat_map(map, fn
       {key, value} when key in [:anchored_at, "anchored_at"] -> [anchored_at: value]
       {key, value} when key in [:storage, "storage"] -> [storage: value]
       {key, value} when key in [:uri, "uri"] -> [uri: value]
@@ -349,7 +349,8 @@ defmodule SigilGuard.Audit.Export do
   end
 
   defp verify_each_inclusion(proofs, checkpoint, events) do
-    root = Map.get(checkpoint, "merkle_root")
+    # Read the root tolerantly (string or atom key), like the rest of the module.
+    root = Map.get(checkpoint, "merkle_root") || Map.get(checkpoint, :merkle_root)
 
     Enum.reduce_while(proofs, :ok, fn proof, :ok ->
       case verify_one_inclusion(proof, root, events) do

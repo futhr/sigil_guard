@@ -207,7 +207,7 @@ defmodule SigilGuard.Audit.Checkpoint do
   `chain_id` is included only when present. The single subject `checkpoint` is
   digested with `digest/1` over the unchanged local record, so signed and
   unsigned checkpoints yield the same subject digest. This wraps exports and
-  cosigning only; the local checkpoint record is never modified.
+  cosigning only.
 
   A checkpoint missing the required fields fails `{:error, :invalid_checkpoint}`.
   """

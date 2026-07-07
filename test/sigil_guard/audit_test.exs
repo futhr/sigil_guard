@@ -235,14 +235,8 @@ defmodule SigilGuard.AuditTest do
       signed = Audit.build_chain(events, @secret_key)
 
       assert length(signed) == 3
-
-      # First event has no prev_hmac
       assert Enum.at(signed, 0).prev_hmac == nil
-
-      # Second event links to first
       assert Enum.at(signed, 1).prev_hmac == Enum.at(signed, 0).hmac
-
-      # Third event links to second
       assert Enum.at(signed, 2).prev_hmac == Enum.at(signed, 1).hmac
     end
   end

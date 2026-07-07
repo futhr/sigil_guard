@@ -39,10 +39,6 @@ defmodule SigilGuard.AuditProofFixture do
   end
 
   @doc false
-  @spec key() :: binary()
-  def key, do: @key
-
-  @doc false
   @spec signer() :: module()
   def signer, do: SeedSigner
 
