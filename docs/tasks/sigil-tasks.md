@@ -2065,6 +2065,21 @@ section is post-3.0.0 parking; neither is counted here.
     (identity spoofing, repudiation, communications poisoning) pass.
   - Validation: gate record in the M6 notes; any uncovered step spawns an
     M6.30 item.
+  - Attempt 2026-07-07: created a local reference-consumer upgrade branch
+    against this repo as a path dependency, applied only migration-guide
+    surface changes, and verified the expected migration shape: dependency
+    pin moved to a path dependency, `_sigil` metadata moved to Agent Trust
+    attachment/auth, `SigilGuard.Envelope` usage moved to
+    `Attestation.from_decision`/`Attestation.sign`/`Attestation.verify`
+    through the consumer's signer wrapper, removed registry/NIF config, and
+    left the three sigil-prefixed boot keys untouched. Focused validation
+    passed: `mix compile --warnings-as-errors` and the signer/socket tests
+    plus security-conformance identity-spoofing, repudiation, and
+    communications-poisoning tests. The full consumer suite is not green yet:
+    after a long run it hit an unrelated eval-runner cold timeout once and a
+    daemon worker boot smoke failure that reproduces as empty worker output
+    under `MIX_ENV=test REFPATH_DAEMON=1`; keep M6.29 open until that tier-2
+    gate is green.
 - [ ] M6.30 Fold reference-consumer findings back into MIGRATING.
   - Spec: `SP.12` - Acceptance Criteria.
   - AC: every migration step discovered during M6.29 that was missing from
