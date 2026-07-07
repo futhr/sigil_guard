@@ -2092,13 +2092,19 @@ section is post-3.0.0 parking; neither is counted here.
     the rule that host-owned sigil-prefixed boot keys stay untouched unless
     they configure SigilGuard itself. Keep M6.30 open until M6.29 can be rerun
     green without the skipped full consumer suite.
-- [ ] M6.31 CLAUDE.md final flip and docs/README v3 diagrams.
+- [x] M6.31 CLAUDE.md final flip and docs/README v3 diagrams.
   - Spec: this file - Closed Decisions; `SP.01` - Public API Surface.
   - AC: CLAUDE.md rule 3 names the `_agent_trust`/`_agent_confirmation`
     contracts as the compatibility surface; the architecture section drops
     Registry-era wording; `docs/README.md` diagrams show the v3 module
     topology.
   - Validation: docs lint (M0.22) green; vocabulary scan clean.
+  - Done: flipped CLAUDE.md to name the v3 Agent Trust compatibility surface
+    (`_agent_trust`, `_agent_confirmation`, statements, trust bundles,
+    manifests, and boundary decisions), removed Registry-era architecture
+    wording, and expanded the architecture topology in `docs/README.md` with
+    current v3 modules. Verified `mix sigil.docs_lint`, `git diff --check`,
+    and a focused vocabulary scan.
 
 ## M7 - Integrations And Adoption
 

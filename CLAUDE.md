@@ -13,17 +13,16 @@ policy, scanning, audit, vault, and trust-bundle primitives they can embed.
 2. Do not depend on the old upstream project, public service, or hosted
    registry. `sigil` remains the project name and idiom; old material is historical
    inspiration and compatibility context only.
-3. Preserve consumer-facing contracts within the 0.2.x line. V3 is the
-   deliberate, spec-governed breaking release: `_sigil`, `_sigil_confirmation`,
-   profile names, and envelope shapes are replaced by the Agent Trust surfaces
-   in `SP.01`-`SP.05` and `SP.13`. Every removal must follow the migration
-   mapping destined for `MIGRATING-3.0.md`. No ad hoc breaks, no permanent
-   compatibility shims.
+3. Preserve the v3 consumer-facing contracts. `_agent_trust`,
+   `_agent_confirmation`, Agent Trust statements, trust bundles, capability
+   manifests, and boundary decisions are the stable compatibility surface.
+   Removed v2 surfaces (`_sigil`, `_sigil_confirmation`, profile names,
+   registry APIs, and legacy signing shapes) stay deleted and mapped in
+   `MIGRATING-3.0.md`. No ad hoc breaks, no permanent compatibility shims.
 4. Default trust material is embedded and local. Remote fetch is host-owned;
    the v3 core performs no HTTP. The only sanctioned HTTP seam is the
    host-provided `SigilGuard.HTTPClient` behaviour used by audit anchor
-   stores (`SP.05`). The v2 registry adapter stays an explicit, signed
-   compatibility adapter until its removal in v3 (`SP.12`).
+   stores (`SP.05`). There is no v3 public registry runtime path.
 5. Boundary awareness is mandatory for runtime security work. Every tool or MCP
    decision should account for phase, origin, sink, actor/identity, trust zone,
    action digest, payload digest, and policy verdict.
@@ -47,18 +46,19 @@ policy, scanning, audit, vault, and trust-bundle primitives they can embed.
 ```
 SigilGuard public API
   -> native Elixir backend
-  -> Scanner / Runtime Gate / MCP Gateway / Confirmation / Envelope
-  -> Policy / RepoPolicy / Audit / Vault / Trust-bundle compatibility path
+  -> Agent Trust Profile / TrustBundle / Attestation / AgentCard
+  -> Boundary / BoundaryPolicy / Scanner / Runtime Gate / MCP Gateway
+  -> Confirmation / Audit / Vault / host behaviours
 ```
 
-The `SigilGuard.Registry` namespace is legacy naming. It remains in the 0.2.x
-line because the current public API and tests use it; v3 removes it per
-`docs/specs/SP.12-legacy-remote-bundle-adapter-contracts.md`. New work uses
-the terminology defined in `docs/specs/SP.01-sigilguard-trust-profile.md`.
-V3 keeps a minimal, individually justified runtime dependency set
-(`:telemetry`, `:nimble_options`, `:jason`), an Elixir `~> 1.18` floor, and
-no network in core decision paths; finch leaves with the registry, and audit
-anchor HTTP goes through a host-provided `SigilGuard.HTTPClient` behaviour.
+The v3 public surface is the embedded Agent Trust Profile defined by
+`docs/specs/SP.01-sigilguard-trust-profile.md` and the follow-on trust-bundle,
+gateway, boundary, audit, and A2A specs. Registry, profile-compatibility, and
+verdict-envelope modules are removed public APIs; historical references live in
+specs and migration docs only. V3 keeps a minimal, individually justified
+runtime dependency set (`:telemetry`, `:nimble_options`, `:jason`), an Elixir
+`~> 1.18` floor, and no network in core decision paths. Audit anchor HTTP goes
+through a host-provided `SigilGuard.HTTPClient` behaviour.
 
 ## Documentation System
 
