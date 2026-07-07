@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 131 / 228 tasks done (57%).** Milestones: 5 complete, 1 partial,
-4 not started. **97 tasks left.** Current milestone: **M4** (22/25, 88%).
+**Overall: 132 / 228 tasks done (58%).** Milestones: 5 complete, 1 partial,
+4 not started. **96 tasks left.** Current milestone: **M4** (23/25, 92%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -73,17 +73,19 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 | Core groundwork | 19 | 19 | 100% | Complete |
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
-| M4 | Boundary scanner and policy kernel | 22 | 25 | 88% | In progress |
+| M4 | Boundary scanner and policy kernel | 23 | 25 | 92% | In progress |
 | M5 | Audit, telemetry, provenance, threat suite | 0 | 26 | 0% | Not started |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **131** | **228** | **57%** | 5 done / 1 partial / 4 to go |
+| — | **Total** | **132** | **228** | **58%** | 5 done / 1 partial / 4 to go |
 
-### What's left (97 tasks)
+### What's left (96 tasks)
 
-- **M4 - 3 left:** M4.08 runtime-gate rewire onto `BoundaryPolicy`; M4.20
-  pattern-set split + bundle wiring; M4.24 curated split-secret vector file.
+- **M4 - 2 left (both heavy):** M4.08 runtime-gate rewire onto `BoundaryPolicy`
+  (integration capstone; must keep M1.02 conformance green); M4.20 pattern-set
+  split + bundle wiring (restructures `Quarantine` into injection/poisoning sets
+  through the SP.02 bundle contract).
 - **M5 - 26:** audit, telemetry, provenance, and the threat-model test suite.
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
@@ -1103,7 +1105,7 @@ section is post-3.0.0 parking; neither is counted here.
     single-shot output; no emitted prefix ever contains bytes matching an
     active secret pattern; `finish/1` flushes everything withheld.
   - Tests: property (all generator classes), negative.
-- [ ] M4.24 Curated split-secret vector file.
+- [x] M4.24 Curated split-secret vector file.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Curated Vector File.
   - AC: `test/fixtures/streaming/split_secret_vectors.json` is committed
