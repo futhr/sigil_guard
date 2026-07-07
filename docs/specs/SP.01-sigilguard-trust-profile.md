@@ -911,7 +911,7 @@ atoms instead of inventing artifact-specific ones.
       `SigilGuard.ConfigError`.
 - [ ] Runtime dependency set is `:telemetry`, `:nimble_options`, and `jason`;
       Elixir floor `~> 1.18`.
-- [ ] Removed config keys raise typed errors naming `MIGRATING-3.0.md`;
+- [x] Removed config keys raise typed errors naming `MIGRATING-3.0.md`;
       unknown keys fail boot with `:unknown_config_key`.
 - [x] The Envelope-to-Attestation table is reproduced 1:1 in `MIGRATING-3.0.md`.
 - [ ] Every error atom in this spec's taxonomy is produced by at least one test.

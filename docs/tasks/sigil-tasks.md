@@ -1942,11 +1942,17 @@ section is post-3.0.0 parking; neither is counted here.
     blocked-reason compatibility, and registry identity endpoints. Documented
     `SigilGuard.TrustProfile.profile_id/0` as the v3 profile id constant
     replacement for `:protocol_profile`.
-- [ ] M6.20 MIGRATING: config migration table.
+- [x] M6.20 MIGRATING: config migration table.
   - Spec: `SP.01` - V3 Configuration Surface (Removed Keys).
   - AC: every removed key row with its replacement (or "none") matching
     the SP.01 table verbatim.
   - Validation: completeness script.
+  - Done: replaced the `MIGRATING-3.0.md` configuration placeholder with the
+    SP.01 removed-key table, including `:backend`, `:protocol_profile`, all
+    `registry_*` groups, and the `scanner_patterns: :registry` value. The
+    section documents `SigilGuard.ConfigError` with reason
+    `:legacy_contract_removed`, kept v3 keys, and `:unknown_config_key` for
+    unrecognized keys.
 - [ ] M6.21 MIGRATING: expected error-change table.
   - Spec: `SP.01` - Error Handling; `SP.02` - Error Handling (reconciled
     atoms).

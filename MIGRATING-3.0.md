@@ -412,8 +412,23 @@ end
 ## Configuration Keys
 
 Remove deleted v2 keys before booting v3. Removed keys fail closed with
-`SigilGuard.ConfigError` naming `MIGRATING-3.0.md`; the complete per-key table is
-filled in by M6.20.
+`SigilGuard.ConfigError` naming `MIGRATING-3.0.md`, with reason
+`:legacy_contract_removed`.
+
+| Removed key | Replacement |
+|-------------|-------------|
+| `:backend` | None; the native Elixir backend is the only backend. |
+| `:protocol_profile` | None; v3 has one profile, `sigil_guard_agent_trust/v1`. |
+| `:registry_url`, `:registry_ttl_ms`, `:registry_timeout_ms`, `:registry_retry_ms` | `:trust_bundle` local sources (SP.02). |
+| `:registry_enabled` | None; no registry runtime path exists. |
+| `:registry_require_signed_bundles`, `:registry_bundle_public_keys` | Bundle roots and thresholds inside the trust bundle (SP.02). |
+| `:registry_bundle_max_age_seconds`, `:registry_bundle_clock_skew_seconds` | Bundle expiry and skew fields inside the trust bundle (SP.02). |
+| `scanner_patterns: :registry` (value) | `scanner_patterns: :bundle`. |
+
+Kept v3 keys are `:trust_bundle`, `:scanner_patterns`, `:http_client`,
+`:attestation_ttl_ms`, `:max_skew_ms`, `:replay_ttl_ms`, `:vault_master_key`,
+and `:trust_mappings`. Unknown keys fail closed with reason
+`:unknown_config_key`.
 
 ## Error Changes
 
