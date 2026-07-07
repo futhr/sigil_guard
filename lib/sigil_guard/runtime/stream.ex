@@ -14,6 +14,7 @@ defmodule SigilGuard.Runtime.Stream do
 
   alias SigilGuard.Context
   alias SigilGuard.Decision
+  alias SigilGuard.Patterns
   alias SigilGuard.Runtime.Gate
   alias SigilGuard.Scanner
 
@@ -128,10 +129,24 @@ defmodule SigilGuard.Runtime.Stream do
 
   defp contained?(hit, emit_size), do: hit.offset + hit.length <= emit_size
 
+  # The effective holdback window is at least the largest active pattern's
+  # `max_match_bytes` (SP.04 Holdback Invariant): a configured window smaller
+  # than that maximum is raised so no match can straddle a chunk boundary.
   defp stream_window_bytes(opts) do
+    max(configured_window(opts), active_max_match_bytes(opts))
+  end
+
+  defp configured_window(opts) do
     case Keyword.get(opts, :stream_window_bytes, @default_window_bytes) do
       value when is_integer(value) and value > 0 -> value
       _ -> @default_window_bytes
+    end
+  end
+
+  defp active_max_match_bytes(opts) do
+    case Keyword.get(opts, :patterns, Patterns.built_in()) do
+      patterns when is_list(patterns) -> Patterns.largest_max_match_bytes(patterns)
+      _ -> Patterns.default_max_match_bytes()
     end
   end
 end

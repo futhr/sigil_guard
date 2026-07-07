@@ -50,51 +50,64 @@ defmodule SigilGuard.Patterns do
           category: category(),
           severity: :low | :medium | :high,
           regex: Regex.t(),
-          replacement_hint: String.t() | nil
+          replacement_hint: String.t() | nil,
+          max_match_bytes: pos_integer()
         }
 
+  @default_max_match_bytes 256
+  @max_match_bytes_limit 4096
+
+  # `max_match_bytes` bounds the longest span each pattern can match, clamping
+  # unbounded quantifiers (SP.04 Holdback Invariant). It sizes the streaming
+  # holdback window so no secret can straddle a chunk boundary undetected.
   @built_in_patterns [
     %{
       name: "aws_access_key",
       category: :secret,
       severity: :high,
       pattern: "(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}",
-      replacement_hint: "[AWS_KEY]"
+      replacement_hint: "[AWS_KEY]",
+      max_match_bytes: 20
     },
     %{
       name: "generic_api_key",
       category: :secret,
       severity: :high,
       pattern: "(?i)(api[_\\-]?key|apikey)\\s*[:=]\\s*['\"]?[\\w\\-]{20,}",
-      replacement_hint: "[API_KEY]"
+      replacement_hint: "[API_KEY]",
+      max_match_bytes: 256
     },
     %{
       name: "bearer_token",
       category: :secret,
       severity: :high,
       pattern: "(?i)bearer\\s+[a-zA-Z0-9._~+/=\\-]{20,}",
-      replacement_hint: "[BEARER_TOKEN]"
+      replacement_hint: "[BEARER_TOKEN]",
+      max_match_bytes: 256
     },
     %{
       name: "database_uri",
       category: :secret,
       severity: :high,
       pattern: "(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@",
-      replacement_hint: "[DATABASE_URI]"
+      replacement_hint: "[DATABASE_URI]",
+      max_match_bytes: 256
     },
     %{
       name: "private_key",
       category: :secret,
       severity: :high,
       pattern: "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
-      replacement_hint: "[PRIVATE_KEY]"
+      replacement_hint: "[PRIVATE_KEY]",
+      max_match_bytes: 40
     },
     %{
       name: "generic_secret",
       category: :secret,
       severity: :medium,
       pattern: "(?i)(secret|password|token|credential)\\s*[:=]\\s*['\"]?[^\\s'\"]{8,}",
-      replacement_hint: "[SECRET]"
+      replacement_hint: "[SECRET]",
+      max_match_bytes: 256
     }
   ]
 
@@ -104,7 +117,8 @@ defmodule SigilGuard.Patterns do
                                   category: raw.category,
                                   severity: raw.severity,
                                   regex: Regex.compile!(raw.pattern),
-                                  replacement_hint: raw.replacement_hint
+                                  replacement_hint: raw.replacement_hint,
+                                  max_match_bytes: raw.max_match_bytes
                                 }
                               end)
 
@@ -112,6 +126,24 @@ defmodule SigilGuard.Patterns do
   @spec built_in() :: [compiled_pattern()]
   def built_in do
     @compiled_built_in_patterns
+  end
+
+  @doc "The default `max_match_bytes` used when a pattern does not declare one."
+  @spec default_max_match_bytes() :: 256
+  def default_max_match_bytes, do: @default_max_match_bytes
+
+  @doc """
+  Return the largest `max_match_bytes` among `patterns`.
+
+  Sizes the streaming holdback window (SP.04): the effective window MUST be at
+  least this value so no pattern match can straddle a chunk boundary undetected.
+  Falls back to the default when the list is empty or a pattern omits the field.
+  """
+  @spec largest_max_match_bytes([compiled_pattern()]) :: pos_integer()
+  def largest_max_match_bytes(patterns) when is_list(patterns) do
+    patterns
+    |> Enum.map(&Map.get(&1, :max_match_bytes, @default_max_match_bytes))
+    |> Enum.max(fn -> @default_max_match_bytes end)
   end
 
   @doc """
@@ -182,8 +214,21 @@ defmodule SigilGuard.Patterns do
       category: to_string(flex_get(raw, :category, "unknown")),
       severity: extract_severity(raw),
       regex: regex,
-      replacement_hint: flex_get(raw, :replacement_hint)
+      replacement_hint: flex_get(raw, :replacement_hint),
+      max_match_bytes: extract_max_match_bytes(raw)
     }
+  end
+
+  # Bundle patterns MAY declare `max_match_bytes` in 1..4096 (SP.04); an absent,
+  # out-of-range, or non-integer value defaults to 256.
+  defp extract_max_match_bytes(raw) do
+    case flex_fetch(raw, :max_match_bytes) do
+      {:ok, value} when is_integer(value) and value >= 1 and value <= @max_match_bytes_limit ->
+        value
+
+      _ ->
+        @default_max_match_bytes
+    end
   end
 
   defp extract_regex_source(raw) do

@@ -5,6 +5,50 @@ defmodule SigilGuard.PatternsTest do
 
   alias SigilGuard.Patterns
 
+  describe "max_match_bytes (SP.04 holdback)" do
+    test "built-in patterns declare the documented bounds" do
+      bounds = Map.new(Patterns.built_in(), &{&1.name, &1.max_match_bytes})
+
+      assert bounds["aws_access_key"] == 20
+      assert bounds["private_key"] == 40
+
+      for name <- ["generic_api_key", "bearer_token", "database_uri", "generic_secret"] do
+        assert bounds[name] == 256, name
+      end
+    end
+
+    test "a declared bundle bound within 1..4096 is used" do
+      [pattern] =
+        Patterns.compile([
+          %{name: "x", category: "test", severity: :low, pattern: "x", max_match_bytes: 512}
+        ])
+
+      assert pattern.max_match_bytes == 512
+    end
+
+    test "an absent, out-of-range, or non-integer bound defaults to 256" do
+      for bad <- [nil, 0, -1, 4097, "512", 12.5] do
+        raw = %{name: "x", category: "test", severity: :low, pattern: "x"}
+        raw = if bad == nil, do: raw, else: Map.put(raw, :max_match_bytes, bad)
+        [pattern] = Patterns.compile([raw])
+        assert pattern.max_match_bytes == 256, inspect(bad)
+      end
+    end
+
+    test "largest_max_match_bytes returns the maximum, defaulting when empty" do
+      assert Patterns.largest_max_match_bytes(Patterns.built_in()) == 256
+      assert Patterns.largest_max_match_bytes([]) == 256
+
+      patterns =
+        Patterns.compile([
+          %{name: "a", category: "t", severity: :low, pattern: "a", max_match_bytes: 100},
+          %{name: "b", category: "t", severity: :low, pattern: "b", max_match_bytes: 4096}
+        ])
+
+      assert Patterns.largest_max_match_bytes(patterns) == 4096
+    end
+  end
+
   describe "built_in/0" do
     test "returns a list of compiled patterns" do
       patterns = Patterns.built_in()

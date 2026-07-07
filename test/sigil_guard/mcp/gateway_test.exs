@@ -7,6 +7,7 @@ defmodule SigilGuard.MCP.GatewayTest do
   alias SigilGuard.Decision
   alias SigilGuard.Envelope
   alias SigilGuard.MCP.Gateway
+  alias SigilGuard.Patterns
   alias SigilGuard.ReplayStore
   alias SigilGuard.Runtime.Stream
   alias SigilGuard.TestSigner
@@ -1253,9 +1254,17 @@ defmodule SigilGuard.MCP.GatewayTest do
 
   describe "guarded_result_chunk/3 and finish_guarded_result_stream/2" do
     test "returns nil while chunks are held back and emits MCP-shaped safe chunks" do
+      # Small-bound patterns keep the window at 8; built-in bounds (256) would
+      # otherwise raise the holdback floor (SP.04 Holdback Invariant).
+      patterns =
+        Patterns.compile([
+          %{name: "z", category: "test", severity: :low, pattern: "zzz", max_match_bytes: 8}
+        ])
+
       stream =
         Gateway.stream_result([tool: "fetch_url", trust_level: :medium],
-          stream_window_bytes: 8
+          stream_window_bytes: 8,
+          patterns: patterns
         )
 
       assert {stream, {:ok, first_response, first_decision}} =
