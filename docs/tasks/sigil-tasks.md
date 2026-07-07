@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 194 / 228 tasks done (85%).** Milestones: 7 complete, 2 partial,
-1 not started. **34 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 195 / 228 tasks done (86%).** Milestones: 7 complete, 2 partial,
+1 not started. **33 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 5 | 20 | 25% | In progress |
+| M7 | Integrations and adoption | 6 | 20 | 30% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **194** | **228** | **85%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **195** | **228** | **86%** | 7 done / 2 partial / 1 to go |
 
-### What's left (34 tasks)
+### What's left (33 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 15:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 14:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2176,13 +2176,22 @@ section is post-3.0.0 parking; neither is counted here.
     `mix compile --warnings-as-errors`, plus `git diff --check`,
     `mix format --check-formatted mix.exs`, `mix sigil.docs_lint`, and
     `mix docs`.
-- [ ] M7.06 Tidewave gating guide with shipped example policy.
+- [x] M7.06 Tidewave gating guide with shipped example policy.
   - Spec: `SP.14` - Tier 1: Tidewave; Per-Target Acceptance.
   - AC: the shipped policy blocks eval-class tools, requires approval for
     repo writes, allows schema/doc reads; the guide states Tidewave is
     dev-only and the guard is defense in depth; `examples/tidewave/`
     carries the policy file.
   - Validation: guide example compiles at its pin; policy fixture parses.
+  - Done: added `guides/integrations/tidewave.md`, wired it into ExDoc,
+    shipped `examples/tidewave/SIGILGUARD_POLICY`, and documented the
+    dev-only defense-in-depth placement. Verified the Tidewave Plug wrapper in
+    a scratch project against `tidewave` 0.6.1 / `bandit` 1.12.0 with
+    `MIX_ENV=dev mix compile --warnings-as-errors`; verified the policy parses
+    and evaluates eval-class tools to `:block`, repo writes to `:confirm`, and
+    docs/schema reads to `:allow`; also ran `git diff --check`,
+    `mix format --check-formatted mix.exs`, `mix sigil.docs_lint`, and
+    `mix docs`.
 - [ ] M7.07 Livebook: quick start.
   - Spec: `SP.14` - Livebooks.
   - AC: `notebooks/quick-start.livemd` covers install, first scan, gate

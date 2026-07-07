@@ -1,0 +1,26 @@
+version 3
+
+[rules]
+default confirm
+
+# Tidewave is dev-only, but eval-class tools can execute arbitrary code.
+block phase:tool_request tool:project_eval,eval,evaluate,execute_code effect:execute
+
+# Any repository write-like operation must be approved explicitly.
+confirm phase:tool_request sink:repo effect:write
+
+# Read-only discovery tools are allowed for documentation and schema lookup.
+allow phase:tool_request tool:get_docs,get_source_location,get_ecto_schemas,get_ash_resources,get_logs effect:read
+
+# Read-only tool results may return to the model after result-side scanning.
+allow phase:tool_result origin:tool sink:model effect:read
+
+[repo]
+default require_approval
+allow agent:* action:read docs/** guides/** README.md CHANGELOG.md mix.exs
+require_approval agent:* action:modify lib/** test/** config/** priv/** mix.exs
+block agent:* priv/secrets/**
+
+[contracts]
+contract sink:model classes:text,structured no_raw_credentials:false
+contract sink:log max_size:65536 no_raw_credentials:true credential_transform:mask
