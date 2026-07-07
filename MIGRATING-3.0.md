@@ -233,7 +233,7 @@ allowed_issuers =
 if MapSet.member?(allowed_issuers, host_authenticated_actor_id) do
   {:ok, host_authenticated_actor_id}
 else
-  {:error, :unknown_issuer}
+  {:error, :actor_not_allowed}
 end
 ```
 
@@ -433,8 +433,22 @@ and `:trust_mappings`. Unknown keys fail closed with reason
 ## Error Changes
 
 Some v2 error atoms were reconciled for v3 trust-bundle and configuration
-contracts. The old-to-new atom table and new boot-error behavior are filled in
-by M6.21.
+contracts.
+
+| V2 / draft atom | V3 atom | Meaning |
+|-----------------|---------|---------|
+| `:rollback_detected` | `:sequence_below_floor` | The signed bundle sequence/root version is below the accepted floor. |
+| `:expired_bundle` | `:bundle_expired` | Bundle document freshness failed. |
+| `:unknown_issuer` | `:unknown_key_id` | No envelope signature key id resolves to an authorized trust-bundle key. |
+| `:invalid_schema` | `:invalid_bundle_format` | Bundle payload shape or strict schema validation failed. |
+| `:invalid_bundle` | `:invalid_bundle_format` | Bundle payload shape or strict schema validation failed. |
+| `:missing_signature` | `:invalid_envelope` | DSSE envelope shape is missing or invalid. |
+| `:unsigned_bundle` | `:invalid_envelope` | Unsigned bundles are not a v3 trust-bundle format. |
+
+Configuration errors changed from permissive fallback behavior to boot-time
+failure. Removed keys raise `SigilGuard.ConfigError` with reason
+`:legacy_contract_removed`; unknown keys raise `SigilGuard.ConfigError` with
+reason `:unknown_config_key`. Both error messages name `MIGRATING-3.0.md`.
 
 ## Version Pinning
 

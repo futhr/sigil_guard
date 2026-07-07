@@ -1953,7 +1953,7 @@ section is post-3.0.0 parking; neither is counted here.
     section documents `SigilGuard.ConfigError` with reason
     `:legacy_contract_removed`, kept v3 keys, and `:unknown_config_key` for
     unrecognized keys.
-- [ ] M6.21 MIGRATING: expected error-change table.
+- [x] M6.21 MIGRATING: expected error-change table.
   - Spec: `SP.01` - Error Handling; `SP.02` - Error Handling (reconciled
     atoms).
   - AC: old-to-new atom rows (`:rollback_detected` to
@@ -1963,6 +1963,12 @@ section is post-3.0.0 parking; neither is counted here.
     `:unsigned_bundle` to `:invalid_envelope`) plus the new
     `SigilGuard.ConfigError` boot behavior.
   - Validation: completeness script.
+  - Done: replaced the `MIGRATING-3.0.md` Error Changes placeholder with the
+    reconciled old-to-new atom table for rollback, expiry, issuer/key,
+    invalid-schema/bundle, and unsigned/missing-signature cases. Documented
+    boot-time `SigilGuard.ConfigError` behavior for removed keys
+    (`:legacy_contract_removed`) and unknown keys (`:unknown_config_key`), both
+    naming `MIGRATING-3.0.md`.
 - [ ] M6.22 MIGRATING: pin note for v2 users.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: states that `~> 0.2` users never auto-upgrade to v3 and that
