@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 155 / 228 tasks done (68%).** Milestones: 6 complete, 1 partial,
-3 not started. **73 tasks left.** Current milestone: **M5** (21/26, 81%).
+**Overall: 156 / 228 tasks done (68%).** Milestones: 6 complete, 1 partial,
+3 not started. **72 tasks left.** Current milestone: **M5** (22/26, 85%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 21 | 26 | 81% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 22 | 26 | 85% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **155** | **228** | **68%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **156** | **228** | **68%** | 6 done / 1 partial / 3 to go |
 
-### What's left (73 tasks)
+### What's left (72 tasks)
 
-- **M5 - 5 left:** the threat-model test suite TM.08-TM.12
-  (move-don't-duplicate). (M5.01-M5.21 done, incl. TM.01-TM.07.)
+- **M5 - 4 left:** the threat-model test suite TM.09-TM.12
+  (move-don't-duplicate). (M5.01-M5.22 done, incl. TM.01-TM.08.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1569,12 +1569,29 @@ section is post-3.0.0 parking; neither is counted here.
     (`:invalid_manifest`). Note: SigilGuard has no `session_id`; the
     "audit session boundary" is realized as the actor-scoped audit chain, and
     the transport session stays host-owned (documented in the module).
-- [ ] M5.22 TM.08 threat family - memory and context poisoning.
+- [x] M5.22 TM.08 threat family - memory and context poisoning.
   - Spec: `R.06` - Control Mapping row 9; `SP.04` (model-ingress gating).
   - AC: `.../tm08_memory_poisoning_test.exs` proves retrieved memory/
     context crosses the scanner and trust-zone policy at model ingress
     with digest provenance (mitigates + detects).
   - Tests: negative, tamper, malformed.
+  - Done: added the TM.08 module (R.06 row 9, ASI06, claim
+    **mitigates + detects**) citing the MemoryGraft attack (arXiv 2512.16962;
+    memory-store/RAG index named host-owned) and referencing the base tests by
+    exact name. Drives `Gate.evaluate/2` at model ingress (Context phase
+    `:inbound_user` -> lifecycle `:model_ingress`, `origin: :resource`) with
+    retrieved-memory fixtures: a grafted record carrying injected instructions
+    is quarantined/blocked (action in `[:block, :quarantine, :confirm]`, not
+    allowed) with the `:ignore_instructions` quarantine indicator and an
+    explaining policy rule firing (mitigates + detects), and a SHA-256
+    `content_hash` payload digest is bound to the decision (and mirrored in
+    `audit_metadata`) as provenance on every ingested record - poisoned or clean.
+    Clean memory is allowed yet still carries the provenance digest (negative);
+    a display:none-hidden injection is still caught (`:hidden_html_instruction`,
+    tamper); non-binary payloads fail closed to a `%Decision{}` without raising
+    (malformed). Distinct from TM.01 (tool-result injection): ingress phase,
+    retrieved-memory origin, and the digest-provenance assertion no prior test
+    makes.
 - [ ] M5.23 TM.09 threat family - lethal-trifecta dataflow.
   - Spec: `R.06` - Control Mapping rows 10 and 11; `SP.04` (Dataflow Rules
     And Lethal Trifecta).
