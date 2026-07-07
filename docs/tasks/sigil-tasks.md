@@ -1850,13 +1850,19 @@ section is post-3.0.0 parking; neither is counted here.
     `SigilGuard.Finch` child, and runtime source has no `Finch.` or
     `SigilGuard.Finch` callsite while the anchor HTTP store still runs through
     `SigilGuard.HTTPClient`.
-- [ ] M6.12 Runtime dependency-set assertion test.
+- [x] M6.12 Runtime dependency-set assertion test.
   - Spec: `SP.12` - Dependency Removal (D9).
   - AC: a permanent test fails whenever the runtime dependency set differs
     from the intended minimal set (`:telemetry`, `:nimble_options`,
     `:jason`) plus OTP/stdlib applications; dev and test deps are exempt;
     adding a runtime dep requires updating this test and a D9-style record.
   - Tests: the assertion itself plus a negative fixture proving it trips.
+  - Done: added `SigilGuard.RuntimeDependencySetTest`, which computes the
+    production runtime dependency closure from `mix.exs` plus `mix.lock` and
+    pins it to `:jason`, `:nimble_options`, and `:telemetry`. The same test
+    pins OTP `extra_applications` to `:crypto` and `:logger`, exempts dev/test
+    deps through production-only filtering, and includes a synthetic
+    extra/missing dependency fixture proving the assertion reports drift.
 - [ ] M6.13 `MIGRATING-3.0.md` skeleton with the dependency update example.
   - Spec: `SP.12` - V3 Removal Map; `SP.01` - Migration: Envelope To
     Attestation.

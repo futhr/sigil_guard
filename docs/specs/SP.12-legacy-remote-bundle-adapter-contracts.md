@@ -244,7 +244,7 @@ go/no-go gate.
       completeness script against the deletion diff.
 - [ ] Booting with any `registry_*` key or `scanner_patterns: :registry`
       raises `SigilGuard.ConfigError` naming the key and `MIGRATING-3.0.md`.
-- [ ] The runtime dependency-set assertion test is in the tree and fails
+- [x] The runtime dependency-set assertion test is in the tree and fails
       when the set differs from `:telemetry`, `:nimble_options`, and `jason`
       plus OTP/stdlib applications.
 - [x] `:nimble_options` is adopted for config/option validation; zero finch
@@ -271,7 +271,7 @@ go/no-go gate.
 - [ ] M1: adopt `:nimble_options` for config/option schemas; keep `jason`;
       floor `~> 1.18`.
 - [x] M6: remove finch; rebuild the anchor store on `SigilGuard.HTTPClient` (SP.05).
-- [ ] M6: land the dependency-set assertion test pinning `:telemetry`,
+- [x] M6: land the dependency-set assertion test pinning `:telemetry`,
       `:nimble_options`, and `jason`.
 - [ ] M8: execute the D11 release sequence with its go/no-go gates.
 
