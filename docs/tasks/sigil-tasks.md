@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 158 / 228 tasks done (69%).** Milestones: 6 complete, 1 partial,
-3 not started. **70 tasks left.** Current milestone: **M5** (24/26, 92%).
+**Overall: 159 / 228 tasks done (70%).** Milestones: 6 complete, 1 partial,
+3 not started. **69 tasks left.** Current milestone: **M5** (25/26, 96%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 24 | 26 | 92% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 25 | 26 | 96% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **158** | **228** | **69%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **159** | **228** | **70%** | 6 done / 1 partial / 3 to go |
 
-### What's left (70 tasks)
+### What's left (69 tasks)
 
-- **M5 - 2 left:** the threat-model test suite TM.11-TM.12
-  (move-don't-duplicate). (M5.01-M5.24 done, incl. TM.01-TM.10.)
+- **M5 - 1 left:** the threat-model test suite TM.12
+  (move-don't-duplicate). (M5.01-M5.25 done, incl. TM.01-TM.11.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1638,7 +1638,7 @@ section is post-3.0.0 parking; neither is counted here.
     (row 13). A single-use agent-response nonce cannot be replayed
     (`:replay_detected`), and a non-envelope card fails closed
     (`:invalid_envelope`). Uses Issuer/Agent/Local/Impostor Ed25519 signers.
-- [ ] M5.25 TM.11 threat family - supply chain.
+- [x] M5.25 TM.11 threat family - supply chain.
   - Spec: `R.06` - Control Mapping rows 14-17; `SP.02` (verification,
     quarantine).
   - AC: `.../tm11_supply_chain_test.exs` proves tampered/revoked/replayed
@@ -1646,6 +1646,22 @@ section is post-3.0.0 parking; neither is counted here.
     documents the out-of-scope tooling-RCE rows as assume-compromised
     posture (detects, partial; out-of-scope rows cited).
   - Tests: negative, tamper, replay.
+  - Done: added the TM.11 module (R.06 rows 14-17, ASI04/ASI05, claim
+    **detects (partial)** row 14 / **out-of-scope (infra); detects drift** row
+    15 / **out-of-scope** rows 16-17) citing the postmark-mcp BCC backdoor
+    (v1.0.16), the Smithery `dockerBuildPath` path traversal, and CVE-2025-49596
+    / CVE-2025-6514, and referencing the base tests by exact name. Mirrors the
+    SP.02 `bundle_document/0` + signer setup and drives `TrustBundle.verify/2`
+    and `load/2`: a genuine bundle verifies, a tampered payload fails
+    `:invalid_signature` and records a quarantine entry
+    (`Quarantine.list/1`, with the decoded `bundle_id`), a revoked-key signature
+    fails `:revoked_key`, and a rolled-back bundle replayed after a newer one
+    fails `:sequence_below_floor`; a backdoored capability manifest drifts to
+    `:manifest_digest_mismatch` via `CapabilityManifest.verify/2`; a non-envelope
+    fails closed `:invalid_envelope`. Rows 16-17 are asserted evidence-only - an
+    actor-scoped HMAC audit chain records tamper-evident boundary decisions
+    around the affected tool (`{:broken, 1}`), with no prevention claim per the
+    out-of-scope definition.
 - [ ] M5.26 TM.12 threat family - repudiation, audit tamper, truncation.
   - Spec: `R.06` - Control Mapping rows 19 and 22; `SP.05`.
   - AC: `.../tm12_repudiation_test.exs` proves chain tamper and truncation
