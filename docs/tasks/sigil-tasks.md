@@ -963,6 +963,16 @@ section is post-3.0.0 parking; neither is counted here.
     resource, and phase appear on runtime decisions.
   - AC: D17 facade contracts stay byte-stable - M1.02 stays green.
   - Tests: negative, property (old-to-new verdict mapping), conformance.
+  - Status (partial, green): `%Decision{}` gained typed `matched_rules`,
+    `evidence_refs`, and boundary labels (`source`/`sink`/`trust_zone`/
+    `actor`/`resource`); `BoundaryPolicy` and the gate populate them; the
+    `:require_approval` action is closed to `:confirm`; verdict-mapping +
+    typed-field tests added; M1.02 stays green. REMAINING: route the gate's
+    verdict *through* `BoundaryPolicy.evaluate` (needs the gate to build a
+    digest-valid `Boundary` and combine boundary/scanner-failure/quarantine
+    verdicts), and promote a confirming verdict's `:allow`/`:redact` action to
+    `:confirm` (requires reworking the confirmation flow, which consumes
+    `action` as the post-confirmation action).
 - [x] M4.09 Sandbox identity fields on `SigilGuard.Context`.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Sandbox Identity (Isolation Levels).

@@ -418,9 +418,18 @@ defmodule SigilGuard.BoundaryPolicy do
       trust_level: normalize_trust(boundary.trust_level),
       hits: boundary.hits,
       indicators: Keyword.get(extra, :indicators, boundary.indicators),
+      matched_rules: typed_matched_rules(matched),
+      evidence_refs: [],
+      source: boundary.source,
+      sink: boundary.sink,
+      trust_zone: boundary.trust_zone,
       audit_metadata:
         audit_metadata(boundary, verdict, matched, Keyword.get(extra, :adaptive_error))
     }
+  end
+
+  defp typed_matched_rules(matched) do
+    Enum.map(matched, &%{rule_id: &1["id"], explanation: &1["explanation"]})
   end
 
   defp matched_reason([]), do: nil

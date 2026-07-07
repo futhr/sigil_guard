@@ -116,6 +116,13 @@ defmodule SigilGuard.Runtime.Gate do
       trust_level: context.trust_level,
       hits: [],
       indicators: [],
+      matched_rules: [%{rule_id: "gate.malformed_input", explanation: to_string(reason)}],
+      evidence_refs: [],
+      source: context.origin,
+      sink: context.sink,
+      trust_zone: context.trust_zone,
+      actor: audit_binary(context.actor),
+      resource: audit_binary(context.resource_uri),
       sanitized_text: nil,
       content_hash: quarantine.content_hash,
       audit_metadata: malformed_input_audit_metadata(context, reason, quarantine.content_hash)
@@ -334,7 +341,8 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp decide(state) do
     source_sink = source_sink_verdict(state)
-    {verdict, action, reason} = strongest_verdict(state.policy_verdict, source_sink)
+    {verdict, raw_action, reason} = strongest_verdict(state.policy_verdict, source_sink)
+    action = unified_action(raw_action)
 
     {verdict, action, reason, action_digest, action_digest_error} =
       enforce_confirmable_digest(state, verdict, action, reason)
@@ -350,11 +358,33 @@ defmodule SigilGuard.Runtime.Gate do
       trust_level: state.context.trust_level,
       hits: state.hits,
       indicators: state.quarantine.indicators,
+      matched_rules: matched_rules(reason),
+      evidence_refs: [],
+      source: state.context.origin,
+      sink: state.context.sink,
+      trust_zone: state.context.trust_zone,
+      actor: audit_binary(state.context.actor),
+      resource: audit_binary(state.context.resource_uri),
       sanitized_text: sanitized_text,
       content_hash: state.quarantine.content_hash,
       audit_metadata: audit_metadata(state, verdict, action, action_digest, action_digest_error)
     }
   end
+
+  # SP.07 closes the unified verdict enum: the repo-approval `:require_approval`
+  # action (emitted outside the declared set) maps to `:confirm`, with the
+  # approval reason preserved in `reason`/`matched_rules`. Promoting a confirming
+  # verdict's `:allow`/`:redact` action up to `:confirm` is deferred to the full
+  # verdict-delegation rewire, because the confirmation flow consumes `action`
+  # as the post-confirmation action to execute.
+  defp unified_action(:require_approval), do: :confirm
+  defp unified_action(action), do: action
+
+  # Surface the deciding reason as a typed matched rule (SP.07). The full
+  # per-rule delegation flows once the gate routes verdicts through
+  # BoundaryPolicy; today the gate's assembled reason is the contributing rule.
+  defp matched_rules(nil), do: []
+  defp matched_rules(reason) when is_binary(reason), do: [%{rule_id: "gate", explanation: reason}]
 
   defp enforce_confirmable_digest(state, {:confirm, _} = verdict, action, reason) do
     case Confirmation.fetch_action_digest(state.payload, state.context) do
