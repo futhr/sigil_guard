@@ -1,0 +1,121 @@
+defmodule SigilGuard.BoundaryPolicy.FileTest do
+  use ExUnit.Case, async: true
+
+  alias SigilGuard.BoundaryPolicy.File, as: PolicyFile
+  alias SigilGuard.RepoPolicy
+
+  @invalid_root Path.expand("../../fixtures/boundary_policy/invalid", __DIR__)
+
+  describe "parse/1 success" do
+    test "parses version, rules, folded matchers, contracts, and repo" do
+      policy = """
+      # a comment
+      version 3
+
+      [rules]
+      block sensitivity:private zone:untrusted sink:external,network
+      confirm trust:high sink:external
+        effect:write   # inline comment
+      default confirm
+
+      [contracts]
+      contract sink:external max_size:1024
+
+      [repo]
+      block secrets/**
+      allow **
+      """
+
+      assert {:ok, compiled} = PolicyFile.parse(policy)
+      assert compiled.default == :confirm
+
+      assert [block_rule, confirm_rule] = compiled.rules
+      assert block_rule.id == "line_5"
+      assert block_rule.decision == :block
+
+      assert block_rule.matchers == %{
+               "sensitivity" => ["private"],
+               "zone" => ["untrusted"],
+               "sink" => ["external", "network"]
+             }
+
+      # The whitespace-continuation line folds into the confirm rule.
+      assert confirm_rule.id == "line_6"
+      assert confirm_rule.matchers["effect"] == ["write"]
+      assert confirm_rule.matchers["trust"] == ["high"]
+
+      assert compiled.contracts == ["contract sink:external max_size:1024"]
+      assert %RepoPolicy{} = compiled.repo
+    end
+
+    test "accepts a version-only file and an absent default" do
+      assert {:ok, %PolicyFile{rules: [], default: nil, contracts: [], repo: nil}} =
+               PolicyFile.parse("version 3\n")
+    end
+
+    test "accepts wildcard and exact string matchers" do
+      assert {:ok, compiled} =
+               PolicyFile.parse("version 3\n[rules]\nallow tool:* actor:svc:bot source:repo\n")
+
+      rule = hd(compiled.rules)
+      assert rule.matchers == %{"tool" => ["*"], "actor" => ["svc:bot"], "source" => ["repo"]}
+    end
+
+    test "rule ids track the first physical line of each logical line" do
+      assert {:ok, compiled} =
+               PolicyFile.parse("version 3\n[rules]\nblock trust:low\nconfirm trust:high\n")
+
+      assert Enum.map(compiled.rules, & &1.id) == ["line_3", "line_4"]
+    end
+  end
+
+  describe "parse/1 grammar errors" do
+    test "every invalid fixture fails :invalid_policy_file" do
+      for path <- Path.wildcard(Path.join(@invalid_root, "*.policy")) do
+        assert PolicyFile.parse(File.read!(path)) == {:error, :invalid_policy_file},
+               Path.basename(path)
+      end
+    end
+
+    test "files over 256 KiB fail :policy_too_large" do
+      oversized = "version 3\n" <> String.duplicate("x", 256 * 1024)
+      assert PolicyFile.parse(oversized) == {:error, :policy_too_large}
+    end
+
+    test "a non-binary input fails :invalid_policy_file" do
+      assert PolicyFile.parse(:nope) == {:error, :invalid_policy_file}
+    end
+
+    test "a bad repo body fails :invalid_policy_file" do
+      assert PolicyFile.parse("version 3\n[repo]\ngibberish line\n") ==
+               {:error, :invalid_policy_file}
+    end
+
+    test "an empty or comment-only file has no version line" do
+      assert PolicyFile.parse("") == {:error, :invalid_policy_file}
+      assert PolicyFile.parse("# just a comment\n") == {:error, :invalid_policy_file}
+    end
+
+    test "content outside a section fails" do
+      assert PolicyFile.parse("version 3\nblock trust:low\n") == {:error, :invalid_policy_file}
+    end
+
+    test "a duplicated [repo] section fails" do
+      assert PolicyFile.parse("version 3\n[repo]\nallow **\n[repo]\nblock **\n") ==
+               {:error, :invalid_policy_file}
+    end
+
+    test "a default with an unknown decision fails" do
+      assert PolicyFile.parse("version 3\n[rules]\ndefault maybe\n") ==
+               {:error, :invalid_policy_file}
+    end
+
+    test "a matcher without a colon or with an empty value fails" do
+      assert PolicyFile.parse("version 3\n[rules]\nblock trustlow\n") ==
+               {:error, :invalid_policy_file}
+
+      assert PolicyFile.parse("version 3\n[rules]\nblock trust:\n") ==
+               {:error, :invalid_policy_file}
+    end
+  end
+end

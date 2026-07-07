@@ -1,0 +1,3 @@
+version 3
+[rules]
+block hits:none,secret

@@ -70,12 +70,12 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
 | M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
-| M4 - Boundary scanner and policy kernel | 25 | 3 | 0 | 22 |
+| M4 - Boundary scanner and policy kernel | 25 | 4 | 0 | 21 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **112** | **0** | **116** |
+| **Total** | **228** | **113** | **0** | **115** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -895,7 +895,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
   - AC: deterministic evaluation over Boundary inputs; combination follows
     the normative rules; absent `default` line means `confirm`.
   - Tests: negative, property (determinism: equal inputs, equal outputs).
-- [ ] M4.04 Policy-file parser: version line, sections, folding.
+- [x] M4.04 Policy-file parser: version line, sections, folding.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` - Policy
     File Schema (Grammar).
   - AC: `version 3` mandatory first non-comment line; `[rules]`, `[repo]`
