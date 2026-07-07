@@ -21,7 +21,7 @@ defmodule SigilGuard do
         backend: :elixir
 
   The built-in backend is native Elixir and uses OTP `:crypto`, Regex, ETS,
-  Finch, and ordinary OTP supervision.
+  and ordinary OTP supervision.
 
   ## Quick Start
 
@@ -61,7 +61,6 @@ defmodule SigilGuard do
   - `SigilGuard.Vault` — Secure secret storage
   - `SigilGuard.Identity` — Trust level hierarchy
   - `SigilGuard.Signer` — Cryptographic signing behaviour
-  - `SigilGuard.Registry` — Legacy remote-bundle compatibility adapter
   - `SigilGuard.Registry.Bundle` — Signed compatibility bundle provenance checks
   - `SigilGuard.Registry.Cache` — Optional remote-bundle data caching
 

@@ -1699,13 +1699,19 @@ section is post-3.0.0 parking; neither is counted here.
 > builds and passes its full suite plus its security-conformance
 > acceptance tests, with all findings folded back (M6.30).
 
-- [ ] M6.01 Delete `SigilGuard.Registry`.
+- [x] M6.01 Delete `SigilGuard.Registry`.
   - Spec: `docs/specs/SP.12-legacy-remote-bundle-adapter-contracts.md` -
     V3 Removal Map.
   - AC: the module is deleted (not hidden); `fetch_bundle/1`,
     `resolve_did/2`, `resolve_key/2`, `fetch_policies/1` map to their
     MIGRATING rows; old registry tests move to migration/removal tests.
   - Tests: removal test (module absent; calls raise cleanly), conformance.
+  - Done: deleted `lib/sigil_guard/registry.ex`, replaced
+    `test/sigil_guard/registry_test.exs` with `registry_removal_test.exs`, and
+    removed the deleted adapter from public module docs / ExDoc grouping.
+    Removal assertions prove `SigilGuard.Registry` is not loadable and
+    `fetch_bundle`, `resolve_did`, `resolve_key`, and `fetch_policies` raise
+    `UndefinedFunctionError` through `apply/3`.
 - [ ] M6.02 Delete `SigilGuard.Registry.Bundle`.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: deleted; provenance checks live in `TrustBundle` verification;
