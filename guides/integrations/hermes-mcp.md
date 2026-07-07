@@ -5,8 +5,10 @@ Validation record:
 - Target package: `hermes_mcp` `0.14.1`.
 - Variant package: `anubis_mcp` `1.6.2`.
 - Package metadata checked: 2026-07-07.
-- Compile validation: pending. This guide is wired into ExDoc and kept
-  illustrative until the pinned scratch-project compile gate runs.
+- Compile validation: passed on 2026-07-07 with Elixir 1.19.4 / Erlang/OTP 28.
+  Scratch projects compiled the SigilGuard interceptor seam, Hermes component
+  registration, Plug placement, and Anubis component variant with
+  `mix compile --warnings-as-errors`.
 
 Hermes MCP exposes MCP servers through supervised server modules and
 Streamable HTTP Plug/Phoenix routing. SigilGuard should sit at the host-owned
@@ -23,6 +25,7 @@ dependency:
 def deps do
   [
     {:hermes_mcp, "~> 0.14.1"},
+    {:plug, "~> 1.18"},
     {:sigil_guard, path: "../sigil_guard", override: true}
   ]
 end
@@ -96,7 +99,34 @@ defmodule MyApp.MCP.SigilGuardInterceptor do
 end
 ```
 
-Then call the seam from the Hermes tool callback:
+Then call the seam from a Hermes component:
+
+```elixir
+defmodule MyApp.MCP.GuardedEcho do
+  use Hermes.Server.Component, type: :tool, name: "echo"
+
+  schema do
+    field(:text, :string, required: true)
+  end
+
+  @impl true
+  def execute(%{text: text} = arguments, frame) do
+    actor = Map.get(frame.assigns, :actor, "anonymous")
+
+    with {:cont, guarded_args} <-
+           MyApp.MCP.SigilGuardInterceptor.before_tool_call("echo", arguments, actor),
+         result <- %{text: Map.get(guarded_args, :text, text)},
+         {:cont, guarded_result} <-
+           MyApp.MCP.SigilGuardInterceptor.after_tool_call("echo", result, actor) do
+      {:ok, guarded_result, frame}
+    else
+      {:halt, error} -> {:error, Jason.encode!(error), frame}
+    end
+  end
+end
+```
+
+Register the component on the Hermes server:
 
 ```elixir
 defmodule MyApp.MCPServer do
@@ -105,36 +135,7 @@ defmodule MyApp.MCPServer do
     version: "1.0.0",
     capabilities: [:tools]
 
-  import Hermes.Server.Frame
-
-  @impl true
-  def init(_client_info, frame) do
-    {:ok,
-     register_tool(frame, "repo_file_write",
-       input_schema: %{path: {:required, :string}, content: {:required, :string}},
-       description: "writes a repository file"
-     )}
-  end
-
-  @impl true
-  def handle_tool("repo_file_write" = tool, arguments, frame) do
-    actor = actor_from_frame(frame)
-
-    with {:cont, guarded_args} <-
-           MyApp.MCP.SigilGuardInterceptor.before_tool_call(tool, arguments, actor),
-         {:ok, result} <- MyApp.Tools.repo_file_write(guarded_args),
-         {:cont, guarded_result} <-
-           MyApp.MCP.SigilGuardInterceptor.after_tool_call(tool, result, actor) do
-      {:reply, guarded_result, frame}
-    else
-      {:halt, error} -> {:error, error, frame}
-      {:error, reason} -> {:error, to_string(reason), frame}
-    end
-  end
-
-  defp actor_from_frame(frame) do
-    get_in(frame.assigns, [:actor]) || "anonymous"
-  end
+  component MyApp.MCP.GuardedEcho
 end
 ```
 
@@ -233,27 +234,27 @@ Streamable HTTP Plug.
 
 ```elixir
 defmodule MyApp.GuardedEcho do
-  use Anubis.Server.Component, type: :tool
+  use Anubis.Server.Component, type: :tool, name: "echo"
 
   alias Anubis.Server.Response
 
   schema do
-    field :text, :string, required: true
+    field(:text, :string, required: true)
   end
 
   @impl true
   def execute(%{text: text} = arguments, frame) do
-    actor = get_in(frame.assigns, [:actor]) || "anonymous"
+    actor = Map.get(frame.assigns, :actor, "anonymous")
 
     with {:cont, guarded_args} <-
            MyApp.MCP.SigilGuardInterceptor.before_tool_call("echo", arguments, actor),
-         result <- %{text: Map.fetch!(guarded_args, :text) || text},
+         result <- %{text: Map.get(guarded_args, :text, text)},
          {:cont, guarded_result} <-
            MyApp.MCP.SigilGuardInterceptor.after_tool_call("echo", result, actor) do
       {:reply, Response.json(Response.tool(), guarded_result), frame}
     else
       {:halt, error} ->
-        {:reply, Response.error(Response.tool(), Jason.encode!(error)), frame}
+        {:reply, Response.text(Response.tool(), Jason.encode!(error)), frame}
     end
   end
 end
@@ -265,9 +266,10 @@ Before marking this guide complete:
 
 1. Create a scratch project outside this repo.
 2. Add the pinned `hermes_mcp` dependency and SigilGuard path dependency.
-3. Copy the interceptor, server callback, and Plug snippets into the scratch
+3. Add `plug` when validating the Plug placement snippet.
+4. Copy the interceptor, server callback, and Plug snippets into the scratch
    project, replacing the example `MyApp.Tools.repo_file_write/1` with a stub.
-4. Run `mix compile --warnings-as-errors`.
-5. Repeat with `anubis_mcp` and the Anubis component snippet.
-6. Record the date, Elixir/OTP versions, target package versions, and result in
+5. Run `mix compile --warnings-as-errors`.
+6. Repeat with `anubis_mcp` and the Anubis component snippet.
+7. Record the date, Elixir/OTP versions, target package versions, and result in
    the validation record above.

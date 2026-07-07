@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 191 / 228 tasks done (84%).** Milestones: 7 complete, 2 partial,
-1 not started. **37 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 192 / 228 tasks done (84%).** Milestones: 7 complete, 2 partial,
+1 not started. **36 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 2 | 20 | 10% | In progress |
+| M7 | Integrations and adoption | 3 | 20 | 15% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **191** | **228** | **84%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **192** | **228** | **84%** | 7 done / 2 partial / 1 to go |
 
-### What's left (37 tasks)
+### What's left (36 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 18:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 17:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2138,17 +2138,19 @@ section is post-3.0.0 parking; neither is counted here.
     `git diff --check`, `mix format --check-formatted mix.exs`,
     `mix sigil.docs_lint`, `mix docs`, and a claim-column cross-check against
     R.06.
-- [ ] M7.03 hermes_mcp integration guide.
+- [x] M7.03 hermes_mcp integration guide.
   - Spec: `SP.14` - Tier 1: hermes_mcp; Per-Target Acceptance.
   - AC: interceptor and middleware/plug placements both shown; the
     anubis_mcp compile variant passes; denials map onto the SP.03 JSON-RPC
     error registry; pinned-version compile validation recorded.
   - Validation: guide example compiles warnings-as-errors at its pin.
-  - Attempt 2026-07-07: added the ExDoc guide draft with the current
-    `hermes_mcp` and `anubis_mcp` pins, interceptor-style request/result
-    placement, Plug/Phoenix placement, JSON-RPC denial mapping, and an explicit
-    scratch-project validation procedure. Verified docs render only; keep open
-    until the pinned Hermes and Anubis compile variants pass.
+  - Done: added the ExDoc guide with `hermes_mcp` 0.14.1 and `anubis_mcp`
+    1.6.2 pins, interceptor-style request/result placement, Hermes component
+    registration, Plug/Phoenix placement, JSON-RPC denial mapping, and the
+    Anubis component variant. Verified `mix compile --warnings-as-errors` in
+    scratch Hermes and Anubis projects plus `git diff --check`,
+    `mix format --check-formatted mix.exs`, `mix sigil.docs_lint`, and
+    `mix docs`.
 - [ ] M7.04 Jido integration guide.
   - Spec: `SP.14` - Tier 1: Jido; Per-Target Acceptance.
   - AC: denial surfaces as a Jido action error without raising; `actor` is
