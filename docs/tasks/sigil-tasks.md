@@ -1908,12 +1908,17 @@ section is post-3.0.0 parking; neither is counted here.
     snippets for `{:file, path}`, `{:priv, app, rel}`, and `{:binary, bytes}`.
     The guidance states that host-owned transport supplies remote bytes outside
     SigilGuard and that v3 does not fetch bundles from a registry.
-- [ ] M6.17 MIGRATING: `Registry.resolve_key/2` and `resolve_did/2` to
+- [x] M6.17 MIGRATING: `Registry.resolve_key/2` and `resolve_did/2` to
       trust-bundle issuer lookup.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: issuer lookup via verified bundle roles; host-auth pointer for DID
     flows.
   - Validation: completeness script.
+  - Done: expanded `MIGRATING-3.0.md` with `Registry.resolve_did/2` and
+    `Registry.resolve_key/2` before snippets, host-auth guidance for DID/actor
+    flows, verified `TrustBundle.identity_issuers/1` issuer checks, and
+    explicit key material construction from verified bundle `keys`, root
+    keyids, and delegated role keyids for `Attestation.verify/3`.
 - [ ] M6.18 MIGRATING: `Envelope.sign/verify` to `Attestation.sign/verify`
       mapping table.
   - Spec: `SP.01` - Migration: Envelope To Attestation.

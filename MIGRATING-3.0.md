@@ -210,7 +210,63 @@ retry policy live outside SigilGuard and feed only the `{:binary, bytes}` source
 
 `SigilGuard.Registry.resolve_did/2` moves to host authentication or verified
 bundle issuer lookup. `SigilGuard.Registry.resolve_key/2` moves to verified
-bundle root/delegation lookup. Exact examples are filled in by M6.17.
+bundle root/delegation lookup.
+
+Before:
+
+```elixir
+{:ok, did_doc} = SigilGuard.Registry.resolve_did("did:web:agent.example", [])
+{:ok, public_key} = SigilGuard.Registry.resolve_key("sha256:key-id", [])
+```
+
+After, for DID or actor identity flows, authenticate the principal in the host
+and compare it with verified issuer policy from the bundle:
+
+```elixir
+{:ok, bundle} = SigilGuard.TrustBundle.load({:file, bundle_path})
+
+allowed_issuers =
+  bundle
+  |> SigilGuard.TrustBundle.identity_issuers()
+  |> MapSet.new()
+
+if MapSet.member?(allowed_issuers, host_authenticated_actor_id) do
+  {:ok, host_authenticated_actor_id}
+else
+  {:error, :unknown_issuer}
+end
+```
+
+After, for key material used to verify attestations, resolve by `keyid` from the
+verified bundle document and only accept keys authorized by the root or delegated
+bundle roles:
+
+```elixir
+document = bundle.document
+keys = Map.fetch!(document, "keys")
+root_keyids = get_in(document, ["roles", "root", "keyids"]) || []
+
+delegate_keyids =
+  document
+  |> get_in(["roles", "delegates"])
+  |> List.wrap()
+  |> Enum.flat_map(&Map.get(&1, "keyids", []))
+
+authorized_keyids = MapSet.new(root_keyids ++ delegate_keyids)
+
+trust_material =
+  for {keyid, %{"public_key" => public_key}} <- keys,
+      MapSet.member?(authorized_keyids, keyid),
+      into: %{} do
+    {keyid, public_key}
+  end
+
+SigilGuard.Attestation.verify(envelope, trust_material)
+```
+
+There is no DID resolver in v3 core. Network DID resolution, OAuth/resource
+server identity, SPIFFE/SVID validation, and account-to-actor mapping remain
+host-owned inputs to SigilGuard.
 
 ### Fetch Policies
 
