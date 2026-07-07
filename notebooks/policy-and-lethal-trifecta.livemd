@@ -1,0 +1,95 @@
+# Policy And Lethal Trifecta
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fpolicy-and-lethal-trifecta.livemd)
+
+This notebook demonstrates the R.06 row-10 lethal-trifecta rule: private data,
+untrusted content, and an external sink must not cross without a deterministic
+policy verdict.
+
+## Setup
+
+```elixir
+Mix.install([
+  {:sigil_guard, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Compile A Policy
+
+```elixir
+policy_text = """
+version 3
+
+[rules]
+default allow
+block sensitivity:private origin:tool,resource,repo zone:untrusted sink:external,network trust:low,medium
+confirm sensitivity:private origin:tool,resource,repo zone:untrusted sink:external,network trust:high
+allow sensitivity:public sink:model
+"""
+
+{:ok, policy} = SigilGuard.BoundaryPolicy.File.parse(policy_text)
+policy.digest
+```
+
+## Private Data + Untrusted Content + External Sink
+
+```elixir
+digest = String.duplicate("a", 64)
+
+boundary = [
+  phase: :tool_result,
+  source: :tool,
+  origin: :tool,
+  sink: :external,
+  source_sensitivity: :private,
+  trust_zone: :untrusted,
+  trust_level: :medium,
+  action_digest: digest,
+  payload_digest: digest,
+  context_digest: digest
+]
+
+decision = SigilGuard.BoundaryPolicy.evaluate(boundary, policy: policy)
+
+%{action: decision.action, reason: decision.reason, rules: decision.matched_rules}
+```
+
+## High-Trust Variant Requires Confirmation
+
+```elixir
+high_trust = Keyword.put(boundary, :trust_level, :high)
+confirmed = SigilGuard.BoundaryPolicy.evaluate(high_trust, policy: policy)
+
+%{action: confirmed.action, reason: confirmed.reason}
+```
+
+## Public Model-Bound Content Is Allowed
+
+```elixir
+public_boundary = [
+  phase: :tool_result,
+  source: :tool,
+  origin: :tool,
+  sink: :model,
+  source_sensitivity: :public,
+  trust_zone: :semi_trusted,
+  trust_level: :medium,
+  action_digest: digest,
+  payload_digest: digest,
+  context_digest: digest
+]
+
+allowed = SigilGuard.BoundaryPolicy.evaluate(public_boundary, policy: policy)
+
+%{action: allowed.action, reason: allowed.reason}
+```
+
+## Summary
+
+```elixir
+%{
+  lethal_trifecta: decision.action,
+  high_trust_external: confirmed.action,
+  public_model_content: allowed.action
+}
+```
