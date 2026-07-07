@@ -14,10 +14,12 @@ defmodule SigilGuard.BoundaryPolicy do
   2. Kernel invariants (never overridable): `trust_zone: :untrusted` at
      `:tool_request` blocks; secret hits headed to an external sink block or
      redact per `:on_sensitive`; quarantine indicators quarantine.
-  3. Sandbox mismatch matrix (SP.04): at the tool phases, the side-effect class
-     and `isolation_level` select a cell; an absent/`:none` isolation defaults
-     to `:quarantine` (reason `:sandbox_required`) unless a matching `[rules]`
-     line carries an `isolation:` matcher - the only sanctioned weakening.
+  3. Sandbox mismatch matrix (SP.04): at the tool phases, when the boundary
+     declares a `tool` or a `sandbox`, the side-effect class and `isolation_level`
+     select a cell; an absent/`:none` isolation defaults to `:quarantine` (reason
+     `:sandbox_required`) unless a matching `[rules]` line carries an `isolation:`
+     matcher - the only sanctioned weakening. A tool-phase boundary that declares
+     neither a tool nor a sandbox is out of the matrix's scope (SP.07).
   4. Repo policy facts (SP.11): the `:repo_facts` map contributes `:block` on a
      repo `block` verdict and `:confirm` on `require_approval`; matched repo
      rules surface in the explanation.
@@ -263,16 +265,30 @@ defmodule SigilGuard.BoundaryPolicy do
   # overriding rule's verdict flows through the normal policy contribution.
   defp sandbox_matrix(%Boundary{phase: phase} = boundary, matching)
        when phase in @sandbox_phases do
-    if isolation_override?(matching) do
-      nil
-    else
-      level = sandbox_level(boundary)
-      {verdict, class} = strictest_cell(sandbox_classes(boundary), level)
-      sandbox_contribution(verdict, class, level)
+    cond do
+      not sandbox_scoped?(boundary) -> nil
+      isolation_override?(matching) -> nil
+      true -> sandbox_cell(boundary)
     end
   end
 
   defp sandbox_matrix(_, _), do: nil
+
+  defp sandbox_cell(boundary) do
+    level = sandbox_level(boundary)
+    {verdict, class} = strictest_cell(sandbox_classes(boundary), level)
+    sandbox_contribution(verdict, class, level)
+  end
+
+  # The matrix has something to evaluate only when the boundary declares a `tool`
+  # (whose side effects need isolation) or a `sandbox` (an isolation level to
+  # check). A tool-phase boundary with neither is out of scope. Standalone this
+  # keeps the fail-closed default for any declared tool (including an unverified
+  # manifest -> class `execute`); in the runtime gate it makes the matrix opt-in
+  # by tool/sandbox presence (SP.07 Gate <-> Kernel Delegation).
+  defp sandbox_scoped?(%Boundary{tool: tool, sandbox: sandbox}) do
+    is_map(tool) or is_map(sandbox)
+  end
 
   defp sandbox_contribution(:allow, _, _), do: nil
 

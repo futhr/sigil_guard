@@ -210,9 +210,9 @@ defmodule SigilGuard.BoundaryPolicyTest do
              )
     end
 
-    test "no verified manifest is treated as class execute" do
-      # A tool with no manifest_digest, and no tool at all, both fail closed to
-      # execute: absent isolation quarantines, affirmative :none blocks.
+    test "a declared but unverified manifest is treated as class execute" do
+      # A declared tool with no manifest_digest fails closed to execute: absent
+      # isolation quarantines, affirmative :none blocks.
       unverified = %{phase: :tool_result, tool: %{"name" => "t", "side_effects" => [:read]}}
 
       assert BoundaryPolicy.evaluate(base(unverified) |> Map.delete(:sandbox)).action ==
@@ -220,6 +220,15 @@ defmodule SigilGuard.BoundaryPolicyTest do
 
       none_level = Map.put(unverified, :sandbox, %{"isolation_level" => :none})
       assert BoundaryPolicy.evaluate(none_level).action == :block
+    end
+
+    test "a tool-phase boundary declaring neither tool nor sandbox is out of scope" do
+      # SP.07 opt-in-by-presence: with no tool and no sandbox there is nothing to
+      # evaluate, so the matrix does not fire (the runtime gate stays opt-in).
+      for phase <- [:tool_request, :tool_result] do
+        boundary = base(%{phase: phase}) |> Map.drop([:sandbox, :tool])
+        assert BoundaryPolicy.evaluate(boundary).action == :allow, inspect(phase)
+      end
     end
 
     test "a tool with multiple side-effect classes uses the strictest cell" do
