@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 192 / 228 tasks done (84%).** Milestones: 7 complete, 2 partial,
-1 not started. **36 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 193 / 228 tasks done (85%).** Milestones: 7 complete, 2 partial,
+1 not started. **35 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 3 | 20 | 15% | In progress |
+| M7 | Integrations and adoption | 4 | 20 | 20% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **192** | **228** | **84%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **193** | **228** | **85%** | 7 done / 2 partial / 1 to go |
 
-### What's left (36 tasks)
+### What's left (35 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 17:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 16:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2151,11 +2151,18 @@ section is post-3.0.0 parking; neither is counted here.
     scratch Hermes and Anubis projects plus `git diff --check`,
     `mix format --check-formatted mix.exs`, `mix sigil.docs_lint`, and
     `mix docs`.
-- [ ] M7.04 Jido integration guide.
+- [x] M7.04 Jido integration guide.
   - Spec: `SP.14` - Tier 1: Jido; Per-Target Acceptance.
   - AC: denial surfaces as a Jido action error without raising; `actor` is
     populated from the agent identity; pinned compile validation recorded.
   - Validation: guide example compiles at its pin.
+  - Done: added `guides/integrations/jido.md` with the `jido` 2.3.2 pin,
+    a guarded action that threads `:agent_id` into the SigilGuard actor
+    boundary, normal Jido `{:error, reason}` denial handling, result-gating
+    guidance, and validation procedure. Verified the guarded action in a
+    scratch project with `mix compile --warnings-as-errors`, plus
+    `git diff --check`, `mix format --check-formatted mix.exs`,
+    `mix sigil.docs_lint`, and `mix docs`.
 - [ ] M7.05 LangChain/ReqLLM integration guide.
   - Spec: `SP.14` - Tier 1: LangChain Elixir And ReqLLM.
   - AC: request and result sides both gated; the ReqLLM pipeline-step

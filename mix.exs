@@ -117,6 +117,7 @@ defmodule SigilGuard.MixProject do
         "guides/cheatsheet.cheatmd": [title: "Cheatsheet"],
         "guides/threat-model.md": [title: "Threat Model"],
         "guides/integrations/hermes-mcp.md": [title: "Hermes MCP Integration"],
+        "guides/integrations/jido.md": [title: "Jido Integration"],
         "guides/release-and-anchoring.md": [title: "Release and Anchoring"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
         "MIGRATING-3.0.md": [title: "Migrating to 3.0"],
