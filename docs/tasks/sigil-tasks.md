@@ -63,8 +63,9 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 159 / 228 tasks done (70%).** Milestones: 6 complete, 1 partial,
-3 not started. **69 tasks left.** Current milestone: **M5** (25/26, 96%).
+**Overall: 190 / 228 tasks done (83%).** Milestones: 7 complete, 2 partial,
+1 not started. **38 tasks left.** Current milestone: **M6/M7** (blocked
+consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,18 +75,18 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 25 | 26 | 96% | In progress |
-| M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
-| M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
+| M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
+| M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
+| M7 | Integrations and adoption | 1 | 20 | 5% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **159** | **228** | **70%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **190** | **228** | **83%** | 7 done / 2 partial / 1 to go |
 
-### What's left (69 tasks)
+### What's left (38 tasks)
 
-- **M5 - 1 left:** the threat-model test suite TM.12
-  (move-don't-duplicate). (M5.01-M5.25 done, incl. TM.01-TM.11.)
-- **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
-- **M7 - 20:** host integrations and adoption surfaces.
+- **M6 - 2:** reference-consumer full-suite validation and final migration
+  fold-back after that gate is green.
+- **M7 - 19:** host integrations, guides, livebooks, benchmarks, security
+  posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
 The table counts every milestone task (F through M8) exactly once. The
@@ -2114,12 +2115,17 @@ section is post-3.0.0 parking; neither is counted here.
 > published with the environment block; OpenSSF passing badge earned;
 > announcement drafts exist and remain unpublished.
 
-- [ ] M7.01 ExDoc cheatsheet.
+- [x] M7.01 ExDoc cheatsheet.
   - Spec: `docs/specs/SP.14-ecosystem-integrations-and-adoption.md` -
     ExDoc Artifacts.
   - AC: `guides/cheatsheet.cheatmd` covers gate verdicts, the policy
     grammar, attestation sign/verify calls, and the confirmation flow.
   - Validation: `mix docs` renders without warnings.
+  - Done: added `guides/cheatsheet.cheatmd`, wired it into ExDoc extras, and
+    covered gate verdict dispatch, the implemented v3 policy-file grammar,
+    attestation sign/verify attachment, and action-bound confirmation. Verified
+    `git diff --check`, `mix format --check-formatted mix.exs`,
+    `mix sigil.docs_lint`, and `mix docs`.
 - [ ] M7.02 Threat-model guide rendered from R.06.
   - Spec: `SP.14` - ExDoc Artifacts; `R.06` - Control Mapping.
   - AC: `guides/threat-model.md` reproduces the control-mapping table,

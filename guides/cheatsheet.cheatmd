@@ -1,0 +1,210 @@
+# SigilGuard Cheatsheet
+
+## Gate Verdicts
+
+SigilGuard gates return `%SigilGuard.Decision{}`. Treat `action` as the v3
+verdict.
+
+```elixir
+alias SigilGuard.ToolGateway
+
+context = [
+  phase: :tool_request,
+  origin: :model,
+  sink: :tool,
+  tool: "repo_file_write",
+  actor: "spiffe://example.test/agents/release-bot",
+  trust_zone: :trusted
+]
+
+decision = ToolGateway.guard_request(request, context)
+
+case decision.action do
+  :allow -> execute_tool(request)
+  :redact -> execute_tool(decision.sanitized_text || request)
+  :confirm -> request_human_approval(decision)
+  :quarantine -> quarantine_request(decision)
+  :block -> reject_request(decision)
+end
+```
+
+Common meanings:
+
+- `:allow` — pass the payload through unchanged.
+- `:redact` — use the sanitized payload or text from the decision.
+- `:confirm` — require an action-bound confirmation token before execution.
+- `:quarantine` — isolate the payload and surface evidence to the operator.
+- `:block` — deny the operation.
+
+For tool results, flip the boundary direction:
+
+```elixir
+result_context = [
+  phase: :tool_result,
+  origin: :tool,
+  sink: :model,
+  tool: "repo_file_write",
+  actor: "spiffe://example.test/agents/release-bot"
+]
+
+decision = ToolGateway.guard_result(result, result_context)
+```
+
+## Policy Grammar
+
+Repository policy files are loaded from the SIGILGUARD filename family:
+
+- `SIGILGUARD_POLICY`
+- `.sigilguard-policy`
+- `.sigilguard/policy`
+- `.github/sigilguard-policy`
+
+Legacy SIGIL filenames fail closed.
+
+Minimal boundary-policy file:
+
+```text
+version 3
+
+[rules]
+default allow
+block phase:tool_request zone:untrusted
+confirm sensitivity:private origin:tool,resource,repo sink:external,network
+allow phase:tool_result isolation:container,vm,remote_attested effect:read
+
+[repo]
+default require_approval
+allow agent:release-bot action:modify docs/** CHANGELOG.md
+block agent:* priv/secrets/**
+
+[contracts]
+contract sink:external,network max_size:16384
+  no_raw_credentials:true digest_only_pii:true classes:text
+  credential_transform:hash
+```
+
+Boundary-rule decisions are `allow`, `redact`, `confirm`, `quarantine`, or
+`block`. Matchers are AND-ed by field and comma-separated within a field. Common
+matchers include `phase`, `origin`, `sink`, `zone`, `trust`, `sensitivity`,
+`isolation`, `effect`, `hits`, and `indicator`.
+
+Repo-policy decisions inside `[repo]` are `allow`, `require_approval`, or
+`block`; `require_approval` maps to the v3 `:confirm` gate verdict.
+
+Load and evaluate the repo section directly when you only need repo path rules:
+
+```elixir
+{:ok, policy} = SigilGuard.RepoPolicy.load(repo_root)
+
+decision =
+  SigilGuard.RepoPolicy.evaluate(policy,
+    phase: :tool_request,
+    source: :model,
+    sink: :tool,
+    action: :write,
+    tool: "repo_file_write",
+    actor: "spiffe://example.test/agents/release-bot"
+  )
+```
+
+Boundary policy can be evaluated directly when the host already has a normalized
+boundary:
+
+```elixir
+decision =
+  SigilGuard.BoundaryPolicy.evaluate(
+    phase: :tool_request,
+    source: :model,
+    sink: :tool,
+    action: :execute,
+    trust_zone: :trusted,
+    actor: "spiffe://example.test/agents/release-bot"
+  )
+```
+
+## Attestation Sign And Verify
+
+Create a statement from a decision, sign it with a host signer, and attach it
+as `_agent_trust`.
+
+```elixir
+alias SigilGuard.Attestation
+
+{:ok, statement} =
+  Attestation.from_decision(decision, context,
+    payload: request,
+    statement_type: :tool_request
+  )
+
+{:ok, envelope} =
+  Attestation.sign(statement, MyApp.AgentSigner,
+    keyid: "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8"
+  )
+
+request = Attestation.attach(request, envelope)
+```
+
+Verify an attached attestation with direct trust material or keys derived from a
+verified trust bundle.
+
+```elixir
+trust_material = %{
+  "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8" =>
+    public_key_b64u
+}
+
+with {:ok, envelope} <- Attestation.fetch(request),
+     {:ok, statement} <-
+       Attestation.verify(envelope, trust_material,
+         payload: request,
+         context: context,
+         consume: true
+       ) do
+  {:ok, statement}
+end
+```
+
+## Confirmation Flow
+
+Confirmation is bound to the exact payload and boundary context. If either
+changes, verification fails.
+
+```elixir
+secret_key = System.fetch_env!("SIGILGUARD_CONFIRMATION_KEY")
+
+decision = SigilGuard.ToolGateway.guard_request(request, context)
+
+{:ok, token} =
+  SigilGuard.ToolGateway.issue_confirmation(
+    request,
+    context,
+    decision,
+    secret_key,
+    ttl_ms: 120_000
+  )
+
+confirmed_request = SigilGuard.Attestation.attach_confirmation(request, token)
+
+case SigilGuard.ToolGateway.guard_confirmed_request(
+       confirmed_request,
+       context,
+       confirmation_key: secret_key
+     ) do
+  %SigilGuard.Decision{action: :allow} -> execute_tool(confirmed_request)
+  %SigilGuard.Decision{} = denied -> reject_request(denied)
+end
+```
+
+Use the out-of-band option when the host keeps tokens outside the MCP payload:
+
+```elixir
+SigilGuard.ToolGateway.guard_confirmed_request(
+  request,
+  context,
+  confirmation_key: secret_key,
+  confirmation_token: token
+)
+```
+
+The same pattern applies to result confirmation with
+`guard_confirmed_result/3`.

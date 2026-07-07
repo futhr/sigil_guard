@@ -114,6 +114,7 @@ defmodule SigilGuard.MixProject do
       main: "readme",
       extras: [
         "README.md": [title: "Overview"],
+        "guides/cheatsheet.cheatmd": [title: "Cheatsheet"],
         "guides/release-and-anchoring.md": [title: "Release and Anchoring"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
         "MIGRATING-3.0.md": [title: "Migrating to 3.0"],
