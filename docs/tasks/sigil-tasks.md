@@ -70,12 +70,12 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
 | M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
-| M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
+| M4 - Boundary scanner and policy kernel | 25 | 2 | 0 | 23 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **109** | **0** | **119** |
+| **Total** | **228** | **111** | **0** | **117** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -873,7 +873,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
 > streaming properties green (zero leaked prefixes); all 20 sandbox matrix
 > cells tested; canonical policy fixtures committed.
 
-- [ ] M4.01 `SigilGuard.Boundary` normalized policy decision input.
+- [x] M4.01 `SigilGuard.Boundary` normalized policy decision input.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` - Data
     Model (Policy Decision Input (`SigilGuard.Boundary`)).
   - AC: the struct carries source/sink/phase/origin/actor/identity/
@@ -881,7 +881,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     sandbox fields; validation rejects out-of-enum values with typed
     errors.
   - Tests: negative, malformed.
-- [ ] M4.02 Lifecycle phase taxonomy (nine phases).
+- [x] M4.02 Lifecycle phase taxonomy (nine phases).
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Lifecycle Taxonomy.
   - AC: the nine phases (session_start, tool_request,
