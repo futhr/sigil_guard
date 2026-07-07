@@ -147,7 +147,6 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Identity,
           SigilGuard.Identity.Binding,
           SigilGuard.Patterns,
-          SigilGuard.Profile,
           SigilGuard.Quarantine,
           SigilGuard.RepoPolicy,
           SigilGuard.RepoPolicy.Decision,

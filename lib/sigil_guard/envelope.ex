@@ -37,11 +37,14 @@ defmodule SigilGuard.Envelope do
   """
 
   alias SigilGuard.Config
-  alias SigilGuard.Profile
   alias SigilGuard.ReplayStore
 
   @type verdict :: :allowed | :blocked | :scanned
-  @type profile :: Profile.t()
+  @type profile ::
+          :auto
+          | :legacy_sigil_guard
+          | :sigil_reference_0_1
+          | :sigil_spec_draft_2026_02
 
   @type t :: %{
           required(String.t()) => String.t()
@@ -49,6 +52,7 @@ defmodule SigilGuard.Envelope do
 
   @canonical_keys ~w(identity nonce timestamp verdict)
   @valid_verdicts [:allowed, :blocked, :scanned]
+  @profiles [:auto, :legacy_sigil_guard, :sigil_reference_0_1, :sigil_spec_draft_2026_02]
 
   @doc """
   Produce the canonical byte representation for signing.
@@ -100,7 +104,7 @@ defmodule SigilGuard.Envelope do
     profile = profile_from_opts(opts)
 
     wire_verdict_format =
-      Keyword.get(opts, :wire_verdict_format, Profile.wire_verdict_format(profile))
+      Keyword.get(opts, :wire_verdict_format, wire_verdict_format(profile))
 
     validate_sign_args!(identity, verdict, reason, wire_verdict_format)
 
@@ -232,7 +236,7 @@ defmodule SigilGuard.Envelope do
   defp canonical_verdict(:scanned), do: "scanned"
 
   defp parse_verdict(verdict, profile) do
-    case {verdict, Profile.verdict_acceptance(profile)} do
+    case {verdict, verdict_acceptance(profile)} do
       {"allowed", _} -> {:ok, :allowed}
       {"blocked", _} -> {:ok, :blocked}
       {"scanned", _} -> {:ok, :scanned}
@@ -246,7 +250,7 @@ defmodule SigilGuard.Envelope do
   defp validate_blocked_reason(:blocked, reason, profile, opts) do
     policy =
       Keyword.get_lazy(opts, :blocked_reason, fn ->
-        if Profile.require_blocked_reason_on_verify?(profile), do: :require, else: :allow
+        if require_blocked_reason_on_verify?(profile), do: :require, else: :allow
       end)
 
     case {policy, reason} do
@@ -340,6 +344,23 @@ defmodule SigilGuard.Envelope do
   defp profile_from_opts(opts) do
     opts
     |> Keyword.get_lazy(:profile, &Config.protocol_profile/0)
-    |> Profile.normalize!()
+    |> normalize_profile!()
   end
+
+  defp normalize_profile!(profile) when profile in @profiles, do: profile
+
+  defp normalize_profile!(profile) do
+    raise ArgumentError,
+          "invalid :sigil_guard protocol_profile #{inspect(profile)}; " <>
+            "expected one of #{inspect(@profiles)}"
+  end
+
+  defp wire_verdict_format(:legacy_sigil_guard), do: :legacy_titlecase
+  defp wire_verdict_format(_), do: :lowercase
+
+  defp verdict_acceptance(:sigil_spec_draft_2026_02), do: :lowercase_only
+  defp verdict_acceptance(_), do: :legacy_and_lowercase
+
+  defp require_blocked_reason_on_verify?(:sigil_spec_draft_2026_02), do: true
+  defp require_blocked_reason_on_verify?(_), do: false
 end

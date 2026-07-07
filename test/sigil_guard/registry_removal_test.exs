@@ -4,6 +4,7 @@ defmodule SigilGuard.RegistryRemovalTest do
   @registry_module SigilGuard.Registry
   @bundle_module SigilGuard.Registry.Bundle
   @cache_module SigilGuard.Registry.Cache
+  @profile_module SigilGuard.Profile
   @registry_functions [
     {:fetch_bundle, []},
     {:resolve_did, ["did:example:alice"]},
@@ -22,6 +23,14 @@ defmodule SigilGuard.RegistryRemovalTest do
     {:rule_count, []},
     {:source, []},
     {:refresh, []}
+  ]
+  @profile_functions [
+    {:profiles, []},
+    {:normalize!, [:auto]},
+    {:wire_verdict_format, [:auto]},
+    {:verdict_acceptance, [:auto]},
+    {:require_blocked_reason_on_verify?, [:auto]},
+    {:registry_identity_endpoints, [:auto]}
   ]
 
   describe "v3 registry adapter removal" do
@@ -86,6 +95,20 @@ defmodule SigilGuard.RegistryRemovalTest do
       refute Enum.any?(child_modules, fn {id, modules} ->
                id in [SigilGuard.Finch, @cache_module] or @cache_module in List.wrap(modules)
              end)
+    end
+  end
+
+  describe "v3 legacy profile removal" do
+    test "SigilGuard.Profile is deleted, not hidden" do
+      refute Code.ensure_loaded?(@profile_module)
+    end
+
+    test "removed profile calls raise UndefinedFunctionError cleanly" do
+      for {function, args} <- @profile_functions do
+        assert_raise UndefinedFunctionError, fn ->
+          apply(@profile_module, function, args)
+        end
+      end
     end
   end
 end

@@ -64,6 +64,7 @@ defmodule SigilGuard.Config do
   @default_timeout_ms 5_000
   @default_retry_ms :timer.minutes(1)
   @default_protocol_profile :auto
+  @profiles [:auto, :legacy_sigil_guard, :sigil_reference_0_1, :sigil_spec_draft_2026_02]
   @default_bundle_max_age_seconds nil
   @default_bundle_clock_skew_seconds 60
   @default_attestation_ttl_ms 300_000
@@ -180,11 +181,19 @@ defmodule SigilGuard.Config do
   end
 
   @doc "Return the configured legacy envelope compatibility profile."
-  @spec protocol_profile() :: SigilGuard.Profile.t()
+  @spec protocol_profile() :: atom()
   def protocol_profile do
     :sigil_guard
     |> Application.get_env(:protocol_profile, @default_protocol_profile)
-    |> SigilGuard.Profile.normalize!()
+    |> normalize_profile!()
+  end
+
+  defp normalize_profile!(profile) when profile in @profiles, do: profile
+
+  defp normalize_profile!(profile) do
+    raise ArgumentError,
+          "invalid :sigil_guard protocol_profile #{inspect(profile)}; " <>
+            "expected one of #{inspect(@profiles)}"
   end
 
   @doc "Return the configured legacy remote-bundle compatibility endpoint."

@@ -1737,12 +1737,20 @@ section is post-3.0.0 parking; neither is counted here.
     extended `registry_removal_test.exs` to prove the module is not loadable,
     cache calls raise `UndefinedFunctionError`, and the running supervisor has
     no registry cache or Finch children.
-- [ ] M6.04 Delete `SigilGuard.Profile`.
+- [x] M6.04 Delete `SigilGuard.Profile`.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Public Modules
     Removed In V3.
   - AC: deleted; `SigilGuard.TrustProfile` is the replacement; all doc
     references updated.
   - Tests: removal test, conformance.
+  - Done: deleted `lib/sigil_guard/profile.ex`, removed the old profile test
+    module, removed `SigilGuard.Profile` from ExDoc grouping, and extended
+    `registry_removal_test.exs` to prove the module is not loadable and legacy
+    profile helper calls raise `UndefinedFunctionError`. Until M6.05 removes
+    `SigilGuard.Envelope`, its remaining transitional profile behavior is
+    private to that module and no public `SigilGuard.Profile` surface remains;
+    `SigilGuard.Config.protocol_profile/0` likewise normalizes without the
+    deleted module.
 - [ ] M6.05 Delete `SigilGuard.Envelope`.
   - Spec: `docs/specs/SP.06-envelope-and-native-backend-contracts.md` - V3
     Transition Rules; `SP.01` - Migration: Envelope To Attestation.
