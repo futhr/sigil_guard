@@ -1,5 +1,34 @@
 # Migrating To SigilGuard 3.0
 
+## Dependency Update
+
+Update the package requirement when you are ready to adopt the v3 breaking
+surface:
+
+```elixir
+# v2
+{:sigil_guard, "~> 0.2"}
+
+# v3
+{:sigil_guard, "~> 3.0"}
+```
+
+Release candidates require an exact pin such as `"3.0.0-rc.1"`; `~> 3.0` does
+not match prerelease versions.
+
+## Migration Checklist
+
+- Rename policy files to the SIGILGUARD filename family.
+- Move MCP trust metadata from `_sigil` to `_agent_trust`.
+- Move MCP confirmation metadata from `_sigil_confirmation` to
+  `_agent_confirmation`.
+- Replace the removed registry namespace with local or embedded
+  `SigilGuard.TrustBundle` sources.
+- Replace verdict envelopes with Agent Trust attestations.
+- Replace profile compatibility calls with `SigilGuard.TrustProfile`.
+- Remove deleted v2 configuration keys before booting v3.
+- Update expected error atoms and boot-error handling.
+
 ## Policy Filenames
 
 SigilGuard 3.0 renames repo policy files from the old SIGIL filename family
@@ -13,6 +42,73 @@ fallbacks.
 | `.sigil-policy` | `.sigilguard-policy` |
 | `.sigil/policy` | `.sigilguard/policy` |
 | `.github/sigil-policy` | `.github/sigilguard-policy` |
+
+## MCP Trust Metadata
+
+Use `_agent_trust` instead of `_sigil` for Agent Trust attestations attached to
+MCP payloads. Literal before/after payload examples are filled in by M6.14.
+
+## MCP Confirmation Metadata
+
+Use `_agent_confirmation` instead of `_sigil_confirmation` for confirmation
+metadata. Literal payload examples and the `:confirmation_token` option path are
+filled in by M6.15.
+
+## Registry To Trust Bundles
+
+The `SigilGuard.Registry` namespace is removed. Migrate to verified trust bundle
+sources loaded by `SigilGuard.TrustBundle`.
+
+### Fetch Bundle
+
+`SigilGuard.Registry.fetch_bundle/1` maps to `SigilGuard.TrustBundle.load/1`.
+Source-construction examples for `{:file, path}`, `{:priv, app, path}`, and
+`{:binary, bytes}` are filled in by M6.16.
+
+### Resolve DID And Key
+
+`SigilGuard.Registry.resolve_did/2` moves to host authentication or verified
+bundle issuer lookup. `SigilGuard.Registry.resolve_key/2` moves to verified
+bundle root/delegation lookup. Exact examples are filled in by M6.17.
+
+### Fetch Policies
+
+`SigilGuard.Registry.fetch_policies/1` maps to the verified trust bundle
+`policies` section.
+
+### Bundle Signing And Cache
+
+`SigilGuard.Registry.Bundle.sign/2` maps to trust-bundle provenance signing.
+`SigilGuard.Registry.Cache` maps to `SigilGuard.TrustBundle.Cache`.
+
+## Envelope To Attestation
+
+`SigilGuard.Envelope` is removed. Use `SigilGuard.Attestation` and Agent Trust
+DSSE envelopes. The SP.01 field mapping table and known consumer call-site
+replacement snippets are filled in by M6.18.
+
+## Profile To TrustProfile
+
+`SigilGuard.Profile` is removed. Use `SigilGuard.TrustProfile` for the v3 Agent
+Trust profile. Function-level mapping and profile-id constant guidance are
+filled in by M6.19.
+
+## Configuration Keys
+
+Remove deleted v2 keys before booting v3. Removed keys fail closed with
+`SigilGuard.ConfigError` naming `MIGRATING-3.0.md`; the complete per-key table is
+filled in by M6.20.
+
+## Error Changes
+
+Some v2 error atoms were reconciled for v3 trust-bundle and configuration
+contracts. The old-to-new atom table and new boot-error behavior are filled in
+by M6.21.
+
+## Version Pinning
+
+`~> 0.2` users do not auto-upgrade to v3. Release-candidate and final-release
+pinning guidance is expanded by M6.22.
 
 ## MCP JSON-RPC Rejection Codes
 

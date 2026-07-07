@@ -1863,13 +1863,19 @@ section is post-3.0.0 parking; neither is counted here.
     pins OTP `extra_applications` to `:crypto` and `:logger`, exempts dev/test
     deps through production-only filtering, and includes a synthetic
     extra/missing dependency fixture proving the assertion reports drift.
-- [ ] M6.13 `MIGRATING-3.0.md` skeleton with the dependency update example.
+- [x] M6.13 `MIGRATING-3.0.md` skeleton with the dependency update example.
   - Spec: `SP.12` - V3 Removal Map; `SP.01` - Migration: Envelope To
     Attestation.
   - AC: the guide exists with section structure covering every mapping
     below; includes the `{:sigil_guard, "~> 0.2"}` to
     `{:sigil_guard, "~> 3.0"}` example.
   - Validation: M6.24 completeness script; link check.
+  - Done: expanded `MIGRATING-3.0.md` with the v2-to-v3 dependency update
+    example, rc exact-pin warning, migration checklist, and stable section
+    skeletons for policy filenames, MCP trust metadata, confirmation metadata,
+    registry-to-trust-bundle mappings, envelope-to-attestation, profile-to-
+    TrustProfile, configuration keys, expected error changes, and version
+    pinning.
 - [ ] M6.14 MIGRATING: `_sigil` to `_agent_trust` before/after examples.
   - Spec: `docs/specs/SP.08-mcp-gateway-and-confirmation-contracts.md` -
     Metadata Namespace.
