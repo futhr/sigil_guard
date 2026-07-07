@@ -11,8 +11,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   @git_revision String.duplicate("a", 40)
 
   defmodule TwoTupleKeywordProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -32,8 +30,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   end
 
   defmodule MissingRuntimeLockProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -53,8 +49,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   end
 
   defmodule RuntimePathProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -74,8 +68,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   end
 
   defmodule NonRuntimePathProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -95,8 +87,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   end
 
   defmodule RuntimeGithubProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -115,8 +105,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   end
 
   defmodule BadDependencyShapeProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -133,8 +121,6 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
   end
 
   defmodule BadDependencyOptionsProject do
-    @moduledoc false
-
     @spec project() :: keyword()
     def project do
       [
@@ -169,7 +155,7 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
                    %{
                      "referenceCategory" => "PACKAGE-MANAGER",
                      "referenceType" => "purl",
-                     "referenceLocator" => "pkg:hex/sigil_guard@0.2.0"
+                     "referenceLocator" => "pkg:hex/sigil_guard@#{Mix.Project.config()[:version]}"
                    }
                  ]
              end)

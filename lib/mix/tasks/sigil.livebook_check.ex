@@ -42,9 +42,18 @@ defmodule Mix.Tasks.Sigil.LivebookCheck do
   """
   @spec check([String.t()], check_opts()) :: check_result()
   def check(paths \\ [], opts \\ []) when is_list(paths) and is_list(opts) do
-    root = opts |> Keyword.get(:root, File.cwd!()) |> Path.expand()
+    root = opts |> Keyword.get(:root, File.cwd!())
+    root = Path.expand(root)
     env = Keyword.get(opts, :env, offline_env())
+    failures = check_failures(root, paths, env)
 
+    case failures do
+      [] -> :ok
+      failures -> {:error, failures}
+    end
+  end
+
+  defp check_failures(root, paths, env) do
     root
     |> selected_notebooks(paths)
     |> Enum.map(&run_notebook(&1, root, env))
@@ -52,10 +61,6 @@ defmodule Mix.Tasks.Sigil.LivebookCheck do
       :ok -> []
       {:error, failure} -> [failure]
     end)
-    |> case do
-      [] -> :ok
-      failures -> {:error, failures}
-    end
   end
 
   @doc """
@@ -99,7 +104,7 @@ defmodule Mix.Tasks.Sigil.LivebookCheck do
       File.write!(script_path, script)
 
       case System.cmd("elixir", [script_path], cd: root, env: env, stderr_to_stdout: true) do
-        {_output, 0} ->
+        {_, 0} ->
           :ok
 
         {output, status} ->

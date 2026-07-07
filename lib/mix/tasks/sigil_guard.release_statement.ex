@@ -1,9 +1,8 @@
 defmodule Mix.Tasks.SigilGuard.ReleaseStatement do
-  @shortdoc "Build the SP.01 release attestation statement"
+  @shortdoc "Build the release attestation statement"
 
   @moduledoc """
-  Build the SP.01 `release` in-toto Statement binding release artifacts
-  (`SP.05` D15).
+  Build the `release` in-toto Statement binding release artifacts.
 
   Given the built Hex tarball and the SBOM, this task computes each artifact's
   SHA-256 and emits the `https://sigilguard.dev/attestation/release/v1`

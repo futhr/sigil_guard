@@ -1,7 +1,10 @@
 {
   "skip_files": [
-    "lib/sigil_guard/tool_gateway/base.ex"
+    "test/support/.*"
   ],
+  "skip_file_reasons": {
+    "test/support/.*": "Test-only fixture generators and helper behaviours are compiled through test elixirc_paths; they are not runtime or public API coverage surfaces."
+  },
   "coverage_options": {
     "minimum_coverage": 95
   }

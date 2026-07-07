@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Sigil.DocsLint do
   @shortdoc "Validate SigilGuard docs catalogue rules"
 
   @moduledoc """
-  Consolidates the documentation checks required before v3 implementation work.
+  Consolidates the documentation checks required before release work.
 
       mix sigil.docs_lint
 

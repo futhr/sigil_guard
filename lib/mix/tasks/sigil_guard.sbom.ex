@@ -61,7 +61,7 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   SHA-256 digest.
 
   The file's raw bytes are hashed and compared to `expected_sha256` (the value
-  attested in the SP.01 `release` statement / SLSA provenance); drift fails with
+  attested in the release statement / SLSA provenance); drift fails with
   `{:error, :sbom_digest_mismatch}` before the structural checks run.
   """
   @spec verify_file(String.t(), String.t()) :: :ok | {:error, term()}

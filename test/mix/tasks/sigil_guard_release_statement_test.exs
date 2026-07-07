@@ -1,4 +1,6 @@
 defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureIO

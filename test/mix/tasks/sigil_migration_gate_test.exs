@@ -73,6 +73,108 @@ defmodule Mix.Tasks.Sigil.MigrationGateTest do
       assert finding.check == :invalid_link
       assert finding.message == "missing anchor: #missing-section"
     end
+
+    test "accepts external links, empty links, and valid local file links" do
+      root =
+        fixture_root(%{
+          "MIGRATING-1.0.md" => """
+          # Migrating
+
+          External [web](https://example.invalid), [mail](mailto:security@example.invalid),
+          empty [link](), and local [guide](docs/guide.md#details).
+          """,
+          "docs/guide.md" => """
+          # Guide
+
+          ## Details
+          """
+        })
+
+      assert :ok = MigrationGate.validate(root: root, required_mappings: [])
+    end
+
+    test "reports links that escape the repository root" do
+      root =
+        fixture_root(%{
+          "MIGRATING-1.0.md" => """
+          # Migrating
+
+          See [outside](../outside.md).
+          """
+        })
+
+      assert {:error, [finding]} = MigrationGate.validate(root: root, required_mappings: [])
+      assert finding.check == :invalid_link
+      assert finding.message == "link escapes repo: ../outside.md"
+    end
+
+    test "reports missing local link targets" do
+      root =
+        fixture_root(%{
+          "MIGRATING-1.0.md" => """
+          # Migrating
+
+          See [missing](docs/missing.md).
+          """
+        })
+
+      assert {:error, [finding]} = MigrationGate.validate(root: root, required_mappings: [])
+      assert finding.check == :invalid_link
+      assert finding.message == "missing link target: docs/missing.md"
+    end
+
+    test "reports missing anchors on same-file links with a path component" do
+      root =
+        fixture_root(%{
+          "MIGRATING-1.0.md" => """
+          # Migrating
+
+          See [missing](MIGRATING-1.0.md#missing-section).
+          """
+        })
+
+      assert {:error, [finding]} = MigrationGate.validate(root: root, required_mappings: [])
+      assert finding.check == :invalid_link
+      assert finding.message == "missing anchor: MIGRATING-1.0.md#missing-section"
+    end
+
+    test "sorts multiple findings by path line and check" do
+      root =
+        fixture_root(%{
+          "MIGRATING-1.0.md" => """
+          # Migrating
+
+          See [missing](docs/missing.md).
+          """
+        })
+
+      assert {:error, findings} =
+               MigrationGate.validate(
+                 root: root,
+                 required_mappings: [module: "SigilGuard.Envelope"]
+               )
+
+      assert Enum.map(findings, & &1.check) == [:missing_mapping, :invalid_link]
+      assert Enum.map(findings, & &1.line) == [nil, 3]
+    end
+
+    test "missing migration guide reports every required mapping without raising" do
+      root = fixture_root(%{})
+
+      assert {:error, findings} =
+               MigrationGate.validate(
+                 root: root,
+                 required_mappings: [
+                   module: "SigilGuard.Envelope",
+                   config: ":registry_url"
+                 ]
+               )
+
+      assert Enum.map(findings, & &1.message) == [
+               "module SigilGuard.Envelope is not mapped",
+               "config :registry_url is not mapped"
+             ]
+    end
   end
 
   defp fixture_root(files) do

@@ -69,7 +69,6 @@ defmodule SigilGuard.MixProject do
       # Testing
       {:excoveralls, "~> 0.18", only: :test},
       {:bypass, "~> 2.1", only: :test},
-      {:mox, "~> 1.1", only: :test},
       {:stream_data, "~> 1.3", only: :test},
 
       # Benchmarks
@@ -97,11 +96,16 @@ defmodule SigilGuard.MixProject do
       },
       files: ~w[
         lib
-        docs
+        guides
+        docs/README.md
+        bench/output/benchmarks.md
         .formatter.exs
         mix.exs
         README.md
         LICENSE
+        SECURITY.md
+        CONTRIBUTING.md
+        AGENTS.md
         CHANGELOG.md
         MIGRATING-1.0.md
       ],
@@ -111,9 +115,10 @@ defmodule SigilGuard.MixProject do
 
   defp docs do
     [
-      main: "readme",
+      main: "readme-1",
       extras: [
         "README.md": [title: "Overview"],
+        "docs/README.md": [title: "Architecture"],
         "guides/cheatsheet.cheatmd": [title: "Cheatsheet"],
         "guides/threat-model.md": [title: "Threat Model"],
         "guides/integrations/hermes-mcp.md": [title: "Hermes MCP Integration"],
@@ -124,6 +129,7 @@ defmodule SigilGuard.MixProject do
         "bench/output/benchmarks.md": [title: "Benchmarks"],
         "MIGRATING-1.0.md": [title: "Migrating to 1.0"],
         "CHANGELOG.md": [title: "Changelog"],
+        "SECURITY.md": [title: "Security"],
         "CONTRIBUTING.md": [title: "Contributing"],
         "AGENTS.md": [title: "AI Agents"],
         LICENSE: [title: "License"]
@@ -132,11 +138,21 @@ defmodule SigilGuard.MixProject do
         "Getting Started": ~r/README/,
         Guides: ~r/guides/,
         Performance: ~r/benchmarks/,
-        Reference: ~r/MIGRATING|CHANGELOG|CONTRIBUTING|AGENTS|LICENSE/
+        Reference: ~r/MIGRATING|CHANGELOG|SECURITY|CONTRIBUTING|AGENTS|LICENSE/
       ],
       groups_for_modules: [
+        "Mix Tasks": [
+          Mix.Tasks.Sigil.DocsLint,
+          Mix.Tasks.Sigil.LivebookCheck,
+          Mix.Tasks.Sigil.MigrationGate,
+          Mix.Tasks.SigilGuard.ReleaseStatement,
+          Mix.Tasks.SigilGuard.Sbom
+        ],
         "Core API": [
           SigilGuard,
+          SigilGuard.AdaptiveDetector,
+          SigilGuard.AgentCard,
+          SigilGuard.AgentTrust,
           SigilGuard.Scanner,
           SigilGuard.Scanner.Pipeline,
           SigilGuard.Policy,
@@ -147,15 +163,29 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Attestation.Envelope,
           SigilGuard.Attestation.Statement,
           SigilGuard.Canonical.JCS,
+          SigilGuard.CapabilityManifest,
           SigilGuard.Context,
           SigilGuard.Decision,
+          SigilGuard.Hooks,
+          SigilGuard.HTTPClient,
           SigilGuard.Identity,
           SigilGuard.Identity.Binding,
+          SigilGuard.Identity.Static,
+          SigilGuard.Lifecycle,
+          SigilGuard.PatternSets,
           SigilGuard.Patterns,
           SigilGuard.Quarantine,
           SigilGuard.RepoPolicy,
           SigilGuard.RepoPolicy.Decision,
-          SigilGuard.TrustProfile
+          SigilGuard.TrustProfile,
+          SigilGuard.Verdict
+        ],
+        "Boundary Policy": [
+          SigilGuard.Boundary,
+          SigilGuard.BoundaryPolicy,
+          SigilGuard.BoundaryPolicy.Contract,
+          SigilGuard.BoundaryPolicy.File,
+          SigilGuard.BoundaryPolicy.Match
         ],
         "Runtime Gate": [
           SigilGuard.Runtime.Gate,
@@ -163,6 +193,8 @@ defmodule SigilGuard.MixProject do
         ],
         "MCP Gateway": [
           SigilGuard.MCP.Gateway,
+          SigilGuard.ToolGateway,
+          SigilGuard.ToolGateway.Base,
           SigilGuard.TransportExamples
         ],
         Audit: [
@@ -175,10 +207,14 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Audit.Anchor.Store.LocalFile,
           SigilGuard.Audit.Actor,
           SigilGuard.Audit.Checkpoint,
+          SigilGuard.Audit.CloudEvents,
           SigilGuard.Audit.EventType,
+          SigilGuard.Audit.Evidence,
           SigilGuard.Audit.ExecutionResult,
           SigilGuard.Audit.Export,
-          SigilGuard.Audit.Logger
+          SigilGuard.Audit.Logger,
+          SigilGuard.Audit.Proof,
+          SigilGuard.Audit.Witness
         ],
         "Signing & Vault": [
           SigilGuard.Signer,
@@ -205,6 +241,10 @@ defmodule SigilGuard.MixProject do
           SigilGuard.TrustBundle.Schema,
           SigilGuard.TrustBundle.Verify
         ]
+      ],
+      skip_undefined_reference_warnings_on: [
+        "CHANGELOG.md",
+        "MIGRATING-1.0.md"
       ],
       source_ref: "v#{@version}",
       source_url: @source_url,

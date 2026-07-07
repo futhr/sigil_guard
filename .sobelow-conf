@@ -2,7 +2,9 @@
   verbose: false,
   private: false,
   skip: true,
-  router: "",
+  # Non-Phoenix library: use this Elixir-readable config file to satisfy
+  # Sobelow's router input without adding a fake runtime router module.
+  router: ".sobelow-conf",
   exit: "low",
   format: "txt",
   ignore: ["Config.HTTPS"],

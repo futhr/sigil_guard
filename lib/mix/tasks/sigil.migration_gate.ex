@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Sigil.MigrationGate do
-  @shortdoc "Validate v3 migration coverage"
+  @shortdoc "Validate 1.0 migration coverage"
 
   @moduledoc """
-  Validates that deleted v2 surfaces have explicit `MIGRATING-1.0.md` coverage.
+  Validates that deleted legacy surfaces have explicit `MIGRATING-1.0.md` coverage.
 
       mix sigil.migration_gate
 
@@ -136,47 +136,66 @@ defmodule Mix.Tasks.Sigil.MigrationGate do
     {file_part, anchor} = split_anchor(target)
     target_path = Path.expand(file_part, Path.dirname(path))
 
+    link_finding_for(%{
+      root: root,
+      path: path,
+      line_no: line_no,
+      target: target,
+      anchor: anchor,
+      anchors: anchors,
+      target_path: target_path
+    })
+  end
+
+  defp link_finding_for(%{target: ""}), do: []
+
+  defp link_finding_for(args) do
     cond do
-      target == "" ->
+      external_link?(args.target) ->
         []
 
-      String.starts_with?(target, ["http://", "https://", "mailto:"]) ->
-        []
+      local_anchor?(args.target) ->
+        local_anchor_finding(args)
 
-      String.starts_with?(target, "#") and
-          MapSet.member?(anchors, String.trim_leading(target, "#")) ->
-        []
+      not inside_root?(args.root, args.target_path) ->
+        invalid_link(args, "link escapes repo: #{args.target}")
 
-      String.starts_with?(target, "#") ->
-        [finding(:invalid_link, relative_path(root, path), line_no, "missing anchor: #{target}")]
+      not File.exists?(args.target_path) ->
+        invalid_link(args, "missing link target: #{args.target}")
 
-      not inside_root?(root, target_path) ->
-        [
-          finding(
-            :invalid_link,
-            relative_path(root, path),
-            line_no,
-            "link escapes repo: #{target}"
-          )
-        ]
-
-      not File.exists?(target_path) ->
-        [
-          finding(
-            :invalid_link,
-            relative_path(root, path),
-            line_no,
-            "missing link target: #{target}"
-          )
-        ]
-
-      Path.expand(target_path) == Path.expand(path) and is_binary(anchor) and
-          not MapSet.member?(anchors, anchor) ->
-        [finding(:invalid_link, relative_path(root, path), line_no, "missing anchor: #{target}")]
+      missing_same_file_anchor?(args) ->
+        invalid_link(args, "missing anchor: #{args.target}")
 
       true ->
         []
     end
+  end
+
+  defp external_link?(target), do: String.starts_with?(target, ["http://", "https://", "mailto:"])
+  defp local_anchor?(target), do: String.starts_with?(target, "#")
+
+  defp local_anchor_finding(args) do
+    anchor = String.trim_leading(args.target, "#")
+
+    if MapSet.member?(args.anchors, anchor) do
+      []
+    else
+      invalid_link(args, "missing anchor: #{args.target}")
+    end
+  end
+
+  defp missing_same_file_anchor?(%{
+         path: path,
+         target_path: target_path,
+         anchor: anchor,
+         anchors: anchors
+       }) do
+    Path.expand(target_path) == Path.expand(path) and is_binary(anchor) and
+      not MapSet.member?(anchors, anchor)
+  end
+
+  defp invalid_link(args, message) do
+    [finding(:invalid_link, relative_path(args.root, args.path), args.line_no, message)]
   end
 
   defp split_anchor(target) do
@@ -195,7 +214,7 @@ defmodule Mix.Tasks.Sigil.MigrationGate do
   defp heading_anchors(body) do
     body
     |> lines()
-    |> Enum.flat_map(fn {line, _line_no} ->
+    |> Enum.flat_map(fn {line, _} ->
       case Regex.run(~r/^#+\s+(.+)$/, line) do
         [_, heading] -> [anchor_for(heading)]
         nil -> []
