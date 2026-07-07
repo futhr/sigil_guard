@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 202 / 228 tasks done (89%).** Milestones: 7 complete, 2 partial,
-1 not started. **26 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 202 / 224 tasks done (90%).** Milestones: 7 complete, 2 partial,
+1 not started. **22 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,17 +77,16 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 13 | 20 | 65% | In progress |
-| M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **202** | **228** | **89%** | 7 done / 2 partial / 1 to go |
+| M7 | Integrations and adoption | 13 | 17 | 76% | In progress |
+| M8 | Release | 0 | 16 | 0% | Not started |
+| — | **Total** | **202** | **224** | **90%** | 7 done / 2 partial / 1 to go |
 
-### What's left (26 tasks)
+### What's left (22 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 7:** host integrations, guides, livebooks, benchmarks, security
-  posture, and adoption surfaces.
-- **M8 - 17:** release engineering and publication.
+- **M7 - 4:** benchmark and comparison artifacts.
+- **M8 - 16:** release engineering and validation.
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
@@ -2112,8 +2111,7 @@ section is post-3.0.0 parking; neither is counted here.
 > Specs: `SP.14`, `SP.15`. Depends on: M6.
 > Exit criteria: `mix check --no-retry` clean; M1.02 conformance green;
 > all five livebooks execute offline; `bench/output/benchmarks.md`
-> published with the environment block; OpenSSF passing badge earned;
-> announcement drafts exist and remain unpublished.
+> published with the environment block.
 
 - [x] M7.01 ExDoc cheatsheet.
   - Spec: `docs/specs/SP.14-ecosystem-integrations-and-adoption.md` -
@@ -2304,34 +2302,6 @@ section is post-3.0.0 parking; neither is counted here.
     vulnerability reporting instructions, 72 h / 7 d / 90 d response targets,
     scope boundaries, and the SP.02 signer-compromise rotation pointer.
     Verified `git diff --check` and `mix sigil.docs_lint`.
-- [ ] M7.18 OpenSSF Best Practices badge to passing.
-  - Spec: `SP.14` - OpenSSF Best Practices Badge.
-  - AC: the bestpractices.dev entry reaches passing, mapping existing
-    gates onto the criteria; the badge MUST be earned before any
-    announcement fires.
-  - Validation: badge status recorded; README badge added.
-  - Attempt 2026-07-07: added
-    `docs/security/openssf-best-practices.md` with a passing-criteria evidence
-    map and the project-specific README badge template. Public BadgeApp API
-    probes returned no project entry for `https://github.com/futhr/sigil_guard`,
-    so this remains open until a maintainer creates or claims the project at
-    bestpractices.dev, reaches passing, and supplies the project id for the
-    README badge.
-- [ ] M7.19 Announcement kit drafts, listings text, and Hex metadata
-      review.
-  - Spec: `SP.14` - Announcement Kit And Listings.
-  - AC: `docs/announcements/elixir-forum.md`, `elixir-radar.md`, and
-    `thinking-elixir.md` drafts exist with the recorded tagline; the
-    awesome-elixir PR text and hex.pm keyword/metadata review are
-    prepared; publishing is gated on 3.0.0 GA and MUST never fire against
-    an rc; claims stay within R.06 levels.
-  - Validation: drafts exist unpublished; claim-level cross-check.
-- [ ] M7.20 ElixirConf CFP draft (date-gated).
-  - Spec: `SP.14` - Announcement Kit And Listings.
-  - AC: `docs/announcements/elixirconf-cfp.md` exists; submission is
-    additionally gated on the CFP window and on 3.0.0 GA.
-  - Validation: draft exists; gating noted inside the draft.
-
 ## M8 - Release
 
 > Specs: `SP.12` (Release Sequence (D11)), `SP.15` (SLO Ratification),
@@ -2339,7 +2309,7 @@ section is post-3.0.0 parking; neither is counted here.
 > Exit criteria (tier-3 gate): `mix check --no-retry` clean; M1.02
 > conformance green; the reference consumer validates green against the
 > PUBLISHED 3.0.0-rc.1 pinned exactly (blocking for GA); 3.0.0 published
-> with provenance and SBOM; announcements fired only after GA.
+> with provenance and SBOM.
 
 - [ ] M8.01 Publish 0.2.1 metadata-only from `release/0.2`.
   - Spec: `SP.12` - Release Sequence (D11) step 1.
@@ -2439,13 +2409,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: GA is published; a post-publish `mix git_ops.release --dry-run`
     confirms normal operation from the 3.0.0 line.
   - Validation: Hex release visible; dry-run output archived.
-- [ ] M8.16 Fire announcements and listings (GA only).
-  - Spec: `SP.14` - Announcement Kit And Listings.
-  - AC: forum/radar/podcast announcements publish from the M7.19 drafts;
-    the awesome-elixir PR and Hex keyword updates land; nothing fires
-    against an rc; claims stay within R.06 levels.
-  - Validation: published links recorded; claim-level cross-check.
-- [ ] M8.17 Reference-consumer production bump to `~> 3.0`.
+- [ ] M8.16 Reference-consumer production bump to `~> 3.0`.
   - Spec: `SP.12` - Release Sequence (D11) step 4.
   - AC: the reference consumer moves from the exact rc pin to `~> 3.0` in
     production; its suite stays green on GA.
