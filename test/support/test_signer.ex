@@ -3,17 +3,13 @@ defmodule SigilGuard.TestSigner do
   Deterministic test signer with a fixed Ed25519 keypair.
 
   Uses a SHA-256 hash of a static seed string to derive a reproducible
-  Ed25519 keypair. This ensures that envelope signatures and public keys
+  Ed25519 keypair. This ensures that attestation signatures and public keys
   are identical across test runs, making assertions on signed data stable.
 
   ## Usage
 
-      envelope = SigilGuard.sign_envelope("did:example:test", :allowed,
-        signer: SigilGuard.TestSigner
-      )
-
-      pub_key = SigilGuard.TestSigner.public_key_b64u()
-      :ok = SigilGuard.verify_envelope(envelope, pub_key)
+      SigilGuard.TestSigner.sign("payload")
+      SigilGuard.TestSigner.public_key_b64u()
 
   """
 
@@ -41,7 +37,7 @@ defmodule SigilGuard.TestSigner do
     pub
   end
 
-  @doc "Return the public key as base64url (no padding) for envelope verification."
+  @doc "Return the public key as base64url (no padding) for attestation verification."
   @spec public_key_b64u() :: String.t()
   def public_key_b64u do
     Base.url_encode64(public_key(), padding: false)

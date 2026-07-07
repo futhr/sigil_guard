@@ -6,7 +6,7 @@ defmodule SigilGuard do
   Protocol) tool calls and AI agent interactions:
 
   1. **Sensitivity Scanning** — Detect credentials, API keys, and secrets in text
-  2. **Envelope Signing** — Ed25519-signed metadata for tamper detection
+  2. **Agent Trust Attestations** — DSSE-backed evidence for tamper detection
   3. **Policy Enforcement** — Risk classification with trust-gated access control
   4. **Tamper-Evident Audit** — HMAC-SHA256 chain for immutable audit logs
   5. **Secure Vaulting** — Encrypted storage for sensitive values
@@ -49,7 +49,6 @@ defmodule SigilGuard do
   - `SigilGuard.Scanner` — Sensitivity scanning engine
   - `SigilGuard.Scanner.Pipeline` — Staged scanner validation/enrichment pipeline
   - `SigilGuard.Patterns` — Pattern compilation and management
-  - `SigilGuard.Envelope` — Existing envelope signing and verification
   - `SigilGuard.Runtime.Gate` — Boundary-aware tool/runtime decisions
   - `SigilGuard.Runtime.Stream` — Chunk-safe streaming sanitization
   - `SigilGuard.MCP.Gateway` — MCP-shaped request/result guard helpers

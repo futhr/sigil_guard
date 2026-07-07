@@ -45,27 +45,6 @@ defmodule SigilGuard.Backend do
   @doc "Scan and redact in a single pass."
   @callback scan_and_redact(text :: String.t(), opts :: keyword()) :: String.t()
 
-  # -- Envelope --
-
-  @doc "Produce canonical byte representation for signing."
-  @callback canonical_bytes(
-              identity :: String.t(),
-              verdict :: SigilGuard.Envelope.verdict(),
-              timestamp :: String.t(),
-              nonce_hex :: String.t()
-            ) :: binary()
-
-  @doc "Sign an envelope."
-  @callback envelope_sign(
-              identity :: String.t(),
-              verdict :: SigilGuard.Envelope.verdict(),
-              opts :: keyword()
-            ) :: SigilGuard.Envelope.t()
-
-  @doc "Verify an envelope's signature."
-  @callback envelope_verify(envelope :: SigilGuard.Envelope.t(), public_key_b64u :: String.t()) ::
-              :ok | {:error, term()}
-
   # -- Policy --
 
   @doc "Evaluate an action against a trust level."

@@ -6,7 +6,6 @@ defmodule SigilGuard.Backend.Elixir do
   OTP. It delegates to the existing SigilGuard modules:
 
     * `SigilGuard.Scanner` — staged deterministic sensitivity scanning
-    * `SigilGuard.Envelope` — Ed25519 signing via `:crypto`
     * `SigilGuard.Policy` — risk classification and trust gating
     * `SigilGuard.Audit` — HMAC-SHA256 chain integrity
 
@@ -42,23 +41,6 @@ defmodule SigilGuard.Backend.Elixir do
 
   @impl SigilGuard.Backend
   def scan_and_redact(text, opts), do: SigilGuard.Scanner.scan_and_redact(text, opts)
-
-  # -- Envelope --
-
-  @impl SigilGuard.Backend
-  def canonical_bytes(identity, verdict, timestamp, nonce_hex) do
-    SigilGuard.Envelope.canonical_bytes(identity, verdict, timestamp, nonce_hex)
-  end
-
-  @impl SigilGuard.Backend
-  def envelope_sign(identity, verdict, opts) do
-    SigilGuard.Envelope.sign(identity, verdict, opts)
-  end
-
-  @impl SigilGuard.Backend
-  def envelope_verify(envelope, public_key_b64u) do
-    SigilGuard.Envelope.verify(envelope, public_key_b64u)
-  end
 
   # -- Policy --
 

@@ -11,7 +11,6 @@ defmodule SigilGuard.ToolGateway.Base do
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
-  alias SigilGuard.Envelope
   alias SigilGuard.Runtime
   alias SigilGuard.Telemetry
 
@@ -219,15 +218,9 @@ defmodule SigilGuard.ToolGateway.Base do
   @doc """
   Guard a signed MCP tool request before execution.
 
-  This verifies `_sigil` metadata before the regular runtime gate. `_sigil`
-  may be placed on the request itself or inside JSON-RPC `params`.
-
-  Options:
-
-    * `:public_keys` - map of envelope identity to Ed25519 public key.
-    * `:public_key_b64u` - fallback public key for any identity.
-    * `:max_skew_ms`, `:replay`, `:replay_ttl_ms`, `:profile` - passed to
-      `SigilGuard.Envelope.verify/3`.
+  The legacy `_sigil` envelope verifier was removed in v3. This helper now
+  fails closed for envelope-bearing requests; use Agent Trust attestations for
+  signed request evidence.
   """
   @spec guard_signed_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_signed_request(request, context \\ %{}, opts \\ []) do
@@ -258,18 +251,17 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Verify `_sigil` metadata on an MCP request.
+  Verify legacy `_sigil` metadata on an MCP request.
 
-  Returns signed identity claims without running the runtime gate.
+  The v3 runtime removed `SigilGuard.Envelope`, so envelope-bearing requests
+  fail closed with `:legacy_envelope_removed`.
   """
   @spec verify_request_envelope(term(), keyword()) ::
           {:ok, %{identity: String.t(), envelope: map()}} | {:error, atom()}
-  def verify_request_envelope(request, opts \\ []) do
+  def verify_request_envelope(request, _opts \\ []) do
     with {:ok, envelope} <- request_envelope(request),
-         {:ok, identity} <- envelope_identity(envelope),
-         {:ok, public_key_b64u} <- envelope_public_key(identity, opts),
-         :ok <- Envelope.verify(envelope, public_key_b64u, opts) do
-      {:ok, %{identity: identity, envelope: envelope}}
+         {:ok, _identity} <- envelope_identity(envelope) do
+      {:error, :legacy_envelope_removed}
     end
   end
 
@@ -880,32 +872,6 @@ defmodule SigilGuard.ToolGateway.Base do
     case fetch_field(envelope, "identity", :identity) do
       identity when is_binary(identity) -> {:ok, identity}
       _ -> {:error, :missing_identity}
-    end
-  end
-
-  defp envelope_public_key(identity, opts) do
-    public_keys = Keyword.get(opts, :public_keys, %{})
-
-    if is_map(public_keys) do
-      case Map.fetch(public_keys, identity) do
-        {:ok, public_key_b64u} when is_binary(public_key_b64u) ->
-          {:ok, public_key_b64u}
-
-        {:ok, _} ->
-          {:error, :invalid_public_key}
-
-        :error ->
-          fallback_public_key(opts)
-      end
-    else
-      {:error, :invalid_public_keys}
-    end
-  end
-
-  defp fallback_public_key(opts) do
-    case Keyword.get(opts, :public_key_b64u) do
-      public_key_b64u when is_binary(public_key_b64u) -> {:ok, public_key_b64u}
-      _ -> {:error, :unknown_identity}
     end
   end
 

@@ -1,21 +1,19 @@
 defmodule SigilGuard.Signer do
   @moduledoc """
-  Behaviour for signing operations in SigilGuard envelopes and attestations.
+  Behaviour for signing operations in SigilGuard attestations.
 
-  Implementations produce Ed25519 signatures over canonical envelope bytes.
+  Implementations produce Ed25519 signatures over canonical attestation bytes.
   The two required callbacks are `c:sign/1` and `c:public_key/0`.
 
   ## Usage
 
-  Pass your signer module to envelope operations:
+  Pass your signer module to attestation operations:
 
-      SigilGuard.sign_envelope("did:example:agent", :allowed,
-        signer: MyApp.HsmSigner
-      )
+      SigilGuard.Attestation.sign(statement, MyApp.HsmSigner)
 
   ## Implementing a Custom Signer
 
-  Any module implementing this behaviour can be used for envelope signing.
+  Any module implementing this behaviour can be used for attestation signing.
   Common use cases include HSM-backed keys, cloud KMS, or hardware tokens:
 
       defmodule MyApp.HsmSigner do

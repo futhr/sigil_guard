@@ -5,6 +5,7 @@ defmodule SigilGuard.RegistryRemovalTest do
   @bundle_module SigilGuard.Registry.Bundle
   @cache_module SigilGuard.Registry.Cache
   @profile_module SigilGuard.Profile
+  @envelope_module SigilGuard.Envelope
   @registry_functions [
     {:fetch_bundle, []},
     {:resolve_did, ["did:example:alice"]},
@@ -31,6 +32,13 @@ defmodule SigilGuard.RegistryRemovalTest do
     {:verdict_acceptance, [:auto]},
     {:require_blocked_reason_on_verify?, [:auto]},
     {:registry_identity_endpoints, [:auto]}
+  ]
+  @envelope_functions [
+    {:canonical_bytes, ["did:example:agent", :allowed, "2026-01-01T00:00:00.000Z", "00"]},
+    {:sign, ["did:example:agent", :allowed, [signer: SigilGuard.TestSigner]]},
+    {:verify, [%{}, SigilGuard.TestSigner.public_key_b64u()]},
+    {:generate_timestamp, []},
+    {:generate_nonce, []}
   ]
 
   describe "v3 registry adapter removal" do
@@ -107,6 +115,20 @@ defmodule SigilGuard.RegistryRemovalTest do
       for {function, args} <- @profile_functions do
         assert_raise UndefinedFunctionError, fn ->
           apply(@profile_module, function, args)
+        end
+      end
+    end
+  end
+
+  describe "v3 legacy envelope removal" do
+    test "SigilGuard.Envelope is deleted, not hidden" do
+      refute Code.ensure_loaded?(@envelope_module)
+    end
+
+    test "removed envelope calls raise UndefinedFunctionError cleanly" do
+      for {function, args} <- @envelope_functions do
+        assert_raise UndefinedFunctionError, fn ->
+          apply(@envelope_module, function, args)
         end
       end
     end

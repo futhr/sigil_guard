@@ -133,7 +133,6 @@ defmodule SigilGuard.MixProject do
           SigilGuard,
           SigilGuard.Scanner,
           SigilGuard.Scanner.Pipeline,
-          SigilGuard.Envelope,
           SigilGuard.Policy,
           SigilGuard.Confirmation,
           SigilGuard.Attestation,

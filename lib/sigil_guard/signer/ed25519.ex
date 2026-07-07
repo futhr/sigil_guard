@@ -13,8 +13,7 @@ defmodule SigilGuard.Signer.Ed25519 do
       signer = SigilGuard.Signer.Ed25519.new(priv)
       signature = SigilGuard.Signer.Ed25519.sign_with(signer, message)
 
-  Or as a module-based signer (the form `SigilGuard.Envelope.sign/3`
-  expects in its `:signer` option) via `start_link/1`:
+  Or as a module-based signer via `start_link/1`:
 
       {:ok, _pid} = SigilGuard.Signer.Ed25519.start_link(private_key: priv)
       signature = SigilGuard.Signer.Ed25519.sign(message)

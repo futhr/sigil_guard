@@ -29,43 +29,6 @@ defmodule SigilGuard.Backend.ElixirTest do
     end
   end
 
-  describe "canonical_bytes/4" do
-    test "delegates to Envelope" do
-      bytes =
-        ElixirBackend.canonical_bytes(
-          "did:sigil:alice",
-          :allowed,
-          "2024-01-01T00:00:00.000Z",
-          "abcd1234"
-        )
-
-      assert is_binary(bytes)
-      assert bytes =~ "identity"
-      assert bytes =~ "verdict"
-    end
-  end
-
-  describe "envelope_sign/3" do
-    test "delegates to Envelope" do
-      envelope =
-        ElixirBackend.envelope_sign("did:sigil:alice", :allowed, signer: SigilGuard.TestSigner)
-
-      assert envelope["identity"] == "did:sigil:alice"
-      assert envelope["verdict"] == "allowed"
-      assert is_binary(envelope["signature"])
-    end
-  end
-
-  describe "envelope_verify/2" do
-    test "delegates to Envelope" do
-      envelope =
-        ElixirBackend.envelope_sign("did:sigil:alice", :allowed, signer: SigilGuard.TestSigner)
-
-      assert :ok =
-               ElixirBackend.envelope_verify(envelope, SigilGuard.TestSigner.public_key_b64u())
-    end
-  end
-
   describe "evaluate_policy/3" do
     test "delegates to Policy" do
       assert :allowed = ElixirBackend.evaluate_policy("read_file", :medium, [])

@@ -1746,12 +1746,8 @@ section is post-3.0.0 parking; neither is counted here.
   - Done: deleted `lib/sigil_guard/profile.ex`, removed the old profile test
     module, removed `SigilGuard.Profile` from ExDoc grouping, and extended
     `registry_removal_test.exs` to prove the module is not loadable and legacy
-    profile helper calls raise `UndefinedFunctionError`. Until M6.05 removes
-    `SigilGuard.Envelope`, its remaining transitional profile behavior is
-    private to that module and no public `SigilGuard.Profile` surface remains;
-    `SigilGuard.Config.protocol_profile/0` likewise normalizes without the
-    deleted module.
-- [ ] M6.05 Delete `SigilGuard.Envelope`.
+    profile helper calls raise `UndefinedFunctionError`.
+- [x] M6.05 Delete `SigilGuard.Envelope`.
   - Spec: `docs/specs/SP.06-envelope-and-native-backend-contracts.md` - V3
     Transition Rules; `SP.01` - Migration: Envelope To Attestation.
   - AC: deleted; the Envelope-to-Attestation field mapping table is
@@ -1759,6 +1755,15 @@ section is post-3.0.0 parking; neither is counted here.
     (two call sites: tool-args metadata attach and socket auth) has exact
     v3 replacement calls documented.
   - Tests: removal test, conformance.
+  - Done: deleted `lib/sigil_guard/envelope.ex`, removed the direct envelope
+    test module, removed legacy envelope callbacks from `SigilGuard.Backend`
+    and `SigilGuard.Backend.Elixir`, removed the module from public docs /
+    ExDoc grouping, and extended `registry_removal_test.exs` to prove
+    `SigilGuard.Envelope` is not loadable and legacy `canonical_bytes`, `sign`,
+    `verify`, `generate_timestamp`, and `generate_nonce` calls raise
+    `UndefinedFunctionError`. Existing gateway signed-request helpers now fail
+    closed with `:legacy_envelope_removed` for envelope-bearing requests until
+    M6.25 removes legacy `_sigil*` reading entirely.
 - [ ] M6.06 Move legacy envelope/profile vectors to
       `test/fixtures/historical/`.
   - Spec: `SP.06` - Known Consumers; V3 Transition Rules (fixture path).
