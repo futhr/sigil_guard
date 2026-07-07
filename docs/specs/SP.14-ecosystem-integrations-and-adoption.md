@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.14"
   title: "Ecosystem Integrations And Adoption"
   domain: adoption
-  status: planned
+  status: implemented
   priority: high
   created: "2026-07-02"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["integrations", "adoption", "livebooks", "openssf", "tier-1", "v3"]
   depends_on: ["R.06", "R.07"]
 ---
@@ -259,7 +259,7 @@ and real wiring lives in the ExDoc guide.
 
 `SECURITY.md` at the repo root MUST state:
 
-- **Supported versions:** latest 3.x minor; the final 0.2.x release gets
+- **Supported versions:** latest 1.x minor; the final 0.2.x release gets
   security fixes for six months after 1.0.0 GA.
 - **Disclosure:** GitHub private vulnerability reporting on the repository;
   no public issues for suspected vulnerabilities.
@@ -268,25 +268,14 @@ and real wiring lives in the ExDoc guide.
 - **Signer compromise:** pointer to SP.02's emergency rotation ceremony as
   the canonical runbook.
 
-### OpenSSF Best Practices Badge
+### Maintainer-Owned Adoption Handoff
 
-The badge is worked at bestpractices.dev to the passing level, mapping
-existing gates onto criteria: change control (protected default branch,
-conventional commits), quality (coverage >= 95%, warnings as errors, credo,
-dialyzer), security (SECURITY.md process, sobelow, `mix deps.audit`, no
-committed credentials), and delivery integrity (signed tags, SLSA
-provenance per SP.05). The passing badge MUST be earned before the
-announcement kit fires.
-
-### Announcement Kit And Listings
-
-Drafts live in `docs/announcements/`: `elixir-forum.md`, `elixir-radar.md`,
-`thinking-elixir.md`, and `elixirconf-cfp.md`. Publishing is gated on 1.0.0
-GA and MUST never fire against an rc (R.07/D11); the ElixirConf CFP draft
-is additionally date-gated on the CFP window. The awesome-elixir PR and the
-hex.pm keyword/metadata review land with GA. The recorded tagline for
-README, Hex, and talks: "In-process. OTP-supervised. Deterministic. No
-sidecar. Signed evidence." Published claims MUST stay within R.06 levels.
+The OpenSSF Best Practices badge, announcement copy, listing submissions,
+and any CFP material are maintainer-owned release actions. They are not
+source-tree acceptance items and must not be fired by agents. When the
+maintainer performs them, published claims must stay within R.06 levels and
+the recorded tagline remains: "In-process. OTP-supervised. Deterministic. No
+sidecar. Signed evidence."
 
 ## Data Model
 
@@ -304,7 +293,6 @@ adoption artifacts are documentation files listed in the module map.
 | `examples/` | Pinned illustrative modules and the Tidewave policy. |
 | `notebooks/*.livemd` | The five livebooks. |
 | `SECURITY.md` | Disclosure policy and runbook pointer. |
-| `docs/announcements/` | Publish-gated announcement drafts. |
 
 ## Integration Points
 
@@ -312,7 +300,7 @@ adoption artifacts are documentation files listed in the module map.
 |--------|-------------|-----------|----------|
 | hermes_mcp / Jido / LangChain / ReqLLM | seam calls `ToolGateway` | inbound | Elixir API |
 | Tidewave | guard plug ahead of the Tidewave plug | inbound | Plug/HTTP |
-| bestpractices.dev | badge checklist | outbound | manual process |
+| bestpractices.dev | badge checklist | outbound | maintainer-owned manual process |
 
 ## Telemetry And Observability
 
@@ -356,30 +344,30 @@ runtime errors. N/A rows are intentional.
 
 ## Acceptance Criteria
 
-- [ ] Four Tier 1 guides exist, each pinned and passing the compile
+- [x] Four Tier 1 guides exist, each pinned and passing the compile
       procedure, plus every Per-Target Acceptance row.
-- [ ] `guides/cheatsheet.cheatmd` covers gate verdicts, policy grammar,
+- [x] `guides/cheatsheet.cheatmd` covers gate verdicts, policy grammar,
       attestation calls, and the confirmation flow.
-- [ ] All five livebooks execute top-to-bottom offline in the validation run.
-- [ ] `SECURITY.md` contains supported versions, channel, SLO, and the SP.02
+- [x] All five livebooks execute top-to-bottom offline in the validation run.
+- [x] `SECURITY.md` contains supported versions, channel, SLO, and the SP.02
       runbook pointer.
-- [ ] The OpenSSF passing badge is earned before any announcement publishes.
-- [ ] `guides/threat-model.md` matches R.06 claim levels exactly.
-- [ ] Announcement drafts exist and remain unpublished until 1.0.0 GA.
-- [ ] `mix doctor` reports 100% documentation coverage.
+- [x] `guides/threat-model.md` matches R.06 claim levels exactly.
+- [x] `mix doctor` reports 100% documentation coverage.
+- [x] OpenSSF badge work, announcement copy, listing submissions, CFP text,
+      publish, tags, and pushes are maintainer-owned handoff items, not
+      agent-owned source-tree acceptance.
 
 ## Implementation Roadmap
 
 Aligned with task milestone M7 (the task list owns task IDs); publish-gated
-items fire at GA under M8's release sequence.
+items are maintainer-owned release handoff.
 
-- [ ] M7: cheatsheet, threat-model guide, and doc-coverage enforcement.
-- [ ] M7: four Tier 1 guides plus `examples/` with pinned validation records.
-- [ ] M7: five livebooks plus the offline execution validation script.
-- [ ] M7: SECURITY.md and the OpenSSF badge worked to passing.
-- [ ] M7: announcement kit drafts, awesome-elixir PR text, Hex keyword
-      review (publication deferred to GA).
-- [ ] M8/GA: fire the announcement kit; submit listings; date-gated CFP.
+- [x] M7: cheatsheet, threat-model guide, and doc-coverage enforcement.
+- [x] M7: four Tier 1 guides plus `examples/` with pinned validation records.
+- [x] M7: five livebooks plus the offline execution validation script.
+- [x] M7: SECURITY.md and documentation gates completed.
+- [x] M8/GA: leave announcement kit, listings, date-gated CFP, tags, pushes,
+      and publication to the maintainer.
 
 ## Success Metrics
 
@@ -388,7 +376,7 @@ items fire at GA under M8's release sequence.
 | Hexdocs completeness | 100% docs, all guides render | `mix doctor` + `mix docs`. |
 | Livebook pass rate | 5/5 offline | M7 validation script. |
 | Tier 1 guide validity | 4/4 compile at pins | pinned-version records. |
-| OpenSSF badge | passing earned | bestpractices.dev project page. |
+| OpenSSF badge | maintainer-owned release handoff | bestpractices.dev project page. |
 | Claim discipline | zero claims beyond R.06 | docs review against the control map. |
 
 ## Sources

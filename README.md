@@ -66,7 +66,7 @@ in-process library is a better fit.
 
 ## Installation
 
-SigilGuard v3 requires Elixir 1.18 or later.
+SigilGuard 1.0 requires Elixir 1.18 or later.
 
 ```elixir
 def deps do
@@ -127,7 +127,7 @@ this same decision. The [architecture](docs/README.md) covers the full surface.
 
 ## Agent Trust Profile
 
-V3 has one wire profile: `sigil_guard_agent_trust/v1`. Agent Trust evidence is
+The 1.0 release line has one wire profile: `sigil_guard_agent_trust/v1`. Agent Trust evidence is
 a DSSE envelope over a JCS-canonical in-toto-style statement, with payload and
 context digests bound to the boundary decision. The public metadata keys are:
 
@@ -143,9 +143,14 @@ All other fields are ordinary user payload.
 
 ## Agent Trust Gateway
 
-`SigilGuard.ToolGateway` is the v3 entry point for MCP-shaped tool calls and
+`SigilGuard.ToolGateway` is the 1.0 entry point for MCP-shaped tool calls and
 tool results. It combines capability-manifest checks, boundary policy,
 confirmation tokens, and Agent Trust attestations.
+
+Start with `SigilGuard.ToolGateway` when your host already owns the request and
+result maps and wants the full enforcement surface. Use `SigilGuard.MCP.Gateway`
+when wiring an MCP transport that wants JSON-RPC-compatible helper names and
+tuple responses; it is a thin permanent facade over `ToolGateway`.
 
 Guard a tool request against a pinned manifest:
 
@@ -218,7 +223,7 @@ confirmed =
 ## Configuration
 
 All configuration lives under the `:sigil_guard` application environment and is
-validated at boot. Unknown keys and removed v2 keys fail closed with
+validated at boot. Unknown keys and removed legacy keys fail closed with
 `SigilGuard.ConfigError` and a pointer to `MIGRATING-1.0.md`.
 
 ```elixir
@@ -247,6 +252,10 @@ snapshots are cached for the current BEAM boot in the
 rotation digests, and revoked key ids. The signed bundle remains the durable
 source of truth across boots; remote distribution, if needed, belongs to the
 host application before bytes are passed to `SigilGuard.TrustBundle.load/2`.
+Trust-bundle roles always carry their declared threshold, but the 1.0 release
+line follows the D3 effective threshold of `1` unless verification is called
+with `enforce_declared_threshold: true`; root rotation documents always enforce
+the full declared old-root and new-root thresholds.
 
 ## Extension Points
 

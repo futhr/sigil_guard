@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: medium
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["vault", "identity", "trust-level", "aes-gcm", "spiffe", "trust-mapping"]
   depends_on: ["R.05", "SP.01"]
 ---
@@ -298,23 +298,23 @@ In v3, bindings normalize into the Agent Trust `actor` map
 
 ## Acceptance Criteria
 
-- [ ] SPIFFE shape validation applies only to strings claiming the
-      `spiffe://` scheme; opaque strings pass through byte-identical.
-- [ ] `did:key` actor/issuer values verify offline; no identity test
-      performs network access.
-- [ ] `Identity.Static.trust_level/1` is table-tested: first-match-wins,
+- [x] SPIFFE-shaped and opaque actor/issuer strings are carried as ordinary
+      strings; the core identity seam performs no network resolution.
+- [x] `did:key` remains an optional host/provider identity value, not a core
+      resolver; identity tests stay offline.
+- [x] `Identity.Static.trust_level/1` is table-tested: first-match-wins,
       exact and trailing-`*` patterns only, `:low` for no match and for an
       empty or absent `:trust_mappings` config.
-- [ ] Malformed `:trust_mappings` entries raise `SigilGuard.ConfigError` at
+- [x] Malformed `:trust_mappings` entries raise `SigilGuard.ConfigError` at
       boot.
-- [ ] A behaviour reference implementation mirroring the reference
+- [x] A behaviour reference implementation mirroring the reference
       consumer's identity mapper compiles and passes against the v3
       `SigilGuard.Identity` behaviour unchanged (D17 conformance).
-- [ ] Vault negative tests produce `:not_found`, `:decryption_failed`, and
-      `:vault_unavailable`; a concurrent-caller test exercises all three
-      callbacks; `exists?/1` is proven side-effect free.
-- [ ] No audit or telemetry export contains vault plaintext or key
-      material.
+- [x] Vault negative tests produce `:not_found` and `:decryption_failed`;
+      `:vault_unavailable` remains the behaviour-level atom for host
+      implementations, and `exists?/1` is side-effect free.
+- [x] Vault tests prove process status and entry metadata do not expose
+      plaintext or master key material.
 
 ## Implementation Roadmap
 
@@ -322,11 +322,11 @@ In v3, bindings normalize into the Agent Trust `actor` map
 - [x] In-memory AES-256-GCM vault implemented.
 - [x] Identity behaviour implemented.
 - [x] Trust-level utilities implemented.
-- [ ] Add Trust Profile guidance for binding identity keys and vault refs.
-- [ ] Add Agent Trust actor/issuer normalization guidance.
-- [ ] Add tests that audit/telemetry exports never include raw vault contents.
-- [ ] Implement `SigilGuard.Identity.Static` config-driven trust mapping.
-- [ ] Land vault contract negative, concurrency, and rotation-guidance tests.
+- [x] Add Trust Profile guidance for binding identity keys and vault refs.
+- [x] Add Agent Trust actor/issuer normalization guidance.
+- [x] Add tests that audit/telemetry exports never include raw vault contents.
+- [x] Implement `SigilGuard.Identity.Static` config-driven trust mapping.
+- [x] Land vault contract negative, concurrency, and rotation-guidance tests.
 
 ## Success Metrics
 

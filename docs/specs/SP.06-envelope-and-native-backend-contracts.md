@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented/transition
   priority: high
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["backend", "envelope", "compatibility", "replay", "signing"]
   depends_on: ["SP.01", "R.07"]
 ---
@@ -15,20 +15,20 @@ sigil_guard:
 
 ## Executive Summary
 
-This spec documents the implemented native Elixir backend, envelope signing,
-profile compatibility, and replay-protection contracts. Its status is
-`implemented/transition`: everything here ships in 0.2.x, but in v3 these are
-transition contracts, not the target architecture. The native backend remains;
-verdict-only envelopes and legacy profile handling move behind attestation
-APIs (SP.01) or historical fixtures.
+This spec documents the completed transition away from verdict-only envelopes
+and profile compatibility while retaining the native Elixir backend, signing
+behaviour, and replay-protection lessons. Its status is
+`implemented/transition`: the native backend remains in v3, while
+`SigilGuard.Envelope` and `SigilGuard.Profile` are deleted public surfaces
+mapped to Agent Trust attestations (SP.01) and historical fixtures.
 
 ## Business Value
 
-- **Problem:** The library already has stable envelope and backend behavior, but
-  that behavior should not define the v3 public trust model.
-- **Solution:** Treat the native backend, envelope bytes, profile handling, and
-  replay checks as transition contracts while building Agent Trust Profile
-  attestations.
+- **Problem:** The library had stable envelope and backend behavior, but that
+  behavior should not define the v3 public trust model.
+- **Solution:** Keep the native backend, signer behaviour, and replay checks,
+  while deleting verdict-only envelope/profile APIs and mapping migrations to
+  Agent Trust Profile attestations.
 - **Beneficiary:** Existing users migrating to v3 and future attestation work.
 - **Impact:** Safer refactors and a clear migration boundary.
 
@@ -37,17 +37,17 @@ APIs (SP.01) or historical fixtures.
 ### Overview
 
 The public facade delegates to `SigilGuard.Backend.impl/0`, which always returns
-the native Elixir backend. The backend composes scanner, redaction, envelope,
-and policy operations without Rust or NIF dependency.
+the native Elixir backend. The backend composes scanner, redaction, and policy
+operations without Rust or NIF dependency.
 
-Envelope signing uses deterministic canonical bytes with lexicographic keys,
-compact JSON, Ed25519 signatures, ISO 8601 millisecond timestamps, and 16-byte
-hex nonces. Verification is adversarial-input safe and returns tagged errors
-instead of raising.
+Historical envelope signing used deterministic canonical bytes, compact JSON,
+Ed25519 signatures, ISO 8601 millisecond timestamps, and nonces. V3 reuses the
+crypto, signer, replay, and adversarial-input lessons through
+`SigilGuard.Attestation`, not through a public `SigilGuard.Envelope` module.
 
-V3 should reuse the native crypto, signing behaviour, replay lessons, and
-adversarial-input handling. It should not keep verdict-only envelopes as the
-primary public proof object.
+V3 keeps the native crypto, signing behaviour, replay lessons, and
+adversarial-input handling. It does not keep verdict-only envelopes as a public
+proof object.
 
 ### Data Flow
 
@@ -56,14 +56,14 @@ sequenceDiagram
     participant Host
     participant API as SigilGuard
     participant Backend as Backend.Elixir
-    participant Envelope
+    participant Attestation
     participant Replay as ReplayStore
 
-    Host->>API: sign/verify/scan/policy call
+    Host->>API: attest/verify/scan/policy call
     API->>Backend: dispatch
-    Backend->>Envelope: sign or verify
-    Envelope->>Replay: optional identity+nonce check
-    Envelope-->>Backend: :ok or {:error, reason}
+    Backend->>Attestation: sign or verify
+    Attestation->>Replay: optional nonce check
+    Attestation-->>Backend: :ok or {:error, reason}
     Backend-->>API: result
     API-->>Host: result
 ```
@@ -73,9 +73,9 @@ sequenceDiagram
 | Contract | Implemented By | Notes |
 |----------|----------------|-------|
 | Native backend only | `SigilGuard.Backend`, `SigilGuard.Backend.Elixir` | Unsupported backend atoms are rejected. |
-| Envelope canonical bytes | `SigilGuard.Envelope.canonical_bytes/4` | Keys: identity, nonce, timestamp, verdict. |
-| Signature algorithm | `SigilGuard.Envelope`, `SigilGuard.Signer.Ed25519` | Ed25519, base64url without padding. |
-| Profile compatibility | `SigilGuard.Profile` | Lowercase and legacy title-case verdict handling. |
+| Attestation envelope | `SigilGuard.Attestation.Envelope` | DSSE envelope over JCS Statement payloads. |
+| Signature algorithm | `SigilGuard.Signer.Ed25519`, `SigilGuard.Attestation` | Ed25519, base64url without padding. |
+| Legacy envelope/profile removal | `RegistryRemovalTest`, `MIGRATING-1.0.md` | `SigilGuard.Envelope` and `SigilGuard.Profile` are not loadable in v3. |
 | Replay protection | `SigilGuard.ReplayStore` | ETS identity/nonce TTL cache. |
 | Public signing seam | `SigilGuard.Signer` | Behaviour for HSM/KMS/custom signers. |
 
@@ -83,10 +83,10 @@ sequenceDiagram
 
 | Current Surface | V3 Action |
 |-----------------|-----------|
-| `SigilGuard.Backend` selection | Keep only if useful internally; remove `backend` config. |
+| `SigilGuard.Backend` selection | Native Elixir remains the only available built-in backend; removed config keys are rejected. |
 | `SigilGuard.Backend.Elixir` | Keep native implementation as the only runtime path. |
-| `SigilGuard.Envelope` | Replace with `SigilGuard.Attestation` per SP.01. |
-| `SigilGuard.Profile` compatibility matrix | Move to historical fixtures; remove from public docs. |
+| `SigilGuard.Envelope` | Deleted; replace with `SigilGuard.Attestation` per SP.01. |
+| `SigilGuard.Profile` compatibility matrix | Deleted; migration and historical fixtures document old forms. |
 | `_sigil` metadata | Replace with `_agent_trust` (namespace rules in SP.08). |
 | Legacy golden vectors | Move to `test/fixtures/historical/`; never v3 proof. |
 | `SigilGuard.ReplayStore` | Retained in v3 as an internal seam (see below). |
@@ -119,7 +119,7 @@ these two call sites plus config removal).
 
 ## Data Model
 
-### Envelope
+### Historical Envelope
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -130,6 +130,9 @@ these two call sites plus config removal).
 | `signature` | string | yes | Ed25519 signature, base64url without padding. |
 | `reason` | string | conditional | Required when signing blocked verdicts. |
 
+This shape is retained only for migration documentation and historical
+fixtures. V3 trust evidence uses SP.01 statements and DSSE envelopes.
+
 ## Module Map
 
 | Module | Purpose |
@@ -137,16 +140,21 @@ these two call sites plus config removal).
 | `lib/sigil_guard.ex` | Public facade. |
 | `lib/sigil_guard/backend.ex` | Backend selection and rejection guard. |
 | `lib/sigil_guard/backend/elixir.ex` | Native backend implementation. |
-| `lib/sigil_guard/envelope.ex` | Envelope canonicalization, sign, verify. |
-| `lib/sigil_guard/profile.ex` | Compatibility profile definitions. |
+| `lib/sigil_guard/attestation.ex` | Agent Trust attestation API replacing envelopes. |
+| `lib/sigil_guard/attestation/envelope.ex` | DSSE envelope helpers. |
 | `lib/sigil_guard/replay_store.ex` | ETS replay cache. |
 | `lib/sigil_guard/signer.ex` | Signing behaviour. |
 | `lib/sigil_guard/signer/ed25519.ex` | Ed25519 signer. |
 | `test/sigil_guard/backend_test.exs` | Backend behavior tests. |
-| `test/sigil_guard/envelope_test.exs` | Envelope compatibility and tamper tests. |
-| `test/sigil_guard/profile_test.exs` | Profile behavior tests. |
+| `test/sigil_guard/registry_removal_test.exs` | Removed envelope/profile APIs are not loadable. |
+| `test/sigil_guard/replay_store_test.exs` | Replay cache tests. |
+| `test/sigil_guard/signer_test.exs` | Signer behavior tests. |
+| `test/sigil_guard/attestation/envelope_test.exs` | DSSE envelope compatibility and tamper tests. |
 
-## Error Handling
+## Historical Error Handling
+
+These atoms describe the removed envelope/profile surface for migration
+evidence. Current attestation error semantics are owned by SP.01.
 
 | Error | Type | Recovery | User Impact |
 |-------|------|----------|-------------|
@@ -160,12 +168,11 @@ these two call sites plus config removal).
 
 ## Security Considerations
 
-- Verification treats envelopes as untrusted wire input and must not raise on
-  malformed maps or invalid base64.
-- Replay checks are optional for compatibility tests but should be enabled at
-  trust boundaries.
-- New Trust Profile attestations should reuse the lesson, not necessarily the
-  same shape: typed payload, canonical bytes, explicit expiry, replay metadata.
+- Attestation verification treats envelopes as untrusted wire input and must
+  not raise on malformed maps or invalid base64.
+- Replay checks are load-bearing for confirmation and attestation reuse.
+- Trust Profile attestations reuse the historical lesson with typed payloads,
+  canonical bytes, explicit expiry, and replay metadata.
 - The NIF backend must not return as a hidden fallback.
 - V3 should not include backend selection config because native Elixir is the
   only backend.
@@ -175,43 +182,44 @@ these two call sites plus config removal).
 | Test | Module | What It Verifies |
 |------|--------|------------------|
 | backend rejection | `BackendTest` | Unsupported backend selection fails cleanly. |
-| golden vectors | `EnvelopeTest` | Compatibility bytes and wire forms. |
-| malformed envelope | `EnvelopeTest` | Bad input returns tagged errors. |
-| replay | `EnvelopeTest` | Duplicate identity/nonce rejects when enabled. |
-| profile matrix | `ProfileTest` | Verdict and lookup compatibility behavior. |
+| removal assertions | `RegistryRemovalTest` | `SigilGuard.Envelope` and `SigilGuard.Profile` are deleted. |
+| attestation vectors | `Attestation.GoldenVectorsTest` | Agent Trust fixtures supersede envelope vectors. |
+| replay | `ReplayStoreTest` | Duplicate identity/nonce rejects when enabled. |
+| signer | `SignerTest`, `Signer.Ed25519Test` | Ed25519 sign/verify behaviour. |
 
 ## Acceptance Criteria
 
-- [ ] Spec status reads `implemented/transition` here and in both catalogue
-      tables (`docs/README.md`, `docs/specs/README.md`).
+- [x] Spec status reads `implemented/transition` here and in the spec
+      catalogue (`docs/specs/README.md`).
 - [x] The Envelope-to-Attestation mapping exists only in SP.01 and
       `MIGRATING-1.0.md`; this spec links to it and never restates it.
-- [ ] V3 moves every legacy vector, including the rust-crate vectors, to
+- [x] V3 moves every legacy vector, including the rust-crate vectors, to
       `test/fixtures/historical/`, and historical fixtures fail Agent Trust
       Profile verification.
-- [ ] Both reference-consumer call sites have a named v3 replacement in
+- [x] Both reference-consumer call sites have a named v3 replacement in
       `MIGRATING-1.0.md`.
-- [ ] `SigilGuard.ReplayStore` survives v3 as an internal module; no
+- [x] `SigilGuard.ReplayStore` survives v3 as an internal module; no
       pluggable replay-store behaviour ships at GA.
 
 ## Implementation Roadmap
 
 - [x] Native Elixir backend is the built-in backend.
 - [x] Unsupported NIF backend is rejected.
-- [x] Envelope signing and verification are implemented.
+- [x] Public envelope/profile APIs are removed and replaced by Agent Trust
+      attestations.
 - [x] Replay store is implemented.
 - [x] Golden vectors are checked in.
-- [ ] Add Agent Trust attestation vectors that supersede this public
+- [x] Add Agent Trust attestation vectors that supersede this public
       contract (M1, SP.01 fixture set).
-- [ ] Move legacy envelope and rust-crate vectors to
+- [x] Move legacy envelope and rust-crate vectors to
       `test/fixtures/historical/` (M6).
-- [ ] Remove public backend config and NIF references from v3 docs (M6).
+- [x] Remove public backend config and NIF references from v3 docs (M6).
 
 ## Success Metrics
 
 | Metric | Target | Measurement |
 |--------|--------|-------------|
-| Compatibility tests | pass | `mix test test/sigil_guard/envelope_test.exs`. |
+| Removal tests | pass | `mix test test/sigil_guard/registry_removal_test.exs`. |
 | Native backend | only supported built-in | `SigilGuard.Backend.available_backends/0`. |
 | Coverage | >= 95% overall | `mix test --cover`. |
 

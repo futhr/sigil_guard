@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.03"
   title: "MCP And Tool Attestation Gateway"
   domain: security
-  status: planned
+  status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags:
     ["mcp", "attestation", "capability-manifest", "confirmation", "json-rpc",
      "oauth", "v3"]
@@ -206,11 +206,9 @@ convention, mirroring SP.01's generator rules (deterministic,
 byte-identical on regeneration, frozen once committed):
 
 ```
-test/fixtures/capability_manifest/<name>/
-  manifest.json   # carried form, compact, keys in JCS order
-  preimage.json   # normalized digest preimage, exact compact JCS bytes
-  expected.json   # description/annotations/input_schema/output_schema
-                  # digests, suspicious_params, manifest_digest
+test/fixtures/capability_manifest/<name>.manifest.json
+test/fixtures/capability_manifest/<name>.preimage.json
+test/fixtures/capability_manifest/<name>.expected.json
 ```
 
 `repo_file_write` is the first fixture; its `manifest_digest` is the value
@@ -517,7 +515,7 @@ statements.
 | `test/sigil_guard/tool_gateway_test.exs` | Guard, drift, audience, sandbox, ordering tests. |
 | `test/sigil_guard/capability_manifest_test.exs` | Canonical form, digest, suspicious-param tests. |
 | `test/sigil_guard/mcp/gateway_test.exs` | Facade parity and JSON-RPC registry tests. |
-| `test/fixtures/capability_manifest/` | Golden manifest vectors (first: `repo_file_write`). |
+| `test/fixtures/capability_manifest/repo_file_write.*.json` | Golden manifest, preimage, and expected digest vector. |
 
 ## Integration Points
 
@@ -597,28 +595,28 @@ malformed-input cases per repository rule 9.
 
 ## Acceptance Criteria
 
-- [ ] `CapabilityManifest.digest/1` reproduces the committed
+- [x] `CapabilityManifest.digest/1` reproduces the committed
       `repo_file_write` golden vector; SP.01's `tool_request` vector
       references that exact digest.
-- [ ] Every drift-matrix mutation is rejected with its named atom; none
+- [x] Every drift-matrix mutation is rejected with its named atom; none
       falls through to a generic error.
-- [ ] `tools/list` verification runs before any definition reaches model
+- [x] `tools/list` verification runs before any definition reaches model
       context; `list_changed` forces re-verification and invalidates
       outstanding tokens via `manifest_digest`.
-- [ ] `suspicious_params` recomputation uses only `suspicious-params-v1`;
+- [x] `suspicious_params` recomputation uses only `suspicious-params-v1`;
       a lying manifest fails `:suspicious_required_param`; a disclosed
       non-empty set forces confirm by default.
-- [ ] Passthrough, audience, resource, and sandbox denials produce their
+- [x] Passthrough, audience, resource, and sandbox denials produce their
       named atoms and documented JSON-RPC codes.
-- [ ] Confirmation tokens: `300_000` ms default TTL, single-use by
+- [x] Confirmation tokens: `300_000` ms default TTL, single-use by
       default, four-digest binding, re-issue required on any change.
-- [ ] Codes `-32050..-32056` emit exactly the documented `data` shapes
+- [x] Codes `-32050..-32056` emit exactly the documented `data` shapes
       with `nil` fields omitted.
-- [ ] Every `MCP.Gateway` helper delegates per the facade table with an
+- [x] Every `MCP.Gateway` helper delegates per the facade table with an
       identical return shape (parity tests).
-- [ ] Digests are identical with and without the six stripped keys present
+- [x] Digests are identical with and without the six stripped keys present
       at root and under `params`.
-- [ ] Every spec-local error atom is produced by at least one test.
+- [x] Every spec-local error atom is produced by at least one test.
 
 ## Implementation Roadmap
 
@@ -626,19 +624,19 @@ Aligned with the task milestones (the task list owns task IDs): gateway
 and manifest work lands in M3; the threat suite lands in M5; legacy strip
 removal lands in M6.
 
-- [ ] M3: `SigilGuard.CapabilityManifest` canonical form, inner digests,
+- [x] M3: `SigilGuard.CapabilityManifest` canonical form, inner digests,
       and the `repo_file_write` golden fixture.
-- [ ] M3: `suspicious-params-v1` extraction in creation and verification.
-- [ ] M3: `verify_manifest/2` with the `tools/list`-time flow and
+- [x] M3: `suspicious-params-v1` extraction in creation and verification.
+- [x] M3: `verify_manifest/2` with the `tools/list`-time flow and
       `list_changed` re-verification.
-- [ ] M3: `guard_request/3` and `guard_result/3` with the normative check
+- [x] M3: `guard_request/3` and `guard_result/3` with the normative check
       order and deny atoms.
-- [ ] M3: `attest_request/3` and `attest_result/3` over SP.01 Attestation.
-- [ ] M3: confirmation v2 claims, single-use default; transition
+- [x] M3: `attest_request/3` and `attest_result/3` over SP.01 Attestation.
+- [x] M3: confirmation v2 claims, single-use default; transition
       dual-strips `_sigil*` alongside `_agent_*`.
-- [ ] M3: JSON-RPC codes `-32050..-32056` and `data` shapes.
-- [ ] M3: `MCP.Gateway` rewired as the permanent facade per the table.
-- [ ] M5: threat-model modules for the TM rows owned here.
+- [x] M3: JSON-RPC codes `-32050..-32056` and `data` shapes.
+- [x] M3: `MCP.Gateway` rewired as the permanent facade per the table.
+- [x] M5: threat-model modules for the TM rows owned here.
 - [x] M6: remove `_sigil*` reading; the strip rule reduces to SP.01's six
       keys.
 

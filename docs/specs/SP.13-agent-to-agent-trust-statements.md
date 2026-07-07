@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.13"
   title: "Agent-To-Agent Trust Statements"
   domain: security
-  status: planned
+  status: implemented
   priority: high
   created: "2026-07-02"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["a2a", "agent-cards", "delegation", "asi07", "agent-trust", "v3"]
   depends_on: ["R.05", "R.06", "SP.01", "SP.02", "SP.03"]
 ---
@@ -233,11 +233,11 @@ DSSE envelope around it:
 Fixture convention, mirroring SP.01's set:
 
 ```
-test/fixtures/agent_cards/research_peer/
-  card.json      # exact compact JCS card payload bytes
-  envelope.json  # DSSE envelope, compact, keys in JCS order
-  expected.json  # seeds, timestamps, card_digest, both keyids,
-                 # payload/PAE SHA-256s, signature (base64url)
+test/fixtures/agent_cards/
+  research_peer.card.json      # exact compact JCS card payload bytes
+  research_peer.envelope.json  # DSSE envelope, compact, keys in JCS order
+  research_peer.expected.json  # seeds, timestamps, card_digest, both keyids,
+                               # payload/PAE SHA-256s, signature (base64url)
 ```
 
 The generator MUST be deterministic; committed fixtures are a frozen
@@ -550,7 +550,7 @@ Spec-local atoms below; SP.01's shared taxonomy (`:invalid_envelope`,
 
 | Test | Module | What It Verifies |
 |------|--------|------------------|
-| card golden vector | `AgentCardTest` + conformance | `card.json` signs to `envelope.json` and verifies back byte-identically. |
+| card golden vector | `AgentCardTest` + conformance | `research_peer.card.json` signs to `research_peer.envelope.json` and verifies back byte-identically. |
 | card tamper | `AgentCardTest` | flipped payload byte fails `:invalid_signature`; non-canonical bytes fail `:invalid_agent_card`; edited card fails `:card_digest_mismatch` where bound. |
 | expired card | `AgentCardTest` | expiry and future-dating fail `:card_expired` exactly at the skew boundaries. |
 | issuer role | `AgentCardTest` | undeclared or role-lacking issuer fails `:untrusted_issuer`. |
@@ -565,38 +565,38 @@ Spec-local atoms below; SP.01's shared taxonomy (`:invalid_envelope`,
 
 ## Acceptance Criteria
 
-- [ ] `AgentCard.new/1`, `digest/1`, `sign/2,3`, `verify/2,3` implement the
+- [x] `AgentCard.new/1`, `digest/1`, `sign/2,3`, `verify/2,3` implement the
       field table; the card golden vector round-trips byte-identically from
       `test/fixtures/agent_cards/`.
-- [ ] Every spec-local error atom is produced by at least one test.
-- [ ] Unknown-peer attestation carries verdict `quarantine`, `peer_trust`
+- [x] Every spec-local error atom is produced by at least one test.
+- [x] Unknown-peer attestation carries verdict `quarantine`, `peer_trust`
       `low`, no `card_digest`/`manifest` subject; no code path allows an
       unverified peer.
-- [ ] Chain tamper matrix (reorder, insert, drop, edit, one-sided) fails
+- [x] Chain tamper matrix (reorder, insert, drop, edit, one-sided) fails
       `:delegation_chain_tampered`; depth 9 fails `:delegation_too_deep`.
-- [ ] `agent_request`/`agent_response` statements pass
+- [x] `agent_request`/`agent_response` statements pass
       `TrustProfile.validate/1` and round-trip their SP.01 golden vectors.
-- [ ] `verify_agent_response/3` enforces back-reference, card binding, and
+- [x] `verify_agent_response/3` enforces back-reference, card binding, and
       status/quarantined shape in the documented order.
-- [ ] Response payloads provably route through the SP.04 result pipeline
+- [x] Response payloads provably route through the SP.04 result pipeline
       after envelope verification.
-- [ ] The JWS-to-DSSE mapping is validated by a shared-keypair parity test.
-- [ ] TM.10 threat-family modules are green with rule-9 case coverage.
-- [ ] Telemetry events fire per the table.
+- [x] The JWS-to-DSSE mapping is validated by a shared-keypair parity test.
+- [x] TM.10 threat-family modules are green with rule-9 case coverage.
+- [x] Telemetry events fire per the table.
 
 ## Implementation Roadmap
 
 Milestone-adjacent placement; the task list owns task IDs.
 
-- [ ] M1-adjacent: `agent_request`/`agent_response` predicate extensions
+- [x] M1-adjacent: `agent_request`/`agent_response` predicate extensions
       and digest wiring land with the SP.01 statement work.
-- [ ] M3-adjacent: `SigilGuard.AgentCard` with card fixtures and bundle
+- [x] M3-adjacent: `SigilGuard.AgentCard` with card fixtures and bundle
       issuer-role verification.
-- [ ] M3-adjacent: `SigilGuard.AgentTrust` helpers, delegation validation,
+- [x] M3-adjacent: `SigilGuard.AgentTrust` helpers, delegation validation,
       quarantine default, capability binding.
-- [ ] M3-adjacent: route verified response payloads through the SP.04
+- [x] M3-adjacent: route verified response payloads through the SP.04
       result pipeline.
-- [ ] M5-adjacent: TM.10 threat-family suite, conformance vectors, JWS
+- [x] M5-adjacent: TM.10 threat-family suite, conformance vectors, JWS
       parity test.
 
 ## Success Metrics

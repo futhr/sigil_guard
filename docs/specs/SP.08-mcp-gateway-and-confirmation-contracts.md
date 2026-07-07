@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: high
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["mcp", "gateway", "confirmation", "json-rpc", "action-digest"]
   depends_on: ["SP.01", "SP.03", "SP.07"]
 ---
@@ -197,9 +197,10 @@ that registry for every code. This is a breaking change from v0.2's
 | Module | Purpose |
 |--------|---------|
 | `lib/sigil_guard/mcp/gateway.ex` | MCP-shaped guard helpers. |
+| `lib/sigil_guard/tool_gateway.ex` | Transport-neutral gateway implementation. |
 | `lib/sigil_guard/confirmation.ex` | Action-bound confirmation tokens. |
 | `lib/sigil_guard/runtime/gate.ex` | Underlying boundary decision engine. |
-| `lib/sigil_guard/envelope.ex` | Current envelope verification; v3 replaces with attestations. |
+| `lib/sigil_guard/attestation.ex` | `_agent_trust` attachment and verification. |
 | `lib/sigil_guard/replay_store.ex` | Optional confirmation nonce consumption. |
 | `test/sigil_guard/mcp/gateway_test.exs` | Gateway request/result/signed/confirmation tests. |
 | `test/sigil_guard/confirmation_test.exs` | Token signing, expiry, digest, replay tests. |
@@ -245,23 +246,23 @@ that registry for every code. This is a breaking change from v0.2's
 
 ## Acceptance Criteria
 
-- [ ] V3 tokens carry `manifest_digest` and a context digest that includes
+- [x] V3 tokens carry `manifest_digest` and a context digest that includes
       `sandbox_id` and `isolation_level`; tampering with either fails
       verification.
-- [ ] Default token TTL is `300_000` ms; expired tokens are rejected.
-- [ ] Single-use is the default: verifying the same token twice fails with
+- [x] Default token TTL is `300_000` ms; expired tokens are rejected.
+- [x] Single-use is the default: verifying the same token twice fails with
       `{:error, :replay_detected}` without any option, and `consume: false`
       opts out per call. The behavior change is documented in
       `MIGRATING-1.0.md`.
-- [ ] `_agent_trust`, `_agent_confirmation`, and `confirmation_token` (atom
+- [x] `_agent_trust`, `_agent_confirmation`, and `confirmation_token` (atom
       and string forms, payload root and `params` level) are stripped before
       every digest, and digests are identical with and without them,
       mirroring SP.01's strip-rule tests.
 - [x] Released 1.0.0 gives `_sigil` and `_sigil_confirmation` no special
       handling anywhere under `lib/`.
-- [ ] Every helper in the Gateway Function Mapping keeps its v2 name and
+- [x] Every helper in the Gateway Function Mapping keeps its v2 name and
       arity on the `MCP.Gateway` facade and delegates to `ToolGateway`.
-- [ ] Gateway rejection codes are `-32050..-32056` per SP.03's registry, and
+- [x] Gateway rejection codes are `-32050..-32056` per SP.03's registry, and
       no code outside that registry is emitted.
 
 ## Implementation Roadmap
@@ -271,13 +272,13 @@ that registry for every code. This is a breaking change from v0.2's
 - [x] Signed request helpers implemented.
 - [x] Confirmation token binding implemented.
 - [x] Single-use replay option implemented.
-- [ ] Replace signed request helpers with SP.03 tool-manifest attestations
+- [x] Replace signed request helpers with SP.03 tool-manifest attestations
       (M3).
-- [ ] Replace metadata keys with `_agent_trust` and `_agent_confirmation`;
+- [x] Replace metadata keys with `_agent_trust` and `_agent_confirmation`;
       dual-strip through M3-M5, `_sigil*` removal in M6.
-- [ ] Flip confirmation single-use to consume-by-default with manifest and
+- [x] Flip confirmation single-use to consume-by-default with manifest and
       sandbox binding (M3).
-- [ ] Rewire facade delegation to `ToolGateway` (M3, D14).
+- [x] Rewire facade delegation to `ToolGateway` (M3, D14).
 
 ## Success Metrics
 

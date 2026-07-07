@@ -15,7 +15,7 @@ defmodule SigilGuard do
 
   ## Runtime Configuration
 
-  SigilGuard validates a closed v3 configuration surface at application boot.
+  SigilGuard validates a closed 1.0 configuration surface at application boot.
   The built-in backend is native Elixir and uses OTP `:crypto`, Regex, ETS,
   and ordinary OTP supervision; no backend selector is required.
 
@@ -49,7 +49,7 @@ defmodule SigilGuard do
   - `SigilGuard.Runtime.Stream` — Chunk-safe streaming sanitization
   - `SigilGuard.MCP.Gateway` — MCP-shaped request/result guard helpers
   - `SigilGuard.Confirmation` — Action-bound approval tokens
-  - `SigilGuard.Attestation` — V3 attestation metadata helpers
+  - `SigilGuard.Attestation` — Agent Trust attestation metadata helpers
   - `SigilGuard.Policy` — Risk classification and trust gating
   - `SigilGuard.Audit` — Tamper-evident audit chain
   - `SigilGuard.Audit.Export` — Portable signed checkpoint + anchor packages

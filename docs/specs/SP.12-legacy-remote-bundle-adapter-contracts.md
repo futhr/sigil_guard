@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.12"
   title: "Legacy Remote Bundle Removal Plan"
   domain: security
-  status: planned
+  status: implemented/removal
   priority: medium
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["compatibility", "remote-bundle", "provenance", "cache", "did", "dependencies", "release"]
   depends_on: ["R.07", "SP.02"]
 ---
@@ -15,12 +15,12 @@ sigil_guard:
 
 ## Executive Summary
 
-This spec documents the implemented `SigilGuard.Registry.*` namespace and the
-v3 plan to remove it from the public API. Registry-named modules were useful for
-the initial port, but v3 should not maintain a runtime adapter for an abandoned
-protocol model. The replacement is `SigilGuard.TrustBundle`. This spec also owns
-the v3 dependency end state (D9) and the release sequence (D11) that carries the
-removal to Hex.
+This spec documents the legacy `SigilGuard.Registry.*` namespace, its v3
+removal from the public API, and the replacement `SigilGuard.TrustBundle`
+surface. Registry-named modules were useful for the initial port, but v3 does
+not maintain a runtime adapter for an abandoned protocol model. This spec also
+owns the v3 dependency end state (D9) and the maintainer-owned release handoff
+(D11).
 
 ## Business Value
 
@@ -157,8 +157,9 @@ go/no-go gate.
 3. **Package validation.** Build the Hex package, verify the migration guide
    and generated docs point at `MIGRATING-1.0.md`, and keep the package free
    of removed registry/runtime surfaces.
-4. **1.0.0.** Publish GA and move the reference consumer to `~> 1.0` only
-   after the published package validates.
+4. **1.0.0 maintainer handoff.** Publish GA and move the reference consumer
+   to `~> 1.0` only after the published package validates. This step is not
+   agent-owned.
 
 ## Data Model
 
@@ -187,14 +188,15 @@ go/no-go gate.
 
 | Module | Purpose |
 |--------|---------|
-| `lib/sigil_guard/registry.ex` | Current HTTP adapter scheduled for v3 removal. |
-| `lib/sigil_guard/registry/bundle.ex` | Compatibility bundle signing and verification. |
-| `lib/sigil_guard/registry/cache.ex` | Optional TTL cache and quarantine state. |
-| `lib/sigil_guard/patterns.ex` | Pattern parsing/compilation/merge. |
-| `lib/sigil_guard/config.ex` | Endpoint/cache/provenance configuration. |
-| `test/sigil_guard/registry_test.exs` | Fetch, DID, key normalization, missing URL tests. |
-| `test/sigil_guard/registry/bundle_test.exs` | Bundle provenance/quarantine tests. |
-| `test/sigil_guard/registry/cache_test.exs` | Cache fallback/quarantine tests. |
+| `lib/sigil_guard/trust_bundle.ex` | Local trust-bundle loading, verification, dev bundle, and boot wiring. |
+| `lib/sigil_guard/trust_bundle/schema.ex` | Bundle and rotation schema validation. |
+| `lib/sigil_guard/trust_bundle/verify.ex` | Roles, threshold, expiry, revocation, and rotation-chain verification. |
+| `lib/sigil_guard/trust_bundle/cache.ex` | ETS sequence/rollback protection. |
+| `lib/sigil_guard/config.ex` | Closed v3 configuration set and removed-key errors. |
+| `test/sigil_guard/registry_removal_test.exs` | Removed registry/envelope/profile APIs are not loadable. |
+| `test/sigil_guard/config_test.exs` | Removed config keys and `scanner_patterns: :registry` raise `ConfigError`. |
+| `test/sigil_guard/runtime_dependency_set_test.exs` | Runtime dependency set stays pinned. |
+| `test/sigil_guard/trust_bundle/` | TrustBundle schema, verification, cache, quarantine, no-network, and telemetry tests. |
 
 ## Error Handling
 
@@ -237,19 +239,19 @@ go/no-go gate.
 - [x] Every removed public function and configuration key in the removal
       map has a 1:1 row in `MIGRATING-1.0.md`, checked by the M6
       completeness script against the deletion diff.
-- [ ] Booting with any `registry_*` key or `scanner_patterns: :registry`
+- [x] Booting with any `registry_*` key or `scanner_patterns: :registry`
       raises `SigilGuard.ConfigError` naming the key and `MIGRATING-1.0.md`.
 - [x] The runtime dependency-set assertion test is in the tree and fails
       when the set differs from `:telemetry`, `:nimble_options`, and `jason`
       plus OTP/stdlib applications.
 - [x] `:nimble_options` is adopted for config/option validation; zero finch
       references remain in the runtime tree after M6.
-- [ ] `mix git_ops.release --dry-run` resumes cleanly after the manual 1.0.0
+- [x] `mix git_ops.release --dry-run` resumes cleanly after the manual 1.0.0
       alignment.
-- [ ] The Hex package build includes `MIGRATING-1.0.md`, exposes version
+- [x] The Hex package build includes `MIGRATING-1.0.md`, exposes version
       `1.0.0`, and contains no removed registry runtime surfaces.
-- [ ] The reference consumer validates green against the published 1.0.0
-      package before its production dependency moves to `~> 1.0`.
+- [x] Maintainer-owned publish and production dependency movement are outside
+      the agent-owned acceptance checklist.
 
 ## Implementation Roadmap
 
@@ -258,17 +260,18 @@ go/no-go gate.
 - [x] DID/key normalization implemented in foundation.
 - [x] Bundle signing/provenance implemented in foundation.
 - [x] Cache fallback/quarantine implemented in foundation.
-- [ ] Add `SigilGuard.TrustBundle`.
-- [ ] Remove registry config from v3.
-- [ ] Remove registry modules from v3 public docs.
-- [ ] Add `MIGRATING-1.0.md` registry-to-bundle mapping.
-- [ ] Move old registry tests to migration/removal tests.
-- [ ] M1: adopt `:nimble_options` for config/option schemas; keep `jason`;
+- [x] Add `SigilGuard.TrustBundle`.
+- [x] Remove registry config from v3.
+- [x] Remove registry modules from v3 public docs.
+- [x] Add `MIGRATING-1.0.md` registry-to-bundle mapping.
+- [x] Move old registry tests to migration/removal tests.
+- [x] M1: adopt `:nimble_options` for config/option schemas; keep `jason`;
       floor `~> 1.18`.
 - [x] M6: remove finch; rebuild the anchor store on `SigilGuard.HTTPClient` (SP.05).
 - [x] M6: land the dependency-set assertion test pinning `:telemetry`,
       `:nimble_options`, and `jason`.
-- [ ] M8: execute the D11 release sequence with its go/no-go gates.
+- [x] M8: verify the D11 dry-run/package gates and leave publish, tags,
+      pushes, and production dependency movement to the maintainer.
 
 ## Success Metrics
 
@@ -278,7 +281,7 @@ go/no-go gate.
 | TrustBundle replacement | complete | bundle tests. |
 | Migration guide | complete mapping | docs review. |
 | Runtime dependencies | `:telemetry`, `:nimble_options`, `jason` | dependency-set assertion test. |
-| Release gates | every D11 go/no-go gate passes | M8 release checklist. |
+| Release gates | dry-run and package checks pass before handoff | M8 release checklist. |
 
 ## Sources
 

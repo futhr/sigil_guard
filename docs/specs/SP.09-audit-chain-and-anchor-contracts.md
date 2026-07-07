@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: high
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["audit", "hmac", "merkle", "anchor", "export"]
   depends_on: ["R.04", "SP.05"]
 ---
@@ -238,14 +238,14 @@ signed under the old string verify unchanged - names are data, not structure.
 
 ## Acceptance Criteria
 
-- [ ] A constants test pins the exact literals `"genesis"`,
+- [x] A constants test pins the exact literals `"genesis"`,
       `"sigil-audit-leaf-v1:"`, `"sigil-audit-node-v1:"`, and
       `"sigil-audit-empty-v1"` against the implementation.
-- [ ] A golden test pins event canonical bytes to the six-field compact
+- [x] A golden test pins event canonical bytes to the six-field compact
       JSON form above; adding, removing, or reordering a field fails it.
-- [ ] A fixed-input chain and checkpoint golden vector (known key, events,
+- [x] A fixed-input chain and checkpoint golden vector (known key, events,
       HMACs, `merkle_root`) stays byte-stable across releases.
-- [ ] Every V3 extension row above resolves to a named SP.05 section; SP.09
+- [x] Every V3 extension row above resolves to a named SP.05 section; SP.09
       defines no proof, witness, privacy, query, or HTTP behavior itself.
 
 ## Implementation Roadmap
@@ -255,10 +255,10 @@ signed under the old string verify unchanged - names are data, not structure.
 - [x] Anchor record implemented.
 - [x] HTTP and local-file anchor stores implemented.
 - [x] Export package implemented.
-- [ ] Add inclusion/consistency proof helpers described by SP.05.
-- [ ] Add signed event export mode described by SP.05.
-- [ ] Add privacy classification for clear, hashed, redacted, and omitted fields.
-- [ ] Add telemetry correlation fields for trace/span ids.
+- [x] Add inclusion/consistency proof helpers described by SP.05.
+- [x] Add signed event export mode described by SP.05.
+- [x] Add privacy classification for clear, hashed, redacted, and omitted fields.
+- [x] Add telemetry correlation fields for trace/span ids.
 
 ## Success Metrics
 

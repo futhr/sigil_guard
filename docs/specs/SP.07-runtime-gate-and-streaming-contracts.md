@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: high
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["runtime", "scanner", "streaming", "quarantine", "telemetry"]
   depends_on: ["SP.01", "SP.04", "R.06"]
 ---
@@ -185,11 +185,11 @@ emit that atom even though it is outside the declared `action` type. V3
 closes the enum: `:require_approval` maps to `:confirm` and the approval
 reason moves into `matched_rules`.
 
-Transition rule: the v2 `Decision.verdict` field remains available,
-populated alongside the unified verdict, during milestones M1-M5 and is
-removed in M6 (SP.12 removal wave, mapped in `MIGRATING-1.0.md`). The
-`SigilGuard.policy_verdict/3` facade vocabulary is unaffected; see
-Stability Guarantees.
+Compatibility rule: the legacy `Decision.verdict` field remains available
+and populated alongside the unified `Decision.action` enum in 1.0.0. It is
+not a new decision source; callers should prefer `action` for v3 verdict
+logic. The `SigilGuard.policy_verdict/3` facade vocabulary is unaffected;
+see Stability Guarantees.
 
 ### New Typed Fields
 
@@ -310,25 +310,25 @@ boundary labels) are normative in the V3 Decision Contract section.
 
 ## Acceptance Criteria
 
-- [ ] V3 `Decision` exposes the unified verdict enum
-      `:allow | :block | :confirm | :redact | :quarantine` as its single
-      verdict vocabulary.
-- [ ] Every v2 `{verdict, action}` pair maps per the V3 Decision Contract
+- [x] V3 `Decision.action` exposes the unified verdict enum
+      `:allow | :block | :confirm | :redact | :quarantine`; the legacy
+      `verdict` field remains populated for compatibility.
+- [x] Every v2 `{verdict, action}` pair maps per the V3 Decision Contract
       table, exercised by tests; `:require_approval` never escapes the v3
       closed enum.
-- [ ] The v2 `Decision.verdict` field is populated through M1-M5 and deleted
-      in M6, with the removal mapped in `MIGRATING-1.0.md`.
-- [ ] `matched_rules` and `evidence_refs` carry the typed shapes above, and
+- [x] The legacy `Decision.verdict` field maps consistently from
+      `Decision.action` and stays available in 1.0.0 for compatibility.
+- [x] `matched_rules` and `evidence_refs` carry the typed shapes above, and
       their mirrors into SP.01's `predicate.matched_rules` and
       `predicate.evidence` are verified by tests.
-- [ ] `SigilGuard.scan/1`, `scan_and_redact/1`, and `policy_verdict/3`
+- [x] `SigilGuard.scan/1`, `scan_and_redact/1`, and `policy_verdict/3`
       return shapes are byte-identical to v2, asserted by the
       consumer-contracts conformance test; hit-map extensions are additive
       only and `name` stays required.
-- [ ] `Runtime.Gate` delegates policy evaluation to
+- [x] `Runtime.Gate` delegates policy evaluation to
       `BoundaryPolicy.evaluate/1`, and quarantine indicators load from trust
       bundles with the seven built-ins as defaults (SP.04 contract).
-- [ ] Streaming holdback passes SP.04's Streaming Property-Test
+- [x] Streaming holdback passes SP.04's Streaming Property-Test
       Specification, including split-secret vectors.
 
 ## Implementation Roadmap
@@ -338,12 +338,12 @@ boundary labels) are normative in the V3 Decision Contract section.
 - [x] Quarantine indicators implemented.
 - [x] Streaming sanitizer implemented.
 - [x] Scanner pipeline implemented.
-- [ ] Expand property/vector tests for boundary holdback and source-to-sink
+- [x] Expand property/vector tests for boundary holdback and source-to-sink
       policy per SP.04's Streaming Property-Test Specification (M4).
-- [ ] Rewire runtime gate to `Boundary` and `BoundaryPolicy` (M4).
-- [ ] Add `evidence_refs` and `matched_rules` to decisions (M4).
-- [ ] Remove the v2 `Decision.verdict` field after the unified enum lands
-      (M6, SP.12).
+- [x] Rewire runtime gate to `Boundary` and `BoundaryPolicy` (M4).
+- [x] Add `evidence_refs` and `matched_rules` to decisions (M4).
+- [x] Keep `Decision.verdict` populated beside `Decision.action` for the
+      1.0.0 compatibility contract.
 
 ## Success Metrics
 

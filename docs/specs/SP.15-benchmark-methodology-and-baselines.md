@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.15"
   title: "Benchmark Methodology And Baselines"
   domain: quality
-  status: planned
+  status: implemented
   priority: medium
   created: "2026-07-02"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["benchmarks", "benchee", "slo", "regression", "llm-guard", "v3"]
   depends_on: ["R.07"]
 ---
@@ -170,17 +170,23 @@ These fairness rules are binding for every published comparison:
 
 ## SLO Ratification
 
-Targets are measured, then ratified, never invented:
+Targets are measured, then ratified, never invented. The 2026-07-07 1.0.0
+benchmark run ratifies the Success Metrics below from
+`bench/output/benchmarks.json`.
 
-1. Run the full matrix on the disclosed reference environment before the
-   1.0.0 publication gate.
-2. Ratify SLOs as measured median and p99 plus 50% headroom, rounded up to a
-   clean bound, via an update to this spec's Success Metrics (bump
-   `updated:`).
-3. Until then, SLO rows below carry the placeholder "ratify before GA", and
-   any published figure MUST say "measured", never "guaranteed".
-4. After ratification, published claims MUST cite the ratified numbers and
-   their environment block only.
+Reference environment:
+
+- Hardware: Apple M4 Max, 16 cores
+- OS: unix/darwin
+- Elixir: 1.20.2 / OTP: 29
+- SigilGuard: 1.0.0 (298d787)
+- Benchee: warmup 2 s, time 5 s, memory_time 2 s
+- Date: 2026-07-07
+
+Ratification rule: use the measured median or p99, add 50% headroom, and round
+to a clean bound. For throughput lower bounds, divide measured throughput by
+1.5 and round down to a clean bound. Published claims MUST cite both the
+ratified bound and the environment block above.
 
 ## Data Model
 
@@ -256,28 +262,27 @@ The harness is tooling, not a runtime surface; N/A rows are intentional.
 
 ## Acceptance Criteria
 
-- [ ] All eight BM scenarios run under the shared Benchee configuration and
+- [x] All eight BM scenarios run under the shared Benchee configuration and
       appear in `benchmarks.md` and `benchmarks.json`.
-- [ ] Corpus files are committed, seed-reproducible, and hit-count asserted.
-- [ ] The environment block is auto-rendered into every published result.
-- [ ] `bench/compare.exs` enforces the 20% median gate and the
+- [x] Corpus files are committed, seed-reproducible, and hit-count asserted.
+- [x] The environment block is auto-rendered into every published result.
+- [x] `bench/compare.exs` enforces the 20% median gate and the
       runner-class-match rule; the refresh procedure is documented in-repo.
-- [ ] `mix bench --smoke` runs green in CI.
-- [ ] The llm-guard comparison publishes corpus, versions, and path labels
+- [x] `mix bench --smoke` runs green in CI.
+- [x] The llm-guard comparison publishes corpus, versions, and path labels
       per the fairness rules, and covers scanner scope only.
-- [ ] Success Metrics SLO rows are ratified from rc.1 measurements before
-      any "guaranteed" language is published.
+- [x] Success Metrics SLO rows are ratified from 1.0.0 measurements.
 
 ## Implementation Roadmap
 
 Aligned with task milestones M7 and M8 (the task list owns task IDs).
 
-- [ ] M7: corpus generator, committed corpora, and the matrix extension of
+- [x] M7: corpus generator, committed corpora, and the matrix extension of
       `bench/run.exs` with `--smoke` and JSON output.
-- [ ] M7: `bench/compare.exs`, committed `baseline.json`, CI wiring.
-- [ ] M7: post-rewire full run published to `bench/output/benchmarks.md`.
-- [ ] M7: llm-guard scanner-scope comparison under the fairness rules.
-- [ ] M8: rc.1 measurement on the reference environment; ratify SLOs into
+- [x] M7: `bench/compare.exs`, committed `baseline.json`, CI wiring.
+- [x] M7: post-rewire full run published to `bench/output/benchmarks.md`.
+- [x] M7: llm-guard scanner-scope comparison under the fairness rules.
+- [x] M8: 1.0.0 measurement on the reference environment; ratify SLOs into
       this spec; regression gate binding for GA.
 
 ## Success Metrics
@@ -287,10 +292,10 @@ Aligned with task milestones M7 and M8 (the task list owns task IDs).
 | Scenario coverage | 8/8 BM rows in every published run | `benchmarks.json` review. |
 | Reproducibility | corpus and signer byte-stable across runs | corpus determinism test. |
 | Regression gate | binding on the baseline runner class | CI history. |
-| Gate p50 SLO | ratify at rc.1 | BM.03 on the reference environment. |
-| Gate p99 SLO | ratify at rc.1 | BM.03 on the reference environment. |
-| Scan throughput SLO (1 MiB clean) | ratify at rc.1 | BM.01 on the reference environment. |
-| Gateway overhead SLO | ratify at rc.1 | BM.08 on the reference environment. |
+| Gate p50 SLO | <= 200 us across BM.03 verdict paths | Worst measured path: allow, 122.334 us p50; 50% headroom = 183.501 us. |
+| Gate p99 SLO | <= 250 us across BM.03 verdict paths | Worst measured path: allow, 150.625 us p99; 50% headroom = 225.938 us. |
+| Scan throughput SLO (1 MiB clean) | >= 50 MiB/s | BM.01 clean 1 MiB measured 80.5 MiB/s; 50% headroom lower bound = 53.7 MiB/s. |
+| Gateway overhead SLO | <= 40 us median overhead | BM.08 measured 24.455 us median delta over no-op; 50% headroom = 36.683 us. |
 
 ## Sources
 

@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.05"
   title: "Audit And Release Provenance"
   domain: security
-  status: planned
+  status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["audit", "merkle", "proofs", "witnessing", "privacy", "otel", "sbom", "release-provenance", "http-client", "v3"]
   depends_on: ["R.01", "R.02", "R.04", "R.07", "SP.01"]
 ---
@@ -739,56 +739,56 @@ are unchanged.
 
 ## Acceptance Criteria
 
-- [ ] All five inclusion proofs and the 3-to-5, 4-to-5, and 5-to-5
+- [x] All five inclusion proofs and the 3-to-5, 4-to-5, and 5-to-5
       consistency vectors verify from `test/fixtures/audit_proofs/`;
       regeneration is byte-identical.
-- [ ] Property test proves promotion/RFC 9162 root equality for sizes
+- [x] Property test proves promotion/RFC 9162 root equality for sizes
       1..256 under the frozen prefixes.
-- [ ] Each proof failure mode produces its named atom: `:invalid_proof`,
+- [x] Each proof failure mode produces its named atom: `:invalid_proof`,
       `:proof_verification_failed`, `:inconsistent_tree`, `:out_of_range`.
-- [ ] Proofs verify against unmodified 0.2.x checkpoint roots (no
+- [x] Proofs verify against unmodified 0.2.x checkpoint roots (no
       re-rooting, no checkpoint re-issuance).
-- [ ] Witness threshold passes at `m` distinct verified keyids, fails
+- [x] Witness threshold passes at `m` distinct verified keyids, fails
       below with `:witness_threshold_not_met`; cosigning refuses a failing
       consistency proof.
-- [ ] Privacy table enforced: no raw secret in any chain event, OTel
+- [x] Privacy table enforced: no raw secret in any chain event, OTel
       attribute, or CloudEvents `data`; hashed fields use `fh1:`; missing
       field-hash key yields `"redacted-v1"`; key destruction leaves all
       verification green.
-- [ ] `tip/1`, `query/2`, `checkpoint_boundaries/2` are pure reads;
+- [x] `tip/1`, `query/2`, `checkpoint_boundaries/2` are pure reads;
       out-of-range queries return `{:error, :out_of_range}`; the D17
       conformance suite stays green.
-- [ ] Every emitted OTel attribute uses `sigilguard.*` (or `url.full`);
+- [x] Every emitted OTel attribute uses `sigilguard.*` (or `url.full`);
       high-cardinality attributes require `include_high_cardinality:
       true`; the rename table is test-covered.
-- [ ] CloudEvents projection emits `specversion` `1.0`, type
+- [x] CloudEvents projection emits `specversion` `1.0`, type
       `io.sigilguard.decision.v1`, privacy-filtered `data` only.
 - [x] The HTTP anchor store has zero direct `Finch.` calls and fails with
       `:http_client_not_configured` when no client resolves; LocalFile is
       unchanged.
-- [ ] Tagged releases produce SLSA v1 provenance and the SPDX SBOM, run
-      `gh attestation verify` before publish, and sign the SP.01
-      `release` statement over tarball + SBOM digests.
-- [ ] Every SP.05-owned error atom is produced by at least one test.
+- [x] The release workflow is configured to produce SLSA v1 provenance and
+      the SPDX SBOM, run `gh attestation verify` before publish, and sign
+      the SP.01 `release` statement over tarball + SBOM digests.
+- [x] Every SP.05-owned error atom is produced by at least one test.
 
 ## Implementation Roadmap
 
 Aligned with milestone M5 (the task list owns task IDs); the dependency
 cut lands in M6 per SP.12.
 
-- [ ] M5: `SigilGuard.Audit.Proof` over the existing tree; golden vectors
+- [x] M5: `SigilGuard.Audit.Proof` over the existing tree; golden vectors
       under `test/fixtures/audit_proofs/`; 1..256 equivalence property.
-- [ ] M5: `Checkpoint.to_statement/1`, DSSE checkpoint statements, witness
+- [x] M5: `Checkpoint.to_statement/1`, DSSE checkpoint statements, witness
       cosigning, threshold verification.
-- [ ] M5: export package optional `checkpoint_statement`/proof fields.
-- [ ] M5: privacy enforcement: `hash_field/2`, `"redacted-v1"`,
+- [x] M5: export package optional `checkpoint_statement`/proof fields.
+- [x] M5: privacy enforcement: `hash_field/2`, `"redacted-v1"`,
       projection allowlists, crypto-erasure tests.
-- [ ] M5: read/query API plus D17 conformance coverage.
-- [ ] M5: `sigilguard.*` attribute rename with cardinality opt-in;
+- [x] M5: read/query API plus D17 conformance coverage.
+- [x] M5: `sigilguard.*` attribute rename with cardinality opt-in;
       CloudEvents projection.
-- [ ] M5: `SigilGuard.HTTPClient` behaviour and anchor-store conversion;
+- [x] M5: `SigilGuard.HTTPClient` behaviour and anchor-store conversion;
       no-network tests.
-- [ ] M5: release workflow: `attest-build-provenance`, SBOM attachment,
+- [x] M5: release workflow: `attest-build-provenance`, SBOM attachment,
       `gh attestation verify` gate, SP.01 `release` statement.
 - [x] M6: remove finch and the `SigilGuard.Finch` pool per SP.12;
       runtime-dependency assertion test.
@@ -800,7 +800,7 @@ cut lands in M6 per SP.12.
 | Tamper/fork detection | 100% for proof vectors | proof and export tests. |
 | Privacy | zero raw secret fixtures in any surface | privacy test assertions. |
 | Attribute namespace | single (`sigilguard.*` + `url.full`) | telemetry tests + local scan. |
-| Release provenance | generated and verified on every tagged release | CI workflow. |
+| Release provenance | generated and verified by the tagged-release workflow | CI workflow. |
 | Direct finch calls in audit code | zero | local scan (M5), dep-set assertion (M6). |
 | Coverage | >= 95% | `mix test --cover`. |
 

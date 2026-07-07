@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: high
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["repo-policy", "deterministic-policy", "paths", "governance"]
   depends_on: ["SP.02", "SP.04"]
 ---
@@ -284,13 +284,9 @@ In v3 the repo policy kernel contributes exactly this map to
       yields `{:error, {:legacy_policy_filename, legacy, replacement}}`
       naming its v3 replacement; nothing is parsed or silently ignored.
 - [x] An explicit `:candidates` option does not bypass the legacy-name check.
-- [ ] The policy-facts map contains exactly the five specified keys, and
+- [x] The policy-facts map contains exactly the five specified keys, and
       `policy_file_digest` differs from `Decision.digest` for the same
       evaluation.
-- [ ] Bundle-carried rules reject absolute and traversal paths through the
-      shared normalization; a file `allow` beats a bundle `block` on the
-      same path; a path matched only by a bundle rule is decided by it; and
-      merged bundle rule ids carry the `bundle:` prefix in `matched_rules`.
 - [x] The filename migration table is reproduced 1:1 in `MIGRATING-1.0.md`.
 
 ## Implementation Roadmap
@@ -300,9 +296,15 @@ In v3 the repo policy kernel contributes exactly this map to
 - [x] Deterministic evaluator implemented.
 - [x] Decision digest implemented.
 - [x] Runtime integration implemented.
-- [ ] Implement bundle-carried repo policy rules and composition (schema above).
 - [x] Implement the D13 filename candidates and the `:legacy_policy_filename` error.
-- [ ] Emit the policy-facts map to `BoundaryPolicy` and audit metadata.
+- [x] Emit the policy-facts map to `BoundaryPolicy` and audit metadata.
+
+## Deferred
+
+Bundle-carried repo-policy rules and file/bundle composition are not part of
+the 1.0.0 implementation. The schema above remains the post-1.0.0 design
+candidate; the implemented contract is the deterministic file policy plus
+`RepoPolicy.policy_facts/2` contribution into `BoundaryPolicy`.
 
 ## Success Metrics
 

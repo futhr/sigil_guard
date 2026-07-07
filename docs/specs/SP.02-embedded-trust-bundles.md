@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.02"
   title: "Embedded Trust Bundles"
   domain: security
-  status: planned
+  status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["trust-bundles", "tuf", "roles", "rotation", "dsse", "quarantine", "v3"]
   depends_on: ["R.01", "R.02", "R.03", "R.07", "SP.01"]
 ---
@@ -604,36 +604,36 @@ reused by reference, never redefined.
 
 ## Acceptance Criteria
 
-- [ ] Golden vectors under `test/fixtures/trust_bundle/` verify and
+- [x] Golden vectors under `test/fixtures/trust_bundle/` verify and
       regenerate byte-identically (`minimal`, `multisig`, `rotation`).
-- [ ] Every role in every fixture carries `threshold` and `keyids`; v1
+- [x] Every role in every fixture carries `threshold` and `keyids`; v1
       verification accepts one valid authorized signature by default, and
       `enforce_declared_threshold: true` makes a 2-of-3 bundle with one
       signature fail `:threshold_not_met`.
-- [ ] Valid rotation: the successor bundle verifies from the pinned genesis
+- [x] Valid rotation: the successor bundle verifies from the pinned genesis
       root through its cross-signed `rotation_chain`.
-- [ ] Below-threshold rotation: a rotation missing either the old-root or
+- [x] Below-threshold rotation: a rotation missing either the old-root or
       new-root declared quorum fails `:rotation_below_threshold`, including
       under v1 default enforcement.
-- [ ] Forked chain: two distinct rotation documents for one root version
+- [x] Forked chain: two distinct rotation documents for one root version
       fail `:forked_root_chain`, in-chain and against the cached digest.
-- [ ] Rotation replay: every pre-rotation bundle fails
+- [x] Rotation replay: every pre-rotation bundle fails
       `:sequence_below_floor` after the floor bump; a lower root version
       fails the same way.
-- [ ] Rollback: `Cache.put/1` rejects non-monotonic sequences, accepts the
+- [x] Rollback: `Cache.put/1` rejects non-monotonic sequences, accepts the
       byte-identical re-put as a no-op, and `floor/1` reflects
       `max(floor, rollback_floor, sequence)`.
-- [ ] Revoked keys never satisfy a threshold and fail `:revoked_key` when
+- [x] Revoked keys never satisfy a threshold and fail `:revoked_key` when
       used, including after the revoking bundle is replaced within a boot.
-- [ ] No-network: `Port.list()` is unchanged across `load` and `verify` for
+- [x] No-network: `Port.list()` is unchanged across `load` and `verify` for
       all four source classes and `dev_bundle/1`; the trust-bundle code
       path references no HTTP or socket module.
-- [ ] `dev_bundle/1` output carries `issuer_class: "dev"` in provenance and
+- [x] `dev_bundle/1` output carries `issuer_class: "dev"` in provenance and
       bundle-state Statements, `dev?: true` in the struct, and `dev: true`
       in telemetry; no production doc or config example references it.
-- [ ] Boot with an invalid configured `:trust_bundle` raises
+- [x] Boot with an invalid configured `:trust_bundle` raises
       `SigilGuard.ConfigError` naming the verify error atom.
-- [ ] Every error atom in this spec's taxonomy is produced by at least one
+- [x] Every error atom in this spec's taxonomy is produced by at least one
       test.
 
 ## Implementation Roadmap
@@ -641,20 +641,20 @@ reused by reference, never redefined.
 Aligned with milestone M2 (the task list owns task IDs); SP.01's M1 JCS and
 DSSE work is a prerequisite, and legacy removal lands in M6 per SP.12.
 
-- [ ] M2: bundle and rotation document schemas over the shared JCS/DSSE
+- [x] M2: bundle and rotation document schemas over the shared JCS/DSSE
       code from SP.01 - no bundle-local canonicalization.
-- [ ] M2: verification pipeline - roles, thresholds (v1 default plus
+- [x] M2: verification pipeline - roles, thresholds (v1 default plus
       declared-m option), expiry, revocation union, `bundle_digest`.
-- [ ] M2: rotation chain walk from the pinned genesis root, fork rejection,
+- [x] M2: rotation chain walk from the pinned genesis root, fork rejection,
       floor bump semantics.
-- [ ] M2: `Cache` (ETS at boot) and `Quarantine` records.
-- [ ] M2: four load sources plus `:trust_bundle` boot wiring with
+- [x] M2: `Cache` (ETS at boot) and `Quarantine` records.
+- [x] M2: four load sources plus `:trust_bundle` boot wiring with
       fail-closed `SigilGuard.ConfigError`.
-- [ ] M2: `dev_bundle/1` with a doctest demonstrating library-mode
+- [x] M2: `dev_bundle/1` with a doctest demonstrating library-mode
       bootstrap.
-- [ ] M2: golden vectors, negative matrix, and the no-network test.
-- [ ] M2: `[:sigil_guard, :trust_bundle, ...]` telemetry events.
-- [ ] M6: delete `SigilGuard.Registry.*` and `registry_*` config per SP.12;
+- [x] M2: golden vectors, negative matrix, and the no-network test.
+- [x] M2: `[:sigil_guard, :trust_bundle, ...]` telemetry events.
+- [x] M6: delete `SigilGuard.Registry.*` and `registry_*` config per SP.12;
       map the v2 surface in `MIGRATING-1.0.md`.
 
 ## Success Metrics

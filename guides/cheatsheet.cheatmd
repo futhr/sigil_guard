@@ -2,7 +2,7 @@
 
 ## Gate Verdicts
 
-SigilGuard gates return `%SigilGuard.Decision{}`. Treat `action` as the v3
+SigilGuard gates return `%SigilGuard.Decision{}`. Treat `action` as the 1.0
 verdict.
 
 ```elixir
@@ -27,6 +27,10 @@ case decision.action do
   :block -> reject_request(decision)
 end
 ```
+
+Use `SigilGuard.ToolGateway` as the enforcement core. Use
+`SigilGuard.MCP.Gateway` only at MCP transport boundaries where
+JSON-RPC-compatible helper names and tuple responses are useful.
 
 Common meanings:
 
@@ -89,7 +93,7 @@ matchers include `phase`, `origin`, `sink`, `zone`, `trust`, `sensitivity`,
 `isolation`, `effect`, `hits`, and `indicator`.
 
 Repo-policy decisions inside `[repo]` are `allow`, `require_approval`, or
-`block`; `require_approval` maps to the v3 `:confirm` gate verdict.
+`block`; `require_approval` maps to the 1.0 `:confirm` gate verdict.
 
 Load and evaluate the repo section directly when you only need repo path rules:
 

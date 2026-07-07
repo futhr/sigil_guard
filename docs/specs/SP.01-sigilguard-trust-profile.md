@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.01"
   title: "Agent Trust Profile"
   domain: security
-  status: planned
+  status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags: ["agent-trust", "attestation", "dsse", "jcs", "v3", "breaking-change"]
   depends_on: ["R.01", "R.02", "R.05", "R.06", "R.07"]
 ---
@@ -891,30 +891,30 @@ atoms instead of inventing artifact-specific ones.
 
 ## Acceptance Criteria
 
-- [ ] `TrustProfile.profile_id/0` returns `"sigil_guard_agent_trust/v1"`;
+- [x] `TrustProfile.profile_id/0` returns `"sigil_guard_agent_trust/v1"`;
       `statement_types/0` returns the eight types in the fixed order.
-- [ ] All 8 statement types validate and round-trip golden vectors
+- [x] All 8 statement types validate and round-trip golden vectors
       byte-identically from `test/fixtures/agent_trust/`.
-- [ ] Verification rejects each tampered digest class with its named atom
+- [x] Verification rejects each tampered digest class with its named atom
       (`:digest_mismatch` x3 classes, `:manifest_digest_mismatch`).
-- [ ] Envelope negatives produce `:invalid_payload_type`, `:duplicate_keyid`,
+- [x] Envelope negatives produce `:invalid_payload_type`, `:duplicate_keyid`,
       `:unknown_key_id`, `:invalid_signature`, `:invalid_base64`,
       `:invalid_envelope`.
-- [ ] The JCS encoder passes the RFC 8785 appendix vectors and adversarial
+- [x] The JCS encoder passes the RFC 8785 appendix vectors and adversarial
       corpus; out-of-range integers return `:unsupported_number_range`.
-- [ ] Digest equality is proven with and without `_agent_trust`,
+- [x] Digest equality is proven with and without `_agent_trust`,
       `_agent_confirmation`, and `confirmation_token` keys present.
-- [ ] Replay reuse yields `:replay_detected`; expiry and future-dating
+- [x] Replay reuse yields `:replay_detected`; expiry and future-dating
       beyond skew yield `:expired_attestation`.
-- [ ] Configuration and option validation is done through NimbleOptions
+- [x] Configuration and option validation is done through NimbleOptions
       schemas; unknown/wrong-type/removed keys fail closed as
       `SigilGuard.ConfigError`.
-- [ ] Runtime dependency set is `:telemetry`, `:nimble_options`, and `jason`;
+- [x] Runtime dependency set is `:telemetry`, `:nimble_options`, and `jason`;
       Elixir floor `~> 1.18`.
 - [x] Removed config keys raise typed errors naming `MIGRATING-1.0.md`;
       unknown keys fail boot with `:unknown_config_key`.
 - [x] The Envelope-to-Attestation table is reproduced 1:1 in `MIGRATING-1.0.md`.
-- [ ] Every error atom in this spec's taxonomy is produced by at least one test.
+- [x] Every error atom in this spec's taxonomy is produced by at least one test.
 
 ## Implementation Roadmap
 
@@ -922,16 +922,16 @@ Aligned with task milestones (the task list owns task IDs): encoding and
 statement work lands in M1; legacy removal and config enforcement land in
 M6 per SP.12.
 
-- [ ] M1: adopt `:nimble_options`; keep `jason` as the JSON library.
-- [ ] M1: `SigilGuard.Canonical.JCS` with RFC 8785 appendix vectors and the
+- [x] M1: adopt `:nimble_options`; keep `jason` as the JSON library.
+- [x] M1: `SigilGuard.Canonical.JCS` with RFC 8785 appendix vectors and the
       adversarial corpus.
-- [ ] M1: DSSE envelope encode/decode, PAE, multi-signature verification.
-- [ ] M1: Statement builder, `TrustProfile` registry, structural validation.
-- [ ] M1: digest computation for all eight statement types with the strip
+- [x] M1: DSSE envelope encode/decode, PAE, multi-signature verification.
+- [x] M1: Statement builder, `TrustProfile` registry, structural validation.
+- [x] M1: digest computation for all eight statement types with the strip
       and normalization rules.
-- [ ] M1: generate and commit golden vectors under `test/fixtures/agent_trust/`.
-- [ ] M1: `_agent_trust`/`_agent_confirmation` attach and fetch helpers.
-- [ ] M6: closed config key set with `SigilGuard.ConfigError`; delete
+- [x] M1: generate and commit golden vectors under `test/fixtures/agent_trust/`.
+- [x] M1: `_agent_trust`/`_agent_confirmation` attach and fetch helpers.
+- [x] M6: closed config key set with `SigilGuard.ConfigError`; delete
       `SigilGuard.Envelope`/`Profile`/`Registry.*` per SP.12 and
       `MIGRATING-1.0.md`.
 

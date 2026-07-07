@@ -3,10 +3,10 @@ sigil_guard:
   id: "SP.04"
   title: "Boundary Scanner And Policy Kernel"
   domain: security
-  status: planned
+  status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-02"
+  updated: "2026-07-07"
   tags:
     ["scanner", "policy", "boundary", "lifecycle", "output-contracts",
      "sandbox", "hooks", "streaming", "v3"]
@@ -812,59 +812,59 @@ SP.01's profile-wide taxonomy applies by reference (`:invalid_context`,
 
 ## Acceptance Criteria
 
-- [ ] `canonical.policy` parses; `canonical.expected.json` reproduces rules,
+- [x] `canonical.policy` parses; `canonical.expected.json` reproduces rules,
       contracts, repo section, and the raw-bytes `policy_file_digest`.
-- [ ] Every legacy filename produces
+- [x] Every legacy filename produces
       `{:error, {:legacy_policy_filename, found, use}}` with the correct
       positional replacement; no silent fallback path exists.
-- [ ] Rule precedence follows `block > quarantine > confirm > redact > allow`;
+- [x] Rule precedence follows `block > quarantine > confirm > redact > allow`;
       `[repo]` keeps its implemented precedence and defaults.
-- [ ] All 20 sandbox matrix cells are tested; absent/`:none` results
+- [x] All 20 sandbox matrix cells are tested; absent/`:none` results
       quarantine or block exactly as specified, and only rules carrying an
       `isolation:` matcher override a cell.
-- [ ] The trifecta example blocks `trust:low,medium` and confirms
+- [x] The trifecta example blocks `trust:low,medium` and confirms
       `trust:high`; the confirmation binds the action digest with `sandbox_id`.
-- [ ] The three transforms match their normative semantics, including the
+- [x] The three transforms match their normative semantics, including the
       truncation UTF-8 property, the 64-byte `max_size` floor, and the
       redaction-quarantine-contract evaluation order.
-- [ ] Every hook callback exists with the specified signature; the fail-closed
+- [x] Every hook callback exists with the specified signature; the fail-closed
       matrix covers timeout, crash, and `:invalid_hook_result` on blockable
       and notification-only phases.
-- [ ] Adaptive nil-path byte-equality holds; adaptive indicators raise but
+- [x] Adaptive nil-path byte-equality holds; adaptive indicators raise but
       never lower risk and never produce an allow.
-- [ ] `scan/1` and `scan_and_redact/1` return shapes are unchanged; `name` is
+- [x] `scan/1` and `scan_and_redact/1` return shapes are unchanged; `name` is
       preserved on every hit; additive fields validate; `span` equals
       `{offset, length}`.
-- [ ] Streaming properties enumerate every two-chunk split of every secret
+- [x] Streaming properties enumerate every two-chunk split of every secret
       fixture with zero leaks; the effective window rises to the largest
       active `max_match_bytes`.
-- [ ] `split_secret_vectors.json` exists with the required vector classes,
+- [x] `split_secret_vectors.json` exists with the required vector classes,
       including confusable negatives, and executes green.
-- [ ] Every spec-local error atom is produced by at least one test.
+- [x] Every spec-local error atom is produced by at least one test.
 
 ## Implementation Roadmap
 
 Aligned with milestone M4 (the task list owns task IDs); TM.08/TM.09 threat
 modules land in M5 on top of this work.
 
-- [ ] M4: `SigilGuard.Boundary` input struct with sandbox fields,
+- [x] M4: `SigilGuard.Boundary` input struct with sandbox fields,
       `source_sensitivity`, and validation.
-- [ ] M4: policy-file parser (version line, sections, folding), raw-bytes
+- [x] M4: policy-file parser (version line, sections, folding), raw-bytes
       digest, D13 filenames, and the legacy-filename typed error.
-- [ ] M4: `BoundaryPolicy.evaluate/2` with decision combination, precedence,
+- [x] M4: `BoundaryPolicy.evaluate/2` with decision combination, precedence,
       and matched-rule explanations.
-- [ ] M4: sandbox mismatch matrix, quarantine defaults, and the explicit
+- [x] M4: sandbox mismatch matrix, quarantine defaults, and the explicit
       `isolation:` override rule.
-- [ ] M4: output contracts with the three transforms and evaluation-order
+- [x] M4: output contracts with the three transforms and evaluation-order
       wiring.
-- [ ] M4: `SigilGuard.Hooks` behaviour, dispatcher, timeout, fail-closed
+- [x] M4: `SigilGuard.Hooks` behaviour, dispatcher, timeout, fail-closed
       matrix.
-- [ ] M4: `SigilGuard.AdaptiveDetector` behaviour with nil-path equality
+- [x] M4: `SigilGuard.AdaptiveDetector` behaviour with nil-path equality
       tests.
-- [ ] M4: pattern-set split, `max_match_bytes`, hit-map extension, pluggable
+- [x] M4: pattern-set split, `max_match_bytes`, hit-map extension, pluggable
       quarantine sets.
-- [ ] M4: streaming property tests and the curated vector file.
-- [ ] M4: canonical and lethal-trifecta policy fixtures with doctests.
+- [x] M4: streaming property tests and the curated vector file.
+- [x] M4: canonical and lethal-trifecta policy fixtures with doctests.
 
 ## Success Metrics
 

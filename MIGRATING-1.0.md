@@ -2,14 +2,15 @@
 
 ## Dependency Update
 
-Update the package requirement when you are ready to adopt the v3 breaking
-surface:
+Update the package requirement when you are ready to adopt the 1.0 breaking
+surface. Historical 0.2.x docs used "v2" and the 1.0 development docs used
+"v3"; this guide otherwise uses release-line names.
 
 ```elixir
-# v2
+# 0.2.x line
 {:sigil_guard, "~> 0.2"}
 
-# v3
+# 1.0 line
 {:sigil_guard, "~> 1.0"}
 ```
 
@@ -33,7 +34,7 @@ when moving production code to the 1.0 release line.
   `SigilGuard.TrustBundle` sources.
 - Replace verdict envelopes with Agent Trust attestations.
 - Replace profile compatibility calls with `SigilGuard.TrustProfile`.
-- Remove deleted v2 configuration keys before booting v3.
+- Remove deleted 0.2.x configuration keys before booting 1.0.
 - Update expected error atoms and boot-error handling.
 - Re-check socket, channel, or session-auth code that previously carried
   `_sigil`; it must now carry or verify `_agent_trust`.
@@ -47,7 +48,7 @@ to the SIGILGUARD filename family. Legacy filenames fail closed with
 `{:error, {:legacy_policy_filename, found, use}}` and are never parsed as
 fallbacks.
 
-| V2 Filename | V3 Filename |
+| 0.2.x filename | 1.0 filename |
 |-------------|-------------|
 | `SIGIL_POLICY` | `SIGILGUARD_POLICY` |
 | `.sigil-policy` | `.sigilguard-policy` |
@@ -58,8 +59,8 @@ fallbacks.
 
 Use `_agent_trust` instead of `_sigil` for Agent Trust attestations attached to
 MCP payloads. The metadata key may appear at the JSON-RPC payload root or inside
-`params`; v3 strips `_agent_trust` from both locations before computing action
-digests. V3 does not strip `_sigil`.
+`params`; 1.0 strips `_agent_trust` from both locations before computing action
+digests. 1.0 does not strip `_sigil`.
 
 Before:
 
@@ -112,9 +113,9 @@ After:
 }
 ```
 
-Mixed-traffic rollout: do not send both metadata keys to the same v3 endpoint.
-Upgrade producers and consumers as a pair, or route v2 traffic to the old v2
-deployment until both sides emit and verify `_agent_trust`. In v3, `_sigil` is
+Mixed-traffic rollout: do not send both metadata keys to the same 1.0 endpoint.
+Upgrade producers and consumers as a pair, or route 0.2.x traffic to the old
+0.2.x deployment until both sides emit and verify `_agent_trust`. In 1.0, `_sigil` is
 ordinary user content for digest purposes and can change the signed action
 digest instead of being treated as transport metadata.
 
@@ -130,7 +131,7 @@ Check both common attachment sites during migration:
 ## MCP Confirmation Metadata
 
 Use `_agent_confirmation` instead of `_sigil_confirmation` for confirmation
-metadata. Like `_agent_trust`, v3 strips `_agent_confirmation` at the JSON-RPC
+metadata. Like `_agent_trust`, 1.0 strips `_agent_confirmation` at the JSON-RPC
 payload root and inside `params` before computing action digests.
 
 Before:
@@ -164,7 +165,7 @@ After:
       "url": "https://hooks.example.invalid/deploy",
       "body": "deploy"
     },
-    "_agent_confirmation": "v3-confirmation-token"
+    "_agent_confirmation": "1.0-confirmation-token"
   }
 }
 ```
@@ -222,7 +223,7 @@ source = {:binary, verified_bundle_json}
 ```
 
 `TrustBundle.load/1` verifies the DSSE envelope and bundle metadata before the
-bundle enters the runtime. SigilGuard v3 does not fetch bundles from a registry;
+bundle enters the runtime. SigilGuard 1.0 does not fetch bundles from a registry;
 if a host downloads bundle bytes, that transport, caching, authentication, and
 retry policy live outside SigilGuard and feed only the `{:binary, bytes}` source.
 
@@ -284,7 +285,7 @@ trust_material =
 SigilGuard.Attestation.verify(envelope, trust_material)
 ```
 
-There is no DID resolver in v3 core. Network DID resolution, OAuth/resource
+There is no DID resolver in 1.0 core. Network DID resolution, OAuth/resource
 server identity, SPIFFE/SVID validation, and account-to-actor mapping remain
 host-owned inputs to SigilGuard.
 
@@ -303,11 +304,11 @@ host-owned inputs to SigilGuard.
 `SigilGuard.Envelope` is removed. Use `SigilGuard.Attestation` and Agent Trust
 DSSE envelopes.
 
-The v2 verdict mapping is `:allowed -> "allow"`, `:blocked -> "block"`, and
-`:scanned -> "allow"`; v2 `:scanned` was advisory, while v3 records scanner
+The 0.2.x verdict mapping is `:allowed -> "allow"`, `:blocked -> "block"`, and
+`:scanned -> "allow"`; 0.2.x `:scanned` was advisory, while 1.0 records scanner
 evidence in `matched_rules`.
 
-| V2 Envelope surface | V3 Attestation surface |
+| 0.2.x Envelope surface | 1.0 Attestation surface |
 |---------------------|------------------------|
 | `identity` | `predicate.actor.id` (issuer is the resolved signing key via `keyid`). |
 | `verdict` (`allowed`/`blocked`/`scanned`) | `predicate.verdict` per the mapping above. |
@@ -389,16 +390,16 @@ from a verified trust bundle as shown in the registry lookup migration section.
 
 ## Profile To TrustProfile
 
-`SigilGuard.Profile` is removed. Use `SigilGuard.TrustProfile` for the v3 Agent
-Trust profile. V3 has one profile id and one wire form:
+`SigilGuard.Profile` is removed. Use `SigilGuard.TrustProfile` for the 1.0 Agent
+Trust profile. 1.0 has one profile id and one wire form:
 `sigil_guard_agent_trust/v1`.
 
-| V2 Profile surface | V3 replacement |
+| 0.2.x Profile surface | 1.0 replacement |
 |--------------------|----------------|
 | `SigilGuard.Profile.profiles/0` | `SigilGuard.TrustProfile.statement_types/0` plus `predicate_type/1` for the closed statement registry. |
-| `SigilGuard.Profile.normalize!/1` | Removed. Build or verify a v3 Statement and call `SigilGuard.TrustProfile.validate/1`; invalid profiles return typed errors instead of normalizing. |
-| `SigilGuard.Profile.wire_verdict_format/1` | Removed. V3 uses one predicate verdict vocabulary in Agent Trust statements. |
-| `SigilGuard.Profile.verdict_acceptance/1` | Removed. `SigilGuard.Attestation.verify/3` and `SigilGuard.TrustProfile.validate/1` enforce the v3 profile. |
+| `SigilGuard.Profile.normalize!/1` | Removed. Build or verify a 1.0 Statement and call `SigilGuard.TrustProfile.validate/1`; invalid profiles return typed errors instead of normalizing. |
+| `SigilGuard.Profile.wire_verdict_format/1` | Removed. 1.0 uses one predicate verdict vocabulary in Agent Trust statements. |
+| `SigilGuard.Profile.verdict_acceptance/1` | Removed. `SigilGuard.Attestation.verify/3` and `SigilGuard.TrustProfile.validate/1` enforce the 1.0 profile. |
 | `SigilGuard.Profile.require_blocked_reason_on_verify?/1` | Removed. Blocking rationale lives in `predicate.matched_rules[].explanation`. |
 | `SigilGuard.Profile.registry_identity_endpoints/1` | Removed. DID/network identity discovery is host-owned; verified bundle issuer policy is available through `SigilGuard.TrustBundle.identity_issuers/1`. |
 | `:protocol_profile` config | Removed. Use `SigilGuard.TrustProfile.profile_id/0` when code needs the constant. |
@@ -431,35 +432,35 @@ end
 
 ## Configuration Keys
 
-Remove deleted v2 keys before booting v3. Removed keys fail closed with
+Remove deleted 0.2.x keys before booting 1.0. Removed keys fail closed with
 `SigilGuard.ConfigError` naming `MIGRATING-1.0.md`, with reason
 `:legacy_contract_removed`.
 
 | Removed key | Replacement |
 |-------------|-------------|
 | `:backend` | None; the native Elixir backend is the only backend. |
-| `:protocol_profile` | None; v3 has one profile, `sigil_guard_agent_trust/v1`. |
+| `:protocol_profile` | None; 1.0 has one profile, `sigil_guard_agent_trust/v1`. |
 | `:registry_url`, `:registry_ttl_ms`, `:registry_timeout_ms`, `:registry_retry_ms` | `:trust_bundle` local sources (SP.02). |
 | `:registry_enabled` | None; no registry runtime path exists. |
 | `:registry_require_signed_bundles`, `:registry_bundle_public_keys` | Bundle roots and thresholds inside the trust bundle (SP.02). |
 | `:registry_bundle_max_age_seconds`, `:registry_bundle_clock_skew_seconds` | Bundle expiry and skew fields inside the trust bundle (SP.02). |
 | `scanner_patterns: :registry` (value) | `scanner_patterns: :bundle`. |
 
-Kept v3 keys are `:trust_bundle`, `:scanner_patterns`, `:http_client`,
+Kept 1.0 keys are `:trust_bundle`, `:scanner_patterns`, `:http_client`,
 `:attestation_ttl_ms`, `:max_skew_ms`, `:replay_ttl_ms`, `:vault_master_key`,
 and `:trust_mappings`. Unknown keys fail closed with reason
 `:unknown_config_key`.
 
 Only remove keys that configure SigilGuard. Host application boot keys may
-still use sigil-prefixed names for unrelated local concerns; v3 does not reserve
+still use sigil-prefixed names for unrelated local concerns; 1.0 does not reserve
 or inspect those names outside the `:sigil_guard` application environment.
 
 ## Error Changes
 
-Some v2 error atoms were reconciled for v3 trust-bundle and configuration
+Some 0.2.x error atoms were reconciled for 1.0 trust-bundle and configuration
 contracts.
 
-| V2 / draft atom | V3 atom | Meaning |
+| 0.2.x / draft atom | 1.0 atom | Meaning |
 |-----------------|---------|---------|
 | `:rollback_detected` | `:sequence_below_floor` | The signed bundle sequence/root version is below the accepted floor. |
 | `:expired_bundle` | `:bundle_expired` | Bundle document freshness failed. |
@@ -467,7 +468,7 @@ contracts.
 | `:invalid_schema` | `:invalid_bundle_format` | Bundle payload shape or strict schema validation failed. |
 | `:invalid_bundle` | `:invalid_bundle_format` | Bundle payload shape or strict schema validation failed. |
 | `:missing_signature` | `:invalid_envelope` | DSSE envelope shape is missing or invalid. |
-| `:unsigned_bundle` | `:invalid_envelope` | Unsigned bundles are not a v3 trust-bundle format. |
+| `:unsigned_bundle` | `:invalid_envelope` | Unsigned bundles are not a 1.0 trust-bundle format. |
 
 Configuration errors changed from permissive fallback behavior to boot-time
 failure. Removed keys raise `SigilGuard.ConfigError` with reason
@@ -476,8 +477,8 @@ reason `:unknown_config_key`. Both error messages name `MIGRATING-1.0.md`.
 
 ## Version Pinning
 
-`~> 0.2` users do not auto-upgrade to v3. The v3 release is intentionally a
-major-version break, so existing v2 consumers stay on the `0.2.x` line until
+`~> 0.2` users do not auto-upgrade to 1.0. The 1.0 release is intentionally a
+major-version break, so existing 0.2.x consumers stay on the `0.2.x` line until
 they edit their dependency requirement.
 
 For the 1.0 release line, use:
@@ -494,7 +495,7 @@ semver rules and remains separate from the `0.2.x` line.
 SigilGuard 1.0 moves MCP gateway rejection codes from the v0.2 `-32001..-32003`
 range to the dedicated `-32050..-32056` range:
 
-| v0.2 code | v3 code | Status |
+| 0.2.x code | 1.0 code | Status |
 |-----------|---------|--------|
 | `-32001` | `-32050` | `blocked` |
 | `-32002` | `-32051` | `confirmation_required` |
@@ -520,8 +521,8 @@ The runtime gate now evaluates through `SigilGuard.BoundaryPolicy` (SP.04) and
   decide what to execute after a confirmation must read `decision.effect`. In
   particular, a `tool_result` prompt-injection decision that used to report
   `action: :quarantine` now reports `action: :confirm, effect: :quarantine`.
-- **`:verdict` (v2 dual vocabulary)** — `:allowed | :blocked | {:confirm, reason}`
-  — is still populated for compatibility and is removed in the M6 wave.
+- **`:verdict` (legacy dual vocabulary)** — `:allowed | :blocked | {:confirm, reason}`
+  — is still populated for compatibility.
 - **New fields**: `matched_rules` (`[%{rule_id, explanation}]`), `evidence_refs`,
   `effect`, and the boundary labels `source`, `sink`, `trust_zone`, `actor`,
   `resource`. The `:require_approval` repo action is closed to `:confirm`.

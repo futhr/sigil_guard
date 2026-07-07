@@ -1,13 +1,13 @@
 # Change Log
 
 All notable changes to this project will be documented in this file.
-See [Conventional Commits](Https://conventionalcommits.org) for commit guidelines.
+See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
 ## Unreleased Breaking Changes For 1.0.0
 
 SigilGuard 1.0 is a deliberate breaking release. Apply
-[`MIGRATING-1.0.md`](MIGRATING-1.0.md) before moving a v2 consumer to the v3
-line.
+[`MIGRATING-1.0.md`](MIGRATING-1.0.md) before moving a 0.2.x consumer to the
+1.0 line.
 
 - Removed `SigilGuard.Registry`, `SigilGuard.Registry.Bundle`, and
   `SigilGuard.Registry.Cache`; use
@@ -32,8 +32,8 @@ line.
   for the 1.0.0 release line.
 - Changed selected trust-bundle error atoms and config boot errors; see
   [Error Changes](MIGRATING-1.0.md#error-changes).
-- Version adoption is explicit: `~> 0.2` remains on v2 and `~> 1.0` adopts the
-  1.0 release line; see
+- Version adoption is explicit: `~> 0.2` remains on the 0.2.x line and
+  `~> 1.0` adopts the 1.0 release line; see
   [Version Pinning](MIGRATING-1.0.md#version-pinning).
 
 <!-- changelog -->
