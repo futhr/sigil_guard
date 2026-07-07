@@ -184,7 +184,6 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Vault.InMemory
         ],
         Registry: [
-          SigilGuard.Registry.Bundle,
           SigilGuard.Registry.Cache
         ],
         Backend: [

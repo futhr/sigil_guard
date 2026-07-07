@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-06-30T12:00:00Z",
+  "patterns": [
+    {
+      "name": "registry_pat",
+      "regex": "REG_[0-9]+",
+      "category": "test",
+      "severity": "low"
+    }
+  ],
+  "provenance": {
+    "issuer": "did:sigil:registry",
+    "algorithm": "Ed25519",
+    "issued_at": "2026-06-30T12:00:00.000Z",
+    "expires_at": "2026-06-30T13:00:00.000Z",
+    "digest": "legacy-registry-bundle-digest-fixture",
+    "signature": "legacy-registry-bundle-signature-fixture"
+  }
+}

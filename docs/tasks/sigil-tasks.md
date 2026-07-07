@@ -1712,12 +1712,19 @@ section is post-3.0.0 parking; neither is counted here.
     Removal assertions prove `SigilGuard.Registry` is not loadable and
     `fetch_bundle`, `resolve_did`, `resolve_key`, and `fetch_policies` raise
     `UndefinedFunctionError` through `apply/3`.
-- [ ] M6.02 Delete `SigilGuard.Registry.Bundle`.
+- [x] M6.02 Delete `SigilGuard.Registry.Bundle`.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: deleted; provenance checks live in `TrustBundle` verification;
     legacy golden vectors preserved under `test/fixtures/historical/`.
   - Tests: removal test, golden vectors (historical still parse as
     fixtures).
+  - Done: deleted `lib/sigil_guard/registry/bundle.ex`, removed the old
+    provenance test module, extended `registry_removal_test.exs` to prove
+    `SigilGuard.Registry.Bundle` is not loadable and its legacy
+    `canonical_bytes`, `digest`, `sign`, and `verify` calls raise
+    `UndefinedFunctionError`, and preserved the old bundle shape in
+    `test/fixtures/historical/legacy_registry_bundle.json` with a parser-only
+    fixture assertion.
 - [ ] M6.03 Delete `SigilGuard.Registry.Cache`.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: deleted; `TrustBundle.Cache` is the only cache; no ETS table or
