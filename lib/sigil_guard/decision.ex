@@ -14,7 +14,7 @@ defmodule SigilGuard.Decision do
           verdict: verdict(),
           action: action(),
           reason: String.t() | nil,
-          phase: SigilGuard.Context.phase(),
+          phase: SigilGuard.Context.phase() | SigilGuard.Lifecycle.phase(),
           risk_level: SigilGuard.Policy.risk_level(),
           trust_level: SigilGuard.Identity.trust_level(),
           hits: [SigilGuard.Patterns.scan_hit()],
