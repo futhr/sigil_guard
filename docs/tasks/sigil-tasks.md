@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 132 / 228 tasks done (58%).** Milestones: 5 complete, 1 partial,
-4 not started. **96 tasks left.** Current milestone: **M4** (23/25, 92%).
+**Overall: 133 / 228 tasks done (58%).** Milestones: 5 complete, 1 partial,
+4 not started. **95 tasks left.** Current milestone: **M4** (24/25, 96%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -73,19 +73,18 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 | Core groundwork | 19 | 19 | 100% | Complete |
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
-| M4 | Boundary scanner and policy kernel | 23 | 25 | 92% | In progress |
+| M4 | Boundary scanner and policy kernel | 24 | 25 | 96% | In progress |
 | M5 | Audit, telemetry, provenance, threat suite | 0 | 26 | 0% | Not started |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **132** | **228** | **58%** | 5 done / 1 partial / 4 to go |
+| — | **Total** | **133** | **228** | **58%** | 5 done / 1 partial / 4 to go |
 
-### What's left (96 tasks)
+### What's left (95 tasks)
 
-- **M4 - 2 left (both heavy):** M4.08 runtime-gate rewire onto `BoundaryPolicy`
-  (integration capstone; must keep M1.02 conformance green); M4.20 pattern-set
-  split + bundle wiring (restructures `Quarantine` into injection/poisoning sets
-  through the SP.02 bundle contract).
+- **M4 - 1 left:** M4.20 pattern-set split + bundle wiring (restructures
+  `Quarantine` into injection/poisoning sets through the SP.02 bundle contract;
+  needs the SP.04 pattern-set-entry schema pinned down first).
 - **M5 - 26:** audit, telemetry, provenance, and the threat-model test suite.
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
@@ -952,10 +951,10 @@ section is post-3.0.0 parking; neither is counted here.
     `block > require_approval > allow` order and unmatched-path defaults;
     decisions carry matched-rule ids and explanations.
   - Tests: negative, property (precedence total order).
-- [ ] M4.08 Runtime gate rewire onto `BoundaryPolicy` with the unified
+- [x] M4.08 Runtime gate rewire onto `BoundaryPolicy` with the unified
       verdict enum.
   - Spec: `docs/specs/SP.07-runtime-gate-and-streaming-contracts.md` - V3
-    Rewire; V3 Decision Contract (Unified Verdict Enum; New Typed Fields).
+    Rewire (Gate <-> Kernel Delegation); V3 Decision Contract.
   - AC: the gate evaluates through `BoundaryPolicy`; the unified verdict
     enum (allow/block/confirm/redact/quarantine) replaces the v2 dual
     vocabulary per the spec's mapping table; `%Decision{}` gains typed
@@ -963,16 +962,15 @@ section is post-3.0.0 parking; neither is counted here.
     resource, and phase appear on runtime decisions.
   - AC: D17 facade contracts stay byte-stable - M1.02 stays green.
   - Tests: negative, property (old-to-new verdict mapping), conformance.
-  - Status (partial, green): `%Decision{}` gained typed `matched_rules`,
-    `evidence_refs`, and boundary labels (`source`/`sink`/`trust_zone`/
-    `actor`/`resource`); `BoundaryPolicy` and the gate populate them; the
-    `:require_approval` action is closed to `:confirm`; verdict-mapping +
-    typed-field tests added; M1.02 stays green. REMAINING: route the gate's
-    verdict *through* `BoundaryPolicy.evaluate` (needs the gate to build a
-    digest-valid `Boundary` and combine boundary/scanner-failure/quarantine
-    verdicts), and promote a confirming verdict's `:allow`/`:redact` action to
-    `:confirm` (requires reworking the confirmation flow, which consumes
-    `action` as the post-confirmation action).
+  - Done: SP.07 gained the normative *Gate <-> Kernel Delegation* subsection
+    and SP.04 the sandbox opt-in framing (Option 1). The gate builds a
+    normalized `Boundary` (phase bridge, evidence digests) and folds
+    `BoundaryPolicy.evaluate` into its combination by the unified total order,
+    keeping scanner-failure/quarantine/risk-trust; the sandbox matrix is opt-in
+    by tool/sandbox presence; `%Decision{}` gained `matched_rules`,
+    `evidence_refs`, boundary labels, and `effect` (the post-confirmation
+    action, separated from the unified `:confirm`), with the confirmation
+    dispatch reading `effect`. M1.02 and every consumer stay green.
 - [x] M4.09 Sandbox identity fields on `SigilGuard.Context`.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Sandbox Identity (Isolation Levels).
