@@ -1919,12 +1919,19 @@ section is post-3.0.0 parking; neither is counted here.
     flows, verified `TrustBundle.identity_issuers/1` issuer checks, and
     explicit key material construction from verified bundle `keys`, root
     keyids, and delegated role keyids for `Attestation.verify/3`.
-- [ ] M6.18 MIGRATING: `Envelope.sign/verify` to `Attestation.sign/verify`
+- [x] M6.18 MIGRATING: `Envelope.sign/verify` to `Attestation.sign/verify`
       mapping table.
   - Spec: `SP.01` - Migration: Envelope To Attestation.
   - AC: the field mapping table is reproduced 1:1; both known consumer
     call-site shapes get exact replacement snippets.
   - Validation: completeness script.
+  - Done: reproduced the SP.01 Envelope-to-Attestation table 1:1 in
+    `MIGRATING-3.0.md`, including the verdict mapping note. Added exact
+    replacement snippets for signing and attaching tool-request metadata
+    (`Envelope.sign/3` + `_sigil` to `Attestation.from_decision/3` +
+    `Attestation.sign/3` + `Attestation.attach/2`) and for verifying attached
+    metadata (`Envelope.verify/2` to `Attestation.fetch/1` +
+    `Attestation.verify/3` with trust material and digest options).
 - [ ] M6.19 MIGRATING: `Profile` to `TrustProfile`.
   - Spec: `SP.01` - Public Modules Removed In V3.
   - AC: function-level mapping; profile id constant migration noted.

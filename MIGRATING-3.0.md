@@ -281,8 +281,91 @@ host-owned inputs to SigilGuard.
 ## Envelope To Attestation
 
 `SigilGuard.Envelope` is removed. Use `SigilGuard.Attestation` and Agent Trust
-DSSE envelopes. The SP.01 field mapping table and known consumer call-site
-replacement snippets are filled in by M6.18.
+DSSE envelopes.
+
+The v2 verdict mapping is `:allowed -> "allow"`, `:blocked -> "block"`, and
+`:scanned -> "allow"`; v2 `:scanned` was advisory, while v3 records scanner
+evidence in `matched_rules`.
+
+| V2 Envelope surface | V3 Attestation surface |
+|---------------------|------------------------|
+| `identity` | `predicate.actor.id` (issuer is the resolved signing key via `keyid`). |
+| `verdict` (`allowed`/`blocked`/`scanned`) | `predicate.verdict` per the mapping above. |
+| `timestamp` | `predicate.issued_at` (`expires_at` is new and required). |
+| `nonce` (16-byte hex) | `predicate.nonce`, same format. |
+| `signature` (single base64url string) | `signatures[0].sig` in the DSSE envelope, plus new `keyid`. |
+| `reason` | `predicate.matched_rules[].explanation`. |
+| Canonical bytes `{identity,nonce,timestamp,verdict}` | PAE over the base64url DSSE payload. |
+| `profile:`/`wire_verdict_format:` options | Removed; one profile, one wire form. |
+| `Envelope.sign(identity, verdict, opts)` | `Attestation.from_decision/3` + `Attestation.sign/3`. |
+| `Envelope.verify(envelope, public_key_b64u, opts)` | `Attestation.verify(envelope, trust_material, opts)`. |
+| `_sigil` | `_agent_trust` (`Attestation.attach/2`, `fetch/1`). |
+| `_sigil_confirmation` | `_agent_confirmation` (`attach_confirmation/2`, `fetch_confirmation/1`). |
+| Legacy envelope fixtures | Moved to `test/fixtures/historical/` (SP.06). |
+
+### Signing A Tool Request
+
+Before:
+
+```elixir
+{:ok, envelope} =
+  SigilGuard.Envelope.sign("spiffe://prod.example.org/agents/release-bot", :allowed,
+    reason: "repo write approved"
+  )
+
+request =
+  update_in(request, ["params"], &Map.put(&1, "_sigil", envelope))
+```
+
+After:
+
+```elixir
+{:ok, statement} =
+  SigilGuard.Attestation.from_decision(decision, context,
+    payload: request,
+    statement_type: :tool_request
+  )
+
+{:ok, envelope} =
+  SigilGuard.Attestation.sign(statement, MyApp.AgentSigner,
+    keyid: "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8"
+  )
+
+request = SigilGuard.Attestation.attach(request, envelope)
+```
+
+### Verifying An Attached Request
+
+Before:
+
+```elixir
+with {:ok, envelope} <- Map.fetch(request["params"], "_sigil"),
+     {:ok, claims} <- SigilGuard.Envelope.verify(envelope, public_key_b64u) do
+  {:ok, claims}
+end
+```
+
+After:
+
+```elixir
+trust_material = %{
+  "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8" =>
+    public_key_b64u
+}
+
+with {:ok, envelope} <- SigilGuard.Attestation.fetch(request),
+     {:ok, statement} <-
+       SigilGuard.Attestation.verify(envelope, trust_material,
+         payload: request,
+         context: context,
+         consume: true
+       ) do
+  {:ok, statement}
+end
+```
+
+The trust material can be a direct `%{keyid => public_key}` map or a map derived
+from a verified trust bundle as shown in the registry lookup migration section.
 
 ## Profile To TrustProfile
 

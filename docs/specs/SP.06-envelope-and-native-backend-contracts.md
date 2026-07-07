@@ -184,7 +184,7 @@ these two call sites plus config removal).
 
 - [ ] Spec status reads `implemented/transition` here and in both catalogue
       tables (`docs/README.md`, `docs/specs/README.md`).
-- [ ] The Envelope-to-Attestation mapping exists only in SP.01 and
+- [x] The Envelope-to-Attestation mapping exists only in SP.01 and
       `MIGRATING-3.0.md`; this spec links to it and never restates it.
 - [ ] V3 moves every legacy vector, including the rust-crate vectors, to
       `test/fixtures/historical/`, and historical fixtures fail Agent Trust

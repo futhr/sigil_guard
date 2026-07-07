@@ -913,7 +913,7 @@ atoms instead of inventing artifact-specific ones.
       Elixir floor `~> 1.18`.
 - [ ] Removed config keys raise typed errors naming `MIGRATING-3.0.md`;
       unknown keys fail boot with `:unknown_config_key`.
-- [ ] The Envelope-to-Attestation table is reproduced 1:1 in `MIGRATING-3.0.md`.
+- [x] The Envelope-to-Attestation table is reproduced 1:1 in `MIGRATING-3.0.md`.
 - [ ] Every error atom in this spec's taxonomy is produced by at least one test.
 
 ## Implementation Roadmap
