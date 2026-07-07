@@ -16,7 +16,7 @@ defmodule SigilGuard.Audit.EventType do
   | `:auth_failure` | Authentication failed |
   | `:policy_violation` | A security policy was violated |
   | `:security_event` | A general security event |
-  | `:sigil_interception` | Sensitive content was intercepted by the scanner |
+  | `:scanner_interception` | Sensitive content was intercepted by the scanner |
   | `:mcp_tool_gated` | An MCP tool call was gated |
   | `:delegation_crossing` | An agent-to-agent delegation boundary was crossed |
 
@@ -39,7 +39,7 @@ defmodule SigilGuard.Audit.EventType do
           | :auth_failure
           | :policy_violation
           | :security_event
-          | :sigil_interception
+          | :scanner_interception
           | :mcp_tool_gated
           | :delegation_crossing
 
@@ -51,7 +51,7 @@ defmodule SigilGuard.Audit.EventType do
     :auth_failure,
     :policy_violation,
     :security_event,
-    :sigil_interception,
+    :scanner_interception,
     :mcp_tool_gated,
     :delegation_crossing
   ]
@@ -73,7 +73,7 @@ defmodule SigilGuard.Audit.EventType do
   def to_string(:auth_failure), do: "AuthFailure"
   def to_string(:policy_violation), do: "PolicyViolation"
   def to_string(:security_event), do: "SecurityEvent"
-  def to_string(:sigil_interception), do: "SigilInterception"
+  def to_string(:scanner_interception), do: "ScannerInterception"
   def to_string(:mcp_tool_gated), do: "McpToolGated"
   def to_string(:delegation_crossing), do: "DelegationCrossing"
 
@@ -86,7 +86,7 @@ defmodule SigilGuard.Audit.EventType do
   def from_string("AuthFailure"), do: {:ok, :auth_failure}
   def from_string("PolicyViolation"), do: {:ok, :policy_violation}
   def from_string("SecurityEvent"), do: {:ok, :security_event}
-  def from_string("SigilInterception"), do: {:ok, :sigil_interception}
+  def from_string("ScannerInterception"), do: {:ok, :scanner_interception}
   def from_string("McpToolGated"), do: {:ok, :mcp_tool_gated}
   def from_string("DelegationCrossing"), do: {:ok, :delegation_crossing}
   def from_string(_), do: :error

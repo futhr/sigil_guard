@@ -13,7 +13,7 @@ defmodule SigilGuard.Audit.EventTypeTest do
     :auth_failure,
     :policy_violation,
     :security_event,
-    :sigil_interception,
+    :scanner_interception,
     :mcp_tool_gated,
     :delegation_crossing
   ]
@@ -48,7 +48,7 @@ defmodule SigilGuard.Audit.EventTypeTest do
         {:auth_failure, "AuthFailure"},
         {:policy_violation, "PolicyViolation"},
         {:security_event, "SecurityEvent"},
-        {:sigil_interception, "SigilInterception"},
+        {:scanner_interception, "ScannerInterception"},
         {:mcp_tool_gated, "McpToolGated"},
         {:delegation_crossing, "DelegationCrossing"}
       ]
@@ -69,7 +69,7 @@ defmodule SigilGuard.Audit.EventTypeTest do
         {"AuthFailure", :auth_failure},
         {"PolicyViolation", :policy_violation},
         {"SecurityEvent", :security_event},
-        {"SigilInterception", :sigil_interception},
+        {"ScannerInterception", :scanner_interception},
         {"McpToolGated", :mcp_tool_gated},
         {"DelegationCrossing", :delegation_crossing}
       ]

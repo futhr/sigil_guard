@@ -154,6 +154,12 @@ extension below is specified by
 | Signed audit events | Canonical `Audit.Event` decision records with an exact `event_hash` field list. | Signed Audit Events. |
 | Telemetry correlation | OTel decision attributes, trace/span correlation, cardinality and sampling guidance (D16). | Telemetry And OTel Guidance. |
 
+The v3 event-type vocabulary (`SigilGuard.Audit.EventType`) renames the legacy
+`SigilInterception` type to the neutral `ScannerInterception`, retiring the
+`sigil` idiom from the emitted names. Because the chain HMAC and Merkle leaf
+cover the event's `type` **value**, not a known-name enum, historical events
+signed under the old string verify unchanged - names are data, not structure.
+
 ## Data Model
 
 ### Audit Event

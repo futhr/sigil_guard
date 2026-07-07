@@ -196,6 +196,30 @@ defmodule SigilGuard.AuditTest do
 
       assert {:broken, 1} = Audit.verify_chain([first, unsigned], @secret_key)
     end
+
+    test "verifies historical events whose type uses the retired name (names are data)" do
+      # v3 renamed the scanner interception event; a chain signed under the old
+      # "SigilInterception" type string still verifies, because the HMAC covers
+      # the type value, not a known-name enum (SP.09 V3 Extensions).
+      legacy =
+        [Audit.new_event("SigilInterception", "alice", "scan", "blocked")]
+        |> Audit.build_chain(@secret_key)
+
+      assert :ok = Audit.verify_chain(legacy, @secret_key)
+
+      renamed =
+        [
+          Audit.new_event(
+            Audit.EventType.to_string(:scanner_interception),
+            "alice",
+            "scan",
+            "blocked"
+          )
+        ]
+        |> Audit.build_chain(@secret_key)
+
+      assert :ok = Audit.verify_chain(renamed, @secret_key)
+    end
   end
 
   describe "verify_chain/3 with :prev_hmac anchor" do

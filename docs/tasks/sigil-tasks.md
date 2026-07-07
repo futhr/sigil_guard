@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 147 / 228 tasks done (64%).** Milestones: 6 complete, 1 partial,
-3 not started. **81 tasks left.** Current milestone: **M5** (13/26, 50%).
+**Overall: 148 / 228 tasks done (65%).** Milestones: 6 complete, 1 partial,
+3 not started. **80 tasks left.** Current milestone: **M5** (14/26, 54%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 13 | 26 | 50% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 14 | 26 | 54% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **147** | **228** | **64%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **148** | **228** | **65%** | 6 done / 1 partial / 3 to go |
 
-### What's left (81 tasks)
+### What's left (80 tasks)
 
-- **M5 - 13 left:** the legacy event rename and the threat-model test suite
-  (twelve TM families). (M5.01-M5.13 done, through release provenance.)
+- **M5 - 12 left:** the threat-model test suite (twelve TM families,
+  move-don't-duplicate). (M5.01-M5.14 done, through the legacy event rename.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1425,12 +1425,19 @@ section is post-3.0.0 parking; neither is counted here.
     consumer-side verification CI example to the release guide. (Workflow-level
     dry-run/negative are exercised on a real tagged run; the Elixir builder is
     unit-tested.)
-- [ ] M5.14 Rename the legacy scanner interception audit event.
+- [x] M5.14 Rename the legacy scanner interception audit event.
   - Spec: `docs/specs/SP.09-audit-chain-and-anchor-contracts.md` - V3
     Extensions (Owned By SP.05).
   - AC: the old interception event name is replaced by a neutral security
     event; chain verification over historical events with the old name
     still verifies (names are data, not structure).
+  - Done: renamed `SigilGuard.Audit.EventType`'s `:sigil_interception` /
+    `"SigilInterception"` to the neutral `:scanner_interception` /
+    `"ScannerInterception"`, retiring the `sigil` idiom from the emitted
+    vocabulary. Added a `verify_chain` test proving a chain signed under the old
+    `"SigilInterception"` type string still verifies (the HMAC covers the type
+    value, not a known-name enum) and pinned the rename + name-agnostic
+    verification in SP.09.
   - Tests: negative, golden vectors (historical chain).
 - [ ] M5.15 TM.01 threat family - prompt injection via tool results.
   - Spec: `docs/research/R.06-agentic-threat-model-and-control-mapping.md`
