@@ -61,8 +61,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 203 / 220 tasks done (92%).** Milestones: 7 complete, 3 partial,
-0 not started. **17 tasks left.** Current milestone: **M6/M7/M8** (blocked
+**Overall: 204 / 220 tasks done (93%).** Milestones: 7 complete, 3 partial,
+0 not started. **16 tasks left.** Current milestone: **M6/M7/M8** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -76,15 +76,15 @@ consumer gate; docs/adoption work started).
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
 | M7 | Integrations and adoption | 13 | 17 | 76% | In progress |
-| M8 | Release | 1 | 12 | 8% | In progress |
-| — | **Total** | **203** | **220** | **92%** | 7 done / 3 partial / 0 to go |
+| M8 | Release | 2 | 12 | 17% | In progress |
+| — | **Total** | **204** | **220** | **93%** | 7 done / 3 partial / 0 to go |
 
-### What's left (17 tasks)
+### What's left (16 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
 - **M7 - 4:** benchmark and comparison artifacts.
-- **M8 - 11:** release engineering and validation.
+- **M8 - 10:** release engineering and validation.
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
@@ -2319,11 +2319,13 @@ section is post-1.0.0 parking; neither is counted here.
     at `MIGRATING-1.0.md`, updated dependency snippets and release docs to the
     1.0 release line, regenerated Agent Trust release fixtures, and verified
     the focused release/doc gates.
-- [ ] M8.02 git_ops 1.0.0 resume check.
+- [x] M8.02 git_ops 1.0.0 resume check.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: `mix git_ops.release --dry-run` operates normally from the `1.0.0`
     line and does not try to derive a separate major-version jump.
   - Validation: dry-run output archived in the release notes draft.
+  - Done: `mix git_ops.release --dry-run` resumes from `1.0.0` and reports
+    `1.1.0` as the next normal conventional-commit release.
 - [ ] M8.03 Reference-consumer 1.0.0 validation (blocking tier-3 gate).
   - Spec: `SP.12` - Release Sequence (D11); Acceptance Criteria.
   - AC: the reference consumer validates green against the 1.0.0 package,
