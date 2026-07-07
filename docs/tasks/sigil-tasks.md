@@ -63,23 +63,37 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-| Milestone | Total | Complete | In Progress | Planned |
-|-----------|-------|----------|-------------|---------|
-| F - Completed foundation and research | 30 | 30 | 0 | 0 |
-| M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
-| M1 - Core groundwork | 19 | 19 | 0 | 0 |
-| M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
-| M4 - Boundary scanner and policy kernel | 25 | 8 | 0 | 17 |
-| M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
-| M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
-| M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
-| M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **117** | **0** | **111** |
+**Overall: 126 / 228 tasks done (55%).** Milestones: 5 complete, 1 partial,
+4 not started. **102 tasks left.** Current milestone: **M4** (17/25, 68%).
+
+| # | Milestone | Done | Total | % | Status |
+|----|-----------|-----:|------:|-----:|-------------|
+| F  | Completed foundation and research | 30 | 30 | 100% | Complete |
+| M0 | Decision lock and docs foundation | 22 | 22 | 100% | Complete |
+| M1 | Core groundwork | 19 | 19 | 100% | Complete |
+| M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
+| M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
+| M4 | Boundary scanner and policy kernel | 17 | 25 | 68% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 0 | 26 | 0% | Not started |
+| M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
+| M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
+| M8 | Release | 0 | 17 | 0% | Not started |
+| — | **Total** | **126** | **228** | **55%** | 5 done / 1 partial / 4 to go |
+
+### What's left (102 tasks)
+
+- **M4 - 8 left:** M4.08 runtime-gate rewire onto `BoundaryPolicy`; M4.19-M4.24
+  scanner validators, pattern-set split, hit-map extension, `max_match_bytes`,
+  streaming property tests, split-secret vectors; M4.25 config-driven trust
+  mapping.
+- **M5 - 26:** audit, telemetry, provenance, and the threat-model test suite.
+- **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
+- **M7 - 20:** host integrations and adoption surfaces.
+- **M8 - 17:** release engineering and publication.
 
 The table counts every milestone task (F through M8) exactly once. The
-Mandatory Gates section is a recurring per-commit checklist and the
-Deferred section is post-3.0.0 parking; neither is counted here.
+Mandatory Gates section is a recurring pre-commit checklist and the Deferred
+section is post-3.0.0 parking; neither is counted here.
 
 ## Operating Rules
 
@@ -959,7 +973,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `:invalid_isolation_level`; omitted level is byte-distinct from
     `"none"` in the context digest.
   - Tests: negative, malformed.
-- [ ] M4.10 Side-effect mismatch matrix with the fail-closed quarantine
+- [x] M4.10 Side-effect mismatch matrix with the fail-closed quarantine
       default.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Fail-Closed Default (Normative); Side-Effect Mismatch Matrix.
@@ -970,7 +984,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `execute`; only a `[rules]` line with an `isolation:` matcher may
     override a cell - kernel invariants never weaken.
   - Tests: negative, property (strictest-cell selection).
-- [ ] M4.11 Sandbox matrix cell tests (all 20 cells).
+- [x] M4.11 Sandbox matrix cell tests (all 20 cells).
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Side-Effect Mismatch Matrix; Acceptance Criteria.
   - AC: every class x level cell is asserted, including missing-sandbox
@@ -978,7 +992,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     override path.
   - Tests: negative (20 cells), expiration not applicable, malformed
     (invalid level input).
-- [ ] M4.12 Sink-aware output contracts (`[contracts]` section).
+- [x] M4.12 Sink-aware output contracts (`[contracts]` section).
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Sink-Aware Output Contracts (Contract Vocabulary).
   - AC: `max_size` (floor 64), `no_raw_credentials`, `digest_only_pii`,
@@ -989,7 +1003,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `:unknown_transform`; a disallowed class escalates to `block` with
     rule `contract.<sink>.class`.
   - Tests: negative, malformed.
-- [ ] M4.13 Contract transforms and evaluation order.
+- [x] M4.13 Contract transforms and evaluation order.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Transform Semantics (Normative); Evaluation Order (Normative).
   - AC: `truncate` keeps the longest prefix at most `max_size - 11` bytes
@@ -1001,7 +1015,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     (class check, credential transform, PII, truncation); no contract runs
     on `block` or `quarantine` verdicts.
   - Tests: property (UTF-8 validity under truncation), negative, malformed.
-- [ ] M4.14 Lethal-trifecta example policy with doctest.
+- [x] M4.14 Lethal-trifecta example policy with doctest.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Dataflow Rules And Lethal Trifecta; Complete Policy File Example.
   - AC: the canonical example's first three rules encode the trifecta
@@ -1011,13 +1025,13 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `sandbox_id`; a doctest executes the policy against representative
     inputs.
   - Tests: doctest, negative (all three conjunct drop-outs), property.
-- [ ] M4.15 Repo policy facts in boundary decisions.
+- [x] M4.15 Repo policy facts in boundary decisions.
   - Spec: `docs/specs/SP.11-repo-policy-kernel-contracts.md` - Policy Facts
     For Boundary Decisions.
   - AC: the policy-facts map feeds `BoundaryPolicy` exactly per the SP.11
     shape; repo verdict facts appear in decision explanations.
   - Tests: negative, malformed.
-- [ ] M4.16 `SigilGuard.Hooks` behaviour.
+- [x] M4.16 `SigilGuard.Hooks` behaviour.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` - Hooks
     Behaviour (Result Semantics).
   - AC: nine optional callbacks map 1:1 to phases as `on_<phase>`;
@@ -1027,7 +1041,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     with source `:hook`, rule id `hook.<module>.<phase>`); hooks cannot
     emit allow/redact/quarantine.
   - Tests: negative (per callback), malformed (`:invalid_hook_result`).
-- [ ] M4.17 Hooks dispatcher: timeout and fail-closed matrix.
+- [x] M4.17 Hooks dispatcher: timeout and fail-closed matrix.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Timeouts And Fail-Closed Matrix.
   - AC: every invocation is bounded by `:hook_timeout_ms` (default
@@ -1037,7 +1051,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     log-and-continue via telemetry; `{:block, _}` short-circuits remaining
     hooks.
   - Tests: negative (all six matrix cells), tamper (crashing hook).
-- [ ] M4.18 Adaptive detector behaviour with the deterministic nil path.
+- [x] M4.18 Adaptive detector behaviour with the deterministic nil path.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Adaptive Detector Behaviour (D5).
   - AC: `SigilGuard.AdaptiveDetector.analyze/3` returns advisory
