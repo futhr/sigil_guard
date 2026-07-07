@@ -81,6 +81,42 @@ defmodule SigilGuard.RegistryRemovalTest do
     end
   end
 
+  describe "historical legacy envelope/profile vectors" do
+    test "legacy envelope golden vectors remain parseable as historical data" do
+      fixture =
+        "test/fixtures/historical/envelope_golden_vectors.sigil_protocol_0_1_5.json"
+        |> File.read!()
+        |> Jason.decode!()
+
+      assert fixture["schema"] == "sigil_guard.envelope_golden_vectors.v1"
+      assert fixture["generated_by"]["crate_version"] == "0.1.5"
+
+      assert Enum.map(fixture["vectors"], & &1["case"]) == [
+               "rust_allowed_reference_0_1_5",
+               "rust_scanned_reference_0_1_5",
+               "rust_blocked_reference_0_1_5"
+             ]
+
+      assert Enum.all?(fixture["vectors"], fn vector ->
+               is_map(vector["envelope"]) and is_binary(vector["canonical_json"])
+             end)
+    end
+
+    test "runtime library code does not read historical fixture paths" do
+      matches =
+        "lib/sigil_guard"
+        |> Path.join("**/*.{ex,exs}")
+        |> Path.wildcard()
+        |> Enum.filter(fn path ->
+          path
+          |> File.read!()
+          |> String.contains?("test/fixtures/historical")
+        end)
+
+      assert matches == []
+    end
+  end
+
   describe "v3 registry cache removal" do
     test "SigilGuard.Registry.Cache is deleted, not hidden" do
       refute Code.ensure_loaded?(@cache_module)

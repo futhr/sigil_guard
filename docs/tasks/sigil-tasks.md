@@ -1764,7 +1764,7 @@ section is post-3.0.0 parking; neither is counted here.
     `UndefinedFunctionError`. Existing gateway signed-request helpers now fail
     closed with `:legacy_envelope_removed` for envelope-bearing requests until
     M6.25 removes legacy `_sigil*` reading entirely.
-- [ ] M6.06 Move legacy envelope/profile vectors to
+- [x] M6.06 Move legacy envelope/profile vectors to
       `test/fixtures/historical/`.
   - Spec: `SP.06` - Known Consumers; V3 Transition Rules (fixture path).
   - AC: old golden vectors live under `test/fixtures/historical/` and are
@@ -1772,6 +1772,12 @@ section is post-3.0.0 parking; neither is counted here.
     exempts that path.
   - Tests: golden vectors (historical), negative (nothing under `lib/`
     reads them).
+  - Done: moved
+    `test/fixtures/envelope_golden_vectors.sigil_protocol_0_1_5.json` to
+    `test/fixtures/historical/envelope_golden_vectors.sigil_protocol_0_1_5.json`,
+    updated the SP.06 fixture-path reference, and extended
+    `registry_removal_test.exs` with parse-only historical vector assertions
+    plus a negative scan proving no `lib/` file reads `test/fixtures/historical`.
 - [ ] M6.07 Remove public examples centered on verdict-only envelopes.
   - Spec: `SP.01` - Public API Surface; `SP.06` - V3 Transition Rules.
   - AC: no README/ExDoc example signs or verifies a verdict-only envelope;

@@ -98,7 +98,7 @@ the surfaces above as transition contracts.
 
 All legacy golden vectors move to `test/fixtures/historical/` in v3 (D6),
 including the rust-crate compatibility vectors currently at
-`test/fixtures/envelope_golden_vectors.sigil_protocol_0_1_5.json`.
+`test/fixtures/historical/envelope_golden_vectors.sigil_protocol_0_1_5.json`.
 Historical fixtures MUST NOT pass Agent Trust Profile checks.
 
 `SigilGuard.ReplayStore` is retained in v3 as an internal seam; pluggable
