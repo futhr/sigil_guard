@@ -1,0 +1,206 @@
+{
+  "environment": {
+    "cores": 16,
+    "date": "2026-07-07",
+    "elixir": "1.20.2",
+    "hardware": "Apple M4 Max",
+    "iterations": 10,
+    "llm_guard": "0.3.16",
+    "llm_guard_scanners": {
+      "llm_guard.regex.aws_access_key": {
+        "class": "llm_guard.input_scanners.regex.Regex",
+        "configuration": {
+          "is_blocked": true,
+          "patterns": [
+            "AKIA[0-9A-Z]{16}"
+          ],
+          "redact": true
+        },
+        "path": "deterministic"
+      },
+      "llm_guard.secrets": {
+        "class": "llm_guard.input_scanners.secrets.Secrets",
+        "configuration": {
+          "redact_mode": "all"
+        },
+        "path": "deterministic"
+      }
+    },
+    "os": "unix/darwin",
+    "otp": "29",
+    "python": "3.11.15",
+    "sigil_guard": "1.0.0 (298d787)"
+  },
+  "recorded_at": "2026-07-07",
+  "results": {
+    "llm_guard.regex.aws_access_key clean_1k.txt": {
+      "corpus": "clean_1k.txt",
+      "median_ns": 9416,
+      "p99_ns": 20708,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.regex.aws_access_key clean_1m.txt": {
+      "corpus": "clean_1m.txt",
+      "median_ns": 155958,
+      "p99_ns": 170500,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.regex.aws_access_key clean_64k.txt": {
+      "corpus": "clean_64k.txt",
+      "median_ns": 18812,
+      "p99_ns": 32458,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.regex.aws_access_key hits_1k.txt": {
+      "corpus": "hits_1k.txt",
+      "median_ns": 8729,
+      "p99_ns": 16375,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.regex.aws_access_key hits_1m.txt": {
+      "corpus": "hits_1m.txt",
+      "median_ns": 8695520,
+      "p99_ns": 8817750,
+      "path": "deterministic",
+      "score_max": 1.0,
+      "synthetic_secret_count": 256,
+      "valid": false
+    },
+    "llm_guard.regex.aws_access_key hits_64k.txt": {
+      "corpus": "hits_64k.txt",
+      "median_ns": 69042,
+      "p99_ns": 116500,
+      "path": "deterministic",
+      "score_max": 1.0,
+      "synthetic_secret_count": 16,
+      "valid": false
+    },
+    "llm_guard.secrets clean_1k.txt": {
+      "corpus": "clean_1k.txt",
+      "median_ns": 2093646,
+      "p99_ns": 30659292,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.secrets clean_1m.txt": {
+      "corpus": "clean_1m.txt",
+      "median_ns": 18526083,
+      "p99_ns": 19513667,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.secrets clean_64k.txt": {
+      "corpus": "clean_64k.txt",
+      "median_ns": 115147083,
+      "p99_ns": 118557250,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.secrets hits_1k.txt": {
+      "corpus": "hits_1k.txt",
+      "median_ns": 2082688,
+      "p99_ns": 2280875,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 0,
+      "valid": true
+    },
+    "llm_guard.secrets hits_1m.txt": {
+      "corpus": "hits_1m.txt",
+      "median_ns": 17703834,
+      "p99_ns": 18609958,
+      "path": "deterministic",
+      "score_max": -1.0,
+      "synthetic_secret_count": 256,
+      "valid": true
+    },
+    "llm_guard.secrets hits_64k.txt": {
+      "corpus": "hits_64k.txt",
+      "median_ns": 116777417,
+      "p99_ns": 119840000,
+      "path": "deterministic",
+      "score_max": 1.0,
+      "synthetic_secret_count": 16,
+      "valid": false
+    },
+    "sigil_guard.scan clean_1k.txt": {
+      "corpus": "clean_1k.txt",
+      "median_ns": 18000,
+      "p99_ns": 3976000,
+      "path": "deterministic",
+      "synthetic_secret_count": 0,
+      "verdict": "clean"
+    },
+    "sigil_guard.scan clean_1m.txt": {
+      "corpus": "clean_1m.txt",
+      "median_ns": 13310000,
+      "p99_ns": 13795000,
+      "path": "deterministic",
+      "synthetic_secret_count": 0,
+      "verdict": "clean"
+    },
+    "sigil_guard.scan clean_64k.txt": {
+      "corpus": "clean_64k.txt",
+      "median_ns": 872000,
+      "p99_ns": 946000,
+      "path": "deterministic",
+      "synthetic_secret_count": 0,
+      "verdict": "clean"
+    },
+    "sigil_guard.scan hits_1k.txt": {
+      "corpus": "hits_1k.txt",
+      "median_ns": 21000,
+      "p99_ns": 51000,
+      "path": "deterministic",
+      "synthetic_secret_count": 0,
+      "verdict": "clean"
+    },
+    "sigil_guard.scan hits_1m.txt": {
+      "corpus": "hits_1m.txt",
+      "median_ns": 14801000,
+      "p99_ns": 16040000,
+      "path": "deterministic",
+      "synthetic_secret_count": 256,
+      "verdict": "hit:256"
+    },
+    "sigil_guard.scan hits_64k.txt": {
+      "corpus": "hits_64k.txt",
+      "median_ns": 930000,
+      "p99_ns": 1797000,
+      "path": "deterministic",
+      "synthetic_secret_count": 16,
+      "verdict": "hit:16"
+    }
+  },
+  "schema": "sigil_guard_llm_guard_comparison/v1",
+  "scope": {
+    "comparison": "SigilGuard.scan/1 versus llm-guard input scanners only",
+    "corpus": "bench/corpus clean_* and hits_* text fixtures",
+    "paths": {
+      "deterministic": [
+        "SigilGuard.scan/1 built-in deterministic scanner",
+        "llm_guard.input_scanners.secrets.Secrets",
+        "llm_guard.input_scanners.regex.Regex configured for AKIA access keys"
+      ],
+      "ml": "not measured; prompt-injection classifiers are outside this synthetic secret-scanning corpus"
+    }
+  }
+}

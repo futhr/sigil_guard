@@ -92,6 +92,11 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Install benchmark dependencies
+        env:
+          MIX_ENV: dev
+        run: mix deps.get
+
       - name: Check formatting
         run: mix format --check-formatted
 
@@ -103,6 +108,16 @@ jobs:
 
       - name: Sobelow security scan
         run: mix sobelow --config
+
+      - name: Run benchmark smoke
+        env:
+          MIX_ENV: dev
+        run: mix bench --smoke
+
+      - name: Compare benchmark smoke to baseline
+        env:
+          MIX_ENV: dev
+        run: mix run bench/compare.exs
 
   dialyzer:
     name: Dialyzer
