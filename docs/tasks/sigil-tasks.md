@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 198 / 228 tasks done (87%).** Milestones: 7 complete, 2 partial,
-1 not started. **30 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 199 / 228 tasks done (87%).** Milestones: 7 complete, 2 partial,
+1 not started. **29 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 9 | 20 | 45% | In progress |
+| M7 | Integrations and adoption | 10 | 20 | 50% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **198** | **228** | **87%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **199** | **228** | **87%** | 7 done / 2 partial / 1 to go |
 
-### What's left (30 tasks)
+### What's left (29 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 11:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 10:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2224,12 +2224,18 @@ section is post-3.0.0 parking; neither is counted here.
     signed export verification with anchor evidence, and a committed-HMAC
     tamper check. Manually ran the equivalent cells offline with `mix run`;
     M7.12 will replace this with the notebook runner.
-- [ ] M7.10 Livebook: hermes integration stub.
+- [x] M7.10 Livebook: hermes integration stub.
   - Spec: `SP.14` - Livebooks (hermes stub rule).
   - AC: `notebooks/hermes-integration.livemd` exercises the interceptor
     contract against an in-notebook stub shaped like the pinned interface;
     it MUST NOT fetch `hermes_mcp` (real wiring lives in M7.03).
   - Validation: offline execution (M7.12).
+  - Done: added `notebooks/hermes-integration.livemd` with a Run in Livebook
+    badge, local-path `Mix.install`, a Hermes-shaped frame/component stub, a
+    SigilGuard request/result interceptor, allowed-call behavior, result
+    redaction, and JSON-RPC denial mapping for unknown manifests. Manually ran
+    the equivalent cells offline with `mix run`; M7.12 will replace this with
+    the notebook runner.
 - [ ] M7.11 Livebook: threat scenarios.
   - Spec: `SP.14` - Livebooks; `R.06` - Test Families.
   - AC: `notebooks/threat-scenarios.livemd` demonstrates selected TM

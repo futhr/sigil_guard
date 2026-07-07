@@ -1,0 +1,187 @@
+# Hermes Integration Stub
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fhermes-integration.livemd)
+
+This notebook exercises the SigilGuard interceptor contract against a local
+Hermes-shaped stub. It does not fetch `hermes_mcp`; the real package wiring is
+covered by `guides/integrations/hermes-mcp.md`.
+
+## Setup
+
+```elixir
+Mix.install([
+  {:sigil_guard, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Hermes-Shaped Frame Stub
+
+```elixir
+defmodule HermesNotebookStub.Frame do
+  defstruct assigns: %{}, private: %{}
+end
+
+frame = struct(HermesNotebookStub.Frame, assigns: %{actor: "did:web:alice"})
+```
+
+## SigilGuard Interceptor
+
+```elixir
+defmodule HermesNotebookStub.Interceptor do
+  alias SigilGuard.{Decision, ToolGateway}
+
+  @digest String.duplicate("a", 64)
+
+  def before_tool_call(tool_name, arguments, actor, opts \\ []) do
+    request = %{
+      "jsonrpc" => "2.0",
+      "id" => "stub-call",
+      "method" => "tools/call",
+      "params" => %{"name" => tool_name, "arguments" => arguments}
+    }
+
+    case ToolGateway.guard_request(request, request_context(tool_name, actor), opts) do
+      %Decision{action: :allow} ->
+        {:cont, arguments}
+
+      %Decision{action: :redact, sanitized_text: text} when is_binary(text) ->
+        {:cont, text}
+
+      %Decision{} = denied ->
+        {:halt, ToolGateway.response_for_decision(denied, request["id"])}
+    end
+  end
+
+  def after_tool_call(tool_name, result, actor, opts \\ []) do
+    case ToolGateway.guard_result(result, result_context(tool_name, actor), opts) do
+      %Decision{action: action} = decision when action in [:allow, :redact] ->
+        {:cont, decision.sanitized_text || result, decision.action}
+
+      %Decision{} = denied ->
+        {:halt, ToolGateway.response_for_decision(denied, "stub-call")}
+    end
+  end
+
+  defp request_context(tool_name, actor) do
+    [
+      phase: :tool_request,
+      source: :model,
+      origin: :model,
+      sink: :tool,
+      actor: actor,
+      action: tool_name,
+      trust_zone: :semi_trusted,
+      trust_level: :medium,
+      tool: %{name: tool_name, side_effects: ["read"], manifest_digest: @digest},
+      action_digest: @digest,
+      payload_digest: @digest,
+      context_digest: @digest,
+      sandbox: %{isolation_level: :container}
+    ]
+  end
+
+  defp result_context(tool_name, actor) do
+    [
+      phase: :tool_result,
+      source: :tool,
+      origin: :tool,
+      sink: :model,
+      actor: actor,
+      action: tool_name,
+      trust_zone: :semi_trusted,
+      trust_level: :medium,
+      tool: %{name: tool_name, side_effects: ["read"], manifest_digest: @digest},
+      action_digest: @digest,
+      payload_digest: @digest,
+      context_digest: @digest
+    ]
+  end
+end
+```
+
+## Hermes-Shaped Tool Component
+
+```elixir
+defmodule HermesNotebookStub.GuardedEcho do
+  alias HermesNotebookStub.Interceptor
+
+  def execute(arguments, frame, opts \\ []) do
+    actor = frame.assigns[:actor] || "anonymous"
+
+    with {:cont, guarded_args} <-
+           Interceptor.before_tool_call(
+             "echo",
+             arguments,
+             actor,
+             Keyword.get(opts, :request_opts, [])
+           ),
+         result <- %{text: Map.get(guarded_args, :text, Map.get(guarded_args, "text", ""))},
+         {:cont, guarded_result, guard_action} <-
+           Interceptor.after_tool_call(
+             "echo",
+             result,
+             actor,
+             Keyword.get(opts, :result_opts, [])
+           ) do
+      {:ok, guarded_result, %{frame | private: Map.put(frame.private, :guard_action, guard_action)}}
+    else
+      {:halt, error} -> {:error, error, frame}
+    end
+  end
+end
+```
+
+## Allowed Tool Call
+
+```elixir
+{:ok, echoed, allowed_frame} = HermesNotebookStub.GuardedEcho.execute(%{text: "hello"}, frame)
+
+%{
+  result: echoed,
+  guard_action: allowed_frame.private.guard_action
+}
+```
+
+## Redacted Tool Result
+
+```elixir
+{:cont, redacted, action} =
+  HermesNotebookStub.Interceptor.after_tool_call(
+    "echo",
+    %{text: "temporary key AKIAIOSFODNN7EXAMPLE"},
+    frame.assigns.actor,
+    on_sensitive: :redact
+  )
+
+%{
+  action: action,
+  redacted: redacted,
+  leaked?: String.contains?(redacted, "AKIAIOSFODNN7EXAMPLE")
+}
+```
+
+## Denial Maps To JSON-RPC Error
+
+```elixir
+{:error, error_response, _frame} =
+  HermesNotebookStub.GuardedEcho.execute(%{text: "hello"}, frame,
+    request_opts: [require_manifest: true, manifests: %{}]
+  )
+
+%{
+  jsonrpc: error_response["jsonrpc"],
+  code: error_response["error"]["code"],
+  status: error_response["error"]["data"]["status"],
+  reason: error_response["error"]["data"]["reason"]
+}
+```
+
+## Summary
+
+```elixir
+%{
+  allowed: allowed_frame.private.guard_action,
+  redacted_result: action,
+  denied_status: error_response["error"]["data"]["status"]
+}
+```
