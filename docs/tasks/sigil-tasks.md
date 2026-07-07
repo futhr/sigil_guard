@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 201 / 228 tasks done (88%).** Milestones: 7 complete, 2 partial,
-1 not started. **27 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 202 / 228 tasks done (89%).** Milestones: 7 complete, 2 partial,
+1 not started. **26 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 12 | 20 | 60% | In progress |
+| M7 | Integrations and adoption | 13 | 20 | 65% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **201** | **228** | **88%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **202** | **228** | **89%** | 7 done / 2 partial / 1 to go |
 
-### What's left (27 tasks)
+### What's left (26 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 8:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 7:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2292,13 +2292,18 @@ section is post-3.0.0 parking; neither is counted here.
     disclosed, deterministic and ML paths labeled, corpus published for
     reproduction.
   - Validation: comparison artifact satisfies every fairness rule.
-- [ ] M7.17 SECURITY.md.
+- [x] M7.17 SECURITY.md.
   - Spec: `SP.14` - SECURITY.md.
   - AC: states supported versions (latest 3.x; final 0.2.x gets security
     fixes for six months after GA), private-vulnerability-report channel,
     the 72 h / 7 d / 90 d response SLO, and the pointer to SP.02's
     emergency rotation ceremony as the signer-compromise runbook.
   - Validation: link check; policy renders on the repo security tab.
+  - Done: added `SECURITY.md` with supported-version policy for latest `3.x`
+    and six months of final `0.2.x` fixes after `3.0.0` GA, GitHub private
+    vulnerability reporting instructions, 72 h / 7 d / 90 d response targets,
+    scope boundaries, and the SP.02 signer-compromise rotation pointer.
+    Verified `git diff --check` and `mix sigil.docs_lint`.
 - [ ] M7.18 OpenSSF Best Practices badge to passing.
   - Spec: `SP.14` - OpenSSF Best Practices Badge.
   - AC: the bestpractices.dev entry reaches passing, mapping existing
