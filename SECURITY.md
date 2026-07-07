@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-SigilGuard provides security fixes for the latest `3.x` release line.
+SigilGuard provides security fixes for the latest `1.x` release line.
 
 After `1.0.0` is published, the final `0.2.x` release line receives security
 fixes for six months.

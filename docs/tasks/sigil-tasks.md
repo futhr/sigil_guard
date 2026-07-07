@@ -2289,12 +2289,12 @@ section is post-1.0.0 parking; neither is counted here.
   - Validation: comparison artifact satisfies every fairness rule.
 - [x] M7.17 SECURITY.md.
   - Spec: `SP.14` - SECURITY.md.
-  - AC: states supported versions (latest 3.x; final 0.2.x gets security
+  - AC: states supported versions (latest 1.x; final 0.2.x gets security
     fixes for six months after GA), private-vulnerability-report channel,
     the 72 h / 7 d / 90 d response SLO, and the pointer to SP.02's
     emergency rotation ceremony as the signer-compromise runbook.
   - Validation: link check; policy renders on the repo security tab.
-  - Done: added `SECURITY.md` with supported-version policy for latest `3.x`
+  - Done: added `SECURITY.md` with supported-version policy for latest `1.x`
     and six months of final `0.2.x` fixes after `1.0.0` GA, GitHub private
     vulnerability reporting instructions, 72 h / 7 d / 90 d response targets,
     scope boundaries, and the SP.02 signer-compromise rotation pointer.
