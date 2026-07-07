@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 154 / 228 tasks done (68%).** Milestones: 6 complete, 1 partial,
-3 not started. **74 tasks left.** Current milestone: **M5** (20/26, 77%).
+**Overall: 155 / 228 tasks done (68%).** Milestones: 6 complete, 1 partial,
+3 not started. **73 tasks left.** Current milestone: **M5** (21/26, 81%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 20 | 26 | 77% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 21 | 26 | 81% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **154** | **228** | **68%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **155** | **228** | **68%** | 6 done / 1 partial / 3 to go |
 
-### What's left (74 tasks)
+### What's left (73 tasks)
 
-- **M5 - 6 left:** the threat-model test suite TM.07-TM.12
-  (move-don't-duplicate). (M5.01-M5.20 done, incl. TM.01-TM.06.)
+- **M5 - 5 left:** the threat-model test suite TM.08-TM.12
+  (move-don't-duplicate). (M5.01-M5.21 done, incl. TM.01-TM.07.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1545,13 +1545,30 @@ section is post-3.0.0 parking; neither is counted here.
     HMAC body (`:invalid_signature`), a single-use replay (`:replay_detected`),
     and an expired approval (`:expired`); a malformed token fails closed
     (`:invalid_token`). Uses an Ed25519 `TrustedSigner` for the DSSE attestation.
-- [ ] M5.21 TM.07 threat family - token passthrough and session hijacking.
+- [x] M5.21 TM.07 threat family - token passthrough and session hijacking.
   - Spec: `R.06` - Control Mapping rows 7 and 8; `SP.03`, `SP.05`.
   - AC: `.../tm07_passthrough_session_test.exs` proves the explicit
     passthrough deny (`:token_passthrough_denied`) and the session-hijack
     assists (per-action nonce, `list_changed` re-verification, audit
     session boundary) at their claim levels (mitigates; detects partial).
   - Tests: negative, replay, tamper.
+  - Done: added the TM.07 module (R.06 rows 7 and 8, ASI03/ASI02, claim
+    **mitigates** for row 7 / **detects (partial)** for row 8; transport and
+    session lifecycle named host-owned) citing the token-passthrough and
+    resumable-stream / `list_changed` session-hijack attacks and referencing the
+    base tests by exact name. Row 7: `guard_request/3` denies a client token
+    reflected at the gateway's own resource (`:token_passthrough_denied`, with
+    `audience`/`self_resource` metadata) while a credential for a legitimate
+    upstream audience is allowed. Row 8 assists: `verify_list_changed/2` rejects
+    a drifted (`:manifest_digest_mismatch`) or wholly new
+    (`:unknown_manifest`) tool smuggled into a refresh while a clean refresh
+    re-verifies; a per-action approval nonce is single-use per actor
+    (`:replay_detected`); and an actor-scoped HMAC audit chain records
+    mid-session actions so tampering is detected (`{:broken, 1}` via
+    `verify_chain/3`). Malformed refresh input fails closed
+    (`:invalid_manifest`). Note: SigilGuard has no `session_id`; the
+    "audit session boundary" is realized as the actor-scoped audit chain, and
+    the transport session stays host-owned (documented in the module).
 - [ ] M5.22 TM.08 threat family - memory and context poisoning.
   - Spec: `R.06` - Control Mapping row 9; `SP.04` (model-ingress gating).
   - AC: `.../tm08_memory_poisoning_test.exs` proves retrieved memory/
