@@ -119,6 +119,14 @@ defmodule SigilGuard.Config do
       type: {:or, [:string, nil]},
       default: nil,
       doc: "Optional base64-encoded vault master key."
+    ],
+    trust_mappings: [
+      type: {:custom, __MODULE__, :validate_trust_mappings, []},
+      default: [],
+      doc:
+        "Ordered `{pattern, trust_level}` actor-to-trust mappings (SP.10). " <>
+          "Patterns are exact strings or a single trailing `*` prefix; " <>
+          "`trust_level` is `:low | :medium | :high`. First match wins."
     ]
   ]
 
@@ -265,6 +273,44 @@ defmodule SigilGuard.Config do
 
   def validate_trust_bundle_source(_) do
     {:error, "expected :none, {:file, path}, {:priv, app, path}, {:map, map}, or {:binary, bin}"}
+  end
+
+  @doc false
+  @spec validate_trust_mappings(term()) :: {:ok, term()} | {:error, String.t()}
+  def validate_trust_mappings(mappings) when is_list(mappings) do
+    if Enum.all?(mappings, &valid_trust_mapping?/1) do
+      {:ok, mappings}
+    else
+      {:error,
+       "expected {pattern, trust_level} tuples; pattern is an exact string or a single " <>
+         "trailing `*` prefix, trust_level is :low | :medium | :high"}
+    end
+  end
+
+  def validate_trust_mappings(_), do: {:error, "expected a list of {pattern, trust_level} tuples"}
+
+  defp valid_trust_mapping?({pattern, trust_level}) do
+    valid_mapping_pattern?(pattern) and trust_level in [:low, :medium, :high]
+  end
+
+  defp valid_trust_mapping?(_), do: false
+
+  # A pattern is an exact string or a single trailing `*` (prefix match); a `*`
+  # in any other position, or more than one, is rejected (SP.10 closed grammar).
+  defp valid_mapping_pattern?(pattern) when is_binary(pattern) do
+    case :binary.matches(pattern, "*") do
+      [] -> true
+      [{pos, 1}] -> pos == byte_size(pattern) - 1
+      _ -> false
+    end
+  end
+
+  defp valid_mapping_pattern?(_), do: false
+
+  @doc "Return the configured ordered actor-to-trust mappings (SP.10)."
+  @spec trust_mappings() :: [{String.t(), SigilGuard.Identity.trust_level()}]
+  def trust_mappings do
+    Application.get_env(:sigil_guard, :trust_mappings, [])
   end
 
   defp reject_removed_keys(opts) do

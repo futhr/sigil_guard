@@ -61,7 +61,8 @@ defmodule SigilGuard.ConfigTest do
         attestation_ttl_ms: 60_000,
         max_skew_ms: 0,
         replay_ttl_ms: 120_000,
-        vault_master_key: Base.encode64(:crypto.strong_rand_bytes(32))
+        vault_master_key: Base.encode64(:crypto.strong_rand_bytes(32)),
+        trust_mappings: [{"spiffe://prod/*", :high}, {"user:42", :medium}]
       ]
 
       assert Config.validate!(opts) == opts
@@ -301,6 +302,36 @@ defmodule SigilGuard.ConfigTest do
     test "returns configured clock skew" do
       Application.put_env(:sigil_guard, :registry_bundle_clock_skew_seconds, 10)
       assert Config.registry_bundle_clock_skew_seconds() == 10
+    end
+  end
+
+  describe "trust_mappings validation (SP.10)" do
+    test "accepts exact patterns, a single trailing wildcard, and an empty table" do
+      for mappings <- [[], [{"user:42", :high}], [{"spiffe://prod/*", :medium}, {"*", :low}]] do
+        assert Config.validate!(trust_mappings: mappings)[:trust_mappings] == mappings
+      end
+    end
+
+    test "rejects a non-list, non-tuple entry, or non-string pattern" do
+      for bad <- [:nope, ["not-a-tuple"], [{123, :high}], [{"a", :high, :extra}]] do
+        assert_raise ConfigError, ~r/:trust_mappings/, fn ->
+          Config.validate!(trust_mappings: bad)
+        end
+      end
+    end
+
+    test "rejects wildcards outside a single trailing position" do
+      for bad <- [[{"a*b", :high}], [{"a*b*", :high}], [{"**", :high}], [{"*x", :high}]] do
+        assert_raise ConfigError, ~r/:trust_mappings/, fn ->
+          Config.validate!(trust_mappings: bad)
+        end
+      end
+    end
+
+    test "rejects a trust level outside the closed set" do
+      assert_raise ConfigError, ~r/:trust_mappings/, fn ->
+        Config.validate!(trust_mappings: [{"user:*", :godmode}])
+      end
     end
   end
 
