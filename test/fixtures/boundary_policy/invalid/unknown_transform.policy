@@ -1,0 +1,4 @@
+version 3
+
+[contracts]
+contract sink:external no_raw_credentials:true credential_transform:rot13

@@ -1,6 +1,7 @@
 defmodule SigilGuard.BoundaryPolicy.FileTest do
   use ExUnit.Case, async: true
 
+  alias SigilGuard.BoundaryPolicy.Contract
   alias SigilGuard.BoundaryPolicy.File, as: PolicyFile
   alias SigilGuard.RepoPolicy
 
@@ -44,13 +45,18 @@ defmodule SigilGuard.BoundaryPolicy.FileTest do
       assert confirm_rule.matchers["effect"] == ["write"]
       assert confirm_rule.matchers["trust"] == ["high"]
 
-      assert compiled.contracts == ["contract sink:external max_size:1024"]
+      assert compiled.contracts == %{
+               "external" => %Contract{max_size: 1024, credential_transform: :mask}
+             }
+
       assert %RepoPolicy{} = compiled.repo
     end
 
     test "accepts a version-only file and an absent default" do
-      assert {:ok, %PolicyFile{rules: [], default: nil, contracts: [], repo: nil}} =
+      assert {:ok, %PolicyFile{rules: [], default: nil, contracts: contracts, repo: nil}} =
                PolicyFile.parse("version 3\n")
+
+      assert contracts == %{}
     end
 
     test "accepts wildcard and exact string matchers" do
@@ -70,10 +76,20 @@ defmodule SigilGuard.BoundaryPolicy.FileTest do
   end
 
   describe "parse/1 grammar errors" do
-    test "every invalid fixture fails :invalid_policy_file" do
+    # SP.04: invalid/ holds one minimal file per parse-error atom. Fixtures
+    # named after a contract atom fail with that atom; the rest are grammar
+    # violations that all fail :invalid_policy_file.
+    @atom_by_basename %{
+      "invalid_output_contract" => :invalid_output_contract,
+      "unknown_transform" => :unknown_transform
+    }
+
+    test "every invalid fixture fails with its named parse-error atom" do
       for path <- Path.wildcard(Path.join(@invalid_root, "*.policy")) do
-        assert PolicyFile.parse(File.read!(path)) == {:error, :invalid_policy_file},
-               Path.basename(path)
+        expected =
+          Map.get(@atom_by_basename, Path.basename(path, ".policy"), :invalid_policy_file)
+
+        assert PolicyFile.parse(File.read!(path)) == {:error, expected}, Path.basename(path)
       end
     end
 

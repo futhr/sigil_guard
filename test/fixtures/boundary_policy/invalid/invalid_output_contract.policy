@@ -1,0 +1,4 @@
+version 3
+
+[contracts]
+contract sink:external max_size:32

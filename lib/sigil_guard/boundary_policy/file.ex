@@ -3,9 +3,9 @@ defmodule SigilGuard.BoundaryPolicy.File do
   Boundary-policy file grammar parser (SP.04).
 
   Parses the v3 line-oriented policy file into a compiled `%File{}`: an ordered
-  list of `[rules]`, an optional `default` verdict, the raw `[contracts]` lines
-  (parsed by `SigilGuard.BoundaryPolicy.Contract`), and the `[repo]` section
-  compiled through `SigilGuard.RepoPolicy`.
+  list of `[rules]`, an optional `default` verdict, the `[contracts]` section
+  compiled by `SigilGuard.BoundaryPolicy.Contract` into a `%{sink => contract}`
+  map, and the `[repo]` section compiled through `SigilGuard.RepoPolicy`.
 
   The mandatory first non-comment line is `version 3`. `#` starts a comment,
   blank lines are ignored, and inside `[rules]`/`[contracts]` a line beginning
@@ -15,6 +15,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
   `:invalid_policy_file`.
   """
 
+  alias SigilGuard.BoundaryPolicy.Contract
   alias SigilGuard.RepoPolicy
   alias SigilGuard.Verdict
 
@@ -62,17 +63,21 @@ defmodule SigilGuard.BoundaryPolicy.File do
           matchers: %{String.t() => [String.t()]}
         }
 
-  @type parse_error :: :invalid_policy_file | :policy_too_large
+  @type parse_error ::
+          :invalid_policy_file
+          | :policy_too_large
+          | :invalid_output_contract
+          | :unknown_transform
 
   @type t :: %__MODULE__{
           rules: [rule()],
           default: Verdict.t() | nil,
-          contracts: [String.t()],
+          contracts: %{optional(String.t()) => Contract.t()},
           repo: RepoPolicy.t() | nil,
           digest: String.t() | nil
         }
 
-  defstruct rules: [], default: nil, contracts: [], repo: nil, digest: nil
+  defstruct rules: [], default: nil, contracts: %{}, repo: nil, digest: nil
 
   @doc """
   Parse policy-file bytes into a compiled `%File{}`.
@@ -265,7 +270,10 @@ defmodule SigilGuard.BoundaryPolicy.File do
   end
 
   defp ingest_section("[contracts]", logical, acc) do
-    {:ok, %{acc | contracts: Enum.map(logical, fn {text, _} -> text end)}}
+    case Contract.parse(Enum.map(logical, fn {text, _} -> text end)) do
+      {:ok, contracts} -> {:ok, %{acc | contracts: contracts}}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   # -- [rules] lines ----------------------------------------------------------
@@ -373,7 +381,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
 
   # -- Accumulator ------------------------------------------------------------
 
-  defp new_acc, do: %{rules: [], default: nil, contracts: [], repo: nil, seen: MapSet.new()}
+  defp new_acc, do: %{rules: [], default: nil, contracts: %{}, repo: nil, seen: MapSet.new()}
 
   defp section_seen?(acc, header), do: MapSet.member?(acc.seen, header)
   defp mark_seen(acc, header), do: %{acc | seen: MapSet.put(acc.seen, header)}

@@ -34,8 +34,22 @@ defmodule SigilGuard.BoundaryPolicyFixture do
       "policy_file_digest" => compiled.digest,
       "default" => atom_to_string(compiled.default),
       "rules" => Enum.map(compiled.rules, &serialize_rule/1),
-      "contracts" => compiled.contracts,
+      "contracts" => serialize_contracts(compiled.contracts),
       "repo" => serialize_repo(compiled.repo)
+    }
+  end
+
+  defp serialize_contracts(contracts) do
+    Map.new(contracts, fn {sink, contract} -> {sink, serialize_contract(contract)} end)
+  end
+
+  defp serialize_contract(contract) do
+    %{
+      "max_size" => contract.max_size,
+      "no_raw_credentials" => contract.no_raw_credentials,
+      "digest_only_pii" => contract.digest_only_pii,
+      "classes" => contract.classes && Enum.map(contract.classes, &Atom.to_string/1),
+      "credential_transform" => Atom.to_string(contract.credential_transform)
     }
   end
 
