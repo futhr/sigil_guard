@@ -23,9 +23,16 @@ defmodule SigilGuard.Patterns do
   patterns take precedence on name collision after provenance checks pass.
   """
 
+  @typedoc """
+  Pattern-set category (SP.04). The built-in pipeline emits the closed atom set
+  `:secret | :injection | :poisoning`; custom/compatibility-bundle patterns may
+  carry a free-form string category.
+  """
+  @type category :: :secret | :injection | :poisoning | String.t()
+
   @type scan_hit :: %{
           required(:name) => String.t(),
-          required(:category) => String.t(),
+          required(:category) => category(),
           required(:severity) => :low | :medium | :high,
           required(:match) => String.t(),
           required(:offset) => non_neg_integer(),
@@ -33,13 +40,14 @@ defmodule SigilGuard.Patterns do
           required(:replacement_hint) => String.t() | nil,
           optional(:confidence) => float(),
           optional(:signals) => [atom()],
+          optional(:span) => {non_neg_integer(), non_neg_integer()},
           optional(:stage) => atom(),
           optional(:validated) => boolean()
         }
 
   @type compiled_pattern :: %{
           name: String.t(),
-          category: String.t(),
+          category: category(),
           severity: :low | :medium | :high,
           regex: Regex.t(),
           replacement_hint: String.t() | nil
@@ -48,42 +56,42 @@ defmodule SigilGuard.Patterns do
   @built_in_patterns [
     %{
       name: "aws_access_key",
-      category: "credential",
+      category: :secret,
       severity: :high,
       pattern: "(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}",
       replacement_hint: "[AWS_KEY]"
     },
     %{
       name: "generic_api_key",
-      category: "credential",
+      category: :secret,
       severity: :high,
       pattern: "(?i)(api[_\\-]?key|apikey)\\s*[:=]\\s*['\"]?[\\w\\-]{20,}",
       replacement_hint: "[API_KEY]"
     },
     %{
       name: "bearer_token",
-      category: "credential",
+      category: :secret,
       severity: :high,
       pattern: "(?i)bearer\\s+[a-zA-Z0-9._~+/=\\-]{20,}",
       replacement_hint: "[BEARER_TOKEN]"
     },
     %{
       name: "database_uri",
-      category: "credential",
+      category: :secret,
       severity: :high,
       pattern: "(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@",
       replacement_hint: "[DATABASE_URI]"
     },
     %{
       name: "private_key",
-      category: "credential",
+      category: :secret,
       severity: :high,
       pattern: "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
       replacement_hint: "[PRIVATE_KEY]"
     },
     %{
       name: "generic_secret",
-      category: "credential",
+      category: :secret,
       severity: :medium,
       pattern: "(?i)(secret|password|token|credential)\\s*[:=]\\s*['\"]?[^\\s'\"]{8,}",
       replacement_hint: "[SECRET]"

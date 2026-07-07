@@ -276,6 +276,32 @@ defmodule SigilGuard.Scanner.PipelineTest do
     end
   end
 
+  describe "hit-map span (D17 additive)" do
+    test "enriched hits carry a span equal to the flat offset/length" do
+      assert {:hit, [hit]} = Scanner.scan("key=AKIAIOSFODNN7EXAMPLE")
+      assert hit.span == {hit.offset, hit.length}
+    end
+
+    property "span always equals the {offset, length} byte values" do
+      check all(
+              secret <-
+                member_of([
+                  "key=AKIAIOSFODNN7EXAMPLE",
+                  "api_key=R7v9K2mQ4xZ8pL6nT5y0",
+                  "secret=R7v9K2mQ4xZ8pL6nT5y0"
+                ]),
+              noise <- string(:alphanumeric, max_length: 8)
+            ) do
+        text = noise <> " " <> secret
+
+        case Scanner.scan(text) do
+          {:ok, _} -> :ok
+          {:hit, hits} -> Enum.each(hits, &assert(&1.span == {&1.offset, &1.length}))
+        end
+      end
+    end
+  end
+
   describe "confidence score bounds" do
     # Fixtures that reliably produce an enriched hit under the built-in patterns.
     @scored_secrets [

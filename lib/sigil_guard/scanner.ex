@@ -153,13 +153,17 @@ defmodule SigilGuard.Scanner do
          } = hit,
          text
        )
-       when is_binary(name) and is_binary(category) and severity in [:low, :medium, :high] and
+       when is_binary(name) and severity in [:low, :medium, :high] and
               is_binary(match) and is_integer(offset) and is_integer(length) and
               offset >= 0 and length >= 0 and offset + length <= byte_size(text) do
-    valid_replacement_hint?(Map.get(hit, :replacement_hint))
+    valid_category?(category) and valid_replacement_hint?(Map.get(hit, :replacement_hint))
   end
 
   defp valid_hit?(_, _), do: false
+
+  # Built-in patterns emit the closed :secret/:injection/:poisoning atoms;
+  # custom/compatibility-bundle patterns may carry a free-form string category.
+  defp valid_category?(category), do: is_atom(category) or is_binary(category)
 
   defp valid_replacement_hint?(hint), do: is_binary(hint) or is_nil(hint)
 

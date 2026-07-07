@@ -152,6 +152,7 @@ defmodule SigilGuard.Scanner.Pipeline do
     |> Map.merge(%{
       confidence: confidence(candidate, signals),
       signals: signals,
+      span: {candidate.offset, candidate.length},
       stage: if(validated?, do: :validated, else: :enriched),
       validated: validated?
     })
@@ -214,7 +215,10 @@ defmodule SigilGuard.Scanner.Pipeline do
   defp signal_bonus(:token_boundary), do: 0.03
   defp signal_bonus(:uri_with_authority), do: 0.07
 
-  defp credential_category?(%{pattern: %{category: "credential"}}), do: true
+  defp credential_category?(%{pattern: %{category: category}}) do
+    category in [:secret, "secret", "credential"]
+  end
+
   defp credential_category?(_), do: false
 
   defp known_key_format?(%{pattern: %{name: name}}) do

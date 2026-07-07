@@ -16,7 +16,7 @@ defmodule SigilGuard.ScannerTest do
       assert {:hit, [hit]} = Scanner.scan("key=AKIAIOSFODNN7EXAMPLE")
 
       assert hit.name == "aws_access_key"
-      assert hit.category == "credential"
+      assert hit.category == :secret
       assert hit.severity == :high
       assert hit.match == "AKIAIOSFODNN7EXAMPLE"
       assert hit.replacement_hint == "[AWS_KEY]"

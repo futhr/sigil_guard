@@ -14,7 +14,8 @@ defmodule SigilGuard.PatternsTest do
 
       for pattern <- patterns do
         assert is_binary(pattern.name)
-        assert is_binary(pattern.category)
+        # Built-in secret patterns carry the closed :secret category atom (SP.04).
+        assert pattern.category == :secret
         assert pattern.severity in [:low, :medium, :high]
         assert %Regex{} = pattern.regex
       end
