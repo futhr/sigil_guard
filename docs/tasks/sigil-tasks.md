@@ -1932,10 +1932,16 @@ section is post-3.0.0 parking; neither is counted here.
     `Attestation.sign/3` + `Attestation.attach/2`) and for verifying attached
     metadata (`Envelope.verify/2` to `Attestation.fetch/1` +
     `Attestation.verify/3` with trust material and digest options).
-- [ ] M6.19 MIGRATING: `Profile` to `TrustProfile`.
+- [x] M6.19 MIGRATING: `Profile` to `TrustProfile`.
   - Spec: `SP.01` - Public Modules Removed In V3.
   - AC: function-level mapping; profile id constant migration noted.
   - Validation: completeness script.
+  - Done: added a function-level `SigilGuard.Profile` to
+    `SigilGuard.TrustProfile` migration table in `MIGRATING-3.0.md`, including
+    removed/no-shim rows for legacy normalization, wire-verdict compatibility,
+    blocked-reason compatibility, and registry identity endpoints. Documented
+    `SigilGuard.TrustProfile.profile_id/0` as the v3 profile id constant
+    replacement for `:protocol_profile`.
 - [ ] M6.20 MIGRATING: config migration table.
   - Spec: `SP.01` - V3 Configuration Surface (Removed Keys).
   - AC: every removed key row with its replacement (or "none") matching

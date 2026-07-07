@@ -370,8 +370,44 @@ from a verified trust bundle as shown in the registry lookup migration section.
 ## Profile To TrustProfile
 
 `SigilGuard.Profile` is removed. Use `SigilGuard.TrustProfile` for the v3 Agent
-Trust profile. Function-level mapping and profile-id constant guidance are
-filled in by M6.19.
+Trust profile. V3 has one profile id and one wire form:
+`sigil_guard_agent_trust/v1`.
+
+| V2 Profile surface | V3 replacement |
+|--------------------|----------------|
+| `SigilGuard.Profile.profiles/0` | `SigilGuard.TrustProfile.statement_types/0` plus `predicate_type/1` for the closed statement registry. |
+| `SigilGuard.Profile.normalize!/1` | Removed. Build or verify a v3 Statement and call `SigilGuard.TrustProfile.validate/1`; invalid profiles return typed errors instead of normalizing. |
+| `SigilGuard.Profile.wire_verdict_format/1` | Removed. V3 uses one predicate verdict vocabulary in Agent Trust statements. |
+| `SigilGuard.Profile.verdict_acceptance/1` | Removed. `SigilGuard.Attestation.verify/3` and `SigilGuard.TrustProfile.validate/1` enforce the v3 profile. |
+| `SigilGuard.Profile.require_blocked_reason_on_verify?/1` | Removed. Blocking rationale lives in `predicate.matched_rules[].explanation`. |
+| `SigilGuard.Profile.registry_identity_endpoints/1` | Removed. DID/network identity discovery is host-owned; verified bundle issuer policy is available through `SigilGuard.TrustBundle.identity_issuers/1`. |
+| `:protocol_profile` config | Removed. Use `SigilGuard.TrustProfile.profile_id/0` when code needs the constant. |
+
+Before:
+
+```elixir
+profile = SigilGuard.Profile.normalize!(:auto)
+format = SigilGuard.Profile.wire_verdict_format(profile)
+```
+
+After:
+
+```elixir
+profile_id = SigilGuard.TrustProfile.profile_id()
+statement_types = SigilGuard.TrustProfile.statement_types()
+{:ok, predicate_type} = SigilGuard.TrustProfile.predicate_type(:tool_request)
+```
+
+For validation, do not normalize legacy profile names. Validate the produced or
+received Agent Trust Statement:
+
+```elixir
+case SigilGuard.TrustProfile.validate(statement) do
+  {:ok, statement} -> {:ok, statement}
+  {:error, :unsupported_profile_version} -> {:error, :upgrade_required}
+  {:error, reason} -> {:error, reason}
+end
+```
 
 ## Configuration Keys
 
