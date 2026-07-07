@@ -1662,7 +1662,7 @@ section is post-3.0.0 parking; neither is counted here.
     actor-scoped HMAC audit chain records tamper-evident boundary decisions
     around the affected tool (`{:broken, 1}`), with no prevention claim per the
     out-of-scope definition.
-- [ ] M5.26 TM.12 threat family - repudiation, audit tamper, truncation.
+- [x] M5.26 TM.12 threat family - repudiation, audit tamper, truncation.
   - Spec: `R.06` - Control Mapping rows 19 and 22; `SP.05`.
   - AC: `.../tm12_repudiation_test.exs` proves chain tamper and truncation
     are detectable via HMAC chain, checkpoints, inclusion/consistency
@@ -1670,6 +1670,22 @@ section is post-3.0.0 parking; neither is counted here.
     reconstructs propagation paths (mitigates + detects; evidence-only for
     cascades).
   - Tests: tamper, negative, property (truncation detection).
+  - Done: added the TM.12 module (R.06 rows 19 and 22, ASI08/ASI03, claim
+    **partial (evidence-only)** for row 19 / **mitigates + detects** for row
+    22) and referenced the base audit/proof/export/evidence tests by exact
+    name. Drives `Audit.verify_chain/3`, `Checkpoint.create/2` and
+    `verify/3`, `Proof.inclusion/2`, `Proof.consistency/2`,
+    `Proof.verify_inclusion/3`, `Proof.verify_consistency/3`, `Anchor.verify/2`,
+    `Export.create/2` and `verify/3`, `Evidence.resolve/2`, and
+    `Attestation.from_decision/3`: a signed anchored export binds a specific
+    event with an inclusion proof and anchor; body tamper breaks the HMAC chain;
+    HMAC tamper breaks checkpoint verification; proof and anchor tamper fail
+    closed; a StreamData property proves every proper prefix verifies as an
+    append-only prefix of the full checkpoint but cannot satisfy the full
+    checkpoint root as the newer root (truncation/fork signal); a forged
+    continuation segment fails against a stored tip; and per-hop agent request /
+    response attestations plus checkpoint/export/anchor evidence refs
+    reconstruct the cascade path without claiming automatic containment.
 
 ## M6 - Legacy Removal, Dependency Cut, And Migration Gate
 
