@@ -1,0 +1,177 @@
+# Audit Export And Proofs
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Faudit-export-and-proofs.livemd)
+
+This notebook builds a signed audit chain, creates portable checkpoint
+evidence, verifies inclusion and consistency proofs, and verifies a signed
+export package against the local events.
+
+## Setup
+
+```elixir
+Mix.install([
+  {:sigil_guard, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Build A Signed Audit Chain
+
+```elixir
+alias SigilGuard.Audit
+
+chain_key = :crypto.hash(:sha256, "audit-livebook-chain-key")
+
+unsigned_events =
+  [
+    {"mcp.tool_call", "did:web:alice", "read_file", "allowed"},
+    {"mcp.tool_result", "did:web:alice", "read_file", "allowed"},
+    {"boundary.decision", "did:web:alice", "send_result", "confirmed"},
+    {"mcp.tool_call", "did:web:alice", "write_file", "blocked"},
+    {"audit.export", "did:web:alice", "checkpoint", "created"}
+  ]
+  |> Enum.with_index()
+  |> Enum.map(fn {{type, actor, action, result}, index} ->
+    Audit.new_event(type, actor, action, result, %{"sequence" => index})
+  end)
+
+events = Audit.build_chain(unsigned_events, chain_key)
+
+%{
+  count: length(events),
+  first_prev_hmac: hd(events).prev_hmac,
+  last_hmac: List.last(events).hmac,
+  chain_verified: Audit.verify_chain(events, chain_key)
+}
+```
+
+## Create And Verify A Checkpoint
+
+```elixir
+alias SigilGuard.Audit.Checkpoint
+
+{:ok, checkpoint} =
+  Checkpoint.create(events,
+    chain_id: "livebook-audit-chain",
+    metadata: %{"environment" => "local-livebook"}
+  )
+
+{:ok, checkpoint_status} = Checkpoint.verify(checkpoint, events)
+
+%{
+  status: checkpoint_status.status,
+  event_count: checkpoint["event_count"],
+  merkle_root: checkpoint["merkle_root"],
+  digest: checkpoint_status.digest
+}
+```
+
+## Verify An Inclusion Proof
+
+```elixir
+alias SigilGuard.Audit.Proof
+
+leaf_index = 2
+target_event = Enum.at(events, leaf_index)
+
+{:ok, inclusion_proof} = Proof.inclusion(events, leaf_index)
+:ok = Proof.verify_inclusion(inclusion_proof, target_event.hmac, checkpoint["merkle_root"])
+
+%{
+  leaf_index: inclusion_proof["leaf_index"],
+  tree_size: inclusion_proof["tree_size"],
+  path_nodes: length(inclusion_proof["audit_path"]),
+  verified: true
+}
+```
+
+## Verify A Consistency Proof
+
+```elixir
+first_size = 3
+older_events = Enum.take(events, first_size)
+
+{:ok, older_checkpoint} = Checkpoint.create(older_events, chain_id: "livebook-audit-chain")
+{:ok, consistency_proof} = Proof.consistency(events, first_size)
+
+:ok =
+  Proof.verify_consistency(
+    consistency_proof,
+    older_checkpoint["merkle_root"],
+    checkpoint["merkle_root"]
+  )
+
+%{
+  first_size: consistency_proof["first_size"],
+  second_size: consistency_proof["second_size"],
+  proof_nodes: length(consistency_proof["proof_nodes"]),
+  verified: true
+}
+```
+
+## Create And Verify A Signed Export
+
+```elixir
+defmodule AuditNotebookSigner do
+  @behaviour SigilGuard.Signer
+
+  @seed :binary.copy(<<0x42>>, 32)
+
+  @impl true
+  def sign(message) do
+    {_public_key, private_key} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    :crypto.sign(:eddsa, :none, message, [private_key, :ed25519])
+  end
+
+  @impl true
+  def public_key do
+    {public_key, _private_key} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    public_key
+  end
+
+  def public_key_b64u, do: Base.url_encode64(public_key(), padding: false)
+end
+
+alias SigilGuard.Audit.Export
+
+issuer = "did:web:audit-livebook"
+
+{:ok, export} =
+  Export.create(events,
+    chain_id: "livebook-audit-chain",
+    signer: AuditNotebookSigner,
+    issuer: issuer,
+    anchor: [storage: "local-worm-demo", uri: "file://audit/livebook/checkpoint.json"],
+    inclusion_proofs: [leaf_index],
+    consistency_proof: first_size
+  )
+
+{:ok, verified_export} =
+  Export.verify(export, events,
+    require_signature: true,
+    require_anchor: true,
+    public_keys: %{issuer => AuditNotebookSigner.public_key_b64u()}
+  )
+
+%{
+  export_kind: export["kind"],
+  checkpoint_status: verified_export.checkpoint.status,
+  checkpoint_issuer: verified_export.checkpoint.issuer,
+  has_anchor: not is_nil(verified_export.anchor),
+  inclusion_proofs: length(export["inclusion_proofs"]),
+  export_digest: verified_export.digest
+}
+```
+
+## Tamper Check
+
+```elixir
+tampered =
+  List.update_at(events, 2, fn event ->
+    %{event | hmac: String.duplicate("0", 64)}
+  end)
+
+%{
+  chain_check: Audit.verify_chain(tampered, chain_key),
+  checkpoint_check: Checkpoint.verify(checkpoint, tampered)
+}
+```

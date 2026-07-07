@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 197 / 228 tasks done (86%).** Milestones: 7 complete, 2 partial,
-1 not started. **31 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 198 / 228 tasks done (87%).** Milestones: 7 complete, 2 partial,
+1 not started. **30 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 8 | 20 | 40% | In progress |
+| M7 | Integrations and adoption | 9 | 20 | 45% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **197** | **228** | **86%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **198** | **228** | **87%** | 7 done / 2 partial / 1 to go |
 
-### What's left (31 tasks)
+### What's left (30 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 12:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 11:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2213,11 +2213,17 @@ section is post-3.0.0 parking; neither is counted here.
     block behavior, high-trust confirmation, and public model-bound allow
     behavior. Manually ran the equivalent cells offline with `mix run`; M7.12
     will replace this with the notebook runner.
-- [ ] M7.09 Livebook: audit export and proofs.
+- [x] M7.09 Livebook: audit export and proofs.
   - Spec: `SP.14` - Livebooks; `SP.05` - Inclusion And Consistency Proofs.
   - AC: `notebooks/audit-export-and-proofs.livemd` walks chain,
     checkpoint, inclusion proof, and signed-export verification.
   - Validation: offline execution (M7.12).
+  - Done: added `notebooks/audit-export-and-proofs.livemd` with a Run in
+    Livebook badge, local-path `Mix.install`, signed audit-chain setup,
+    checkpoint verification, inclusion and consistency proof verification,
+    signed export verification with anchor evidence, and a committed-HMAC
+    tamper check. Manually ran the equivalent cells offline with `mix run`;
+    M7.12 will replace this with the notebook runner.
 - [ ] M7.10 Livebook: hermes integration stub.
   - Spec: `SP.14` - Livebooks (hermes stub rule).
   - AC: `notebooks/hermes-integration.livemd` exercises the interceptor
