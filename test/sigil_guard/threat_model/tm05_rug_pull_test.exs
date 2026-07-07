@@ -1,30 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM05RugPullTest do
-  @moduledoc """
-  TM.05 - rug pull / TOFU drift (R.06 Control Mapping rows 5 and 18, ASI04/ASI05,
-  claim: **mitigates**; row 18 is out-of-scope for the IDE itself, and this
-  mitigates the analogous config-swap pattern).
+  @moduledoc false
 
-  Sourced attack: a tool is benign at trust-on-first-use, then swaps its
-  definition after approval - the rug pull, and the pattern behind the Cursor
-  "MCPoison" config-swap persistence (CVE-2025-54136). A `tools/list_changed`
-  refresh is the delivery vector for the swapped definition.
-
-  Control (SP.03): manifest digests are pinned, so a swapped definition is
-  rejected on re-verification, and `verify_list_changed/2` re-verifies the whole
-  refreshed list and halts on the first drift. Cached approvals die structurally
-  because confirmation tokens bind `manifest_digest`: once the tool's config
-  changes the digest changes, the outstanding token no longer applies
-  (`:manifest_digest_mismatch`), and single-use binding rejects a replayed
-  approval (`:replay_detected`). `mitigates` means the swapped tool is rejected
-  or forced through fresh confirmation, deterministically.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.ToolGatewayTest` "list_changed manifest drift invalidates stale
-  approval tokens" and "re-verifies refreshed tools after list_changed";
-  `SigilGuard.ConfirmationTest` "rejects manifest-bound tokens for changed
-  manifests" and "consumes confirmation tokens by default". This module drives
-  the re-verification and token-binding controls with rug-pull fixtures.
-  """
   use ExUnit.Case, async: false
 
   alias SigilGuard.CapabilityManifest
@@ -33,9 +9,7 @@ defmodule SigilGuard.ThreatModel.TM05RugPullTest do
   alias SigilGuard.Runtime.Gate
   alias SigilGuard.ToolGateway
 
-  @manifest "test/fixtures/capability_manifest/repo_file_write/manifest.json"
-            |> File.read!()
-            |> Jason.decode!()
+  @manifest SigilGuard.FixturePath.read_json!("capability_manifest/repo_file_write.manifest.json")
 
   @now ~U[2026-06-30 12:00:00.000Z]
   @confirmation_key :crypto.hash(:sha256, "tm05-rug-pull-confirmation-key")

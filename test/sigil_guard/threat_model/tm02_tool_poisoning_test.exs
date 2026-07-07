@@ -1,30 +1,11 @@
 defmodule SigilGuard.ThreatModel.TM02ToolPoisoningTest do
-  @moduledoc """
-  TM.02 - tool poisoning via descriptions/metadata (R.06 Control Mapping row 2,
-  ASI02/ASI04, claim: **mitigates**).
+  @moduledoc false
 
-  Sourced attack: a server ships a benign-looking tool, then poisons its
-  description, annotations, or schema after approval (the MCPTox family) to
-  redirect the agent. Because the description and metadata are delivered as tool
-  *definition* - before any content is scanned - a text scanner cannot see them.
-
-  Control (SP.03): the capability manifest pins a digest over the tool's
-  description, annotations, and input/output schemas; `verify_manifest/2` rejects
-  any observed manifest that drifts from the pinned digest with
-  `:manifest_digest_mismatch`. `mitigates` means poisoned drift is denied.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.ToolGatewayTest` "blocks the first manifest verification failure
-  before runtime scanning" and the `SigilGuard.CapabilityManifestTest` digest
-  cases. This module drives the pinning control with poisoned-drift fixtures.
-  """
   use ExUnit.Case, async: true
 
   alias SigilGuard.ToolGateway
 
-  @manifest "test/fixtures/capability_manifest/repo_file_write/manifest.json"
-            |> File.read!()
-            |> Jason.decode!()
+  @manifest SigilGuard.FixturePath.read_json!("capability_manifest/repo_file_write.manifest.json")
 
   defp verify(observed) do
     ToolGateway.verify_manifest(observed,

@@ -1,4 +1,6 @@
 defmodule SigilGuard.ToolGatewayTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias __MODULE__.TrustedSigner
@@ -11,7 +13,8 @@ defmodule SigilGuard.ToolGatewayTest do
   alias SigilGuard.ToolGateway
   alias SigilGuard.TrustBundle
 
-  @fixture Path.expand("../fixtures/capability_manifest/repo_file_write", __DIR__)
+  @fixture SigilGuard.FixturePath.path("capability_manifest")
+  @manifest_fixture "repo_file_write.manifest.json"
   @confirmation_key :crypto.hash(:sha256, "tool-gateway-confirmation-test-key")
   @request_action_digest String.duplicate("a", 64)
   @now ~U[2026-06-30 12:00:00.000Z]
@@ -1667,7 +1670,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
   defp manifest do
     @fixture
-    |> Path.join("manifest.json")
+    |> Path.join(@manifest_fixture)
     |> File.read!()
     |> Jason.decode!()
   end

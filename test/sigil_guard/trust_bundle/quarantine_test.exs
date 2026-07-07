@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.QuarantineTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias SigilGuard.Attestation.Envelope

@@ -84,7 +84,7 @@ defmodule SigilGuard.ReleaseMalformedCampaignTest do
   end
 
   defp assert_taxonomy(reason) when is_atom(reason), do: :ok
-  defp assert_taxonomy({reason, _detail}) when is_atom(reason), do: :ok
+  defp assert_taxonomy({reason, _}) when is_atom(reason), do: :ok
 
   defp assert_taxonomy(reason) do
     flunk("expected taxonomy atom, got: #{inspect(reason)}")

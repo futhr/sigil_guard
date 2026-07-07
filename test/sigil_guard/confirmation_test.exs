@@ -285,8 +285,10 @@ defmodule SigilGuard.ConfirmationTest do
         %{claims | "actor" => 123},
         %{claims | "decision" => "allow"},
         %{claims | "payload_digest" => "bad"},
+        %{claims | "payload_digest" => claims["payload_digest"] <> "\n"},
         %{claims | "context_digest" => "bad"},
-        %{claims | "nonce" => "bad"}
+        %{claims | "nonce" => "bad"},
+        %{claims | "nonce" => claims["nonce"] <> "\n"}
       ]
 
       for malformed_claims <- invalid_claims do

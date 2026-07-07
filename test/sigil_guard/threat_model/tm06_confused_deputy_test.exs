@@ -1,35 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM06ConfusedDeputyTest do
-  @moduledoc """
-  TM.06 - confused deputy and consent replay (R.06 Control Mapping rows 6 and 21,
-  ASI03/ASI09, claim: **mitigates (partial)** for row 6 and **mitigates (the
-  token)** for row 21).
+  @moduledoc false
 
-  Sourced attacks: (row 6) a proxy with static client credentials is tricked
-  into replaying a stored consent to a new audience - the confused deputy; and
-  (row 21) a spoofed or forged human approval is presented to the agent. The
-  partial / out-of-scope boundaries are host-owned: SigilGuard consumes an
-  already-issued identity/audience and binds it, but does not run the OAuth
-  authorization server, manage consent cookies, or make the human judgment.
-
-  Control (SP.01, SP.03, SP.08): the gateway refuses a credential minted for the
-  wrong audience or resource (`:audience_mismatch` / `:resource_mismatch`);
-  attestations bind actor + audience + resource with a single-use nonce
-  (`{actor, nonce}` replay scope) and DSSE expiry, so a stored consent cannot be
-  replayed to a new audience or reused expired; and confirmation tokens bind the
-  action, payload, context (incl. actor and `sandbox_id`), and manifest digests,
-  are single-use with a TTL, and reject a forged HMAC - so a replayed or spoofed
-  approval cannot approve an action. `mitigates` means the deputy refuses, or the
-  replayed / forged consent is rejected, deterministically.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.ToolGatewayTest` "blocks token passthrough, resource, and audience
-  mismatches before runtime" and "accepts matching resource and audience checks";
-  `SigilGuard.AttestationSignVerifyTest` "can consume attestation nonces for
-  replay protection" and "rejects expired attestations";
-  `SigilGuard.ConfirmationTest` "rejects tampered token bodies" and "consumes
-  confirmation tokens by default". This module drives the audience/resource,
-  consent-replay, and approval-forgery controls with confused-deputy fixtures.
-  """
   use ExUnit.Case, async: false
 
   alias __MODULE__.TrustedSigner
@@ -42,9 +13,7 @@ defmodule SigilGuard.ThreatModel.TM06ConfusedDeputyTest do
   alias SigilGuard.ToolGateway
   alias SigilGuard.TrustProfile
 
-  @manifest "test/fixtures/capability_manifest/repo_file_write/manifest.json"
-            |> File.read!()
-            |> Jason.decode!()
+  @manifest SigilGuard.FixturePath.read_json!("capability_manifest/repo_file_write.manifest.json")
 
   @now ~U[2026-07-03 12:00:00.000Z]
   @confirmation_key :crypto.hash(:sha256, "tm06-confused-deputy-confirmation-key")

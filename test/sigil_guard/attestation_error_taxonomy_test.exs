@@ -1,4 +1,6 @@
 defmodule SigilGuard.AttestationErrorTaxonomyTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias __MODULE__.MissingSigner

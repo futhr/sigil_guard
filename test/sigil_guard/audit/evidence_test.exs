@@ -1,4 +1,6 @@
 defmodule SigilGuard.Audit.EvidenceTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Attestation

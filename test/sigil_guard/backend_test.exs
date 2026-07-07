@@ -30,6 +30,17 @@ defmodule SigilGuard.BackendTest do
       assert Backend.impl() == SigilGuard.Backend.Elixir
     end
 
+    test "memoized backend follows configuration changes" do
+      Application.put_env(:sigil_guard, :backend, :elixir)
+      assert Backend.impl() == SigilGuard.Backend.Elixir
+
+      Application.put_env(:sigil_guard, :backend, SigilGuard.Backend.Elixir)
+      assert Backend.impl() == SigilGuard.Backend.Elixir
+
+      Application.put_env(:sigil_guard, :backend, :nif)
+      assert_raise ArgumentError, ~r/backend :nif has been removed/, fn -> Backend.impl() end
+    end
+
     test "raises for an atom that is not a backend module" do
       Application.put_env(:sigil_guard, :backend, :bogus)
 

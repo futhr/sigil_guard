@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.CacheTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
   use ExUnitProperties
 

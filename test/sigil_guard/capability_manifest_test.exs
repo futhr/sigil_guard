@@ -1,14 +1,26 @@
 defmodule SigilGuard.CapabilityManifestTest do
-  use ExUnit.Case, async: true
+  @moduledoc false
+
+  use ExUnit.Case, async: false
 
   alias SigilGuard.Canonical.JCS
   alias SigilGuard.CapabilityManifest
 
-  @fixture Path.expand("../fixtures/capability_manifest/repo_file_write", __DIR__)
+  @fixture SigilGuard.FixturePath.path("capability_manifest")
+  @expected_fixture "repo_file_write.expected.json"
+  @manifest_fixture "repo_file_write.manifest.json"
+  @preimage_fixture "repo_file_write.preimage.json"
 
   describe "new/1" do
+    test "fixture helper resolves independently of cwd" do
+      File.cd!("test/sigil_guard/threat_model", fn ->
+        assert %{"name" => "repo_file_write"} =
+                 SigilGuard.FixturePath.read_json!(["capability_manifest", @manifest_fixture])
+      end)
+    end
+
     test "validates the repo_file_write canonical manifest" do
-      manifest = read_json("manifest.json")
+      manifest = read_json(@manifest_fixture)
 
       assert {:ok, capability} = CapabilityManifest.new(manifest)
 
@@ -16,8 +28,8 @@ defmodule SigilGuard.CapabilityManifestTest do
       assert capability.manifest_format == "sigil_guard_capability_manifest/v1"
       assert capability.side_effects == ["write"]
       assert capability.sandbox == %{"min_isolation" => "container", "required" => true}
-      assert capability.preimage == read_json("preimage.json")
-      assert capability.digest == read_json("expected.json")["manifest_digest"]
+      assert capability.preimage == read_json(@preimage_fixture)
+      assert capability.digest == read_json(@expected_fixture)["manifest_digest"]
     end
 
     test "validates optional output schema and sandbox false forms" do
@@ -56,6 +68,12 @@ defmodule SigilGuard.CapabilityManifestTest do
          Map.put(manifest(), "sandbox", %{"required" => false, "min_isolation" => "container"})},
         {"non-map input schema", Map.put(manifest(), "input_schema", [])},
         {"bad issuer keyid", Map.put(manifest(), "issuer_keyid", "key")},
+        {"issuer keyid with trailing newline",
+         Map.put(manifest(), "issuer_keyid", manifest()["issuer_keyid"] <> "\n")},
+        {"expires_at with trailing newline",
+         Map.put(manifest(), "expires_at", manifest()["expires_at"] <> "\n")},
+        {"regex-shaped invalid expires_at",
+         Map.put(manifest(), "expires_at", "2026-99-02T12:00:00.000Z")},
         {"bad optional list", Map.put(manifest(), "audience", ["server", 1])},
         {"unsorted suspicious params",
          Map.put(manifest(), "suspicious_params", ["token", "apiKey"])},
@@ -79,9 +97,9 @@ defmodule SigilGuard.CapabilityManifestTest do
     test "checks carried inner digests when present" do
       valid =
         manifest()
-        |> Map.put("description_sha256", read_json("expected.json")["description_sha256"])
-        |> Map.put("input_schema_sha256", read_json("expected.json")["input_schema_sha256"])
-        |> Map.put("annotations_sha256", read_json("expected.json")["annotations_sha256"])
+        |> Map.put("description_sha256", read_json(@expected_fixture)["description_sha256"])
+        |> Map.put("input_schema_sha256", read_json(@expected_fixture)["input_schema_sha256"])
+        |> Map.put("annotations_sha256", read_json(@expected_fixture)["annotations_sha256"])
 
       assert {:ok, %CapabilityManifest{}} = CapabilityManifest.new(valid)
 
@@ -132,9 +150,9 @@ defmodule SigilGuard.CapabilityManifestTest do
 
   describe "digest/1" do
     test "reproduces committed golden vectors and the SP.01 tool_request digest" do
-      manifest_json = read_fixture_bytes("manifest.json")
-      preimage_json = read_fixture_bytes("preimage.json")
-      expected = read_json("expected.json")
+      manifest_json = read_fixture_bytes(@manifest_fixture)
+      preimage_json = read_fixture_bytes(@preimage_fixture)
+      expected = read_json(@expected_fixture)
       tool_request = read_json(["agent_trust", "tool_request", "expected.json"])
 
       assert {:ok, ^manifest_json} = JCS.encode(manifest())
@@ -146,10 +164,10 @@ defmodule SigilGuard.CapabilityManifestTest do
     end
 
     test "can digest a struct from its preimage when no cached digest is set" do
-      manifest = %CapabilityManifest{digest: nil, preimage: read_json("preimage.json")}
+      manifest = %CapabilityManifest{digest: nil, preimage: read_json(@preimage_fixture)}
 
       assert CapabilityManifest.digest(manifest) ==
-               {:ok, read_json("expected.json")["manifest_digest"]}
+               {:ok, read_json(@expected_fixture)["manifest_digest"]}
     end
 
     test "fails closed for invalid digest inputs" do
@@ -204,7 +222,7 @@ defmodule SigilGuard.CapabilityManifestTest do
     end
   end
 
-  defp manifest, do: read_json("manifest.json")
+  defp manifest, do: read_json(@manifest_fixture)
 
   defp read_fixture_bytes(file) do
     @fixture
@@ -221,9 +239,6 @@ defmodule SigilGuard.CapabilityManifestTest do
   end
 
   defp read_json(path) when is_list(path) do
-    [Path.expand("../fixtures", __DIR__) | path]
-    |> Path.join()
-    |> File.read!()
-    |> Jason.decode!()
+    SigilGuard.FixturePath.read_json!(path)
   end
 end

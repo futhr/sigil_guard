@@ -1,4 +1,6 @@
 defmodule SigilGuard.Attestation.AgentPredicateTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Attestation.AgentPredicate

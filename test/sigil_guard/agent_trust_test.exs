@@ -1,4 +1,6 @@
 defmodule SigilGuard.AgentTrustTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias SigilGuard.AgentCard
@@ -19,7 +21,6 @@ defmodule SigilGuard.AgentTrustTest do
   end
 
   defmodule Issuer do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x21>>, 32)
     @impl SigilGuard.Signer
@@ -30,7 +31,6 @@ defmodule SigilGuard.AgentTrustTest do
   end
 
   defmodule Agent do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x41>>, 32)
     @impl SigilGuard.Signer
@@ -41,7 +41,6 @@ defmodule SigilGuard.AgentTrustTest do
   end
 
   defmodule Local do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x71>>, 32)
     @impl SigilGuard.Signer
@@ -408,6 +407,17 @@ defmodule SigilGuard.AgentTrustTest do
              ) == {:error, :digest_mismatch}
     end
 
+    test "a request_action_digest with trailing newline fails :invalid_payload" do
+      {envelope, payload, rad} = signed_response()
+
+      assert AgentTrust.verify_agent_response(envelope, issuer_material(),
+               peer_card: card_envelope(),
+               request_action_digest: rad <> "\n",
+               payload: payload,
+               now: @now
+             ) == {:error, :invalid_payload}
+    end
+
     test "a missing request_action_digest fails :invalid_payload" do
       {envelope, payload, _} = signed_response()
 
@@ -477,14 +487,12 @@ defmodule SigilGuard.AgentTrustTest do
   end
 
   defmodule TrustMapper do
-    @moduledoc false
     @spec trust_level(term()) :: :low | :medium | :high
     def trust_level("spiffe://prod.example.org/agents/reviewer"), do: :high
     def trust_level(_), do: :low
   end
 
   defmodule RaisingTrust do
-    @moduledoc false
     @spec trust_level(term()) :: no_return()
     def trust_level(_), do: raise("boom")
   end

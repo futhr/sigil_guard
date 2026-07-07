@@ -4,7 +4,7 @@ defmodule SigilGuard.BoundaryPolicyFixture do
   alias SigilGuard.BoundaryPolicy.File, as: PolicyFile
   alias SigilGuard.Canonical.JCS
 
-  @root Path.expand("../fixtures/boundary_policy", __DIR__)
+  @root SigilGuard.FixturePath.path("boundary_policy")
 
   @doc false
   @spec canonical_path() :: Path.t()

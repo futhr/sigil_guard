@@ -1,4 +1,6 @@
 defmodule SigilGuard.AttestationSignVerifyTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias __MODULE__.TrustedSigner

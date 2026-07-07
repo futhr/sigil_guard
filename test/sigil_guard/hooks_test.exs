@@ -1,4 +1,6 @@
 defmodule SigilGuard.HooksTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Boundary
@@ -7,31 +9,26 @@ defmodule SigilGuard.HooksTest do
   # -- Fixture hook modules (blockable: tool_request; notify: session_start) ---
 
   defmodule BlockHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:block, "denied"}
   end
 
   defmodule ConfirmHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:confirm, "review needed"}
   end
 
   defmodule ContinueHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:ok, :continue}
   end
 
   defmodule LowRiskHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:ok, :continue, %{risk_level: :low}}
   end
 
   defmodule HighRiskHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _) do
       {:ok, :continue, %{risk_level: :high, indicators: [%{"category" => "suspicious"}]}}
@@ -39,58 +36,50 @@ defmodule SigilGuard.HooksTest do
   end
 
   defmodule QuarantineHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:quarantine, "nope"}
   end
 
   defmodule InvalidHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: :banana
   end
 
   defmodule BadSignalHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:ok, :continue, %{risk_level: :nuclear}}
   end
 
   defmodule CrashHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: raise("boom")
   end
 
   defmodule SlowHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _) do
-      Process.sleep(500)
-      {:ok, :continue}
+      receive do
+        :release -> {:ok, :continue}
+      end
     end
   end
 
   defmodule ThrowHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: throw(:boom)
   end
 
   defmodule ExitHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: exit(:boom)
   end
 
   defmodule IndicatorOnlyHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:ok, :continue, %{indicators: [%{"category" => "note"}]}}
   end
 
   defmodule NotifyBehaviourHook do
-    @moduledoc false
     @behaviour SigilGuard.Hooks
     @impl SigilGuard.Hooks
     @spec on_session_start(term(), term()) :: term()
@@ -98,23 +87,21 @@ defmodule SigilGuard.HooksTest do
   end
 
   defmodule NotifyBlockHook do
-    @moduledoc false
     @spec on_session_start(term(), term()) :: term()
     def on_session_start(_, _), do: {:block, "cannot"}
   end
 
   defmodule NotifyCrashHook do
-    @moduledoc false
     @spec on_session_start(term(), term()) :: term()
     def on_session_start(_, _), do: raise("boom")
   end
 
   defmodule NotifySlowHook do
-    @moduledoc false
     @spec on_session_start(term(), term()) :: term()
     def on_session_start(_, _) do
-      Process.sleep(500)
-      :ok
+      receive do
+        :release -> :ok
+      end
     end
   end
 

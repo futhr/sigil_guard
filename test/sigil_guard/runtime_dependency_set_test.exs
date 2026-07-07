@@ -1,4 +1,6 @@
 defmodule SigilGuard.RuntimeDependencySetTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   @expected_runtime_dependencies MapSet.new([:jason, :nimble_options, :telemetry])
@@ -43,7 +45,7 @@ defmodule SigilGuard.RuntimeDependencySetTest do
       {name, requirement, opts} when is_binary(requirement) and is_list(opts) ->
         if runtime_dependency?(opts), do: [name], else: []
 
-      {_name, _requirement, opts} when is_list(opts) ->
+      {_, _, opts} when is_list(opts) ->
         []
     end)
     |> MapSet.new()

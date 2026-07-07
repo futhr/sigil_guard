@@ -1,4 +1,6 @@
 defmodule SigilGuard.Audit.WitnessTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Attestation.Envelope
@@ -9,7 +11,6 @@ defmodule SigilGuard.Audit.WitnessTest do
   alias SigilGuard.Canonical.JCS
 
   defmodule Witness1 do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed for b <- 0x41..0x60, into: <<>>, do: <<b>>
 
@@ -27,7 +28,6 @@ defmodule SigilGuard.Audit.WitnessTest do
   end
 
   defmodule Witness2 do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed for b <- 0x61..0x80, into: <<>>, do: <<b>>
 
@@ -45,7 +45,6 @@ defmodule SigilGuard.Audit.WitnessTest do
   end
 
   defmodule BadSigner do
-    @moduledoc false
     def sign(_), do: "too-short"
     def public_key, do: "not-a-key"
   end

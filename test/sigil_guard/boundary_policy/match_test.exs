@@ -1,4 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy.MatchTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.BoundaryPolicy
@@ -8,7 +10,7 @@ defmodule SigilGuard.BoundaryPolicy.MatchTest do
 
   setup_all do
     {:ok, canonical} =
-      PolicyFile.parse(File.read!("test/fixtures/boundary_policy/canonical.policy"))
+      PolicyFile.parse(SigilGuard.FixturePath.read!("boundary_policy/canonical.policy"))
 
     %{policy: canonical}
   end
@@ -168,6 +170,12 @@ defmodule SigilGuard.BoundaryPolicy.MatchTest do
 
       assert {:confirm, ["policy.default.absent"]} =
                eval([tool: nil, actor: nil, hits: [], indicators: []], policy)
+    end
+
+    test "nil present-in fields and unknown matcher keys do not match" do
+      policy = compile!("version 3\n[rules]\nblock origin:user\nconfirm made_up:value\n")
+
+      assert {:allow, []} = eval([origin: nil], policy)
     end
 
     test "malformed hit and indicator entries are skipped" do

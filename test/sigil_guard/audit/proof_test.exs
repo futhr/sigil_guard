@@ -1,4 +1,6 @@
 defmodule SigilGuard.Audit.ProofTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
   use ExUnitProperties
 

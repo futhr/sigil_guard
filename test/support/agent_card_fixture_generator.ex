@@ -12,7 +12,7 @@ defmodule SigilGuard.AgentCardFixtureGenerator do
 
   @doc false
   @spec fixtures() :: [String.t()]
-  def fixtures, do: ["research_peer"]
+  def fixtures, do: Map.keys(generate()) |> Enum.sort()
 
   @doc false
   @spec write!(Path.t()) :: :ok
@@ -20,22 +20,19 @@ defmodule SigilGuard.AgentCardFixtureGenerator do
     root = Path.expand(root)
     File.rm_rf!(root)
 
-    for {dir, files} <- generate() do
-      target = Path.join(root, dir)
-      File.mkdir_p!(target)
+    File.mkdir_p!(root)
 
-      for {name, bytes} <- files do
-        File.write!(Path.join(target, name), bytes)
-      end
+    for {name, bytes} <- generate() do
+      File.write!(Path.join(root, name), bytes)
     end
 
     :ok
   end
 
   @doc false
-  @spec generate() :: %{required(String.t()) => %{required(String.t()) => binary()}}
+  @spec generate() :: %{required(String.t()) => binary()}
   def generate do
-    %{"research_peer" => research_peer_files()}
+    research_peer_files()
   end
 
   defp research_peer_files do
@@ -47,9 +44,9 @@ defmodule SigilGuard.AgentCardFixtureGenerator do
     {:ok, expected_json} = JCS.encode(expected(card_json, envelope))
 
     %{
-      "card.json" => card_json,
-      "envelope.json" => envelope_json,
-      "expected.json" => expected_json
+      "research_peer.card.json" => card_json,
+      "research_peer.envelope.json" => envelope_json,
+      "research_peer.expected.json" => expected_json
     }
   end
 

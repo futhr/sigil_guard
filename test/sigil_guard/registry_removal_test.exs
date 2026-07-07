@@ -1,4 +1,6 @@
 defmodule SigilGuard.RegistryRemovalTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   @registry_module SigilGuard.Registry
@@ -146,8 +148,8 @@ defmodule SigilGuard.RegistryRemovalTest do
         Mix.Project.config()
         |> Keyword.fetch!(:deps)
         |> Enum.map(fn
-          {app, _requirement} -> app
-          {app, _requirement, _opts} -> app
+          {app, _} -> app
+          {app, _, _} -> app
         end)
 
       refute :finch in direct_deps

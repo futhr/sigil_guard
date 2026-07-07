@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.BootTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias __MODULE__.BundleSigner

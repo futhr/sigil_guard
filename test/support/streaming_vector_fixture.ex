@@ -6,7 +6,7 @@ defmodule SigilGuard.StreamingVectorFixture do
   alias SigilGuard.Runtime.Gate
   alias SigilGuard.Runtime.Stream
 
-  @root Path.expand("../fixtures/streaming", __DIR__)
+  @root SigilGuard.FixturePath.path("streaming")
   @context [phase: :tool_result, sink: :model, trust_level: :medium]
 
   # Each text embeds one built-in secret with boundary-clean surrounding bytes.

@@ -16,7 +16,7 @@ defmodule SigilGuard.ReleaseNoNetworkSweepTest do
   alias SigilGuard.TestSigner
   alias SigilGuard.TrustBundle
 
-  @fixtures Path.expand("../fixtures/trust_bundle", __DIR__)
+  @fixtures SigilGuard.FixturePath.path("trust_bundle")
   @now ~U[2026-07-03 12:00:00.000Z]
   @secret_key :crypto.hash(:sha256, "release no network sweep")
 
@@ -56,7 +56,7 @@ defmodule SigilGuard.ReleaseNoNetworkSweepTest do
     end)
 
     assert_unchanged_ports(fn ->
-      assert {:ok, _statement} =
+      assert {:ok, _} =
                Attestation.from_decision(decision(), context(),
                  payload: %{"method" => "tools/call", "params" => %{"name" => "compile"}},
                  now: @now,
@@ -76,7 +76,7 @@ defmodule SigilGuard.ReleaseNoNetworkSweepTest do
 
       assert {:ok, receipt} = Store.put(LocalFile, anchor, path: path)
       assert {:ok, ^anchor} = Store.fetch(LocalFile, receipt)
-      assert {:ok, _verified} = Store.verify(LocalFile, receipt, checkpoint)
+      assert {:ok, _} = Store.verify(LocalFile, receipt, checkpoint)
     end)
   end
 

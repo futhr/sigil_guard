@@ -1,4 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy.ContractTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   use ExUnitProperties

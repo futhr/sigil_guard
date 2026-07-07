@@ -11,7 +11,7 @@ defmodule SigilGuard.AuditProofFixture do
   alias SigilGuard.Audit.Proof
   alias SigilGuard.Canonical.JCS
 
-  @root Path.expand("../fixtures/audit_proofs", __DIR__)
+  @root SigilGuard.FixturePath.path("audit_proofs")
   @key "sigil-guard-audit-proof-test-key"
   @issuer "did:web:test.example.org"
   @generated_at "2026-07-02T12:00:05.000Z"

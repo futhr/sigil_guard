@@ -1,4 +1,6 @@
 defmodule SigilGuard.AgentCardTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.AgentCard
@@ -8,7 +10,7 @@ defmodule SigilGuard.AgentCardTest do
   alias SigilGuard.Canonical.JCS
   alias SigilGuard.TrustBundle
 
-  @fixture_root Path.expand("../fixtures/agent_cards", __DIR__)
+  @fixture_root SigilGuard.FixturePath.path("agent_cards")
   @now ~U[2026-07-15 12:00:00.000Z]
 
   setup_all do
@@ -118,6 +120,8 @@ defmodule SigilGuard.AgentCardTest do
         {"expires before issued",
          Map.put(valid_card(), "expires_at", "2026-07-01T12:00:00.000Z")},
         {"bad timestamp format", Map.put(valid_card(), "issued_at", "2026-07-02 12:00:00Z")},
+        {"timestamp with trailing newline",
+         Map.put(valid_card(), "issued_at", valid_card()["issued_at"] <> "\n")},
         {"capability not a map", Map.put(valid_card(), "capabilities", ["summarize"])},
         {"public key not a map", Map.put(valid_card(), "public_keys", ["key"])},
         {"non-binary endpoint", Map.put(valid_card(), "endpoints", [123])},
@@ -177,11 +181,10 @@ defmodule SigilGuard.AgentCardTest do
       try do
         AgentCardFixtureGenerator.write!(tmp)
 
-        for dir <- AgentCardFixtureGenerator.fixtures(),
-            file <- ~w(card.json envelope.json expected.json) do
-          committed = Path.join([@fixture_root, dir, file])
-          regenerated = Path.join([tmp, dir, file])
-          assert File.read!(regenerated) == File.read!(committed), "#{dir}/#{file}"
+        for fixture <- AgentCardFixtureGenerator.fixtures() do
+          committed = Path.join(@fixture_root, fixture)
+          regenerated = Path.join(tmp, fixture)
+          assert File.read!(regenerated) == File.read!(committed), fixture
         end
       after
         File.rm_rf!(tmp)
@@ -189,9 +192,9 @@ defmodule SigilGuard.AgentCardTest do
     end
 
     test "envelope verifies and matches the recorded digest and signature" do
-      card_json = read_fixture("card.json")
-      envelope = read_json("envelope.json")
-      expected = read_json("expected.json")
+      card_json = read_fixture("research_peer.card.json")
+      envelope = read_json("research_peer.envelope.json")
+      expected = read_json("research_peer.expected.json")
 
       assert {:ok, ^card_json} = JCS.encode(Jason.decode!(card_json))
       assert sha256_hex(card_json) == expected["card_digest"]
@@ -455,7 +458,7 @@ defmodule SigilGuard.AgentCardTest do
     %TrustBundle{document: document}
   end
 
-  defp read_fixture(name), do: File.read!(Path.join([@fixture_root, "research_peer", name]))
+  defp read_fixture(name), do: File.read!(Path.join(@fixture_root, name))
   defp read_json(name), do: Jason.decode!(read_fixture(name))
 
   defp flip_first_byte(payload) do

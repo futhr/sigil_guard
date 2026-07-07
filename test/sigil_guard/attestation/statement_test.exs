@@ -1,4 +1,6 @@
 defmodule SigilGuard.Attestation.StatementTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Attestation.Statement
@@ -49,6 +51,12 @@ defmodule SigilGuard.Attestation.StatementTest do
 
       assert Statement.build(@predicate_type, predicate(), %{
                action: String.upcase(@digest_a),
+               payload: @digest_b,
+               context: @digest_c
+             }) == {:error, :invalid_profile}
+
+      assert Statement.build(@predicate_type, predicate(), %{
+               action: @digest_a <> "\n",
                payload: @digest_b,
                context: @digest_c
              }) == {:error, :invalid_profile}
@@ -161,6 +169,17 @@ defmodule SigilGuard.Attestation.StatementTest do
                "predicateType" => @predicate_type,
                "predicate" => predicate(),
                "subject" => ["bad"]
+             }) == {:error, :invalid_profile}
+
+      assert Statement.parse(%{
+               "_type" => Statement.statement_type(),
+               "predicateType" => @predicate_type,
+               "predicate" => predicate(),
+               "subject" => [
+                 %{"name" => "action", "digest" => %{"sha256" => @digest_a <> "\n"}},
+                 %{"name" => "payload", "digest" => %{"sha256" => @digest_b}},
+                 %{"name" => "context", "digest" => %{"sha256" => @digest_c}}
+               ]
              }) == {:error, :invalid_profile}
     end
   end

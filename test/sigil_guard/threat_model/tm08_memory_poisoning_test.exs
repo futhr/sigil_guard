@@ -1,33 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM08MemoryPoisoningTest do
-  @moduledoc """
-  TM.08 - memory and context poisoning (R.06 Control Mapping row 9, ASI06,
-  claim: **mitigates + detects**).
+  @moduledoc false
 
-  Sourced attack: MemoryGraft (arXiv 2512.16962) - grafted "successful
-  experiences" persist in long-term memory and re-surface via retrieval,
-  inducing behavioral drift. A poisoned retrieved record carries injected
-  instructions that reach the model at model ingress. The vector store, RAG
-  index, and eviction policy are host-owned; SigilGuard gates the content at the
-  model-ingress boundary and binds provenance.
-
-  Control (SP.04): retrieved memory/context crosses the boundary scanner and the
-  trust-zone policy kernel at `:model_ingress` (Context phase `:inbound_user`)
-  before it reaches the model. A poisoned record bearing injection/poisoning
-  indicators is quarantined or blocked (`mitigates`), a deterministic
-  quarantine indicator plus a boundary policy rule fire (`detects`), and a
-  SHA-256 payload/content digest (`content_hash`) is bound to the ingest
-  decision as provenance on every record - poisoned or clean.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.QuarantineTest` "detects prompt injection indicators" and "detects
-  hidden HTML instructions"; `SigilGuard.Runtime.GateTest` "quarantines prompt
-  injection in tool output before model ingestion" and "runtime decisions carry
-  the new typed fields (matched_rules, boundary labels)";
-  `SigilGuard.BoundaryPolicyTest` "quarantine indicators quarantine". TM.01
-  already covers tool-result injection; this module drives the distinct
-  model-ingress angle - retrieved memory as origin, ingress phase, and digest
-  provenance - with memory-poisoning fixtures.
-  """
   use ExUnit.Case, async: true
 
   alias SigilGuard.Decision

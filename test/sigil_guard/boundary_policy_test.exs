@@ -1,4 +1,6 @@
 defmodule SigilGuard.BoundaryPolicyTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   use ExUnitProperties
@@ -13,19 +15,16 @@ defmodule SigilGuard.BoundaryPolicyTest do
   @digest String.duplicate("a", 64)
 
   defmodule RequestConfirmHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:confirm, "confirm please"}
   end
 
   defmodule EgressBlockHook do
-    @moduledoc false
     @spec on_model_egress(term(), term()) :: term()
     def on_model_egress(_, _), do: {:block, "egress denied"}
   end
 
   defmodule RiskHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _) do
       {:ok, :continue, %{risk_level: :high, indicators: [%{"category" => "hookflag"}]}}
@@ -33,13 +32,11 @@ defmodule SigilGuard.BoundaryPolicyTest do
   end
 
   defmodule CrashHook do
-    @moduledoc false
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: raise("boom")
   end
 
   defmodule EchoDetector do
-    @moduledoc false
     @spec analyze(term(), term(), keyword()) :: term()
     def analyze(_, _, opts), do: Keyword.fetch!(opts, :return)
   end

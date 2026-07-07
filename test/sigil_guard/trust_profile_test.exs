@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustProfileTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Attestation.AgentPredicate
@@ -84,6 +86,10 @@ defmodule SigilGuard.TrustProfileTest do
 
       assert statement
              |> put_in(["predicate", "profile"], "other_profile/v1")
+             |> TrustProfile.validate() == {:error, :invalid_profile}
+
+      assert statement
+             |> put_in(["predicate", "profile"], :sigil_guard_agent_trust)
              |> TrustProfile.validate() == {:error, :invalid_profile}
     end
 

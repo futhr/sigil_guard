@@ -6,14 +6,36 @@ defmodule SigilGuard.Runtime.BadScannerPipelineTestStub do
 end
 
 defmodule SigilGuard.Runtime.GateTest do
-  @moduledoc false
-
   use ExUnit.Case, async: true
 
   use ExUnitProperties
 
+  alias SigilGuard.Attestation.Digest
+  alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.Runtime.Gate
+
+  defmodule BoundaryCaptureHook do
+    @capture_table :sigil_guard_runtime_gate_boundary_capture
+
+    @spec on_tool_request(SigilGuard.Boundary.t(), keyword()) :: {:ok, :continue}
+    def on_tool_request(boundary, opts), do: capture(boundary, opts)
+
+    @spec on_model_ingress(SigilGuard.Boundary.t(), keyword()) :: {:ok, :continue}
+    def on_model_ingress(boundary, opts), do: capture(boundary, opts)
+
+    @spec on_file_changed(SigilGuard.Boundary.t(), keyword()) :: {:ok, :continue}
+    def on_file_changed(boundary, opts), do: capture(boundary, opts)
+
+    defp capture(boundary, _) do
+      with table when table != :undefined <- :ets.whereis(@capture_table),
+           [{_, pid}] <- :ets.lookup(table, boundary.payload_digest) do
+        send(pid, {:boundary, boundary})
+      end
+
+      {:ok, :continue}
+    end
+  end
 
   describe "evaluate/3" do
     test "allows clean tool results into the model boundary" do
@@ -67,6 +89,61 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.audit_metadata.sink == :external
       assert decision.audit_metadata.trust_level == :high
       refute decision.sanitized_text =~ "AKIAIOSFODNN7EXAMPLE"
+    end
+
+    test "uses the canonical attestation context digest for boundary evaluation" do
+      context = [
+        phase: :tool_request,
+        origin: :model,
+        sink: :tool,
+        actor: "did:web:alice",
+        identity: "did:web:alice#agent",
+        tool: "read_file",
+        resource_uri: "file:///repo/README.md",
+        trust_level: :high,
+        trust_zone: :trusted,
+        sandbox_id: "sandbox-1",
+        isolation_level: :container
+      ]
+
+      {:ok, expected_digest} = Digest.context_digest(:tool_request, Context.new(context))
+      capture_boundary_for("README.md")
+
+      assert %Decision{} = Gate.evaluate("README.md", context, hooks: [BoundaryCaptureHook])
+
+      assert_receive {:boundary, boundary}
+      assert boundary.context_digest == expected_digest
+    end
+
+    test "boundary context digest does not collide at the old inspect truncation horizon" do
+      prefix = String.duplicate("actor-prefix-", 500)
+
+      base_context = [
+        phase: :inbound_user,
+        origin: :user,
+        sink: :model,
+        action: "chat",
+        trust_level: :high,
+        trust_zone: :trusted
+      ]
+
+      first_context = Keyword.put(base_context, :actor, prefix <> "a")
+      second_context = Keyword.put(base_context, :actor, prefix <> "b")
+
+      capture_boundary_for("hello-one")
+      Gate.evaluate("hello-one", first_context, hooks: [BoundaryCaptureHook])
+      assert_receive {:boundary, first_boundary}
+
+      capture_boundary_for("hello-two")
+      Gate.evaluate("hello-two", second_context, hooks: [BoundaryCaptureHook])
+      assert_receive {:boundary, second_boundary}
+
+      {:ok, first_expected} = Digest.context_digest(:model_ingress, Context.new(first_context))
+      {:ok, second_expected} = Digest.context_digest(:model_ingress, Context.new(second_context))
+
+      assert first_boundary.context_digest == first_expected
+      assert second_boundary.context_digest == second_expected
+      assert first_boundary.context_digest != second_boundary.context_digest
     end
 
     test "blocks malformed context labels instead of raising policy errors" do
@@ -638,6 +715,26 @@ defmodule SigilGuard.Runtime.GateTest do
       assert metadata.identity == "did:sigil:agent"
       refute inspect(metadata) =~ "sk_live"
     end
+  end
+
+  defp capture_boundary_for(text) do
+    table = :sigil_guard_runtime_gate_boundary_capture
+
+    if :ets.whereis(table) == :undefined do
+      try do
+        :ets.new(table, [:named_table, :public, :set])
+      rescue
+        ArgumentError -> :ok
+      end
+    end
+
+    :ets.insert(table, {sha256(text), self()})
+  end
+
+  defp sha256(text) do
+    :sha256
+    |> :crypto.hash(text)
+    |> Base.encode16(case: :lower)
   end
 
   describe "V3 decision contract (SP.07)" do

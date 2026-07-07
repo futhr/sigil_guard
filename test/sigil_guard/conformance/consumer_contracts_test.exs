@@ -9,8 +9,6 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
   alias SigilGuard.Vault
 
   defmodule ActorPatternIdentity do
-    @moduledoc false
-
     @behaviour SigilGuard.Identity
 
     @impl SigilGuard.Identity
@@ -32,8 +30,6 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
   end
 
   defmodule RequestSigningSigner do
-    @moduledoc false
-
     @behaviour SigilGuard.Signer
 
     @seed :binary.list_to_bin(Enum.to_list(1..32))
@@ -47,8 +43,6 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
   end
 
   defmodule DatabaseBackedVault do
-    @moduledoc false
-
     @behaviour SigilGuard.Vault
 
     @table __MODULE__

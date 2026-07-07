@@ -767,8 +767,6 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
 end
 
 defmodule SigilGuard.Audit.Anchor.Store.HTTPNoClientTest do
-  @moduledoc false
-
   use ExUnit.Case, async: false
 
   alias SigilGuard.Audit.Anchor.Store

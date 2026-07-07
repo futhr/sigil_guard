@@ -1,4 +1,6 @@
 defmodule SigilGuard.PatternSetsTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.PatternSets

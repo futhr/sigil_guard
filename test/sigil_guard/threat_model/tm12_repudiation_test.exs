@@ -1,26 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM12RepudiationTest do
-  @moduledoc """
-  TM.12 - repudiation, audit tamper, truncation, and cascades (R.06 Control
-  Mapping rows 19 and 22, ASI08/ASI03, claim: **partial (evidence-only)** for
-  row 19 and **mitigates + detects** for row 22).
+  @moduledoc false
 
-  Control (SP.05, SP.13): signed audit events form an actor-scoped HMAC chain;
-  checkpoints commit the chain with a Merkle root; inclusion and consistency
-  proofs bind individual events and append-only history to externally anchored
-  checkpoints. Tail truncation is not detectable from raw events alone, so this
-  module verifies the SP.05 checkpoint/proof/anchor path that detects it. For
-  cascading agent failures, SigilGuard does not claim automatic containment;
-  per-hop attestations and audit evidence reconstruct the propagation path.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.AuditTest` "detects tampered events in chain";
-  `SigilGuard.Audit.CheckpointTest` "detects event/checkpoint mismatch";
-  `SigilGuard.Audit.ProofTest` "a forked newer root fails :inconsistent_tree";
-  `SigilGuard.Audit.ExportTest` "verifies signed anchored exports"; and
-  `SigilGuard.Audit.EvidenceTest` "the same evidence ref flows through and
-  resolves". This module composes those controls into the R.06 TM.12 threat
-  family.
-  """
   use ExUnit.Case, async: true
   use ExUnitProperties
 

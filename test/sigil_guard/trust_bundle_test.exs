@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundleTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias __MODULE__.BundleSigner
@@ -115,12 +117,11 @@ defmodule SigilGuard.TrustBundleTest do
       file_path =
         Path.join(System.tmp_dir!(), "sigil_guard-trust-bundle-#{System.unique_integer()}.json")
 
-      priv_rel = "test_trust_bundle/source-#{System.unique_integer()}/bundle.json"
-      priv_path = Application.app_dir(:sigil_guard, Path.join("priv", priv_rel))
+      {priv_rel, priv_path, priv_root} = priv_bundle_fixture_path("source")
 
       on_exit(fn ->
         File.rm(file_path)
-        File.rm_rf(Path.dirname(priv_path))
+        File.rm_rf!(priv_root)
       end)
 
       File.mkdir_p!(Path.dirname(file_path))
@@ -156,12 +157,11 @@ defmodule SigilGuard.TrustBundleTest do
       file_path =
         Path.join(System.tmp_dir!(), "sigil_guard-not-json-#{System.unique_integer()}.json")
 
-      priv_rel = "test_trust_bundle/not-json-#{System.unique_integer()}/bundle.json"
-      priv_path = Application.app_dir(:sigil_guard, Path.join("priv", priv_rel))
+      {priv_rel, priv_path, priv_root} = priv_bundle_fixture_path("not-json")
 
       on_exit(fn ->
         File.rm(file_path)
-        File.rm_rf(Path.dirname(priv_path))
+        File.rm_rf!(priv_root)
       end)
 
       File.write!(file_path, "not json")
@@ -290,6 +290,17 @@ defmodule SigilGuard.TrustBundleTest do
     Port.list()
     |> Enum.filter(&(Port.info(&1, :connected) == {:connected, owner}))
     |> MapSet.new()
+  end
+
+  defp priv_bundle_fixture_path(name) do
+    root = "test_trust_bundle_#{System.unique_integer([:positive])}"
+    rel_path = Path.join([root, name, "bundle.json"])
+
+    {
+      rel_path,
+      Application.app_dir(:sigil_guard, Path.join("priv", rel_path)),
+      Application.app_dir(:sigil_guard, Path.join("priv", root))
+    }
   end
 
   defp key_descriptor(signer) do

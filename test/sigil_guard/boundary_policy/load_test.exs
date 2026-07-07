@@ -1,4 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy.LoadTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.BoundaryPolicy.File, as: PolicyFile

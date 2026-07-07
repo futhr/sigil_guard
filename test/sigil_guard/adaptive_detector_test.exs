@@ -1,4 +1,6 @@
 defmodule SigilGuard.AdaptiveDetectorTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.AdaptiveDetector
@@ -7,23 +9,21 @@ defmodule SigilGuard.AdaptiveDetectorTest do
   # Returns whatever `:return` opt is given, so one detector exercises every
   # result shape; crash/slow detectors are separate.
   defmodule EchoDetector do
-    @moduledoc false
     @spec analyze(term(), term(), keyword()) :: term()
     def analyze(_, _, opts), do: Keyword.fetch!(opts, :return)
   end
 
   defmodule CrashDetector do
-    @moduledoc false
     @spec analyze(term(), term(), keyword()) :: term()
     def analyze(_, _, _), do: raise("boom")
   end
 
   defmodule SlowDetector do
-    @moduledoc false
     @spec analyze(term(), term(), keyword()) :: term()
     def analyze(_, _, _) do
-      Process.sleep(500)
-      {:ok, []}
+      receive do
+        :release -> {:ok, []}
+      end
     end
   end
 

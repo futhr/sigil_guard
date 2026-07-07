@@ -1,37 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM11SupplyChainTest do
-  @moduledoc """
-  TM.11 - supply chain (R.06 Control Mapping rows 14-17, ASI04/ASI05, claim:
-  **detects (partial)** for row 14, **out-of-scope (infra); detects drift** for
-  row 15, and **out-of-scope** for rows 16 and 17).
+  @moduledoc false
 
-  Sourced attacks: the postmark-mcp npm package built trust over 15 versions then
-  added a one-line BCC backdoor in v1.0.16 (row 14); the Smithery hosting
-  path-traversal (`dockerBuildPath`) exposed 3,000+ servers (row 15); and the
-  ecosystem tooling RCEs CVE-2025-49596 (MCP Inspector) and CVE-2025-6514
-  (mcp-remote) (rows 16, 17). SigilGuard's posture: assume the tooling is
-  compromised and verify at the boundary.
-
-  Control (SP.02, SP.03, SP.04): a redistributed trust bundle is verified against
-  its pinned roots - a tampered payload fails `:invalid_signature`, a bundle
-  signed by a revoked key fails `:revoked_key`, and a rolled-back bundle fails
-  `:sequence_below_floor`; every failure records a quarantine entry with
-  evidence. A capability manifest that drifts from its pinned digest fails
-  `:manifest_digest_mismatch`. This is the `detects (drift)` signal for the
-  backdoored-package and redistributed-bundle rows. Rows 16 and 17 are
-  out-of-scope tooling RCEs: SigilGuard cannot patch host-owned tooling or
-  transport and makes no prevention claim - it only records tamper-evident audit
-  evidence of the boundary decisions around the affected tool.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.TrustBundle.VerifyTest` "verifies a bundle envelope and returns a
-  trust-bundle snapshot" and "rejects unknown, invalid, duplicate, and revoked
-  signatures"; `SigilGuard.TrustBundle.GoldenFixtureTest` "pre-rotation bundles
-  replay below the accepted floor"; `SigilGuard.TrustBundle.QuarantineTest`
-  "records verify failures with decoded payload metadata";
-  `SigilGuard.CapabilityManifestTest` "distinguishes schema drift from manifest
-  drift". This module drives the bundle-verification, quarantine, and
-  manifest-drift controls with supply-chain fixtures.
-  """
   use ExUnit.Case, async: false
 
   alias __MODULE__.{BundleSigner, RootSigner}
@@ -49,9 +18,7 @@ defmodule SigilGuard.ThreatModel.TM11SupplyChainTest do
   @role_expires_at "2026-07-03T14:00:00.000Z"
   @audit_key :crypto.hash(:sha256, "tm11-supply-chain-audit-key")
 
-  @manifest "test/fixtures/capability_manifest/repo_file_write/manifest.json"
-            |> File.read!()
-            |> Jason.decode!()
+  @manifest SigilGuard.FixturePath.read_json!("capability_manifest/repo_file_write.manifest.json")
 
   setup do
     Cache.clear()
@@ -199,7 +166,6 @@ defmodule SigilGuard.ThreatModel.TM11SupplyChainTest do
   end
 
   defmodule RootSigner do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :crypto.hash(:sha256, "trust-bundle-root")
     @impl SigilGuard.Signer
@@ -217,7 +183,6 @@ defmodule SigilGuard.ThreatModel.TM11SupplyChainTest do
   end
 
   defmodule BundleSigner do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :crypto.hash(:sha256, "trust-bundle-delegate")
     @impl SigilGuard.Signer

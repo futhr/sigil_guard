@@ -1,4 +1,6 @@
 defmodule SigilGuard.LifecycleTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Lifecycle

@@ -1,11 +1,13 @@
 defmodule SigilGuard.TrustBundle.NoNetworkTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias SigilGuard.TrustBundle
   alias SigilGuard.TrustBundle.Cache
   alias SigilGuard.TrustBundle.Quarantine
 
-  @fixtures Path.expand("../../fixtures/trust_bundle", __DIR__)
+  @fixtures SigilGuard.FixturePath.path("trust_bundle")
   @now ~U[2026-07-03 12:00:00.000Z]
   @network_references [":httpc", ":gen_tcp", ":ssl", "SigilGuard.HTTPClient"]
 
@@ -26,12 +28,11 @@ defmodule SigilGuard.TrustBundle.NoNetworkTest do
     file_path =
       Path.join(System.tmp_dir!(), "sigil_guard-no-network-#{System.unique_integer()}.json")
 
-    priv_rel = "test_trust_bundle/no-network-#{System.unique_integer()}/bundle.json"
-    priv_path = Application.app_dir(:sigil_guard, Path.join("priv", priv_rel))
+    {priv_rel, priv_path, priv_root} = priv_bundle_fixture_path("no-network")
 
     on_exit(fn ->
       File.rm(file_path)
-      File.rm_rf(Path.dirname(priv_path))
+      File.rm_rf!(priv_root)
     end)
 
     File.write!(file_path, encoded)
@@ -99,5 +100,16 @@ defmodule SigilGuard.TrustBundle.NoNetworkTest do
     |> then(&Path.join([@fixtures | &1]))
     |> File.read!()
     |> Jason.decode!()
+  end
+
+  defp priv_bundle_fixture_path(name) do
+    root = "test_trust_bundle_#{System.unique_integer([:positive])}"
+    rel_path = Path.join([root, name, "bundle.json"])
+
+    {
+      rel_path,
+      Application.app_dir(:sigil_guard, Path.join("priv", rel_path)),
+      Application.app_dir(:sigil_guard, Path.join("priv", root))
+    }
   end
 end

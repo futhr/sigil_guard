@@ -1,41 +1,12 @@
 defmodule SigilGuard.ThreatModel.TM04SchemaInjectionTest do
-  @moduledoc """
-  TM.04 - schema injection via adversarial required params (R.06 Control Mapping
-  row 4, ASI02/ASI03, claim: **mitigates + detects**).
+  @moduledoc false
 
-  Sourced attack: a server adds an adversarial *required* parameter with a
-  credential-shaped name (for example `AWS_ACCESS_KEY_ID` or `apiKey`) to a
-  tool's input schema. The agent treats the requirement as a legitimate API
-  constraint and fills it from its environment or system prompt. A result
-  scanner cannot see this - the manipulation lives in the tool *definition*
-  (the input schema), not in any tool result.
-
-  Control (SP.03): the `suspicious_params` disclosure is recomputed from every
-  `required` list in the input schema (at any depth) against the closed
-  `suspicious-params-v1` indicator set and bound into the signed manifest digest
-  (alongside `input_schema_sha256`). Two facets are asserted per the claim:
-  `mitigates` - an honestly disclosed suspicious required param forces
-  `guard_request/3` to a `{:confirm, "suspicious_required_param"}` verdict, so
-  the secret is never supplied without confirmation; `detects` - a manifest that
-  lies about its schema (an undisclosed suspicious param) or drifts a pinned
-  schema digest produces a deterministic signal (`:suspicious_required_param` /
-  `:schema_digest_mismatch`).
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.ToolGatewayTest` "forces confirmation for disclosed suspicious
-  required parameters"; `SigilGuard.CapabilityManifestTest` "rejects lying
-  suspicious parameter disclosures" and "walks nested required lists for
-  suspicious parameters". This module drives the disclosure/digest control with
-  schema-injection fixtures.
-  """
   use ExUnit.Case, async: true
 
   alias SigilGuard.CapabilityManifest
   alias SigilGuard.ToolGateway
 
-  @manifest "test/fixtures/capability_manifest/repo_file_write/manifest.json"
-            |> File.read!()
-            |> Jason.decode!()
+  @manifest SigilGuard.FixturePath.read_json!("capability_manifest/repo_file_write.manifest.json")
 
   # A tools/call request for the guarded tool. It carries no manifest of its own,
   # so the pinned manifest supplies the schema under evaluation.

@@ -1,36 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM09LethalTrifectaTest do
-  @moduledoc """
-  TM.09 - lethal-trifecta dataflow (R.06 Control Mapping rows 10 and 11,
-  ASI01/ASI02/ASI05, claim: **mitigates** for row 10 and **mitigates (dataflow);
-  out-of-scope (the runtime that executes)** for row 11).
+  @moduledoc false
 
-  Sourced attack: Willison's lethal trifecta - any agent that simultaneously has
-  private-data access, exposure to untrusted content, and an external-comms sink
-  can be driven to exfiltrate with no code vulnerability at all; and unexpected
-  code execution when tool/agent output reaches an execution sink. SigilGuard
-  gates the *dataflow* deterministically; the sandbox/runtime that would actually
-  execute a command is host-owned and out of scope.
-
-  Control (SP.04): the boundary policy kernel encodes the trifecta as a
-  conjunction over boundary labels - `source_sensitivity: :private` AND untrusted
-  content exposure (`origin: tool/resource/repo` AND `trust_zone: :untrusted`)
-  AND an external sink (`sink: external/network`). When all three hold, low- and
-  medium-trust actors are blocked; a high-trust actor is routed to a
-  digest-bound confirmation. Because the legs are ANDed, dropping any one leg
-  falls through to allow - the conjunction is exact. Untrusted-origin content is
-  kept out of execution sinks by the non-overridable untrusted-`tool_request`
-  invariant and the sandbox side-effect matrix (an `execute` class with `:none`
-  isolation blocks). The verdict is reproducible and independent of model
-  cooperation.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.BoundaryPolicyTest` "low and medium trust block outright", "high
-  trust routes to confirm", "dropping the external-sink leg no longer blocks",
-  "untrusted zone blocks a tool request", and "an affirmative :none blocks
-  execute and network with the cell rule id". This module drives the trifecta
-  conjunction, its exact-conjunct coverage, and the execution-sink denial with
-  lethal-trifecta fixtures.
-  """
   use ExUnit.Case, async: true
   use ExUnitProperties
 

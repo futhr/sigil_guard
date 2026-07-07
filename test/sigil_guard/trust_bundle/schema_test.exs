@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.SchemaTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Attestation.Envelope
@@ -65,9 +67,12 @@ defmodule SigilGuard.TrustBundle.SchemaTest do
         {"unknown top-level field", Map.put(bundle_document(), "extra", true)},
         {"missing required field", Map.delete(bundle_document(), "bundle_id")},
         {"sequence regex violation", Map.put(bundle_document(), "sequence", "0")},
+        {"sequence with trailing newline", Map.put(bundle_document(), "sequence", "1\n")},
         {"rollback floor above sequence", Map.put(bundle_document(), "rollback_floor", "2")},
         {"invalid timestamp precision",
          Map.put(bundle_document(), "issued_at", "2026-07-02T12:00:00Z")},
+        {"timestamp with trailing newline",
+         Map.put(bundle_document(), "issued_at", @issued_at <> "\n")},
         {"non-binary timestamp", Map.put(bundle_document(), "issued_at", 1)},
         {"inverted lifetime", Map.put(bundle_document(), "expires_at", @issued_at)},
         {"threshold below range", put_in(bundle_document(), ["roles", "root", "threshold"], 0)},
@@ -82,6 +87,10 @@ defmodule SigilGuard.TrustBundle.SchemaTest do
         {
           "role keyid absent from keys",
           put_in(bundle_document(), ["roles", "root", "keyids"], [bad_keyid])
+        },
+        {
+          "role keyid with trailing newline",
+          put_in(bundle_document(), ["roles", "root", "keyids"], [valid_keyid <> "\n"])
         },
         {
           "keyid not sha256 of key",

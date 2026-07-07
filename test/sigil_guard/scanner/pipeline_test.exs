@@ -18,15 +18,11 @@ defmodule SigilGuard.ScannerPipelineTestStub do
 end
 
 defmodule SigilGuard.ScannerBadReturnTestStub do
-  @moduledoc false
-
   @spec scan(String.t(), [map()], keyword()) :: term()
   def scan(_, _, _), do: :not_hits
 end
 
 defmodule SigilGuard.ScannerBadHitTestStub do
-  @moduledoc false
-
   @spec scan(String.t(), [map()], keyword()) :: [map()]
   def scan(text, _, _) do
     [
@@ -44,8 +40,6 @@ defmodule SigilGuard.ScannerBadHitTestStub do
 end
 
 defmodule SigilGuard.Scanner.PipelineTest do
-  @moduledoc false
-
   use ExUnit.Case, async: true
 
   use ExUnitProperties

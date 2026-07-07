@@ -1,4 +1,6 @@
 defmodule SigilGuard.CoverageGateTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   @coveralls_config Path.expand("../../coveralls.json", __DIR__)

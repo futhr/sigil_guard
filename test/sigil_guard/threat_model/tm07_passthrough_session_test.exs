@@ -1,38 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM07PassthroughSessionTest do
-  @moduledoc """
-  TM.07 - token passthrough and session hijacking (R.06 Control Mapping rows 7
-  and 8, ASI03/ASI02, claim: **mitigates** for row 7 and **detects (partial)**
-  for row 8).
+  @moduledoc false
 
-  Sourced attacks: (row 7) a server forwards a client token to an upstream API
-  it was not issued for - token passthrough, explicitly forbidden by the MCP
-  spec; and (row 8) an attacker resumes a stream or forces a `tools/list_changed`
-  refresh to smuggle new, unapproved tools mid-session. TLS, stream resumption,
-  and session lifecycle are host-owned, so row 8 is a detects-partial assist, not
-  prevention.
-
-  Control (SP.03, SP.05): the gateway denies passthrough deterministically -
-  a credential whose audience is the gateway's own resource is never forwarded
-  upstream (`:token_passthrough_denied`). For session hijacking SigilGuard
-  assists: `verify_list_changed/2` re-verifies a refreshed `tools/list` and
-  rejects a smuggled or drifted tool before it reaches the model
-  (`:manifest_digest_mismatch` / `:unknown_manifest`); per-action nonces are
-  single-use per actor (`:replay_detected`), so a replayed or resumed action is
-  refused; and each action is recorded in an actor-scoped, tamper-evident HMAC
-  audit chain whose continuity `verify_chain/3` checks. `mitigates` means the
-  passthrough is blocked; `detects` means the smuggled tool, replayed action, or
-  tampered record produces a deterministic signal. SigilGuard has no session id;
-  the transport session boundary itself stays host-owned.
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.ToolGatewayTest` "blocks token passthrough, resource, and audience
-  mismatches before runtime" and "re-verifies refreshed tools after
-  list_changed"; `SigilGuard.ConfirmationTest` "consumes confirmation tokens by
-  default"; `SigilGuard.AuditTest` "verifies a valid chain of events" and
-  "detects tampering in the middle of a chain". This module drives the
-  passthrough, list_changed, nonce, and audit-chain controls with session-hijack
-  fixtures.
-  """
   use ExUnit.Case, async: false
 
   alias SigilGuard.Audit
@@ -42,9 +10,7 @@ defmodule SigilGuard.ThreatModel.TM07PassthroughSessionTest do
   alias SigilGuard.Runtime.Gate
   alias SigilGuard.ToolGateway
 
-  @manifest "test/fixtures/capability_manifest/repo_file_write/manifest.json"
-            |> File.read!()
-            |> Jason.decode!()
+  @manifest SigilGuard.FixturePath.read_json!("capability_manifest/repo_file_write.manifest.json")
 
   @now ~U[2026-07-03 12:00:00.000Z]
   @confirmation_key :crypto.hash(:sha256, "tm07-session-confirmation-key")

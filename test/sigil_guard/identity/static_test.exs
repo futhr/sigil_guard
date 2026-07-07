@@ -1,4 +1,6 @@
 defmodule SigilGuard.Identity.StaticTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   use ExUnitProperties
@@ -53,6 +55,12 @@ defmodule SigilGuard.Identity.StaticTest do
     test "a non-binary actor is :low even under a catch-all mapping" do
       put_mappings([{"*", :high}])
       assert Static.trust_level(%{}) == :low
+    end
+
+    test "malformed mapping entries are ignored defensively" do
+      put_mappings([:bad, {123, :high}, {"user:*", :medium}])
+      assert Static.trust_level("user:alice") == :medium
+      assert Static.trust_level("service:api") == :low
     end
   end
 

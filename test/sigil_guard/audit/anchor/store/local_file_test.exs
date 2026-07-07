@@ -195,6 +195,8 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
     test "rejects invalid local store inputs" do
       {_, anchor} = anchor_fixture()
 
+      assert {:error, :invalid_anchor} = LocalFile.put(:not_an_anchor, [])
+      assert {:error, :missing_path} = LocalFile.fetch(%{}, :not_options)
       assert {:error, :missing_path} = Store.put(LocalFile, anchor)
 
       assert {:error, :invalid_anchor} =
@@ -247,6 +249,16 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
       }
 
       assert {:error, :remote_file_uri} = Store.fetch(LocalFile, remote_file_receipt)
+
+      empty_file_uri_receipt = %{
+        "anchor_digest" => Anchor.digest(anchor),
+        "uri" => "file://"
+      }
+
+      assert {:error, :missing_path} = Store.fetch(LocalFile, empty_file_uri_receipt)
+
+      assert {:error, :missing_path} =
+               Store.fetch(LocalFile, %{"anchor_digest" => Anchor.digest(anchor), "uri" => false})
     end
 
     test "reports missing and corrupt logs" do
@@ -262,6 +274,13 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
 
       assert {:error, :invalid_log} =
                Store.fetch(LocalFile, Anchor.digest(anchor), path: corrupt_path)
+
+      scalar_path = tmp_path()
+      File.mkdir_p!(Path.dirname(scalar_path))
+      File.write!(scalar_path, "[]\n")
+
+      assert {:error, :invalid_log} =
+               Store.fetch(LocalFile, Anchor.digest(anchor), path: scalar_path)
     end
 
     test "detects anchor record digest mismatches inside the log" do

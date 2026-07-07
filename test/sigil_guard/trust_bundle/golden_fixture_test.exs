@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias __MODULE__.OldBundleSigner
@@ -10,7 +12,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
   alias SigilGuard.TrustBundle.Schema
   alias SigilGuard.TrustBundleFixtureGenerator
 
-  @fixtures Path.expand("../../fixtures/trust_bundle", __DIR__)
+  @fixtures SigilGuard.FixturePath.path("trust_bundle")
   @now ~U[2026-07-03 12:00:00.000Z]
 
   setup do

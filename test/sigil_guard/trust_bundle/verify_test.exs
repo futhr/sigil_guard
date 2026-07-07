@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.VerifyTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias __MODULE__.BundleBackupSigner
@@ -92,6 +94,22 @@ defmodule SigilGuard.TrustBundle.VerifyTest do
                Verify.verify(two_signatures, now: @now, enforce_declared_threshold: true)
     end
 
+    test "documents D3 threshold defaults and opt-in declared enforcement" do
+      public_docs = Code.fetch_docs(TrustBundle)
+      verify_docs = Code.fetch_docs(Verify)
+
+      public_verify_doc = doc_text(public_docs, :verify, 2)
+
+      assert public_verify_doc =~ "The 1.0 release line defaults to the D3 effective"
+      assert public_verify_doc =~ "threshold of `1`"
+
+      assert public_verify_doc =~ ":enforce_declared_threshold"
+      assert doc_text(verify_docs, :verify, 2) =~ "Defaults to `false` for D3 compatibility"
+
+      assert File.read!("README.md") =~
+               "follows the D3 effective threshold of `1` unless verification is called"
+    end
+
     test "rejects unknown, invalid, duplicate, and revoked signatures" do
       document = bundle_document()
 
@@ -174,6 +192,11 @@ defmodule SigilGuard.TrustBundle.VerifyTest do
              |> envelope([BundleSigner])
              |> Map.put("payload", "*")
              |> Verify.verify(now: @now) == {:error, :invalid_base64}
+
+      assert document
+             |> put_in(["keys", bundle_keyid(), "public_key"], "*")
+             |> envelope([BundleSigner])
+             |> Verify.verify(now: @now) == {:error, :invalid_bundle_format}
 
       assert document
              |> envelope([BundleSigner])
@@ -261,6 +284,13 @@ defmodule SigilGuard.TrustBundle.VerifyTest do
   defp payload_digest(document) do
     {:ok, payload} = JCS.encode(document)
     Base.encode16(:crypto.hash(:sha256, payload), case: :lower)
+  end
+
+  defp doc_text({:docs_v1, _, _, _, _, _, docs}, name, arity) do
+    Enum.find_value(docs, fn
+      {{:function, ^name, ^arity}, _, _, %{"en" => doc}, _} -> doc
+      _ -> nil
+    end)
   end
 
   defp key_descriptor(signer) do

@@ -30,6 +30,11 @@ defmodule SigilGuard.RepoPolicyTest do
       assert rule.agents == ["did:web:codex"]
       assert rule.actions == ["modify"]
       assert rule.paths == ["README.md", "docs/**"]
+
+      assert rule.path_matchers == [
+               [{:literal, "README.md"}],
+               [{:literal, "docs"}, :globstar]
+             ]
     end
 
     test "accepts compiled and keyword policies with aliases and defaults" do
@@ -57,6 +62,23 @@ defmodule SigilGuard.RepoPolicyTest do
       assert rule.message == "review_docs"
     end
 
+    test "precompiles missing matchers on manually built policy structs" do
+      compiled = compile!(rules: [rule("src", :allow, ["src/*.ex"])])
+      stripped = %{compiled | rules: Enum.map(compiled.rules, &Map.delete(&1, :path_matchers))}
+
+      assert {:ok, restored} = RepoPolicy.compile(stripped)
+      assert [[{:literal, "src"}, {:regex, %Regex{}}]] = hd(restored.rules).path_matchers
+
+      decision =
+        RepoPolicy.evaluate(restored,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["src/main.ex"]
+        )
+
+      assert decision.verdict == :allow
+    end
+
     test "rejects absolute and traversal path patterns" do
       assert {:error, {:absolute_path_pattern, 0}} =
                RepoPolicy.compile(%{rules: [%{decision: :allow, paths: ["/etc/passwd"]}]})
@@ -72,6 +94,20 @@ defmodule SigilGuard.RepoPolicyTest do
       assert {:error, {:invalid_decision, 0}} = RepoPolicy.compile(%{rules: [%{paths: ["*"]}]})
       assert {:error, :invalid_decision} = RepoPolicy.compile(%{default: false})
       assert {:error, :invalid_rules} = RepoPolicy.compile(%{rules: false})
+
+      assert {:error, :invalid_path_pattern} =
+               RepoPolicy.compile(%RepoPolicy{
+                 rules: [
+                   %{
+                     id: "bad",
+                     decision: :allow,
+                     agents: ["*"],
+                     actions: ["*"],
+                     paths: [123],
+                     index: 0
+                   }
+                 ]
+               })
 
       assert {:error, {:invalid_decision, 0}} =
                RepoPolicy.compile(%{rules: [%{decision: "nope", paths: ["*"]}]})
@@ -611,6 +647,30 @@ defmodule SigilGuard.RepoPolicyTest do
       assert RepoPolicy.canonical_bytes(policy) == RepoPolicy.canonical_bytes(policy)
       assert RepoPolicy.digest(policy) == RepoPolicy.digest(policy)
       assert byte_size(RepoPolicy.digest(policy)) == 64
+
+      stripped = %{policy | rules: Enum.map(policy.rules, &Map.delete(&1, :path_matchers))}
+
+      assert RepoPolicy.canonical_bytes(policy) == RepoPolicy.canonical_bytes(stripped)
+      assert RepoPolicy.digest(policy) == RepoPolicy.digest(stripped)
+    end
+
+    test "precompiles glob matchers before evaluation" do
+      policy = compile!(rules: [rule("src", :allow, ["src/*.ex", "apps/**/mix.exs"])])
+
+      assert [
+               [
+                 [{:literal, "src"}, {:regex, %Regex{}}],
+                 [{:literal, "apps"}, :globstar, {:literal, "mix.exs"}]
+               ]
+             ] = Enum.map(policy.rules, & &1.path_matchers)
+
+      repo_policy_source = File.read!("lib/sigil_guard/repo_policy.ex")
+      [_, evaluation_source] = String.split(repo_policy_source, "defp rule_matches?", parts: 2)
+
+      [evaluation_source | _] =
+        String.split(evaluation_source, "defp normalize_decision", parts: 2)
+
+      refute evaluation_source =~ "Regex.compile!"
     end
   end
 

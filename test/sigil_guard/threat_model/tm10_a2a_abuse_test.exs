@@ -1,39 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM10A2AAbuseTest do
-  @moduledoc """
-  TM.10 - A2A impersonation and delegation abuse (R.06 Control Mapping rows 12,
-  13, and 20, ASI03/ASI07/ASI10, claim: **mitigates** for rows 12 and 13 /
-  **detects-at-boundary** for row 20).
+  @moduledoc false
 
-  Sourced attack: a peer agent spoofs an identity or escalates a delegated scope
-  beyond its grant, and rogue agents operate outside their authorized envelope.
-  An agent card is signed supply-chain input, never trusted context - its trust
-  chains from the bundle's declared issuers, never from the transport that
-  delivered it.
-
-  Control (SP.13): an agent card is a DSSE payload verified against the trust
-  bundle's `agent_card`-role issuers - an unrecognized issuer fails
-  `:unknown_key_id`, a resolvable non-issuer key fails `:untrusted_issuer`, a
-  tampered payload fails `:invalid_signature`, and an expired card fails
-  `:card_expired`, so an impostor cannot present a trusted card. A peer with no
-  verified card is fail-closed to a `quarantine` verdict with the
-  `agent.unknown_peer.quarantine` rule (or `{:error, :unknown_agent}` under
-  `require_peer_card`), denying unknown/unbundled agents at the boundary.
-  Delegation chains enforce a max depth (`:delegation_too_deep`) and an
-  order-preserving digest mirror, so any reorder/insert/drop/edit fails
-  `:delegation_chain_tampered`; trust is MIN-derived and never escalates. Agent
-  statements reuse the SP.01 `{actor, nonce}` replay scope (`:replay_detected`).
-
-  Base-control coverage is referenced, not duplicated (by exact name):
-  `SigilGuard.AgentCardTest` "signs and verifies against the issuer key map", "a
-  resolvable non-issuer key fails :untrusted_issuer", "an undeclared key fails
-  :unknown_key_id", "an expired card fails :card_expired past the skew boundary",
-  and "flipped payload byte fails :invalid_signature";
-  `SigilGuard.AgentTrustTest` "attests a quarantine verdict, low trust, and the
-  unknown-peer rule", "require_peer_card short-circuits to :unknown_agent", "a
-  chain beyond the default depth fails :delegation_too_deep", and "reorder,
-  insert, drop, edit, and one-sided presence fail". This module drives the card,
-  quarantine, delegation, and replay controls with A2A-abuse fixtures.
-  """
   use ExUnit.Case, async: false
 
   alias __MODULE__.{Agent, Impostor, Issuer, Local}
@@ -165,7 +132,6 @@ defmodule SigilGuard.ThreatModel.TM10A2AAbuseTest do
   ## Signers
 
   defmodule Issuer do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x21>>, 32)
     @impl SigilGuard.Signer
@@ -176,7 +142,6 @@ defmodule SigilGuard.ThreatModel.TM10A2AAbuseTest do
   end
 
   defmodule Agent do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x41>>, 32)
     @impl SigilGuard.Signer
@@ -187,7 +152,6 @@ defmodule SigilGuard.ThreatModel.TM10A2AAbuseTest do
   end
 
   defmodule Local do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x71>>, 32)
     @impl SigilGuard.Signer
@@ -199,7 +163,6 @@ defmodule SigilGuard.ThreatModel.TM10A2AAbuseTest do
 
   # An issuer whose key is not among the trust bundle's declared card issuers.
   defmodule Impostor do
-    @moduledoc false
     @behaviour SigilGuard.Signer
     @seed :binary.copy(<<0x99>>, 32)
     @impl SigilGuard.Signer

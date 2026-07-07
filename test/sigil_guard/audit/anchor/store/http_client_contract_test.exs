@@ -13,21 +13,18 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPClientContractTest do
   @generated_at "2026-01-01T00:00:00.000Z"
 
   defmodule ErrorClient do
-    @moduledoc false
     @behaviour SigilGuard.HTTPClient
     @impl SigilGuard.HTTPClient
     def request(_, _, _, _, _), do: {:error, :boom}
   end
 
   defmodule CrashClient do
-    @moduledoc false
     @behaviour SigilGuard.HTTPClient
     @impl SigilGuard.HTTPClient
     def request(_, _, _, _, _), do: raise("adapter exploded")
   end
 
   defmodule BigBodyClient do
-    @moduledoc false
     @behaviour SigilGuard.HTTPClient
     @impl SigilGuard.HTTPClient
     def request(_, _, _, _, _) do
@@ -36,7 +33,6 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPClientContractTest do
   end
 
   defmodule MangledClient do
-    @moduledoc false
     @behaviour SigilGuard.HTTPClient
     @impl SigilGuard.HTTPClient
     def request(_, _, _, _, _) do
@@ -45,14 +41,12 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPClientContractTest do
   end
 
   defmodule NoStatusClient do
-    @moduledoc false
     @behaviour SigilGuard.HTTPClient
     @impl SigilGuard.HTTPClient
     def request(_, _, _, _, _), do: {:ok, %{body: "{}"}}
   end
 
   defmodule TimeoutClient do
-    @moduledoc false
     @behaviour SigilGuard.HTTPClient
     @impl SigilGuard.HTTPClient
     def request(_, _, _, _, opts) do

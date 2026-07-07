@@ -1,4 +1,6 @@
 defmodule SigilGuard.BoundaryTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.Boundary

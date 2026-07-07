@@ -18,7 +18,7 @@ Mix.install([
 
 ```elixir
 manifest_path =
-  Path.expand("../test/fixtures/capability_manifest/repo_file_write/manifest.json", __DIR__)
+  Path.expand("../test/fixtures/capability_manifest/repo_file_write.manifest.json", __DIR__)
 
 manifest =
   manifest_path

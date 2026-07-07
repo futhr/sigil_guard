@@ -1,4 +1,6 @@
 defmodule SigilGuard.AttestationTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
   use ExUnitProperties
 
@@ -30,13 +32,19 @@ defmodule SigilGuard.AttestationTest do
     end
 
     test "raises on non-map payloads and envelopes" do
-      assert_raise ArgumentError, ~r/expected attestation payload to be a map/, fn ->
-        Attestation.attach("bad", @envelope)
-      end
+      error =
+        assert_raise ArgumentError, ~r/expected attestation payload to be a map/, fn ->
+          Attestation.attach({"secret", "do-not-leak"}, @envelope)
+        end
 
-      assert_raise ArgumentError, ~r/expected attestation envelope to be a map/, fn ->
-        Attestation.attach(%{}, "bad")
-      end
+      refute Exception.message(error) =~ "do-not-leak"
+
+      error =
+        assert_raise ArgumentError, ~r/expected attestation envelope to be a map/, fn ->
+          Attestation.attach(%{}, {"secret", "do-not-leak"})
+        end
+
+      refute Exception.message(error) =~ "do-not-leak"
     end
   end
 
@@ -62,13 +70,19 @@ defmodule SigilGuard.AttestationTest do
     end
 
     test "raises on non-map payloads and non-string tokens" do
-      assert_raise ArgumentError, ~r/expected attestation payload to be a map/, fn ->
-        Attestation.attach_confirmation("bad", @token)
-      end
+      error =
+        assert_raise ArgumentError, ~r/expected attestation payload to be a map/, fn ->
+          Attestation.attach_confirmation({"secret", "do-not-leak"}, @token)
+        end
 
-      assert_raise ArgumentError, ~r/expected confirmation token to be a string/, fn ->
-        Attestation.attach_confirmation(%{}, 123)
-      end
+      refute Exception.message(error) =~ "do-not-leak"
+
+      error =
+        assert_raise ArgumentError, ~r/expected confirmation token to be a string/, fn ->
+          Attestation.attach_confirmation(%{}, {"secret", "secret-token"})
+        end
+
+      refute Exception.message(error) =~ "secret-token"
     end
   end
 

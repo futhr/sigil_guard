@@ -1,4 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy.CanonicalTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.BoundaryPolicy.File, as: PolicyFile

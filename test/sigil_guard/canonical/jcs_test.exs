@@ -1,10 +1,12 @@
 defmodule SigilGuard.Canonical.JCSTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
   use ExUnitProperties
 
   alias SigilGuard.Canonical.JCS
 
-  @fixture_path Path.expand("../../fixtures/jcs/adversarial_corpus.json", __DIR__)
+  @fixture_path SigilGuard.FixturePath.path("jcs/adversarial_corpus.json")
 
   describe "encode/1" do
     test "matches the RFC 8785 canonical JSON sample byte-for-byte" do
@@ -98,6 +100,19 @@ defmodule SigilGuard.Canonical.JCSTest do
 
       assert JCS.encode(invalid) == {:error, :invalid_map}
       assert JCS.encode(%{invalid => "value"}) == {:error, :invalid_map}
+    end
+
+    test "rejects non-string map keys after normalization" do
+      assert JCS.encode(%{1 => "integer key"}) == {:error, :invalid_map}
+      assert JCS.encode(%{{:tuple, :key} => "tuple key"}) == {:error, :invalid_map}
+    end
+
+    test "normalizes decimal float formatting branches" do
+      assert JCS.encode(1.5) == {:ok, "1.5"}
+      assert JCS.encode(-0.0) == {:ok, "0"}
+      assert JCS.encode(1.0e20) == {:ok, "100000000000000000000"}
+      assert JCS.encode(1.0e-6) == {:ok, "0.000001"}
+      assert JCS.encode(1.0e-7) == {:ok, "1e-7"}
     end
 
     test "rejects key collisions after atom-to-string normalization" do

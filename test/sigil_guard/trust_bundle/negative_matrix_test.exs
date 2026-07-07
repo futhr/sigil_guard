@@ -1,4 +1,6 @@
 defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
+  @moduledoc false
+
   use ExUnit.Case, async: false
 
   alias __MODULE__.BundleBackupSigner
@@ -11,7 +13,7 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
   alias SigilGuard.TrustBundle
   alias SigilGuard.TrustBundle.Cache
 
-  @fixtures Path.expand("../../fixtures/trust_bundle", __DIR__)
+  @fixtures SigilGuard.FixturePath.path("trust_bundle")
   @now ~U[2026-07-03 12:00:00.000Z]
   @issued_at "2026-07-03T11:00:00.000Z"
   @expires_at "2026-07-03T13:00:00.000Z"

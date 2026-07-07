@@ -1,11 +1,13 @@
 defmodule SigilGuard.Attestation.GoldenVectorsTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.AgentTrustFixtureGenerator
   alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Canonical.JCS
 
-  @fixture_root Path.expand("../../fixtures/agent_trust", __DIR__)
+  @fixture_root SigilGuard.FixturePath.path("agent_trust")
   @files ~w(statement.json envelope.json expected.json)
 
   test "agent-trust fixtures regenerate byte-identically" do

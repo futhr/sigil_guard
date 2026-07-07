@@ -1,27 +1,6 @@
 defmodule SigilGuard.ThreatModel.TM01InjectionViaToolResultsTest do
-  @moduledoc """
-  TM.01 - prompt injection via tool results (R.06 Control Mapping row 1, ASI01,
-  claim: **mitigates**).
+  @moduledoc false
 
-  Sourced attack: untrusted tool-result content carries instructions the model
-  is meant to obey - e.g. a GitHub PR-title / issue-body hijack, or an
-  exfiltration directive smuggled into a "successful" result (R.06, Findings:
-  "Prompt injection via tool results").
-
-  Controls (SP.04): the result-phase scanner pipeline and quarantine indicators
-  flag the injection, streaming holdback prevents a secret from leaking across a
-  chunk boundary, and the sink-aware output contract redacts/blocks sensitive
-  content bound for an untrusted sink; the boundary policy kernel taints the
-  `tool_result` origin. `mitigates` means the malicious input is blocked,
-  quarantined, or forced through confirmation.
-
-  Base-control coverage is not duplicated here; it lives in (by exact name):
-  `SigilGuard.QuarantineTest` "detects prompt injection indicators" /
-  "detects exfiltration requests" / "detects hidden HTML instructions";
-  `SigilGuard.ScannerTest` "accepts custom patterns"; and the streaming
-  split-secret vectors in `SigilGuard.Runtime.StreamingVectorsTest`. This module
-  drives those controls end-to-end with the sourced attack fixtures.
-  """
   use ExUnit.Case, async: true
 
   alias SigilGuard.Quarantine

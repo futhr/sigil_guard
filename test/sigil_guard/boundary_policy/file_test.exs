@@ -1,11 +1,13 @@
 defmodule SigilGuard.BoundaryPolicy.FileTest do
+  @moduledoc false
+
   use ExUnit.Case, async: true
 
   alias SigilGuard.BoundaryPolicy.Contract
   alias SigilGuard.BoundaryPolicy.File, as: PolicyFile
   alias SigilGuard.RepoPolicy
 
-  @invalid_root Path.expand("../../fixtures/boundary_policy/invalid", __DIR__)
+  @invalid_root SigilGuard.FixturePath.path("boundary_policy/invalid")
 
   describe "parse/1 success" do
     test "parses version, rules, folded matchers, contracts, and repo" do
