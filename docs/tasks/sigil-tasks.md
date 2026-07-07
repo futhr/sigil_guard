@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 156 / 228 tasks done (68%).** Milestones: 6 complete, 1 partial,
-3 not started. **72 tasks left.** Current milestone: **M5** (22/26, 85%).
+**Overall: 157 / 228 tasks done (69%).** Milestones: 6 complete, 1 partial,
+3 not started. **71 tasks left.** Current milestone: **M5** (23/26, 88%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 22 | 26 | 85% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 23 | 26 | 88% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **156** | **228** | **68%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **157** | **228** | **69%** | 6 done / 1 partial / 3 to go |
 
-### What's left (72 tasks)
+### What's left (71 tasks)
 
-- **M5 - 4 left:** the threat-model test suite TM.09-TM.12
-  (move-don't-duplicate). (M5.01-M5.22 done, incl. TM.01-TM.08.)
+- **M5 - 3 left:** the threat-model test suite TM.10-TM.12
+  (move-don't-duplicate). (M5.01-M5.23 done, incl. TM.01-TM.09.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1592,7 +1592,7 @@ section is post-3.0.0 parking; neither is counted here.
     (malformed). Distinct from TM.01 (tool-result injection): ingress phase,
     retrieved-memory origin, and the digest-provenance assertion no prior test
     makes.
-- [ ] M5.23 TM.09 threat family - lethal-trifecta dataflow.
+- [x] M5.23 TM.09 threat family - lethal-trifecta dataflow.
   - Spec: `R.06` - Control Mapping rows 10 and 11; `SP.04` (Dataflow Rules
     And Lethal Trifecta).
   - AC: `.../tm09_lethal_trifecta_test.exs` proves the conjunction rule
@@ -1600,6 +1600,22 @@ section is post-3.0.0 parking; neither is counted here.
     never enters exec/command sinks (mitigates; execution runtime
     out-of-scope).
   - Tests: negative, property (conjunct coverage), tamper.
+  - Done: added the TM.09 module (R.06 rows 10 and 11, ASI01/ASI02/ASI05,
+    claim **mitigates** for row 10 / **mitigates (dataflow); out-of-scope (the
+    runtime that executes)** for row 11) citing Willison's lethal trifecta and
+    referencing the base tests by exact name. Loads the shipped
+    `canonical.policy` fixture and drives `BoundaryPolicy.evaluate/2`: the
+    trifecta conjunction (private data x untrusted origin+zone x external sink)
+    blocks low/medium trust and routes high trust to a confirmation (row 10); a
+    StreamData property proves exact-conjunct coverage - dropping any single leg
+    (private-data, untrusted-exposure, or external-sink) falls through to
+    `:allow` at every trust level. Row 11: untrusted content at `:tool_request`
+    is blocked by the non-overridable invariant (reason "untrusted zone may not
+    request tools") and an `execute` side-effect with `:none` isolation blocks
+    via the sandbox matrix (rule `sandbox.matrix.execute.none`) - the runtime
+    that would execute is out of scope. Tamper: a scrubbed benign-looking
+    payload still blocks (the verdict is label-driven, not a content classifier);
+    malformed: a boundary missing required digests fails closed to `:block`.
 - [ ] M5.24 TM.10 threat family - A2A impersonation and delegation abuse.
   - Spec: `R.06` - Control Mapping rows 12, 13, and 20; `SP.13`.
   - AC: `.../tm10_a2a_abuse_test.exs` proves card verification against
