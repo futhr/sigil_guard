@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 153 / 228 tasks done (67%).** Milestones: 6 complete, 1 partial,
-3 not started. **75 tasks left.** Current milestone: **M5** (19/26, 73%).
+**Overall: 154 / 228 tasks done (68%).** Milestones: 6 complete, 1 partial,
+3 not started. **74 tasks left.** Current milestone: **M5** (20/26, 77%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 19 | 26 | 73% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 20 | 26 | 77% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **153** | **228** | **67%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **154** | **228** | **68%** | 6 done / 1 partial / 3 to go |
 
-### What's left (75 tasks)
+### What's left (74 tasks)
 
-- **M5 - 7 left:** the threat-model test suite TM.06-TM.12
-  (move-don't-duplicate). (M5.01-M5.19 done, incl. TM.01-TM.05.)
+- **M5 - 6 left:** the threat-model test suite TM.07-TM.12
+  (move-don't-duplicate). (M5.01-M5.20 done, incl. TM.01-TM.06.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1523,12 +1523,28 @@ section is post-3.0.0 parking; neither is counted here.
     `:replay_detected`), expiration (`:expired` past TTL), and malformed
     (non-list refresh -> `:invalid_manifest`) fail closed. Uses real
     `CapabilityManifest.digest/1` values so the drift is a genuine digest change.
-- [ ] M5.20 TM.06 threat family - confused deputy and consent replay.
+- [x] M5.20 TM.06 threat family - confused deputy and consent replay.
   - Spec: `R.06` - Control Mapping rows 6 and 21; `SP.01`, `SP.03`.
   - AC: `.../tm06_confused_deputy_test.exs` proves audience/resource/actor
     binding plus nonce replay scope and token single-use defeat replayed
     or forged approvals (mitigates, partial).
   - Tests: negative, replay, expiration, tamper.
+  - Done: added the TM.06 module (R.06 rows 6 and 21, ASI03/ASI09, claim
+    **mitigates (partial)** for row 6 / **mitigates (the token)** for row 21;
+    host-owned OAuth consent and human judgment named out of scope) citing the
+    confused-deputy consent-cookie-replay and spoofed-approval attacks and
+    referencing the base tests by exact name. Drives three control surfaces
+    with confused-deputy fixtures: `guard_request/3` refuses a credential minted
+    for the wrong audience (`:audience_mismatch`, `accepted_audiences ==
+    ["repo-mcp"]`) or resource (`:resource_mismatch`) while matching
+    audience/resource is allowed; a signed consent attestation binds actor +
+    nonce with a `{actor, nonce}` single-use replay scope (second verify ->
+    `:replay_detected`) and DSSE expiry (`:expired_attestation`); and a
+    confirmation token bound to action/payload/context (incl. actor and
+    `sandbox_id`)/manifest rejects a rebound actor (`:digest_mismatch`), a forged
+    HMAC body (`:invalid_signature`), a single-use replay (`:replay_detected`),
+    and an expired approval (`:expired`); a malformed token fails closed
+    (`:invalid_token`). Uses an Ed25519 `TrustedSigner` for the DSSE attestation.
 - [ ] M5.21 TM.07 threat family - token passthrough and session hijacking.
   - Spec: `R.06` - Control Mapping rows 7 and 8; `SP.03`, `SP.05`.
   - AC: `.../tm07_passthrough_session_test.exs` proves the explicit
