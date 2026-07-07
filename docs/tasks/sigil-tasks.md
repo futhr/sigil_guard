@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 143 / 228 tasks done (63%).** Milestones: 6 complete, 1 partial,
-3 not started. **85 tasks left.** Current milestone: **M5** (9/26, 35%).
+**Overall: 144 / 228 tasks done (63%).** Milestones: 6 complete, 1 partial,
+3 not started. **84 tasks left.** Current milestone: **M5** (10/26, 38%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 9 | 26 | 35% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 10 | 26 | 38% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **143** | **228** | **63%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **144** | **228** | **63%** | 6 done / 1 partial / 3 to go |
 
-### What's left (85 tasks)
+### What's left (84 tasks)
 
-- **M5 - 17 left:** attestation evidence refs, HTTPClient/anchor stores, and the
-  threat-model test suite. (M5.01-M5.09: proofs, checkpoint statements,
-  cosigning, exports, privacy, OTel rename, CloudEvents, read/query done.)
+- **M5 - 16 left:** HTTPClient/anchor stores, provenance/SBOM, and the
+  threat-model test suite. (M5.01-M5.10: proofs, checkpoint statements,
+  cosigning, exports, privacy, OTel, CloudEvents, read/query, evidence refs.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1345,13 +1345,22 @@ section is post-3.0.0 parking; neither is counted here.
     span and checks its length against `event_count` (`:checkpoint_mismatch`),
     yielding `nil` indices for empty checkpoints and `:invalid_query` for a
     non-checkpoint term. A purity test asserts the reads emit no telemetry.
-- [ ] M5.10 Bind attestations to audit evidence refs.
+- [x] M5.10 Bind attestations to audit evidence refs.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Data Model;
     `docs/specs/SP.01-sigilguard-trust-profile.md` - Data Model (evidence).
   - AC: attestation predicates carry evidence refs
     (`kind: checkpoint/export/anchor`) resolving to audit artifacts;
     round-trip from decision to attestation to audit event is asserted.
   - Tests: negative, tamper (dangling refs detected).
+  - Done: added `SigilGuard.Audit.Evidence` with `ref/2` (build the SP.01
+    `%{"kind", "ref"}` from a checkpoint/export/anchor `digest/1`), `validate/1`
+    (closed kind + non-empty binary ref, else `:invalid_evidence`), and
+    `resolve/2` (every ref's `(kind, digest)` must match a supplied artifact,
+    else `:dangling_evidence_ref`). `Attestation.from_decision/3` now validates
+    the `:evidence` option before building the predicate (`:invalid_evidence`),
+    so decision, attestation predicate, and audit-event `metadata["evidence"]`
+    carry the identical resolvable ref. Round-trip, negative, and tamper
+    (dangling/mislabelled ref) tests included.
 - [ ] M5.11 `SigilGuard.HTTPClient` behaviour and anchor-store conversion.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` -
     SigilGuard.HTTPClient Behaviour (D9).

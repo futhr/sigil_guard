@@ -12,6 +12,7 @@ defmodule SigilGuard.Attestation do
   alias SigilGuard.Attestation.Digest
   alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Attestation.Statement
+  alias SigilGuard.Audit.Evidence
   alias SigilGuard.Canonical.JCS
   alias SigilGuard.Context
   alias SigilGuard.ReplayStore
@@ -99,6 +100,7 @@ defmodule SigilGuard.Attestation do
           | :invalid_trust_zone
           | :invalid_audience
           | :invalid_metadata
+          | :invalid_evidence
 
   @doc """
   Sign a decoded SigilGuard Statement as a DSSE envelope.
@@ -130,6 +132,7 @@ defmodule SigilGuard.Attestation do
 
   def from_decision(%SigilGuard.Decision{} = decision, context, opts) when is_list(opts) do
     with {:ok, payload} <- required_payload(opts),
+         :ok <- validate_evidence_option(opts),
          {:ok, context} <- normalize_context(context),
          {:ok, statement_type} <- decision_statement_type(context, opts),
          {:ok, actor_id} <- context_actor_id(context),
@@ -339,6 +342,13 @@ defmodule SigilGuard.Attestation do
       {:ok, payload} when is_map(payload) -> {:ok, payload}
       {:ok, _} -> {:error, :invalid_payload}
       :error -> {:error, :invalid_payload}
+    end
+  end
+
+  defp validate_evidence_option(opts) do
+    case Keyword.fetch(opts, :evidence) do
+      :error -> :ok
+      {:ok, evidence} -> Evidence.validate(evidence)
     end
   end
 
