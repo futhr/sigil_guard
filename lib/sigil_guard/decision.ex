@@ -8,6 +8,11 @@ defmodule SigilGuard.Decision do
   keeps the v2 dual vocabulary (`:allowed | :blocked | {:confirm, reason}`)
   populated alongside for compatibility; it is removed in the M6 removal wave.
 
+  On a `:confirm` decision, `:action` is the unified verdict `:confirm` while
+  `:effect` records the executable action (`:allow | :redact | :quarantine`) to
+  run once confirmation is accepted; the confirmation dispatch keys off `:effect`,
+  and the confirmation token binding is unchanged (SP.07).
+
   V3 adds `matched_rules` and `evidence_refs` so verdicts are explainable and
   evidence-linked without raw payloads, and surfaces the boundary labels
   (`source`, `sink`, `trust_zone`, `actor`, `resource`, `phase`) on the
@@ -15,6 +20,7 @@ defmodule SigilGuard.Decision do
   """
 
   @type action :: :allow | :redact | :quarantine | :block | :confirm
+  @type effect :: :allow | :redact | :quarantine | nil
   @type verdict :: SigilGuard.Policy.verdict()
 
   @typedoc "A rule that contributed to the verdict (SP.07); mirrors SP.01 `predicate.matched_rules`."
@@ -31,6 +37,7 @@ defmodule SigilGuard.Decision do
           indicators: [map()],
           matched_rules: [matched_rule()],
           evidence_refs: [String.t()],
+          effect: effect(),
           source: atom() | String.t() | nil,
           sink: atom() | String.t() | nil,
           trust_zone: atom() | String.t() | nil,
@@ -56,6 +63,7 @@ defmodule SigilGuard.Decision do
     :trust_zone,
     :actor,
     :resource,
+    :effect,
     hits: [],
     indicators: [],
     matched_rules: [],

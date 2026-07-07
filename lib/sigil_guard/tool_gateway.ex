@@ -1116,6 +1116,7 @@ defmodule SigilGuard.ToolGateway do
   defp maybe_put_request_action_digest(metadata, _), do: metadata
 
   defp quarantine_status(%Decision{action: :quarantine}), do: :quarantined
+  defp quarantine_status(%Decision{effect: :quarantine}), do: :quarantined
   defp quarantine_status(%Decision{verdict: {:confirm, _}, indicators: [_ | _]}), do: :confirm
   defp quarantine_status(%Decision{indicators: [_ | _]}), do: :suspicious
   defp quarantine_status(_), do: :safe

@@ -122,6 +122,7 @@ defmodule SigilGuard.Runtime.Gate do
       indicators: [],
       matched_rules: [%{rule_id: "gate.malformed_input", explanation: to_string(reason)}],
       evidence_refs: [],
+      effect: nil,
       source: context.origin,
       sink: context.sink,
       trust_zone: context.trust_zone,
@@ -354,16 +355,21 @@ defmodule SigilGuard.Runtime.Gate do
     {verdict, raw_action, reason} =
       combine_with_boundary({gate_verdict, gate_action, gate_reason}, boundary_decision)
 
-    action = unified_action(raw_action)
+    action = unified_action(verdict, raw_action)
 
     {verdict, action, reason, action_digest, action_digest_error} =
       enforce_confirmable_digest(state, verdict, action, reason)
 
-    sanitized_text = sanitized_text(state.text, state.hits, state.quarantine, action, state.opts)
+    effect = decision_effect(action, raw_action)
+    sanitize_action = if action == :confirm, do: effect, else: action
+
+    sanitized_text =
+      sanitized_text(state.text, state.hits, state.quarantine, sanitize_action, state.opts)
 
     %Decision{
       verdict: verdict,
       action: action,
+      effect: effect,
       reason: reason,
       phase: state.context.phase,
       risk_level: state.risk,
@@ -474,14 +480,22 @@ defmodule SigilGuard.Runtime.Gate do
   defp unified_strength(:allowed, :redact), do: :redact
   defp unified_strength(:allowed, _), do: :allow
 
-  # SP.07 closes the unified verdict enum: the repo-approval `:require_approval`
-  # action (emitted outside the declared set) maps to `:confirm`, with the
-  # approval reason preserved in `reason`/`matched_rules`. Promoting a confirming
-  # verdict's `:allow`/`:redact` action up to `:confirm` is deferred to the full
-  # verdict-delegation rewire, because the confirmation flow consumes `action`
-  # as the post-confirmation action to execute.
-  defp unified_action(:require_approval), do: :confirm
-  defp unified_action(action), do: action
+  # SP.07 unified verdict enum: a confirming verdict's `action` is `:confirm`; the
+  # executable action to run once confirmation is accepted moves to `effect`. Every
+  # other verdict's action is already in the closed set.
+  defp unified_action({:confirm, _}, _), do: :confirm
+  defp unified_action(_, action), do: action
+
+  # `effect` is the post-confirmation executable action (SP.07). For a `:confirm`
+  # decision it is the underlying `:allow`/`:redact`/`:quarantine` the caller runs
+  # after acceptance (`:require_approval`/`:confirm`-shaped source actions proceed
+  # as `:allow`); for a crossing decision it mirrors the action; a block has none.
+  defp decision_effect(:confirm, raw_action), do: normalize_effect(raw_action)
+  defp decision_effect(action, _) when action in [:allow, :redact, :quarantine], do: action
+  defp decision_effect(_, _), do: nil
+
+  defp normalize_effect(action) when action in [:allow, :redact, :quarantine], do: action
+  defp normalize_effect(_), do: :allow
 
   # Surface the deciding reason as a typed matched rule (SP.07). The full
   # per-rule delegation flows once the gate routes verdicts through

@@ -678,9 +678,12 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   defp confirmed_decision(%Decision{} = decision, claims) do
+    action = confirmed_action(decision)
+
     metadata =
       Map.merge(decision.audit_metadata, %{
         verdict: :allowed,
+        action: action,
         confirmation_status: :accepted,
         confirmation_actor: claims["actor"],
         confirmation_nonce_hash: hash_text(claims["nonce"]),
@@ -691,10 +694,19 @@ defmodule SigilGuard.ToolGateway.Base do
     %{
       decision
       | verdict: :allowed,
+        action: action,
         reason: "Confirmation token accepted",
         audit_metadata: metadata
     }
   end
+
+  # The unified verdict `action` for a confirm decision is `:confirm`; the action
+  # to run after acceptance is the decision's `effect` (SP.07). Default to `:allow`
+  # when no effect is recorded (e.g. a bare confirm).
+  defp confirmed_action(%Decision{effect: effect}) when effect in [:allow, :redact, :quarantine],
+    do: effect
+
+  defp confirmed_action(_), do: :allow
 
   defp release_confirmed_result(
          %Decision{
@@ -1075,6 +1087,10 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   defp error_kind(%Decision{action: :quarantine}), do: :quarantined
+  # A pending quarantine that also needs confirmation keeps the quarantine error
+  # code; its unified verdict action is `:confirm` while the effect records
+  # `:quarantine`. A rejected confirmation (verdict `:blocked`) does not match.
+  defp error_kind(%Decision{effect: :quarantine, verdict: {:confirm, _}}), do: :quarantined
   defp error_kind(%Decision{verdict: {:confirm, _}}), do: :confirmation_required
 
   defp error_kind(%Decision{audit_metadata: metadata}) when is_map(metadata) do

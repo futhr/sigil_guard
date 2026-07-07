@@ -125,7 +125,8 @@ defmodule SigilGuard.Runtime.GateTest do
 
       assert {:confirm, reason} = decision.verdict
       assert reason =~ "prompt-injection"
-      assert decision.action == :quarantine
+      assert decision.action == :confirm
+      assert decision.effect == :quarantine
       assert Enum.any?(decision.indicators, &(&1.id == :ignore_instructions))
       refute decision.sanitized_text =~ "Ignore previous instructions"
     end
@@ -578,7 +579,8 @@ defmodule SigilGuard.Runtime.GateTest do
 
       assert {:confirm, reason} = decision.verdict
       assert reason == "Tool result should be reviewed before model ingestion"
-      assert decision.action == :quarantine
+      assert decision.action == :confirm
+      assert decision.effect == :quarantine
       assert [:system_prompt_probe] == decision.audit_metadata.indicator_ids
     end
 
@@ -599,7 +601,8 @@ defmodule SigilGuard.Runtime.GateTest do
       assert {:confirm, reason} = decision.verdict
       assert reason =~ "Manual confirmation allowed"
       assert reason =~ "Tool result should be reviewed"
-      assert decision.action == :quarantine
+      assert decision.action == :confirm
+      assert decision.effect == :quarantine
     end
 
     test "emits redacted runtime telemetry" do
@@ -709,6 +712,25 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.audit_metadata.repo_policy_verdict == :require_approval
     end
 
+    test "a confirming verdict separates :confirm from the executable :effect" do
+      decision =
+        Gate.evaluate(
+          "clean output",
+          [
+            phase: :tool_request,
+            origin: :model,
+            sink: :tool,
+            action: "delete_database",
+            trust_level: :medium
+          ],
+          risk_level: :high
+        )
+
+      assert {:confirm, _} = decision.verdict
+      assert decision.action == :confirm
+      assert decision.effect == :allow
+    end
+
     test "the gate's verdict flows through BoundaryPolicy (boundary rule ids appear)" do
       decision =
         Gate.evaluate(%{"tool" => "read_file", "text" => "README.md"},
@@ -741,8 +763,8 @@ defmodule SigilGuard.Runtime.GateTest do
 
     defp consistent_verdict?(:allowed, action), do: action in [:allow, :redact]
     defp consistent_verdict?(:blocked, action), do: action == :block
-    # A confirming verdict never blocks; the post-confirmation action it carries
-    # is promoted to :confirm only under the deferred full verdict delegation.
-    defp consistent_verdict?({:confirm, _}, action), do: action != :block
+    # A confirming verdict's unified action is always :confirm; the executable
+    # action moves to `effect` (SP.07 verdict/effect split).
+    defp consistent_verdict?({:confirm, _}, action), do: action == :confirm
   end
 end

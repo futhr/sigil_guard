@@ -95,7 +95,8 @@ defmodule SigilGuard.Runtime.StreamTest do
       assert first_decision.verdict == :allowed
       assert {:confirm, reason} = second_decision.verdict
       assert reason =~ "prompt-injection"
-      assert second_decision.action == :quarantine
+      assert second_decision.action == :confirm
+      assert second_decision.effect == :quarantine
       assert stream.halted?
       assert third_decision == second_decision
       assert first <> second <> third =~ "safe"

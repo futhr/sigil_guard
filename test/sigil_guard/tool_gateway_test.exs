@@ -1410,7 +1410,8 @@ defmodule SigilGuard.ToolGatewayTest do
         )
 
       assert {:confirm, _} = decision.verdict
-      assert decision.action == :quarantine
+      assert decision.action == :confirm
+      assert decision.effect == :quarantine
       assert decision.audit_metadata.quarantine_status == :quarantined
       assert :ignore_instructions in decision.audit_metadata.scanner_summary.indicator_ids
     end
@@ -1424,7 +1425,8 @@ defmodule SigilGuard.ToolGatewayTest do
         )
 
       assert {:confirm, _} = decision.verdict
-      assert decision.action == :quarantine
+      assert decision.action == :confirm
+      assert decision.effect == :quarantine
 
       assert {:ok, token} =
                ToolGateway.issue_confirmation(
@@ -1464,7 +1466,8 @@ defmodule SigilGuard.ToolGatewayTest do
                )
 
       assert {:confirm, _} = decision.verdict
-      assert decision.action == :quarantine
+      assert decision.action == :confirm
+      assert decision.effect == :quarantine
       assert response["error"]["code"] == -32_052
       assert response["error"]["data"]["status"] == "quarantined"
       refute Map.has_key?(response["error"]["data"], "sanitized_text")
