@@ -1,0 +1,36 @@
+version 3
+
+[rules]
+default allow
+
+# TM.09: private data x untrusted content x external comms
+block sensitivity:private origin:tool,resource,repo
+  zone:untrusted sink:external,network trust:low,medium
+confirm sensitivity:private origin:tool,resource,repo
+  zone:untrusted sink:external,network trust:high
+confirm sensitivity:internal origin:tool,resource
+  sink:external,network
+
+# untrusted callers cannot execute privileged actions
+block phase:tool_request zone:untrusted
+
+# TM.08: gate retrieved memory/context at model ingress
+quarantine phase:model_ingress origin:tool,resource
+  indicator:injection,poisoning
+
+# sandbox-aware overrides of the mismatch matrix
+allow phase:tool_result isolation:container,vm,remote_attested
+  effect:read
+confirm phase:tool_request isolation:none effect:write
+
+[repo]
+default require_approval
+allow agent:release-bot action:modify docs/** CHANGELOG.md
+block agent:* priv/secrets/**
+
+[contracts]
+contract sink:external,network max_size:16384
+  no_raw_credentials:true digest_only_pii:true classes:text
+  credential_transform:hash
+contract sink:log max_size:65536 no_raw_credentials:true
+contract sink:model classes:text,structured

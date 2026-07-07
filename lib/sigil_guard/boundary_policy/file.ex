@@ -68,14 +68,35 @@ defmodule SigilGuard.BoundaryPolicy.File do
     if byte_size(bytes) > @max_bytes do
       {:error, :policy_too_large}
     else
-      bytes
-      |> String.split("\n")
-      |> Enum.with_index(1)
-      |> parse_lines()
+      parse_within_limit(bytes)
     end
   end
 
   def parse(_), do: {:error, :invalid_policy_file}
+
+  defp parse_within_limit(bytes) do
+    result =
+      bytes
+      |> String.split("\n")
+      |> Enum.with_index(1)
+      |> parse_lines()
+
+    case result do
+      {:ok, compiled} -> {:ok, %{compiled | digest: digest(bytes)}}
+      error -> error
+    end
+  end
+
+  @doc """
+  Return the lowercase-hex SHA-256 over the raw policy-file bytes as read.
+
+  The evidence digest is over raw bytes with no normalization, so it exists even
+  for files that fail to parse and matches what `sha256sum` and git produce.
+  """
+  @spec digest(binary()) :: String.t()
+  def digest(bytes) when is_binary(bytes) do
+    Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+  end
 
   # -- Top-level line walk ----------------------------------------------------
 
