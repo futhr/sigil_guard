@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 149 / 228 tasks done (65%).** Milestones: 6 complete, 1 partial,
-3 not started. **79 tasks left.** Current milestone: **M5** (15/26, 58%).
+**Overall: 150 / 228 tasks done (66%).** Milestones: 6 complete, 1 partial,
+3 not started. **78 tasks left.** Current milestone: **M5** (16/26, 62%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 15 | 26 | 58% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 16 | 26 | 62% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **149** | **228** | **65%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **150** | **228** | **66%** | 6 done / 1 partial / 3 to go |
 
-### What's left (79 tasks)
+### What's left (78 tasks)
 
-- **M5 - 11 left:** the threat-model test suite TM.02-TM.12
-  (move-don't-duplicate). (M5.01-M5.15 done, incl. TM.01 injection via tool
-  results.)
+- **M5 - 10 left:** the threat-model test suite TM.03-TM.12
+  (move-don't-duplicate). (M5.01-M5.16 done, incl. TM.01 injection and TM.02
+  tool poisoning.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1456,12 +1456,19 @@ section is post-3.0.0 parking; neither is counted here.
     holdback prevents a chunk-straddling secret from being emitted, and a
     display:none-hidden instruction is still quarantined; negatives (benign
     result allowed, no leak) and malformed inputs are covered.
-- [ ] M5.16 TM.02 threat family - tool poisoning via descriptions/metadata.
+- [x] M5.16 TM.02 threat family - tool poisoning via descriptions/metadata.
   - Spec: `R.06` - Control Mapping row 2; `SP.03` (manifest digest
     pinning).
   - AC: `.../tm02_tool_poisoning_test.exs` proves description/annotation/
     schema drift denies via manifest digest pinning (mitigates).
   - Tests: negative, tamper.
+  - Done: added the TM.02 module (R.06 row 2, ASI02/ASI04, mitigates) citing
+    the MCPTox poisoning attack and referencing the base tests by name. Drives
+    `ToolGateway.verify_manifest/2` with poisoned-drift fixtures: an unchanged
+    manifest verifies, while a poisoned description or annotations drift to
+    `:manifest_digest_mismatch` and a poisoned input schema is rejected;
+    tamper (text swapped under a pinned digest) and malformed/unknown manifests
+    fail closed.
 - [ ] M5.17 TM.03 threat family - line jumping.
   - Spec: `R.06` - Control Mapping row 3; `SP.03` (verify-before-list).
   - AC: `.../tm03_line_jumping_test.exs` proves `tools/list` content is
