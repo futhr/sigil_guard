@@ -18,7 +18,7 @@ policy, scanning, audit, vault, and trust-bundle primitives they can embed.
    manifests, and boundary decisions are the stable compatibility surface.
    Removed v2 surfaces (`_sigil`, `_sigil_confirmation`, profile names,
    registry APIs, and legacy signing shapes) stay deleted and mapped in
-   `MIGRATING-3.0.md`. No ad hoc breaks, no permanent compatibility shims.
+   `MIGRATING-1.0.md`. No ad hoc breaks, no permanent compatibility shims.
 4. Default trust material is embedded and local. Remote fetch is host-owned;
    the v3 core performs no HTTP. The only sanctioned HTTP seam is the
    host-provided `SigilGuard.HTTPClient` behaviour used by audit anchor

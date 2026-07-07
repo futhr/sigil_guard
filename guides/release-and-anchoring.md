@@ -38,7 +38,7 @@ comparison is case-insensitive on the expected value.
 Verify the build provenance itself with the GitHub CLI, gating publish on it:
 
 ```bash
-gh attestation verify sigil_guard-3.0.0.tar --repo futhr/sigil_guard
+gh attestation verify sigil_guard-1.0.0.tar --repo futhr/sigil_guard
 ```
 
 ### Consumer-side verification in CI
@@ -51,11 +51,11 @@ SBOM digest, and structure — before trusting the release:
   env:
     GH_TOKEN: ${{ github.token }}
   run: |
-    gh attestation verify sigil_guard-3.0.0.tar --repo futhr/sigil_guard
-    gh attestation verify sigil_guard-3.0.0.spdx.json --repo futhr/sigil_guard
+    gh attestation verify sigil_guard-1.0.0.tar --repo futhr/sigil_guard
+    gh attestation verify sigil_guard-1.0.0.spdx.json --repo futhr/sigil_guard
     mix sigil_guard.sbom \
-      --verify sigil_guard-3.0.0.spdx.json \
-      --sha256 "$(shasum -a 256 sigil_guard-3.0.0.spdx.json | cut -d' ' -f1)"
+      --verify sigil_guard-1.0.0.spdx.json \
+      --sha256 "$(shasum -a 256 sigil_guard-1.0.0.spdx.json | cut -d' ' -f1)"
 ```
 
 The tagged-release workflow produces these subjects with

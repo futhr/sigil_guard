@@ -285,7 +285,7 @@ atoms.
   golden vectors) and SP.12 (legacy registry removal and the removal map
   for the v2 bundle surface).
 - Migration needed: yes. v2 single-signature bundles do not verify under
-  v3. `MIGRATING-3.0.md` maps the v2 provenance block to a v3 role
+  v3. `MIGRATING-1.0.md` maps the v2 provenance block to a v3 role
   declaration plus DSSE envelope, and legacy bundle fixtures move to
   `test/fixtures/historical/`.
 - Breaking changes: yes — the bundle format. Sequence semantics, signature

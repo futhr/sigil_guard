@@ -182,9 +182,9 @@ defmodule SigilGuard.AttestationFromDecisionTest do
     test "requires explicit statement type for unphased attestation types" do
       payload = %{
         "package" => "sigil_guard",
-        "version" => "3.0.0",
+        "version" => "1.0.0",
         "artifacts" => [
-          %{"name" => "sigil_guard-3.0.0.tar", "sha256" => String.duplicate("a", 64)}
+          %{"name" => "sigil_guard-1.0.0.tar", "sha256" => String.duplicate("a", 64)}
         ]
       }
 

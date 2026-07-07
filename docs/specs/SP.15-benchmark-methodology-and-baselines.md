@@ -19,8 +19,8 @@ Performance claims without a published methodology are marketing. This spec
 defines the normative benchmark scenario matrix, the deterministic corpus
 rules, the environment-disclosure format, the CI regression gates, and the
 fairness rules for cross-ecosystem comparison against Python llm-guard. SLOs
-are measured on 3.0.0-rc.1 and then ratified into this spec; they are never
-invented in advance.
+are measured before the 1.0.0 publication gate and then ratified into this
+spec; they are never invented in advance.
 
 ## Business Value
 
@@ -172,11 +172,12 @@ These fairness rules are binding for every published comparison:
 
 Targets are measured, then ratified, never invented:
 
-1. Run the full matrix on the disclosed reference environment at 3.0.0-rc.1.
+1. Run the full matrix on the disclosed reference environment before the
+   1.0.0 publication gate.
 2. Ratify SLOs as measured median and p99 plus 50% headroom, rounded up to a
    clean bound, via an update to this spec's Success Metrics (bump
    `updated:`).
-3. Until then, SLO rows below carry the placeholder "ratify at rc.1", and
+3. Until then, SLO rows below carry the placeholder "ratify before GA", and
    any published figure MUST say "measured", never "guaranteed".
 4. After ratification, published claims MUST cite the ratified numbers and
    their environment block only.

@@ -118,7 +118,7 @@ Legacy filename handling is fail-closed:
   Explicit candidates may add non-default v3 paths, but they do not authorize
   old `SIGIL` filenames as fallbacks.
 
-Migration table (reproduced 1:1 in `MIGRATING-3.0.md`):
+Migration table (reproduced 1:1 in `MIGRATING-1.0.md`):
 
 | V2 Filename | V3 Filename |
 |-------------|-------------|
@@ -291,7 +291,7 @@ In v3 the repo policy kernel contributes exactly this map to
       shared normalization; a file `allow` beats a bundle `block` on the
       same path; a path matched only by a bundle rule is decided by it; and
       merged bundle rule ids carry the `bundle:` prefix in `matched_rules`.
-- [x] The filename migration table is reproduced 1:1 in `MIGRATING-3.0.md`.
+- [x] The filename migration table is reproduced 1:1 in `MIGRATING-1.0.md`.
 
 ## Implementation Roadmap
 

@@ -130,7 +130,7 @@ change; it is not a competing claim list.
 | Single-use | Opt-in via `consume: true`. | Default. See below. |
 
 Single-use is a deliberate v3 behavior change and MUST be called out in
-`MIGRATING-3.0.md`: in v2, replay rejection requires passing
+`MIGRATING-1.0.md`: in v2, replay rejection requires passing
 `consume: true`; in v3, every successful confirmation verification consumes
 the token nonce in `SigilGuard.ReplayStore` by default, and a second
 verification fails with `{:error, :replay_detected}`. `consume: false`
@@ -162,9 +162,9 @@ without attached metadata MUST be identical.
 The legacy `_sigil` and `_sigil_confirmation` keys do not exist in v3: they
 are not read, not stripped, and not special-cased, so a v3 digest treats
 them as ordinary user content. There is no runtime shim or dual-read mode
-(D6); mixed-traffic rollout guidance lives in `MIGRATING-3.0.md` only. The
+(D6); mixed-traffic rollout guidance lives in `MIGRATING-1.0.md` only. The
 in-repo M3-M5 transition dual-strips both prefixes until the M6 removal
-wave; released 3.0.0 strips only the `_agent_*` list above.
+wave; released 1.0.0 strips only the `_agent_*` list above.
 
 ## Gateway Function Mapping
 
@@ -190,7 +190,7 @@ Confirmation Lifecycle sections).
 V3 renumbers the gateway rejection codes to `-32050..-32056`, owned by
 SP.03's JSON-RPC error registry; this spec never mints codes and points to
 that registry for every code. This is a breaking change from v0.2's
-`-32001..-32003`, documented in `MIGRATING-3.0.md`.
+`-32001..-32003`, documented in `MIGRATING-1.0.md`.
 
 ## Module Map
 
@@ -252,12 +252,12 @@ that registry for every code. This is a breaking change from v0.2's
 - [ ] Single-use is the default: verifying the same token twice fails with
       `{:error, :replay_detected}` without any option, and `consume: false`
       opts out per call. The behavior change is documented in
-      `MIGRATING-3.0.md`.
+      `MIGRATING-1.0.md`.
 - [ ] `_agent_trust`, `_agent_confirmation`, and `confirmation_token` (atom
       and string forms, payload root and `params` level) are stripped before
       every digest, and digests are identical with and without them,
       mirroring SP.01's strip-rule tests.
-- [x] Released 3.0.0 gives `_sigil` and `_sigil_confirmation` no special
+- [x] Released 1.0.0 gives `_sigil` and `_sigil_confirmation` no special
       handling anywhere under `lib/`.
 - [ ] Every helper in the Gateway Function Mapping keeps its v2 name and
       arity on the `MCP.Gateway` facade and delegates to `ToolGateway`.

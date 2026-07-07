@@ -33,9 +33,10 @@ minimal and individually justified rather than driven to zero - `:telemetry`,
 justified by OTP 27 crypto and set-theoretic types (D9); adaptive/ML detection
 is a core behaviour with a deterministic nil-path while the model-backed
 reference implementation is deferred to an optional post-GA package (D5); v3
-ships no compatibility namespace and migrates users through `MIGRATING-3.0.md`
-and the changelog only (D6); and the release sequence is a metadata-only
-`0.2.1`, then a manually versioned `3.0.0-rc.1`, then `3.0.0` (D11). It also
+ships no compatibility namespace and migrates users through `MIGRATING-1.0.md`
+and the changelog only (D6); and the release sequence is a direct manual
+alignment to `1.0.0`, followed by git_ops, package, and reference-consumer
+validation (D11). It also
 fixes Tier 1 integration targets (hermes_mcp, Jido, LangChain/ReqLLM,
 Tidewave) and the adoption playbook that SP.14 and SP.15 turn into tasks.
 
@@ -54,7 +55,7 @@ Five sub-questions:
 3. Where does ML-backed detection live relative to the deterministic core?
 4. Does v3 carry a compatibility namespace for 0.2.x users, or documentation
    only?
-5. How do 0.2.x and 3.0.0 coexist on Hex, and which artifacts and channels
+5. How do 0.2.x and 1.0.0 coexist on Hex, and which artifacts and channels
    make the library visible to its audience?
 
 ## Methodology
@@ -250,16 +251,15 @@ behavior.
 Three mechanical facts shape D11:
 
 - git_ops derives the next version from conventional-commit history and the
-  current mix.exs version. It has no operation that jumps 0.2.x to a
-  3.0.0-rc.1 prerelease, so the rc version must be set manually and git_ops
-  must be re-verified afterwards with a dry run.
-- Elixir version requirements do not match prerelease versions unless the
-  requirement itself carries a prerelease suffix: `~> 3.0` does not match
-  `3.0.0-rc.1`. rc consumers must pin the exact version, and the rc
-  announcement must say so.
-- Tag `v0.2.0` is the last released 0.2.x state, so a `release/0.2` branch
-  cut at that tag can publish a metadata-only 0.2.1 without touching or
-  re-verifying any v3 work in progress on `main`.
+  current mix.exs version. It cannot infer the intended 0.2.x-to-1.0.0 jump
+  from history, so the 1.0.0 version must be set manually and git_ops must be
+  re-verified afterwards with a dry run.
+- `~> 0.2` remains pinned to the legacy line and does not auto-upgrade to
+  1.0.0, so consumers opt into the breaking release by changing their
+  dependency requirement to `~> 1.0`.
+- The reference consumer should move to `~> 1.0` only after the published
+  package validates, keeping local path validation separate from production
+  dependency updates.
 
 ### Tier 1 Integration Targets
 
@@ -419,7 +419,7 @@ NimbleOptions-rejection mandates.
 - Legacy modules (the legacy remote bundle namespace, `SigilGuard.Envelope`,
   and `SigilGuard.Profile`) are deleted in M6, not hidden, wrapped, or
   deprecated in place.
-- The migration surface is `MIGRATING-3.0.md` plus the CHANGELOG, with a 1:1
+- The migration surface is `MIGRATING-1.0.md` plus the CHANGELOG, with a 1:1
   old-to-new mapping for every removed public API.
 - Historical golden vectors MUST move to `test/fixtures/historical/` and
   remain in the test tree as migration evidence only.
@@ -429,24 +429,19 @@ NimbleOptions-rejection mandates.
 
 ### D11: Release Sequence (Adopted)
 
-1. **0.2.1 metadata-only.** Cut branch `release/0.2` at tag `v0.2.0`.
-   Allowed changes: corrected Hex metadata (description, links, keywords)
-   and a README status banner pointing at the v3 direction. The `lib/` diff
-   MUST be zero; that is the go/no-go gate. Publish 0.2.1 from the branch so
-   the last 0.2.x release carries accurate metadata and the migration
-   pointer.
-2. **3.0.0-rc.1.** Perform a manual version jump on `main`: git_ops cannot
-   derive 0.2.x to 3.0.0-rc.1 from commit history. Set the mix.exs version,
-   write the CHANGELOG entry manually, and tag `v3.0.0-rc.1`. Verify git_ops
-   resumes correctly with a post-tag dry run. The rc announcement MUST state
-   that `~> 3.0` does not match rc releases and that rc consumers pin
-   `"3.0.0-rc.1"` exactly.
-3. **Soak and reference-consumer gate.** Run a fixed soak window while the
-   reference consumer validates against the published rc.1 pinned exactly.
-   This gate is blocking for GA.
-4. **3.0.0.** Publish GA, confirm git_ops operates normally from the new
-   version line, fire the announcement kit (never against an rc), and move
-   the reference consumer to `~> 3.0`.
+1. **Manual 1.0.0 alignment.** Perform a manual version jump on `main`:
+   git_ops cannot infer the intended 0.2.x-to-1.0.0 jump from commit history.
+   Set the mix.exs version, migration guide, changelog, generated fixtures,
+   package metadata, and release docs together.
+2. **git_ops resume check.** Verify git_ops resumes correctly with a dry run
+   from the new version line after the manual alignment.
+3. **Package and reference-consumer gate.** Build the package, verify the
+   migration guide and docs point at `MIGRATING-1.0.md`, and validate the
+   reference consumer against the package before changing production
+   dependency requirements.
+4. **1.0.0.** Publish GA, confirm git_ops operates normally from the new
+   version line, and move
+   the reference consumer to `~> 1.0`.
 
 ## Recommendation
 
@@ -456,7 +451,7 @@ All four decision areas above are adopted, together with the Tier 1/Tier 2
 integration tiering, the delivery model, and the adoption playbook below.
 This closes R.01's fourth Deferred item (whether adaptive anomaly detection
 belongs in the main package or an optional provider behaviour) and R.01 Open
-Questions 4 (compatibility namespace versus `MIGRATING-3.0.md`) and 5
+Questions 4 (compatibility namespace versus `MIGRATING-1.0.md`) and 5
 (adaptive scanning as a core behaviour versus a separate package), and it
 closes the task-list open decisions on adaptive detectors, the compatibility
 namespace, and the release sequence.
@@ -500,7 +495,7 @@ Artifacts (SP.14 owns acceptance criteria; SP.15 owns benchmark rules):
   attest-build-provenance action, and SBOMs from the existing SPDX mix
   task, explicitly aligned with Elixir's own OpenChain-certified,
   SBOM-attested release posture.
-- Announcement kit gated on 3.0.0 GA: ElixirForum post, Elixir Radar pitch,
+- Announcement kit gated on 1.0.0 GA: ElixirForum post, Elixir Radar pitch,
   Thinking Elixir pitch, ElixirConf US CFP (date-gated), awesome-elixir PR,
   and curated Hex keywords.
 
@@ -532,7 +527,7 @@ attribute prefix decision is recorded in SP.05 (D16).
   release-sequence sections), SP.04 (adaptive-detector behaviour), new
   SP.14 (ecosystem integrations and adoption), new SP.15 (benchmark
   methodology and llm-guard comparison fairness rules).
-- Migration needed: yes. `MIGRATING-3.0.md` carries a 1:1 mapping for every
+- Migration needed: yes. `MIGRATING-1.0.md` carries a 1:1 mapping for every
   removal; no runtime compatibility namespace; historical vectors move to
   `test/fixtures/historical/`.
 - Breaking changes: yes. Elixir floor 1.17 to 1.18, adoption of

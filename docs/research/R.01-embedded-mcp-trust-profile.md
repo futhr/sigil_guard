@@ -41,7 +41,7 @@ The historical SIGIL surface is not a runtime migration layer for v3. It is
 historical context and migration-documentation input. Existing `_sigil` fields,
 confirmation metadata, envelope fixtures, profile names, and registry-named
 modules should be mapped to v3 Agent Trust replacements in changelog and
-`MIGRATING-3.0.md`, not preserved as permanent compatibility shims.
+`MIGRATING-1.0.md`, not preserved as permanent compatibility shims.
 
 ## Research Question
 
@@ -119,11 +119,9 @@ repo direction.
 That means the main migration risk is private/direct Git use, not broad public
 Hex adoption. V3 should therefore be explicit and honest:
 
-- keep package users on `~> 0.2` unless they opt into `~> 3.0`;
-- optionally publish a final metadata-only `0.2.1` if the branch can preserve
-  0.2 behavior;
-- publish `3.0.0-rc.1` before `3.0.0`;
-- document every removed public API in `MIGRATING-3.0.md`;
+- keep package users on `~> 0.2` unless they opt into `~> 1.0`;
+- align the repo directly to `1.0.0` as the major release line;
+- document every removed public API in `MIGRATING-1.0.md`;
 - avoid carrying abandoned protocol vocabulary as runtime architecture.
 
 ## Standards Landscape
@@ -561,7 +559,7 @@ All questions this note originally left open are now closed:
   references; VC-style credentials remain optional opaque references.
 - Compatibility namespace: closed by
   [R.07](R.07-ecosystem-positioning-dependencies-and-adoption.md) — no
-  `SigilGuard.Compatibility` namespace; `MIGRATING-3.0.md` and the changelog
+  `SigilGuard.Compatibility` namespace; `MIGRATING-1.0.md` and the changelog
   carry the migration.
 - Adaptive scanning: closed by
   [R.07](R.07-ecosystem-positioning-dependencies-and-adoption.md) — behaviour

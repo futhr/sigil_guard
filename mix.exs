@@ -1,7 +1,7 @@
 defmodule SigilGuard.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "1.0.0"
   @source_url "https://github.com/futhr/sigil_guard"
 
   def project do
@@ -93,7 +93,7 @@ defmodule SigilGuard.MixProject do
       links: %{
         "GitHub" => @source_url,
         "Documentation" => "https://hexdocs.pm/sigil_guard",
-        "Migration Guide" => @source_url <> "/blob/main/MIGRATING-3.0.md"
+        "Migration Guide" => @source_url <> "/blob/main/MIGRATING-1.0.md"
       },
       files: ~w[
         lib
@@ -103,7 +103,7 @@ defmodule SigilGuard.MixProject do
         README.md
         LICENSE
         CHANGELOG.md
-        MIGRATING-3.0.md
+        MIGRATING-1.0.md
       ],
       maintainers: ["Tobias Bohwalli <hi@futhr.io>"]
     ]
@@ -122,7 +122,7 @@ defmodule SigilGuard.MixProject do
         "guides/integrations/tidewave.md": [title: "Tidewave Integration"],
         "guides/release-and-anchoring.md": [title: "Release and Anchoring"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
-        "MIGRATING-3.0.md": [title: "Migrating to 3.0"],
+        "MIGRATING-1.0.md": [title: "Migrating to 1.0"],
         "CHANGELOG.md": [title: "Changelog"],
         "CONTRIBUTING.md": [title: "Contributing"],
         "AGENTS.md": [title: "AI Agents"],

@@ -22,7 +22,7 @@ and by MCP helpers. In v3 this foundation is rewired behind
 `SigilGuard.Boundary` and `SigilGuard.BoundaryPolicy`. This spec also owns
 two v3 contracts: the unified decision verdict enum (V3 Decision Contract)
 and the consumer-facing stability guarantees that hold unchanged through
-3.0.0 (Stability Guarantees).
+1.0.0 (Stability Guarantees).
 
 ## Business Value
 
@@ -187,7 +187,7 @@ reason moves into `matched_rules`.
 
 Transition rule: the v2 `Decision.verdict` field remains available,
 populated alongside the unified verdict, during milestones M1-M5 and is
-removed in M6 (SP.12 removal wave, mapped in `MIGRATING-3.0.md`). The
+removed in M6 (SP.12 removal wave, mapped in `MIGRATING-1.0.md`). The
 `SigilGuard.policy_verdict/3` facade vocabulary is unaffected; see
 Stability Guarantees.
 
@@ -211,7 +211,7 @@ raw payloads.
 These are the D17 consumer contracts. They are kept IDENTICAL through v3:
 the reference consumer calls them as hard contracts, and the
 consumer-contracts conformance suite asserts these shapes at every
-milestone exit. They MUST NOT change in 3.0.0.
+milestone exit. They MUST NOT change in 1.0.0.
 
 | Contract | Return shape (identical in v2 and v3) |
 |----------|----------------------------------------|
@@ -317,7 +317,7 @@ boundary labels) are normative in the V3 Decision Contract section.
       table, exercised by tests; `:require_approval` never escapes the v3
       closed enum.
 - [ ] The v2 `Decision.verdict` field is populated through M1-M5 and deleted
-      in M6, with the removal mapped in `MIGRATING-3.0.md`.
+      in M6, with the removal mapped in `MIGRATING-1.0.md`.
 - [ ] `matched_rules` and `evidence_refs` carry the typed shapes above, and
       their mirrors into SP.01's `predicate.matched_rules` and
       `predicate.evidence` are verified by tests.

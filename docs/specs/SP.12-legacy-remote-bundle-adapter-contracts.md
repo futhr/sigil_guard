@@ -92,7 +92,7 @@ sequenceDiagram
 | `SigilGuard.Registry.fetch_policies/1` | Bundle `policies` section. |
 | `SigilGuard.Registry.Bundle.sign/2` | `TrustBundle` provenance signing. |
 | `SigilGuard.Registry.Cache` | `TrustBundle.Cache`. |
-| `registry_url`, `registry_enabled`, and every other `registry_*` config key | Removed; boot fails closed with a typed `SigilGuard.ConfigError` naming the key and `MIGRATING-3.0.md`. |
+| `registry_url`, `registry_enabled`, and every other `registry_*` config key | Removed; boot fails closed with a typed `SigilGuard.ConfigError` naming the key and `MIGRATING-1.0.md`. |
 | `scanner_patterns: :registry` | `scanner_patterns: :built_in \| :bundle`; the `:registry` value raises the same typed error. |
 
 The removed configuration keys are `:registry_url`, `:registry_ttl_ms`,
@@ -103,7 +103,7 @@ The removed configuration keys are `:registry_url`, `:registry_ttl_ms`,
 `SigilGuard.Config.validate!/0` raises `SigilGuard.ConfigError` at boot with
 reason `:legacy_contract_removed` for these enumerated keys and
 `:unknown_config_key` for any other unrecognized key; both messages MUST
-name the offending key and point at `MIGRATING-3.0.md`.
+name the offending key and point at `MIGRATING-1.0.md`.
 
 ## Dependency Removal (D9)
 
@@ -144,26 +144,21 @@ merit. D9 fixes the end state:
 
 ## Release Sequence (D11)
 
-The 0.2.x-to-3.0.0 sequence is fixed by D11 (R.07); each step carries a
+The 0.2.x-to-1.0.0 sequence is fixed by D11 (R.07); each step carries a
 go/no-go gate.
 
-1. **0.2.1 metadata-only.** Cut branch `release/0.2` at tag `v0.2.0` and
-   publish 0.2.1 from it with corrected Hex metadata and a README status
-   banner only. Go/no-go: the package diff against 0.2.0 MUST contain zero
-   `lib/` changes.
-2. **3.0.0-rc.1 by manual version jump.** git_ops cannot derive
-   0.2.x-to-3.0.0-rc.1 from commit history: set the mix.exs version and
-   CHANGELOG entry manually and tag `v3.0.0-rc.1`. Go/no-go: a post-tag
-   `mix git_ops.release --dry-run` MUST resume cleanly from the new
-   version line. `~> 3.0` does NOT match prerelease versions, so rc
-   consumers MUST pin `"3.0.0-rc.1"` exactly, and the rc announcement MUST
-   say so.
-3. **Soak plus reference-consumer rc validation.** Run the fixed soak
-   window while the reference consumer validates against the published
-   rc.1 pinned exactly. This gate is blocking for GA.
-4. **3.0.0.** Publish GA, confirm git_ops operates normally from the new
-   version line, fire announcements (never against an rc), and move the
-   reference consumer to `~> 3.0`.
+1. **Manual 1.0.0 alignment.** Set the package version, migration guide,
+   changelog, package metadata, generated fixtures, and release docs to
+   `1.0.0` in one repo-doc release alignment commit.
+2. **git_ops resume check.** git_ops cannot derive the manual major-version
+   jump from 0.2.x history, so a post-alignment
+   `mix git_ops.release --dry-run` MUST resume cleanly from the new version
+   line before publication.
+3. **Package validation.** Build the Hex package, verify the migration guide
+   and generated docs point at `MIGRATING-1.0.md`, and keep the package free
+   of removed registry/runtime surfaces.
+4. **1.0.0.** Publish GA and move the reference consumer to `~> 1.0` only
+   after the published package validates.
 
 ## Data Model
 
@@ -212,8 +207,8 @@ go/no-go gate.
 | `:missing_public_key` | return tuple | fix DID response | key resolution fails. |
 | `:invalid_public_key` | return tuple | fix key material | key resolution fails. |
 | quarantine reason | cache status | inspect provenance | bundle not loaded. |
-| `:legacy_contract_removed` | boot raise (`SigilGuard.ConfigError`) | delete the removed key per `MIGRATING-3.0.md` | v3 boot fails closed. |
-| `:unknown_config_key` | boot raise (`SigilGuard.ConfigError`) | remove or fix the key per `MIGRATING-3.0.md` | v3 boot fails closed. |
+| `:legacy_contract_removed` | boot raise (`SigilGuard.ConfigError`) | delete the removed key per `MIGRATING-1.0.md` | v3 boot fails closed. |
+| `:unknown_config_key` | boot raise (`SigilGuard.ConfigError`) | remove or fix the key per `MIGRATING-1.0.md` | v3 boot fails closed. |
 
 ## Security Considerations
 
@@ -240,21 +235,21 @@ go/no-go gate.
 ## Acceptance Criteria
 
 - [x] Every removed public function and configuration key in the removal
-      map has a 1:1 row in `MIGRATING-3.0.md`, checked by the M6
+      map has a 1:1 row in `MIGRATING-1.0.md`, checked by the M6
       completeness script against the deletion diff.
 - [ ] Booting with any `registry_*` key or `scanner_patterns: :registry`
-      raises `SigilGuard.ConfigError` naming the key and `MIGRATING-3.0.md`.
+      raises `SigilGuard.ConfigError` naming the key and `MIGRATING-1.0.md`.
 - [x] The runtime dependency-set assertion test is in the tree and fails
       when the set differs from `:telemetry`, `:nimble_options`, and `jason`
       plus OTP/stdlib applications.
 - [x] `:nimble_options` is adopted for config/option validation; zero finch
       references remain in the runtime tree after M6.
-- [ ] The 0.2.1 package diff against 0.2.0 contains zero `lib/` changes.
-- [ ] A post-tag `mix git_ops.release --dry-run` resumes cleanly after the
-      manual 3.0.0-rc.1 jump, and the rc announcement documents the
-      exact-pin requirement.
-- [ ] The reference consumer validates green against the published
-      3.0.0-rc.1 pinned exactly before GA.
+- [ ] `mix git_ops.release --dry-run` resumes cleanly after the manual 1.0.0
+      alignment.
+- [ ] The Hex package build includes `MIGRATING-1.0.md`, exposes version
+      `1.0.0`, and contains no removed registry runtime surfaces.
+- [ ] The reference consumer validates green against the published 1.0.0
+      package before its production dependency moves to `~> 1.0`.
 
 ## Implementation Roadmap
 
@@ -266,7 +261,7 @@ go/no-go gate.
 - [ ] Add `SigilGuard.TrustBundle`.
 - [ ] Remove registry config from v3.
 - [ ] Remove registry modules from v3 public docs.
-- [ ] Add `MIGRATING-3.0.md` registry-to-bundle mapping.
+- [ ] Add `MIGRATING-1.0.md` registry-to-bundle mapping.
 - [ ] Move old registry tests to migration/removal tests.
 - [ ] M1: adopt `:nimble_options` for config/option schemas; keep `jason`;
       floor `~> 1.18`.

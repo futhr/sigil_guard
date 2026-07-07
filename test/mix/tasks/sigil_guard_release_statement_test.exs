@@ -29,7 +29,7 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
                  tarball: tarball,
                  sbom: sbom,
                  package: "sigil_guard",
-                 version: "3.0.0"
+                 version: "1.0.0"
                )
 
       assert statement["predicateType"] == "https://sigilguard.dev/attestation/release/v1"
@@ -42,8 +42,8 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
       {tarball_a, sbom} = write_artifacts("release A")
       {tarball_b, _} = write_artifacts("release B")
 
-      {:ok, a} = ReleaseStatement.statement(tarball: tarball_a, sbom: sbom, version: "3.0.0")
-      {:ok, b} = ReleaseStatement.statement(tarball: tarball_b, sbom: sbom, version: "3.0.0")
+      {:ok, a} = ReleaseStatement.statement(tarball: tarball_a, sbom: sbom, version: "1.0.0")
+      {:ok, b} = ReleaseStatement.statement(tarball: tarball_b, sbom: sbom, version: "1.0.0")
 
       # Different tarball bytes yield a different release action digest.
       refute action_digest(a) == action_digest(b)

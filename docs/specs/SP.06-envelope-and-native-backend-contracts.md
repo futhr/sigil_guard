@@ -93,7 +93,7 @@ sequenceDiagram
 
 The Envelope-to-Attestation field mapping is owned by SP.01's
 "Migration: Envelope To Attestation" table, reproduced 1:1 in
-`MIGRATING-3.0.md`. This spec MUST NOT duplicate that table; it only marks
+`MIGRATING-1.0.md`. This spec MUST NOT duplicate that table; it only marks
 the surfaces above as transition contracts.
 
 All legacy golden vectors move to `test/fixtures/historical/` in v3 (D6),
@@ -109,7 +109,7 @@ the ETS semantics are load-bearing for confirmation single-use (SP.08).
 
 The reference consumer is the only known production consumer of
 `SigilGuard.Envelope` and has exactly two call sites. Both migrations MUST
-be documented in `MIGRATING-3.0.md` (D17: the expected consumer diff is
+be documented in `MIGRATING-1.0.md` (D17: the expected consumer diff is
 these two call sites plus config removal).
 
 | Consumer call site | V2 usage | V3 replacement |
@@ -185,12 +185,12 @@ these two call sites plus config removal).
 - [ ] Spec status reads `implemented/transition` here and in both catalogue
       tables (`docs/README.md`, `docs/specs/README.md`).
 - [x] The Envelope-to-Attestation mapping exists only in SP.01 and
-      `MIGRATING-3.0.md`; this spec links to it and never restates it.
+      `MIGRATING-1.0.md`; this spec links to it and never restates it.
 - [ ] V3 moves every legacy vector, including the rust-crate vectors, to
       `test/fixtures/historical/`, and historical fixtures fail Agent Trust
       Profile verification.
 - [ ] Both reference-consumer call sites have a named v3 replacement in
-      `MIGRATING-3.0.md`.
+      `MIGRATING-1.0.md`.
 - [ ] `SigilGuard.ReplayStore` survives v3 as an internal module; no
       pluggable replay-store behaviour ships at GA.
 

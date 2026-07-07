@@ -254,7 +254,7 @@ defmodule SigilGuard.Attestation.DigestTest do
                :release,
                %{
                  "package" => "sigil_guard",
-                 "version" => "3.0.0",
+                 "version" => "1.0.0",
                  "artifacts" => [
                    %{"name" => "z.tar", "sha256" => String.duplicate("c", 64)},
                    %{name: "a.tar", sha256: String.duplicate("d", 64)}
@@ -267,7 +267,7 @@ defmodule SigilGuard.Attestation.DigestTest do
                 %{
                   "statement_type" => "release",
                   "package" => "sigil_guard",
-                  "version" => "3.0.0",
+                  "version" => "1.0.0",
                   "artifacts" => [
                     %{"name" => "a.tar", "sha256" => String.duplicate("d", 64)},
                     %{"name" => "z.tar", "sha256" => String.duplicate("c", 64)}
@@ -399,7 +399,7 @@ defmodule SigilGuard.Attestation.DigestTest do
 
       assert Digest.action_preimage(
                :release,
-               %{"package" => "sigil_guard", "version" => "3.0.0", "artifacts" => []},
+               %{"package" => "sigil_guard", "version" => "1.0.0", "artifacts" => []},
                %{},
                []
              ) == {:error, :invalid_payload}
@@ -408,7 +408,7 @@ defmodule SigilGuard.Attestation.DigestTest do
                :release,
                %{
                  "package" => "sigil_guard",
-                 "version" => "3.0.0",
+                 "version" => "1.0.0",
                  "artifacts" => [%{"name" => "bad.tar"}]
                },
                %{},
@@ -419,7 +419,7 @@ defmodule SigilGuard.Attestation.DigestTest do
                :release,
                %{
                  "package" => "sigil_guard",
-                 "version" => "3.0.0",
+                 "version" => "1.0.0",
                  "artifacts" => [%{"name" => "bad.tar", "sha256" => "bad"}]
                },
                %{},
@@ -430,7 +430,7 @@ defmodule SigilGuard.Attestation.DigestTest do
                :release,
                %{
                  "package" => "sigil_guard",
-                 "version" => "3.0.0",
+                 "version" => "1.0.0",
                  "artifacts" => ["bad"]
                },
                %{},

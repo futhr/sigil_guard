@@ -607,8 +607,8 @@ Milestone-adjacent placement; the task list owns task IDs.
 | Card golden vector | byte-stable across OTP/Elixir releases | conformance suite in CI matrix. |
 | Fail-open paths for unknown peers | zero | negative-test review of every attest/verify path. |
 | Error taxonomy | every spec-local atom exercised | coverage review. |
-| TM.10 family | green before 3.0.0 | M5 gate. |
-| Host card migration | mechanical via the mapping table | JWS/DSSE parity test + `MIGRATING-3.0.md` review. |
+| TM.10 family | green before 1.0.0 | M5 gate. |
+| Host card migration | mechanical via the mapping table | JWS/DSSE parity test + `MIGRATING-1.0.md` review. |
 
 ## Sources
 

@@ -6,7 +6,7 @@ defmodule SigilGuard.Identity.Static do
   `SigilGuard.Identity` behaviour over the `:trust_mappings` config so a simple
   prefix table needs no custom module. It is a convenience, not a new seam - a
   host `SigilGuard.Identity` implementation remains the full-power extension
-  point, and a richer mapping DSL is parked post-3.0.0.
+  point, and a richer mapping DSL is parked post-1.0.0.
 
   `:trust_mappings` is an ordered list of `{pattern, trust_level}` pairs
   evaluated first-match-wins. A pattern is an exact string or a single trailing

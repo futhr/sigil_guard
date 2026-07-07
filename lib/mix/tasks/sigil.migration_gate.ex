@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Sigil.MigrationGate do
   @shortdoc "Validate v3 migration coverage"
 
   @moduledoc """
-  Validates that deleted v2 surfaces have explicit `MIGRATING-3.0.md` coverage.
+  Validates that deleted v2 surfaces have explicit `MIGRATING-1.0.md` coverage.
 
       mix sigil.migration_gate
 
@@ -89,7 +89,7 @@ defmodule Mix.Tasks.Sigil.MigrationGate do
       |> Keyword.get(:root, File.cwd!())
       |> Path.expand()
 
-    path = Path.join(root, "MIGRATING-3.0.md")
+    path = Path.join(root, "MIGRATING-1.0.md")
     body = read(path)
     required_mappings = Keyword.get(opts, :required_mappings, @required_mappings)
 

@@ -28,7 +28,7 @@ defmodule Mix.Tasks.Sigil.MigrationGateTest do
     test "accepts present mappings and valid local anchors" do
       root =
         fixture_root(%{
-          "MIGRATING-3.0.md" => """
+          "MIGRATING-1.0.md" => """
           # Migrating
 
           See [Registry](#registry-to-trust-bundles).
@@ -47,7 +47,7 @@ defmodule Mix.Tasks.Sigil.MigrationGateTest do
     end
 
     test "reports missing required mappings" do
-      root = fixture_root(%{"MIGRATING-3.0.md" => "# Migrating\n"})
+      root = fixture_root(%{"MIGRATING-1.0.md" => "# Migrating\n"})
 
       assert {:error, [finding]} =
                MigrationGate.validate(
@@ -62,7 +62,7 @@ defmodule Mix.Tasks.Sigil.MigrationGateTest do
     test "reports broken local anchors" do
       root =
         fixture_root(%{
-          "MIGRATING-3.0.md" => """
+          "MIGRATING-1.0.md" => """
           # Migrating
 
           See [Missing](#missing-section).

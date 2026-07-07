@@ -412,7 +412,7 @@ Elixir, fully offline).
   that section with a normative "Attestation Envelope And Canonical
   Encoding" section copying the constants above.
 - The task-list Open Decision "plain JCS JSON vs a DSSE-style envelope in
-  v3.0".
+  v1.0".
 
 ## Impact On SigilGuard
 
@@ -429,7 +429,7 @@ Elixir, fully offline).
   section instead of restating it.
 - Migration needed: yes. Envelope verdict-signing maps to Attestation
   statements via the field mapping table in SP.01, documented 1:1 in
-  `MIGRATING-3.0.md`; legacy envelope fixtures move to
+  `MIGRATING-1.0.md`; legacy envelope fixtures move to
   `test/fixtures/historical/`.
 - Breaking changes: yes. v3 external signed bytes are not compatible with
   0.2.x envelope canonical bytes, and the public signing API changes.

@@ -6,7 +6,7 @@ release: every architectural decision (D1-D19) is closed, research-backed,
 and recorded below with rationale (see Closed Decisions); no open choices
 remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M8. A
 task is done only when its AC bullets hold and its named test families
-exist. Migration lives in `MIGRATING-3.0.md`, `CHANGELOG.md`, and release
+exist. Migration lives in `MIGRATING-1.0.md`, `CHANGELOG.md`, and release
 notes - never in permanent legacy runtime shims.
 
 This file, the research notes (`../research/R.01`-`R.07`), and the specs
@@ -26,13 +26,13 @@ is already gone and stays gone (`CLAUDE.md` rule 1) - ignore any NIF, rustler,
 precompiled-binary, or `SIGIL_GUARD_BUILD` references in history. Do not carry
 the v0.2 `Registry`, `Envelope`, `Profile`, `protocol_profile`, or
 `registry_*` surfaces into v3; they are deleted in M6 with 1:1 migration
-mappings in `MIGRATING-3.0.md`. Legacy golden vectors move to
+mappings in `MIGRATING-1.0.md`. Legacy golden vectors move to
 `test/fixtures/historical/` as migration evidence, not v3 proofs.
 
 **The reference consumer contract.** One production agent runtime embeds
 SigilGuard (Elixir `~> 1.19`, OTP 27+), pinned `~> 0.1` today, moving to
-`~> 3.0` only after the release-candidate gate. It depends on the stable
-contracts in decision **D17**: `scan/1`, `scan_and_redact/1`,
+`~> 1.0` only after the 1.0 package is published and validated. It depends on
+the stable contracts in decision **D17**: `scan/1`, `scan_and_redact/1`,
 `policy_verdict/3`, the `Identity` / `Signer` / `Vault` behaviours,
 `Signer.Ed25519.{new/1, sign_with/2, verify/3}`, and the `%Audit{}` struct
 fields - all kept byte-identical in v3 (hit maps extend additively only). The
@@ -47,13 +47,11 @@ its internal module names, into any repository file (`CLAUDE.md` rule 11).
 Refer to it only as "the reference consumer"; neutralize example identifiers
 (e.g. `host:operator:42`). Maintain this in every new file.
 
-**Release mechanics.** `git_ops` manages versioning at release (a `feat`
-commit implies a minor bump) but CANNOT derive `3.0.0-rc.1` from 0.2.x
-history - the jump to the release candidate is a manual version set (D11, M8),
-verified afterward with `mix git_ops.release --dry-run` resuming cleanly.
-`~> 3.0` does not resolve a pre-release; consumers pin `"3.0.0-rc.1"` exactly
-during the soak. Sequence: `0.2.1` metadata-only -> `3.0.0-rc.1` -> soak plus
-a blocking reference-consumer validation -> `3.0.0`.
+**Release mechanics.** The repo is aligned directly to `1.0.0` as the major
+release line (D11, M8). `git_ops` remains the normal release tool after the
+manual major-version alignment is committed and verified with
+`mix git_ops.release --dry-run` resuming cleanly. Consumers move to `~> 1.0`
+only after the package is published and validated.
 
 **Gate and conventions.** Canonical gate `mix check --no-retry` (full list in
 `CLAUDE.md`); coverage >= 95%; run `mix credo --strict` before each commit.
@@ -63,8 +61,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 202 / 224 tasks done (90%).** Milestones: 7 complete, 2 partial,
-1 not started. **22 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 203 / 220 tasks done (92%).** Milestones: 7 complete, 3 partial,
+0 not started. **17 tasks left.** Current milestone: **M6/M7/M8** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -78,19 +76,19 @@ consumer gate; docs/adoption work started).
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
 | M7 | Integrations and adoption | 13 | 17 | 76% | In progress |
-| M8 | Release | 0 | 16 | 0% | Not started |
-| — | **Total** | **202** | **224** | **90%** | 7 done / 2 partial / 1 to go |
+| M8 | Release | 1 | 12 | 8% | In progress |
+| — | **Total** | **203** | **220** | **92%** | 7 done / 3 partial / 0 to go |
 
-### What's left (22 tasks)
+### What's left (17 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
 - **M7 - 4:** benchmark and comparison artifacts.
-- **M8 - 16:** release engineering and validation.
+- **M8 - 11:** release engineering and validation.
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
-section is post-3.0.0 parking; neither is counted here.
+section is post-1.0.0 parking; neither is counted here.
 
 ## Operating Rules
 
@@ -101,7 +99,7 @@ section is post-3.0.0 parking; neither is counted here.
   historical fixtures where useful.
 - Do not keep a public registry runtime path in v3.
 - Do not keep compatibility shims just to preserve v2 APIs.
-- Put v2-to-v3 migration in `MIGRATING-3.0.md` and `CHANGELOG.md`.
+- Put v2-to-v3 migration in `MIGRATING-1.0.md` and `CHANGELOG.md`.
 - Keep SigilGuard embedded/local-first; host applications own transport,
   auth, sandbox execution, storage, and deployment.
 - Add tests with every behavior change.
@@ -111,7 +109,7 @@ section is post-3.0.0 parking; neither is counted here.
   complete before its exit criteria hold.
 - Any commit that changes, renames, or deletes a consumer-facing contract
   MUST update `test/sigil_guard/conformance/consumer_contracts_test.exs`
-  and `MIGRATING-3.0.md` in the same commit.
+  and `MIGRATING-1.0.md` in the same commit.
 - From M6 exit onward the runtime dependency set is exactly the intended
   minimal set — `:telemetry`, `:nimble_options`, `:jason` — plus OTP/stdlib
   applications; new runtime dependencies require a decision record (D9).
@@ -249,7 +247,7 @@ section is post-3.0.0 parking; neither is counted here.
       SP.13-SP.15 and R.02-R.07 rows, diagrams, ownership rules.
 - [x] M0.19 CLAUDE.md reconciliation: rules 3/4 restated for the
       spec-governed v3 break; architecture section updated.
-- [x] M0.20 Root README status/roadmap block (0.2.x current, v3.0 planned
+- [x] M0.20 Root README status/roadmap block (0.2.x current, v1.0 planned
       breaking release) plus legacy trust-bundle bullet disambiguation.
 - [x] M0.21 Rewrite `docs/tasks/sigil-tasks.md` as this v3 checklist.
 - [x] M0.22 Add `mix sigil.docs_lint` dev task.
@@ -313,7 +311,7 @@ section is post-3.0.0 parking; neither is counted here.
     Jason→stdlib-JSON swap is cancelled per D9 — dep-count is not a goal);
     Elixir floor `~> 1.18` re-justified on OTP 27 + set-theoretic types.
   - Tests: schema-validation negative tests (unknown key, bad value type,
-    out-of-range) return typed errors that name `MIGRATING-3.0.md` for
+    out-of-range) return typed errors that name `MIGRATING-1.0.md` for
     removed keys.
 - [x] M1.04 `SigilGuard.Canonical.JCS` encoder (RFC 8785, ~200 LOC).
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - JCS Constraints
@@ -648,7 +646,7 @@ section is post-3.0.0 parking; neither is counted here.
 > facade parity table green; manifest drift matrix green; agent-card
 > golden vectors committed.
 
-- [x] M3.01 `SigilGuard.CapabilityManifest` canonical form.
+- [x] M1.01 `SigilGuard.CapabilityManifest` canonical form.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - CapabilityManifest
     Canonical Form (Digest Field List (Normative)).
   - AC: `new/1` validates the closed field table (required fields, closed
@@ -657,7 +655,7 @@ section is post-3.0.0 parking; neither is counted here.
     fails `:invalid_manifest` otherwise; `manifest_format` is
     `sigil_guard_capability_manifest/v1`.
   - Tests: negative, malformed.
-- [x] M3.02 Manifest digest, inner digests, and the `repo_file_write`
+- [x] M1.02 Manifest digest, inner digests, and the `repo_file_write`
       golden fixture.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - CapabilityManifest
     Canonical Form (Canonical Example).
@@ -670,7 +668,7 @@ section is post-3.0.0 parking; neither is counted here.
     and its digest equals the value referenced by the SP.01 `tool_request`
     golden vector (M1.14).
   - Tests: golden vectors, tamper, malformed.
-- [x] M3.03 Suspicious required parameters (schema-injection indicators).
+- [x] M1.03 Suspicious required parameters (schema-injection indicators).
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Suspicious
     Required Parameters.
   - AC: `suspicious_params` is recomputed deterministically from the
@@ -682,7 +680,7 @@ section is post-3.0.0 parking; neither is counted here.
     `guard_request` unless boundary policy explicitly allows it; the field
     is bound inside the signed manifest digest.
   - Tests: negative, tamper, malformed.
-- [x] M3.04 `ToolGateway.guard_request/3` with the normative check order.
+- [x] M1.04 `ToolGateway.guard_request/3` with the normative check order.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Public API
     Sketch.
   - AC: the seven-step order holds and the first failing step denies:
@@ -695,7 +693,7 @@ section is post-3.0.0 parking; neither is counted here.
     `:self_resource`, `:now`, `:max_skew_ms`) behave per spec; denials are
     block decisions carrying the deny atom in reason and audit_metadata.
   - Tests: negative (per step), tamper, malformed.
-- [x] M3.05 `ToolGateway.guard_result/3` with result binding.
+- [x] M1.05 `ToolGateway.guard_result/3` with result binding.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Request And
     Result Attestation Binding (tool_result Binding).
   - AC: `guard_result/3` accepts `:request_action_digest` and binds the
@@ -703,7 +701,7 @@ section is post-3.0.0 parking; neither is counted here.
     decision; `guarded_request/3`/`guarded_result/3` and the stream trio
     keep their v2 wire shapes.
   - Tests: negative, tamper, malformed.
-- [x] M3.06 `verify_manifest/2` at `tools/list` time (line-jumping
+- [x] M1.06 `verify_manifest/2` at `tools/list` time (line-jumping
       defense).
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Public API Sketch
     (verify_manifest/2); Threat Coverage And Host-Owned Exclusions (TM.03).
@@ -714,7 +712,7 @@ section is post-3.0.0 parking; neither is counted here.
     is required; unknown tools fail `:unknown_manifest`, expired manifests
     `:manifest_expired`.
   - Tests: negative, tamper, expiration, malformed.
-- [x] M3.07 `tools/list_changed` re-verification and approval invalidation.
+- [x] M1.07 `tools/list_changed` re-verification and approval invalidation.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Threat Coverage
     And Host-Owned Exclusions (TM.05, TM.07).
   - AC: a `list_changed` notification forces full re-verification; cached
@@ -722,7 +720,7 @@ section is post-3.0.0 parking; neither is counted here.
     `manifest_digest` - a re-listed drifted manifest invalidates every
     outstanding token for that tool.
   - Tests: negative, replay (stale approval after re-list), tamper.
-- [x] M3.08 Manifest drift matrix tests.
+- [x] M1.08 Manifest drift matrix tests.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Acceptance
     Criteria.
   - AC: changed name, description, annotations, permissions/scopes, input
@@ -730,7 +728,7 @@ section is post-3.0.0 parking; neither is counted here.
     (`:manifest_digest_mismatch` or `:schema_digest_mismatch`); none falls
     through to a generic error.
   - Tests: tamper (per field), negative.
-- [x] M3.09 `attest_request/3` and `attest_result/3` binding helpers.
+- [x] M1.09 `attest_request/3` and `attest_result/3` binding helpers.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Request And
     Result Attestation Binding; Public API Sketch.
   - AC: `attest_request/3` binds actor, tool/manifest digest, action
@@ -792,7 +790,7 @@ section is post-3.0.0 parking; neither is counted here.
     (`invalid_attestation` with the SP.01 atom as string), `-32056`
     (`sandbox_required` with isolation fields); each emits exactly the
     documented `data` shape with nil fields omitted; the v0.2 → v3 code
-    change is recorded in `MIGRATING-3.0.md`.
+    change is recorded in `MIGRATING-1.0.md`.
   - Tests: negative (per code), golden shape assertions.
 - [x] M3.15 Passthrough, audience, and resource denials.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Public API Sketch
@@ -1693,7 +1691,7 @@ section is post-3.0.0 parking; neither is counted here.
 > Depends on: M1-M5.
 > Exit criteria (tier-2 consolidated gate): `mix check --no-retry` clean;
 > M1.02 conformance green; the M6.24 completeness script proves every
-> deleted surface has a 1:1 `MIGRATING-3.0.md` row; runtime dependency set
+> deleted surface has a 1:1 `MIGRATING-1.0.md` row; runtime dependency set
 > is exactly the intended minimal set (`:telemetry`, `:nimble_options`,
 > `:jason`); the reference-consumer upgrade branch (M6.29)
 > builds and passes its full suite plus its security-conformance
@@ -1751,7 +1749,7 @@ section is post-3.0.0 parking; neither is counted here.
   - Spec: `docs/specs/SP.06-envelope-and-native-backend-contracts.md` - V3
     Transition Rules; `SP.01` - Migration: Envelope To Attestation.
   - AC: deleted; the Envelope-to-Attestation field mapping table is
-    reproduced 1:1 in `MIGRATING-3.0.md` (M6.18); the known-consumers note
+    reproduced 1:1 in `MIGRATING-1.0.md` (M6.18); the known-consumers note
     (two call sites: tool-args metadata attach and socket auth) has exact
     v3 replacement calls documented.
   - Tests: removal test, conformance.
@@ -1795,7 +1793,7 @@ section is post-3.0.0 parking; neither is counted here.
     fails closed with `SigilGuard.ConfigError`: reason
     `:legacy_contract_removed` for removed keys, `:unknown_config_key`
     for unrecognized keys; every message names the offending key and
-    `MIGRATING-3.0.md`; kept keys (`:trust_bundle`, `:scanner_patterns`,
+    `MIGRATING-1.0.md`; kept keys (`:trust_bundle`, `:scanner_patterns`,
     `:http_client`, `:attestation_ttl_ms`, `:max_skew_ms`,
     `:replay_ttl_ms`, `:vault_master_key`) validate per their table rows.
   - Tests: negative (per kept-key validation rule), malformed.
@@ -1811,21 +1809,21 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: `:backend`, `:protocol_profile`, all nine `registry_*` keys, and
     the `scanner_patterns: :registry` value each raise
     `SigilGuard.ConfigError` at boot naming the key and
-    `MIGRATING-3.0.md`.
+    `MIGRATING-1.0.md`.
   - Tests: negative (one boot test per removed key/value).
   - Done: added a boot-time matrix in `ConfigTest` for `:backend`,
     `:protocol_profile`, all nine `registry_*` keys, and
     `scanner_patterns: :registry`. Each case clears v3 config, injects the
     removed key/value, calls `SigilGuard.Application.start/2`, and asserts a
     `SigilGuard.ConfigError` with the offending key, reason
-    `:legacy_contract_removed`, and `MIGRATING-3.0.md` in the message.
+    `:legacy_contract_removed`, and `MIGRATING-1.0.md` in the message.
 - [x] M6.10 D13 policy filename rename verification.
   - Spec: `docs/specs/SP.11-repo-policy-kernel-contracts.md` - V3 Policy
     Filenames (D13); `SP.04` - Policy Filenames.
   - AC: with M4.06 shipped, every legacy filename
     (old SIGIL-name variants) produces
     `{:error, {:legacy_policy_filename, found, use}}` and no silent
-    fallback path exists anywhere; `MIGRATING-3.0.md` carries the four
+    fallback path exists anywhere; `MIGRATING-1.0.md` carries the four
     positional rename rows.
   - Tests: negative (all four legacy names), conformance.
   - Done: aligned `SigilGuard.RepoPolicy.find_file/2` with the D13 v3
@@ -1834,7 +1832,7 @@ section is post-3.0.0 parking; neither is counted here.
     `{:error, {:legacy_policy_filename, found, use}}`. Added coverage that a
     legacy file is not used as a fallback or accepted beside a v3/explicit
     candidate, and added the four-row filename migration table to
-    `MIGRATING-3.0.md`.
+    `MIGRATING-1.0.md`.
 - [x] M6.11 Remove finch and the `SigilGuard.Finch` pool.
   - Spec: `SP.12` - Dependency Removal (D9); `SP.05` -
     SigilGuard.HTTPClient Behaviour (D9).
@@ -1863,14 +1861,14 @@ section is post-3.0.0 parking; neither is counted here.
     pins OTP `extra_applications` to `:crypto` and `:logger`, exempts dev/test
     deps through production-only filtering, and includes a synthetic
     extra/missing dependency fixture proving the assertion reports drift.
-- [x] M6.13 `MIGRATING-3.0.md` skeleton with the dependency update example.
+- [x] M6.13 `MIGRATING-1.0.md` skeleton with the dependency update example.
   - Spec: `SP.12` - V3 Removal Map; `SP.01` - Migration: Envelope To
     Attestation.
   - AC: the guide exists with section structure covering every mapping
     below; includes the `{:sigil_guard, "~> 0.2"}` to
-    `{:sigil_guard, "~> 3.0"}` example.
+    `{:sigil_guard, "~> 1.0"}` example.
   - Validation: M6.24 completeness script; link check.
-  - Done: expanded `MIGRATING-3.0.md` with the v2-to-v3 dependency update
+  - Done: expanded `MIGRATING-1.0.md` with the v2-to-v3 dependency update
     example, rc exact-pin warning, migration checklist, and stable section
     skeletons for policy filenames, MCP trust metadata, confirmation metadata,
     registry-to-trust-bundle mappings, envelope-to-attestation, profile-to-
@@ -1882,7 +1880,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: literal before/after payload examples; the mixed-traffic
     transition note lives only here.
   - Validation: completeness script; vocabulary scan exemption honored.
-  - Done: replaced the `MIGRATING-3.0.md` trust metadata placeholder with
+  - Done: replaced the `MIGRATING-1.0.md` trust metadata placeholder with
     literal JSON-RPC before/after examples mapping `_sigil` envelope metadata to
     `_agent_trust` DSSE Agent Trust metadata under `params`, and documented the
     mixed-traffic rollout rule that v3 treats `_sigil` as ordinary user content
@@ -1893,7 +1891,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: literal before/after examples including the `:confirmation_token`
     option path.
   - Validation: completeness script.
-  - Done: replaced the `MIGRATING-3.0.md` confirmation metadata placeholder with
+  - Done: replaced the `MIGRATING-1.0.md` confirmation metadata placeholder with
     literal JSON-RPC before/after examples mapping `_sigil_confirmation` to
     `_agent_confirmation` under `params`, documented the digest-strip behavior,
     and added the out-of-band `:confirmation_token` option path for confirmed
@@ -1903,7 +1901,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: code-level mapping with source construction
     (`{:file, _}`/`{:priv, _, _}`/`{:binary, _}`) guidance.
   - Validation: completeness script.
-  - Done: expanded the `MIGRATING-3.0.md` Fetch Bundle section with a
+  - Done: expanded the `MIGRATING-1.0.md` Fetch Bundle section with a
     `Registry.fetch_bundle/1` before snippet and `TrustBundle.load/1` after
     snippets for `{:file, path}`, `{:priv, app, rel}`, and `{:binary, bytes}`.
     The guidance states that host-owned transport supplies remote bytes outside
@@ -1914,7 +1912,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: issuer lookup via verified bundle roles; host-auth pointer for DID
     flows.
   - Validation: completeness script.
-  - Done: expanded `MIGRATING-3.0.md` with `Registry.resolve_did/2` and
+  - Done: expanded `MIGRATING-1.0.md` with `Registry.resolve_did/2` and
     `Registry.resolve_key/2` before snippets, host-auth guidance for DID/actor
     flows, verified `TrustBundle.identity_issuers/1` issuer checks, and
     explicit key material construction from verified bundle `keys`, root
@@ -1926,7 +1924,7 @@ section is post-3.0.0 parking; neither is counted here.
     call-site shapes get exact replacement snippets.
   - Validation: completeness script.
   - Done: reproduced the SP.01 Envelope-to-Attestation table 1:1 in
-    `MIGRATING-3.0.md`, including the verdict mapping note. Added exact
+    `MIGRATING-1.0.md`, including the verdict mapping note. Added exact
     replacement snippets for signing and attaching tool-request metadata
     (`Envelope.sign/3` + `_sigil` to `Attestation.from_decision/3` +
     `Attestation.sign/3` + `Attestation.attach/2`) and for verifying attached
@@ -1937,7 +1935,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: function-level mapping; profile id constant migration noted.
   - Validation: completeness script.
   - Done: added a function-level `SigilGuard.Profile` to
-    `SigilGuard.TrustProfile` migration table in `MIGRATING-3.0.md`, including
+    `SigilGuard.TrustProfile` migration table in `MIGRATING-1.0.md`, including
     removed/no-shim rows for legacy normalization, wire-verdict compatibility,
     blocked-reason compatibility, and registry identity endpoints. Documented
     `SigilGuard.TrustProfile.profile_id/0` as the v3 profile id constant
@@ -1947,7 +1945,7 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: every removed key row with its replacement (or "none") matching
     the SP.01 table verbatim.
   - Validation: completeness script.
-  - Done: replaced the `MIGRATING-3.0.md` configuration placeholder with the
+  - Done: replaced the `MIGRATING-1.0.md` configuration placeholder with the
     SP.01 removed-key table, including `:backend`, `:protocol_profile`, all
     `registry_*` groups, and the `scanner_patterns: :registry` value. The
     section documents `SigilGuard.ConfigError` with reason
@@ -1963,43 +1961,42 @@ section is post-3.0.0 parking; neither is counted here.
     `:unsigned_bundle` to `:invalid_envelope`) plus the new
     `SigilGuard.ConfigError` boot behavior.
   - Validation: completeness script.
-  - Done: replaced the `MIGRATING-3.0.md` Error Changes placeholder with the
+  - Done: replaced the `MIGRATING-1.0.md` Error Changes placeholder with the
     reconciled old-to-new atom table for rollback, expiry, issuer/key,
     invalid-schema/bundle, and unsigned/missing-signature cases. Documented
     boot-time `SigilGuard.ConfigError` behavior for removed keys
     (`:legacy_contract_removed`) and unknown keys (`:unknown_config_key`), both
-    naming `MIGRATING-3.0.md`.
+    naming `MIGRATING-1.0.md`.
 - [x] M6.22 MIGRATING: pin note for v2 users.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: states that `~> 0.2` users never auto-upgrade to v3 and that
-    `~> 3.0` does not match release candidates (exact rc pin required).
+    `~> 1.0` is the explicit 1.0 release-line dependency.
   - Validation: completeness script.
-  - Done: expanded the `MIGRATING-3.0.md` Version Pinning section to state
-    that `~> 0.2` remains on the v2 line, release candidates require exact pins
-    such as `"3.0.0-rc.1"`, `~> 3.0` does not match prereleases, and `~> 3.0`
-    is the post-GA dependency requirement.
+  - Done: expanded the `MIGRATING-1.0.md` Version Pinning section to state
+    that `~> 0.2` remains on the v2 line and `~> 1.0` is the 1.0 release-line
+    dependency requirement.
 - [x] M6.23 CHANGELOG breaking-change section.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: a breaking-change section enumerates removals with MIGRATING
     anchors; git_ops conventions untouched (generated entries are not
     hand-edited elsewhere).
   - Validation: link check; completeness script.
-  - Done: added a manual `Unreleased Breaking Changes For 3.0.0` section above
+  - Done: added a manual `Unreleased Breaking Changes For 1.0.0` section above
     the git_ops `<!-- changelog -->` marker, leaving generated entries
     untouched. The section enumerates registry, envelope, metadata, profile,
     config, policy filename, Finch dependency, error atom, and version-pinning
-    breaks with anchors into `MIGRATING-3.0.md`.
+    breaks with anchors into `MIGRATING-1.0.md`.
 - [x] M6.24 Migration completeness-gate script.
   - Spec: `SP.12` - Acceptance Criteria.
   - AC: a repo script cross-references the M6 deletion diff (removed
-    modules, functions, config keys, filenames) against `MIGRATING-3.0.md`
+    modules, functions, config keys, filenames) against `MIGRATING-1.0.md`
     and fails on any unmapped removal; it also link-checks the migration
     doc; wired into CI for the M6 branch onward.
   - Tests: fixture-driven script test (unmapped removal fails; mapped
     passes).
   - Done: added `mix sigil.migration_gate`, which statically checks required
     M6 removed modules, functions, config keys, and policy filenames against
-    `MIGRATING-3.0.md`, validates local migration-doc links and anchors, and is
+    `MIGRATING-1.0.md`, validates local migration-doc links and anchors, and is
     wired into the CI docs job. Added focused tests for a clean guide, missing
     mapping failure, broken-anchor failure, and rejected task arguments.
 - [x] M6.25 Remove legacy `_sigil*` reading; strip rule reduces to the six
@@ -2008,7 +2005,7 @@ section is post-3.0.0 parking; neither is counted here.
     Roadmap (M6); `SP.01` - Metadata Strip Rule.
   - AC: the gateway no longer reads `_sigil`/`_sigil_confirmation`; the
     digest strip set is exactly SP.01's six keys; mixed-traffic behavior
-    is documented only in `MIGRATING-3.0.md`.
+    is documented only in `MIGRATING-1.0.md`.
   - Tests: negative (legacy metadata is inert), property (digest
     stability), conformance.
   - Done: removed `_sigil` and `_sigil_confirmation` fetch/strip aliases from
@@ -2019,12 +2016,12 @@ section is post-3.0.0 parking; neither is counted here.
 - [x] M6.26 README rewrite: installation, examples, configuration.
   - Spec: `SP.01` - V3 Configuration Surface; `SP.14` - Announcement Kit
     And Listings (tagline).
-  - AC: installation snippet says `{:sigil_guard, "~> 3.0"}`; MCP examples
+  - AC: installation snippet says `{:sigil_guard, "~> 1.0"}`; MCP examples
     are replaced with Agent Trust attestation examples; the configuration
     table lists exactly the SP.01 kept keys.
   - Validation: docs vocabulary scan; `mix docs`; README snippets compile
     as doctests where applicable.
-  - Done: updated the README tagline and navigation, kept the 3.0 dependency
+  - Done: updated the README tagline and navigation, kept the 1.0 dependency
     snippet, added `ToolGateway` Agent Trust examples for manifest guarding,
     `_agent_trust` attestation attachment, and `_agent_confirmation`
     confirmations, and added the closed v3 configuration table from the
@@ -2056,7 +2053,7 @@ section is post-3.0.0 parking; neither is counted here.
   - Spec: `SP.12` - Release Sequence (D11); `SP.07` - Stability
     Guarantees (D17).
   - AC: an upgrade branch of the reference consumer builds against this
-    repo as a path dependency applying ONLY `MIGRATING-3.0.md` steps; the
+    repo as a path dependency applying ONLY `MIGRATING-1.0.md` steps; the
     observed diff matches the expected shape: exactly two `_sigil` call
     sites change (tool-args metadata attach and socket auth) plus dropped
     registry/NIF config keys; its three sigil-prefixed boot keys are
@@ -2083,11 +2080,11 @@ section is post-3.0.0 parking; neither is counted here.
 - [ ] M6.30 Fold reference-consumer findings back into MIGRATING.
   - Spec: `SP.12` - Acceptance Criteria.
   - AC: every migration step discovered during M6.29 that was missing from
-    `MIGRATING-3.0.md` is added; the M6.24 script and M6.29 build are
+    `MIGRATING-1.0.md` is added; the M6.24 script and M6.29 build are
     re-run green afterward.
   - Validation: completeness script green on the updated doc.
   - Attempt 2026-07-07: folded the reference-consumer upgrade findings into
-    `MIGRATING-3.0.md`: local path-dependency validation, the two observed
+    `MIGRATING-1.0.md`: local path-dependency validation, the two observed
     `_sigil` migration sites (tool-call metadata and socket/session auth), and
     the rule that host-owned sigil-prefixed boot keys stay untouched unless
     they configure SigilGuard itself. Keep M6.30 open until M6.29 can be rerun
@@ -2298,7 +2295,7 @@ section is post-3.0.0 parking; neither is counted here.
     emergency rotation ceremony as the signer-compromise runbook.
   - Validation: link check; policy renders on the repo security tab.
   - Done: added `SECURITY.md` with supported-version policy for latest `3.x`
-    and six months of final `0.2.x` fixes after `3.0.0` GA, GitHub private
+    and six months of final `0.2.x` fixes after `1.0.0` GA, GitHub private
     vulnerability reporting instructions, 72 h / 7 d / 90 d response targets,
     scope boundaries, and the SP.02 signer-compromise rotation pointer.
     Verified `git diff --check` and `mix sigil.docs_lint`.
@@ -2308,53 +2305,40 @@ section is post-3.0.0 parking; neither is counted here.
 > `SP.05` (Release Provenance). Depends on: M6 (M7 required before GA).
 > Exit criteria (tier-3 gate): `mix check --no-retry` clean; M1.02
 > conformance green; the reference consumer validates green against the
-> PUBLISHED 3.0.0-rc.1 pinned exactly (blocking for GA); 3.0.0 published
-> with provenance and SBOM.
+> 1.0.0 package; 1.0.0 is published with provenance and SBOM.
 
-- [ ] M8.01 Publish 0.2.1 metadata-only from `release/0.2`.
-  - Spec: `SP.12` - Release Sequence (D11) step 1.
-  - AC: branch `release/0.2` is cut at tag `v0.2.0`; 0.2.1 carries only
-    corrected Hex metadata and a README status banner; the package diff
-    against 0.2.0 contains zero `lib/` changes (go/no-go).
-  - Validation: recorded package diff; Hex release visible.
-- [ ] M8.02 git_ops major-bump dry-run verification.
-  - Spec: `SP.12` - Release Sequence (D11) step 2.
-  - AC: a dry run demonstrates git_ops cannot derive 0.2.x to 3.0.0-rc.1
-    from commit history; the documented manual-jump procedure is the
-    recorded consequence.
+- [x] M8.01 Align repository versioning to 1.0.0.
+  - Spec: `SP.12` - Release Sequence (D11); `R.07`.
+  - AC: `mix.exs` version is `1.0.0`; README and migration dependency
+    snippets use `~> 1.0`; the migration guide is named `MIGRATING-1.0.md`;
+    release-provenance examples, Agent Trust release fixtures, and package
+    metadata all reference `1.0.0`.
+  - Validation: package build metadata shows version `1.0.0`; migration and
+    docs gates pass; release-vector fixture tests pass.
+  - Done: bumped the package version to `1.0.0`, aligned the migration guide
+    at `MIGRATING-1.0.md`, updated dependency snippets and release docs to the
+    1.0 release line, regenerated Agent Trust release fixtures, and verified
+    the focused release/doc gates.
+- [ ] M8.02 git_ops 1.0.0 resume check.
+  - Spec: `SP.12` - Release Sequence (D11).
+  - AC: `mix git_ops.release --dry-run` operates normally from the `1.0.0`
+    line and does not try to derive a separate major-version jump.
   - Validation: dry-run output archived in the release notes draft.
-- [ ] M8.03 Manual version jump to 3.0.0-rc.1.
-  - Spec: `SP.12` - Release Sequence (D11) step 2.
-  - AC: `mix.exs` version and the CHANGELOG entry are set manually; tag
-    `v3.0.0-rc.1` is created.
-  - Validation: tag exists; version and changelog agree.
-- [ ] M8.04 Post-tag git_ops resume check (rc line).
-  - Spec: `SP.12` - Release Sequence (D11) step 2 go/no-go.
-  - AC: `mix git_ops.release --dry-run` resumes cleanly from the new
-    version line after the manual jump.
-  - Validation: dry-run output archived.
-- [ ] M8.05 Publish 3.0.0-rc.1 with the exact-pin note.
-  - Spec: `SP.12` - Release Sequence (D11) step 2.
-  - AC: rc.1 is published; the rc announcement states that `~> 3.0` does
-    NOT match prerelease versions and consumers MUST pin `"3.0.0-rc.1"`
-    exactly.
-  - Validation: Hex release visible; note present in the rc notes.
-- [ ] M8.06 Reference-consumer rc validation (blocking tier-3 gate).
-  - Spec: `SP.12` - Release Sequence (D11) step 3; Acceptance Criteria.
-  - AC: the reference consumer validates green against the PUBLISHED
-    3.0.0-rc.1 pinned exactly (not a path dep): full suite plus its
-    security-conformance acceptance tests; this gate blocks GA.
-  - Validation: gate record; failures reopen M6.30 fold-back before any
-    further rc.
-- [ ] M8.07 SLSA L3 provenance and SBOM on the release workflow.
+- [ ] M8.03 Reference-consumer 1.0.0 validation (blocking tier-3 gate).
+  - Spec: `SP.12` - Release Sequence (D11); Acceptance Criteria.
+  - AC: the reference consumer validates green against the 1.0.0 package,
+    not a path dependency: full suite plus its security-conformance acceptance
+    tests; this gate blocks publication.
+  - Validation: gate record; failures reopen M6.30 fold-back before publish.
+- [ ] M8.04 SLSA L3 provenance and SBOM on the release workflow.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15).
-  - AC: the rc and GA tags produce SLSA v1 provenance via
+  - AC: the 1.0.0 tag produces SLSA v1 provenance via
     `attest-build-provenance` with tarball + SBOM subjects; `gh
     attestation verify` gates publish; the SP.01 `release` statement signs
     tarball and SBOM digests.
-  - Tests: workflow run on rc tag; negative (verification failure blocks).
-- [ ] M8.08 Socket-denying no-network sweep.
+  - Tests: workflow run on tag; negative (verification failure blocks).
+- [ ] M8.05 Socket-denying no-network sweep.
   - Spec: `SP.02` - Loading Sources (No-network guarantee); `SP.05` -
     SigilGuard.HTTPClient Behaviour (trust model).
   - AC: a suite-wide sweep proves every scan/gate/policy/attestation/
@@ -2362,57 +2346,50 @@ section is post-3.0.0 parking; neither is counted here.
     sole, explicitly host-triggered exception); runs in CI on the release
     branch.
   - Tests: negative (port-list and socket-deny assertions across paths).
-- [ ] M8.09 Fuzz final pass over attestations, bundles, manifests, and
+- [ ] M8.06 Fuzz final pass over attestations, bundles, manifests, and
       policy files.
   - Spec: `SP.01`/`SP.02`/`SP.03`/`SP.04` - Error Handling tables.
   - AC: randomized malformed-input campaigns against every public decode/
     verify entry point produce only taxonomy atoms - no raises, no
     timeouts; corpus seeds are committed for reproduction.
   - Tests: malformed (fuzz harness), negative.
-- [ ] M8.10 Telemetry conformance tests for every event family.
+- [ ] M8.07 Telemetry conformance tests for every event family.
   - Spec: `SP.02`/`SP.03`/`SP.04`/`SP.05` - Telemetry And Observability
     tables.
   - AC: every documented event family fires with exactly the documented
     measurement/metadata keys; no undocumented events are emitted; the
     `sigilguard.*` namespace holds everywhere.
   - Tests: telemetry conformance suite (one assertion block per family).
-- [ ] M8.11 SLO ratification from rc.1 measurements.
+- [ ] M8.08 SLO ratification from 1.0.0 measurements.
   - Spec: `docs/specs/SP.15-benchmark-methodology-and-baselines.md` - SLO
     Ratification.
   - AC: the full matrix runs on the disclosed reference environment at
-    rc.1; SLOs are ratified as measured median and p99 plus 50% headroom
+    1.0.0; SLOs are ratified as measured median and p99 plus 50% headroom
     into SP.15's Success Metrics (bump `updated:`); until then no
     "guaranteed" language anywhere.
   - Validation: SP.15 update commit; published figures cite the ratified
     numbers only.
-- [ ] M8.12 Soak window (14 days).
-  - Spec: `SP.12` - Release Sequence (D11) step 3.
-  - AC: a fixed 14-day soak runs with rc.1 in the reference consumer's
-    staging environment; regressions reopen the rc cycle (rc.2) rather
-    than shortening the window.
-  - Validation: soak log with start/end dates and zero unresolved
-    regressions.
-- [ ] M8.13 Release checklist execution.
+- [ ] M8.09 Release checklist execution.
   - Spec: `SP.12` - Release Sequence (D11); `SP.05` - Release Provenance.
   - AC: the checklist covering docs, SBOM, provenance, benchmarks, and Hex
     metadata is executed and archived for the GA release.
   - Validation: checklist archived with the GA tag.
-- [ ] M8.14 Dependency-audit posture note.
+- [ ] M8.10 Dependency-audit posture note.
   - Spec: `SP.12` - Dependency Removal (D9); `R.07`.
   - AC: release notes record the audited posture: runtime deps are the
     intended minimal set (`:telemetry`, `:nimble_options`, `:jason`) chosen
     on merit; integrations and adaptive detectors add no runtime deps
     (docs/optional packages only); `mix deps.audit` clean at tag.
   - Validation: note present; M6.12 assertion green at tag.
-- [ ] M8.15 Publish 3.0.0 GA with the git_ops resume check.
+- [ ] M8.11 Publish 1.0.0 GA with the git_ops resume check.
   - Spec: `SP.12` - Release Sequence (D11) step 4.
   - AC: GA is published; a post-publish `mix git_ops.release --dry-run`
-    confirms normal operation from the 3.0.0 line.
+    confirms normal operation from the 1.0.0 line.
   - Validation: Hex release visible; dry-run output archived.
-- [ ] M8.16 Reference-consumer production bump to `~> 3.0`.
+- [ ] M8.12 Reference-consumer production bump to `~> 1.0`.
   - Spec: `SP.12` - Release Sequence (D11) step 4.
-  - AC: the reference consumer moves from the exact rc pin to `~> 3.0` in
-    production; its suite stays green on GA.
+  - AC: the reference consumer moves to `~> 1.0` in production; its suite
+    stays green on GA.
   - Validation: gate record closing the v3 program.
 
 ## Closed Decisions
@@ -2433,22 +2410,22 @@ sources, 2026-07-02).
 | D3 | **TUF role-subset bundles**: root + delegated signer roles, m-of-n threshold schema (v1 enforces 1), per-role expiry, sequence floors (rollback protection), revocation by list and omission, documented emergency-rotation ceremony. Snapshot/timestamp roles rejected (embedded hosts control update cadence). | `R.03`, `SP.02` |
 | D4 | **SCITT is vocabulary alignment plus an optional post-GA adapter, never core.** A networked transparency service would break the offline guarantee; checkpoint + witness cosigning gives equivalent properties offline. | `R.04` |
 | D5 | **Adaptive/ML detection is a core behaviour with a deterministic nil-path**; results are advisory (raise risk, never lower, never sole basis for allow). The ONNX/DeBERTa reference detector ships as an optional post-GA package so core stays zero-ML. | `R.07`, `SP.04` |
-| D6 | **No `SigilGuard.Compatibility` namespace.** Legacy modules are deleted; migration lives in `MIGRATING-3.0.md` + `CHANGELOG.md`; historical vectors move to `test/fixtures/historical/`. Justified by near-zero public adoption and the reference consumer's small isolated surface. | `R.07`, `SP.06` |
+| D6 | **No `SigilGuard.Compatibility` namespace.** Legacy modules are deleted; migration lives in `MIGRATING-1.0.md` + `CHANGELOG.md`; historical vectors move to `test/fixtures/historical/`. Justified by near-zero public adoption and the reference consumer's small isolated surface. | `R.07`, `SP.06` |
 | D7 | **Eight statement types**: the six original plus `agent_request`/`agent_response` (protocol-neutral names; A2A predicate specifics live in SP.13). Motivated by OWASP ASI07 inter-agent communication. | `SP.01`, `SP.13` |
 | D8 | **Sink-aware output contracts in the policy kernel**: `max_size`, `no_raw_credentials`, `digest_only_pii`; transforms `truncate`/`hash`/`mask`; per-sink schema in the policy file. Closes an industry-wide gap (safe output handling). | `SP.04` |
 | D9 | **Minimal, well-justified dependencies - NOT zero** (the "zero-dep core" rule was overturned as dogma). Core runtime deps: `:telemetry` + `:nimble_options` (validated schemas + generated docs; safer than hand-rolled validation) + `:jason` (kept; the Jason->stdlib-JSON swap is cancelled). HTTP stays behind the host-provided `SigilGuard.HTTPClient` behaviour for security (no network in decision paths) and host-owns-transport, not dep-avoidance; an optional `req` default client MAY ship. finch leaves core with the registry. JCS encoder stays hand-rolled (no BEAM lib does RFC 8785). Floor `~> 1.18` justified on OTP 27 + set-theoretic types. | `R.07`, `SP.12`, `SP.01` |
 | D10 | **Simplified RFC 9162 inclusion + consistency proofs** over the existing Merkle tree (retaining the `sigil-audit-leaf-v1:` domain separation), optional DSSE-multisig **witness cosigning**, per-field **privacy classes** (clear/hashed/redacted/omitted), digest-first **GDPR** stance (erasure targets host payload stores; chain holds only digests). | `R.04`, `SP.05` |
-| D11 | **Release path**: publish `0.2.1` metadata-only (zero `lib/` diff, from a `release/0.2` branch at tag v0.2.0) -> manual jump to `3.0.0-rc.1` (git_ops cannot derive it; `~> 3.0` does not match a pre-release, pin exact) -> soak + blocking reference-consumer rc gate -> `3.0.0`. | `R.07`, `SP.12` |
+| D11 | **Release path**: align the repo directly to `1.0.0` as the major release line, verify the manual version jump with git_ops and package checks, publish GA, then move the reference consumer to `~> 1.0` after package validation. | `R.07`, `SP.12` |
 | D12 | **Formal threat model** mapping OWASP Agentic Top 10 2026 (ASI01-ASI10) and named MCP attacks to SigilGuard controls with claim level (mitigates/detects/out-of-scope) and a named `TM.01`-`TM.12` test family per claim; host-owned exclusions explicit. | `R.06` |
 | D13 | **Policy filenames `SIGILGUARD_POLICY`, `.sigilguard-policy`, `.sigilguard/policy`, `.github/sigilguard-policy`.** Old `SIGIL_POLICY`/`.sigil-policy` names produce a typed `:legacy_policy_filename` startup error naming the new file - no silent fallback. | `SP.04`, `SP.11` |
 | D14 | **`SigilGuard.MCP.Gateway` stays a permanent thin facade** over `ToolGateway` (not deprecated), preserving the consumer entry point. | `SP.03`, `SP.08` |
 | D15 | **SPDX 2.3 SBOM (existing `mix sigil_guard.sbom`) stays canonical**; SLSA L3 provenance via GitHub attest-build-provenance; CycloneDX optional later; Rekor anchoring optional. | `SP.05` |
 | D16 | **Single OTel attribute namespace `sigilguard.*`** (resolves the v0.2 `sigil.*` vs draft `sigil_guard.*` split; rename is mechanical). | `SP.05` |
 | D17 | **Consumer-facing contracts kept byte-identical in v3**: `scan/1` `{:ok,_}|{:hit,[%{name: _}]}`, `scan_and_redact/1`, `policy_verdict/3` `:allowed|:blocked|{:confirm, reason}`, the Identity/Signer/Vault behaviours, `Signer.Ed25519.new/1|sign_with/2|verify/3`, and `%Audit{}` fields. Hit maps extend additively only. Deliberate breaks get 1:1 MIGRATING mappings. | `SP.07` |
-| D18 | **Shell-command AST risk analysis is an explicit v3.0 non-goal** (hosts keep their own analyzers); parked in Deferred, revisit post-GA. | `SP.04` |
+| D18 | **Shell-command AST risk analysis is an explicit v1.0 non-goal** (hosts keep their own analyzers); parked in Deferred, revisit post-GA. | `SP.04` |
 | D19 | **Gateway JSON-RPC rejection codes renumbered to `-32050..-32056`** (blocked/confirmation_required/quarantined/manifest_drift/unknown_manifest/invalid_attestation/sandbox_required). Legal but ambiguous at v0.2's `-32001..-32003` (a client can conflate `-32001` with an SDK transport timeout; MCP's `-32042` shows the low band filling); the v3 break moves to a clean sub-range with buffer. | `SP.03`, `SP.08` |
 
-## Deferred (Post-3.0.0)
+## Deferred (Post-1.0.0)
 
 Parked deliberately; not counted in the Progress Summary. Each item needs
 fresh research or a spec update before work starts.

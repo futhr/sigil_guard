@@ -23,7 +23,7 @@ defmodule SigilGuard.ConfigError do
       reason: reason,
       message:
         "invalid :sigil_guard configuration for #{inspect(key)} " <>
-          "(#{reason}): #{detail}; see MIGRATING-3.0.md"
+          "(#{reason}): #{detail}; see MIGRATING-1.0.md"
     }
   end
 end

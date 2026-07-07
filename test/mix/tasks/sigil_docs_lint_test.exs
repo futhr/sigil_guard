@@ -165,7 +165,7 @@ defmodule Mix.Tasks.Sigil.DocsLintTest do
       root =
         fixture_root(%{
           "README.md" => "Public docs\n",
-          "MIGRATING-3.0.md" => "_sigil migration note\n",
+          "MIGRATING-1.0.md" => "_sigil migration note\n",
           "test/fixtures/historical/example.md" => "_sigil fixture note\n",
           "docs/specs/SP.01-example.md" => front_matter("SP.01"),
           "docs/tasks/sigil-tasks.md" => "- [ ] M1.01 Uses `SP.01`.\n"

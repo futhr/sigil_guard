@@ -37,7 +37,7 @@ migration mapping. The old upstream protocol remains historical input only.
   reference consumer.
 - **Impact:** Cleaner API, interoperable evidence (cosign/Rekor/GUAC-legible),
   zero canonicalization attack surface in the trust path, and a migration
-  story documented once in `MIGRATING-3.0.md` instead of encoded forever.
+  story documented once in `MIGRATING-1.0.md` instead of encoded forever.
 
 ## V3 Position
 
@@ -52,7 +52,7 @@ migration mapping. The old upstream protocol remains historical input only.
 | Scanning | Regex/staged scanner | Boundary-aware source-to-sink policy pipeline |
 | Audit | HMAC chain/checkpoint foundation | Signed evidence exports with Merkle roots |
 | Configuration | Open key set, registry/backend keys | Validated closed key set, fail-closed at boot |
-| Migration | Runtime compatibility | `MIGRATING-3.0.md` field-by-field mapping |
+| Migration | Runtime compatibility | `MIGRATING-1.0.md` field-by-field mapping |
 
 ## Technical Architecture
 
@@ -421,7 +421,7 @@ Guarded payload (an MCP `tools/call` writing a repo file):
   "jsonrpc": "2.0",
   "method": "tools/call",
   "params": {
-    "arguments": {"content": "## 3.0.0\n", "path": "docs/CHANGELOG.md"},
+    "arguments": {"content": "## 1.0.0\n", "path": "docs/CHANGELOG.md"},
     "name": "repo_file_write"
   }
 }
@@ -446,7 +446,7 @@ Action digest preimage:
 
 ```json
 {
-  "arguments": {"content": "## 3.0.0\n", "path": "docs/CHANGELOG.md"},
+  "arguments": {"content": "## 1.0.0\n", "path": "docs/CHANGELOG.md"},
   "method": "tools/call",
   "statement_type": "tool_request",
   "tool": "repo_file_write"
@@ -659,7 +659,7 @@ witness cosigning (R.02). Role thresholds are owned by SP.02.
 ### Public Modules Removed In V3
 
 Removal mechanics and sequencing are owned by SP.12; the replacements are
-fixed here. All removals are deletions, not hidden shims; `MIGRATING-3.0.md`
+fixed here. All removals are deletions, not hidden shims; `MIGRATING-1.0.md`
 carries the 1:1 mapping.
 
 | Current Surface | V3 Action |
@@ -692,7 +692,7 @@ carries the 1:1 mapping.
 All configuration lives under the `:sigil_guard` application env.
 `SigilGuard.Config.validate!/0` runs at `Application.start/2` and fails
 closed: any key outside the kept set below raises `SigilGuard.ConfigError`
-whose message names the offending key and points at `MIGRATING-3.0.md`,
+whose message names the offending key and points at `MIGRATING-1.0.md`,
 with reason `:legacy_contract_removed` for removed keys and
 `:unknown_config_key` for unrecognized keys.
 
@@ -729,7 +729,7 @@ documentation.
 ### Removed Keys
 
 Each raises `SigilGuard.ConfigError` (reason `:legacy_contract_removed`) at
-boot, naming the key and `MIGRATING-3.0.md`.
+boot, naming the key and `MIGRATING-1.0.md`.
 
 | Removed key | Replacement |
 |-------------|-------------|
@@ -786,7 +786,7 @@ attestation and confirmation namespaces from colliding.
 
 ## Migration: Envelope To Attestation
 
-This table feeds `MIGRATING-3.0.md` mechanically and MUST be reproduced
+This table feeds `MIGRATING-1.0.md` mechanically and MUST be reproduced
 there 1:1. The v2 verdict mapping is `:allowed -> "allow"`,
 `:blocked -> "block"`, and `:scanned -> "allow"` (v2 `:scanned` was
 advisory; v3 records scanner evidence in `matched_rules` instead).
@@ -853,8 +853,8 @@ atoms instead of inventing artifact-specific ones.
 | `:invalid_map` | JCS input not JSON-representable, or key collision after normalization | fix the input map | encoding rejected (surfaced as `:invalid_payload` by `Attestation`) |
 | `:invalid_payload` | payload/context cannot produce digest preimages; required action field missing; `issued_at >= expires_at`; actor id unresolvable | supply the required fields | no attestation emitted |
 | `:invalid_signer` | signer module does not export `sign/1` or returned a non-64-byte signature | implement `SigilGuard.Signer` | signing fails |
-| `:legacy_contract_removed` | removed v2 API or config key used | follow `MIGRATING-3.0.md` | boot/call fails with a migration pointer |
-| `:unknown_config_key` | unrecognized `:sigil_guard` key at boot | remove or fix the key per `MIGRATING-3.0.md` | boot fails closed |
+| `:legacy_contract_removed` | removed v2 API or config key used | follow `MIGRATING-1.0.md` | boot/call fails with a migration pointer |
+| `:unknown_config_key` | unrecognized `:sigil_guard` key at boot | remove or fix the key per `MIGRATING-1.0.md` | boot fails closed |
 
 ## Security Considerations
 
@@ -887,7 +887,7 @@ atoms instead of inventing artifact-specific ones.
 | expiry and skew | `AttestationTest` | Expired and future-dated statements yield `:expired_attestation` exactly at the skew boundaries. |
 | malformed JCS inputs | `Canonical.JCSTest` | RFC 8785 appendix vectors, surrogate-pair keys, NFC/NFD twins, `-0`, `1e+21`, integers at and beyond the range bound, duplicate-key rejection, encode-decode-encode property. |
 | statement validation | `TrustProfileTest` | Unknown types, wrong profile/version, subject order violations fail with named atoms. |
-| legacy removal | `ConfigTest` + migration tests | Removed keys/APIs raise `SigilGuard.ConfigError`/`:legacy_contract_removed` naming `MIGRATING-3.0.md`. |
+| legacy removal | `ConfigTest` + migration tests | Removed keys/APIs raise `SigilGuard.ConfigError`/`:legacy_contract_removed` naming `MIGRATING-1.0.md`. |
 
 ## Acceptance Criteria
 
@@ -911,9 +911,9 @@ atoms instead of inventing artifact-specific ones.
       `SigilGuard.ConfigError`.
 - [ ] Runtime dependency set is `:telemetry`, `:nimble_options`, and `jason`;
       Elixir floor `~> 1.18`.
-- [x] Removed config keys raise typed errors naming `MIGRATING-3.0.md`;
+- [x] Removed config keys raise typed errors naming `MIGRATING-1.0.md`;
       unknown keys fail boot with `:unknown_config_key`.
-- [x] The Envelope-to-Attestation table is reproduced 1:1 in `MIGRATING-3.0.md`.
+- [x] The Envelope-to-Attestation table is reproduced 1:1 in `MIGRATING-1.0.md`.
 - [ ] Every error atom in this spec's taxonomy is produced by at least one test.
 
 ## Implementation Roadmap
@@ -933,7 +933,7 @@ M6 per SP.12.
 - [ ] M1: `_agent_trust`/`_agent_confirmation` attach and fetch helpers.
 - [ ] M6: closed config key set with `SigilGuard.ConfigError`; delete
       `SigilGuard.Envelope`/`Profile`/`Registry.*` per SP.12 and
-      `MIGRATING-3.0.md`.
+      `MIGRATING-1.0.md`.
 
 ## Success Metrics
 
@@ -944,7 +944,7 @@ M6 per SP.12.
 | Runtime dependencies | `:telemetry`, `:nimble_options`, `jason` | dependency-set assertion test. |
 | Config validation | NimbleOptions schema, fail-closed | `ConfigTest`. |
 | Legacy public names | zero in v3 public docs | local scan. |
-| Migration table | reproduced 1:1 in `MIGRATING-3.0.md` | completeness script (M6). |
+| Migration table | reproduced 1:1 in `MIGRATING-1.0.md` | completeness script (M6). |
 | Error taxonomy | every atom exercised by a test | coverage review. |
 
 ## Sources

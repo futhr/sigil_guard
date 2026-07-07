@@ -369,7 +369,7 @@ into an external sink.
 |-------|------|---------|---------|
 | `max_size` | positive integer (bytes), minimum 64 | unlimited | Cap on outbound byte size; violations apply `truncate`. |
 | `no_raw_credentials` | boolean | `false` | Re-scan outbound text with the secret pattern set; any surviving match is replaced per `credential_transform`. |
-| `digest_only_pii` | boolean | `false` | Every span matched by a `pii: true` flagged pattern is replaced with `hash`. No built-in pattern sets the flag in v3.0; bundles supply PII patterns. |
+| `digest_only_pii` | boolean | `false` | Every span matched by a `pii: true` flagged pattern is replaced with `hash`. No built-in pattern sets the flag in v1.0; bundles supply PII patterns. |
 | `classes` | CSV of `text`, `structured` | all classes | Allowed content classes from the SP.01 payload class: UTF-8 binary is `text`; map or list is `structured`. A disallowed class is not transformable: the verdict escalates to `block` with matched rule `contract.<sink>.class`. |
 | `credential_transform` | `mask` \| `hash` | `mask` | Transform for `no_raw_credentials` violations; any other value fails with `:unknown_transform`. |
 
@@ -701,7 +701,7 @@ Unicode-confusable negative vectors (for example a Cyrillic `А` inside an
 ## Non-Goal: Shell-Command AST Risk Analysis (D18)
 
 Parsing shell commands into ASTs to score execution risk is explicitly out of
-scope for v3.0. Command risk is shell-dialect and host specific; deterministic
+scope for v1.0. Command risk is shell-dialect and host specific; deterministic
 coverage would need a parser per dialect, and the kernel already gates the
 `execute` side-effect class through the sandbox matrix and denies untrusted
 content into execution sinks via rules and contracts. Hosts keep their own

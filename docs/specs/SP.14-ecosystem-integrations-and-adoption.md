@@ -260,7 +260,7 @@ and real wiring lives in the ExDoc guide.
 `SECURITY.md` at the repo root MUST state:
 
 - **Supported versions:** latest 3.x minor; the final 0.2.x release gets
-  security fixes for six months after 3.0.0 GA.
+  security fixes for six months after 1.0.0 GA.
 - **Disclosure:** GitHub private vulnerability reporting on the repository;
   no public issues for suspected vulnerabilities.
 - **Response SLO:** acknowledge in 72 hours, triage verdict in 7 days, fix
@@ -281,7 +281,7 @@ announcement kit fires.
 ### Announcement Kit And Listings
 
 Drafts live in `docs/announcements/`: `elixir-forum.md`, `elixir-radar.md`,
-`thinking-elixir.md`, and `elixirconf-cfp.md`. Publishing is gated on 3.0.0
+`thinking-elixir.md`, and `elixirconf-cfp.md`. Publishing is gated on 1.0.0
 GA and MUST never fire against an rc (R.07/D11); the ElixirConf CFP draft
 is additionally date-gated on the CFP window. The awesome-elixir PR and the
 hex.pm keyword/metadata review land with GA. The recorded tagline for
@@ -365,7 +365,7 @@ runtime errors. N/A rows are intentional.
       runbook pointer.
 - [ ] The OpenSSF passing badge is earned before any announcement publishes.
 - [ ] `guides/threat-model.md` matches R.06 claim levels exactly.
-- [ ] Announcement drafts exist and remain unpublished until 3.0.0 GA.
+- [ ] Announcement drafts exist and remain unpublished until 1.0.0 GA.
 - [ ] `mix doctor` reports 100% documentation coverage.
 
 ## Implementation Roadmap

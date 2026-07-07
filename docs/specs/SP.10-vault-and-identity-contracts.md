@@ -167,7 +167,7 @@ end
 
 Anything beyond this grammar (mid-string wildcards, role lookups, session
 state) belongs in a host `SigilGuard.Identity` implementation; a richer
-mapping DSL is explicitly parked post-3.0.0.
+mapping DSL is explicitly parked post-1.0.0.
 
 ## Vault Behaviour Contract
 

@@ -71,7 +71,7 @@ SigilGuard v3 requires Elixir 1.18 or later.
 ```elixir
 def deps do
   [
-    {:sigil_guard, "~> 3.0"}
+    {:sigil_guard, "~> 1.0"}
   ]
 end
 ```
@@ -219,7 +219,7 @@ confirmed =
 
 All configuration lives under the `:sigil_guard` application environment and is
 validated at boot. Unknown keys and removed v2 keys fail closed with
-`SigilGuard.ConfigError` and a pointer to `MIGRATING-3.0.md`.
+`SigilGuard.ConfigError` and a pointer to `MIGRATING-1.0.md`.
 
 ```elixir
 config :sigil_guard,

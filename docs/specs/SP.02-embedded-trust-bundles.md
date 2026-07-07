@@ -655,7 +655,7 @@ DSSE work is a prerequisite, and legacy removal lands in M6 per SP.12.
 - [ ] M2: golden vectors, negative matrix, and the no-network test.
 - [ ] M2: `[:sigil_guard, :trust_bundle, ...]` telemetry events.
 - [ ] M6: delete `SigilGuard.Registry.*` and `registry_*` config per SP.12;
-      map the v2 surface in `MIGRATING-3.0.md`.
+      map the v2 surface in `MIGRATING-1.0.md`.
 
 ## Success Metrics
 

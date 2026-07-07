@@ -83,20 +83,20 @@ defmodule SigilGuard.ConfigTest do
     end
 
     test "rejects removed trust bundle source constructors" do
-      assert_raise ConfigError, ~r/:trust_bundle.*invalid_config.*MIGRATING-3\.0\.md/, fn ->
+      assert_raise ConfigError, ~r/:trust_bundle.*invalid_config.*MIGRATING-1\.0\.md/, fn ->
         Config.validate!(trust_bundle: {:path, "priv/sigil_guard/trust_bundle.json"})
       end
     end
 
     test "raises typed errors for unknown keys" do
-      assert_raise ConfigError, ~r/:unknown.*unknown_config_key.*MIGRATING-3\.0\.md/, fn ->
+      assert_raise ConfigError, ~r/:unknown.*unknown_config_key.*MIGRATING-1\.0\.md/, fn ->
         Config.validate!(unknown: true)
       end
     end
 
     test "raises typed errors for removed keys" do
       assert_raise ConfigError,
-                   ~r/:registry_url.*legacy_contract_removed.*MIGRATING-3\.0\.md/,
+                   ~r/:registry_url.*legacy_contract_removed.*MIGRATING-1\.0\.md/,
                    fn ->
                      Config.validate!(registry_url: "https://custom.example.com")
                    end
@@ -104,7 +104,7 @@ defmodule SigilGuard.ConfigTest do
 
     test "raises typed errors for removed values" do
       assert_raise ConfigError,
-                   ~r/:scanner_patterns.*legacy_contract_removed.*MIGRATING-3\.0\.md/,
+                   ~r/:scanner_patterns.*legacy_contract_removed.*MIGRATING-1\.0\.md/,
                    fn ->
                      Config.validate!(scanner_patterns: :registry)
                    end
@@ -118,33 +118,33 @@ defmodule SigilGuard.ConfigTest do
 
       assert error.key == :vault_master_key
       assert error.reason == :invalid_config
-      assert error.message =~ "MIGRATING-3.0.md"
+      assert error.message =~ "MIGRATING-1.0.md"
     end
 
     test "raises typed errors for out-of-range values" do
       assert_raise ConfigError,
-                   ~r/:attestation_ttl_ms.*invalid_config.*MIGRATING-3\.0\.md/,
+                   ~r/:attestation_ttl_ms.*invalid_config.*MIGRATING-1\.0\.md/,
                    fn ->
                      Config.validate!(attestation_ttl_ms: 0)
                    end
     end
 
     test "raises typed errors for invalid trust bundle sources" do
-      assert_raise ConfigError, ~r/:trust_bundle.*invalid_config.*MIGRATING-3\.0\.md/, fn ->
+      assert_raise ConfigError, ~r/:trust_bundle.*invalid_config.*MIGRATING-1\.0\.md/, fn ->
         Config.validate!(trust_bundle: 123)
       end
     end
 
     test "raises typed errors for invalid cross-option combinations" do
       assert_raise ConfigError,
-                   ~r/:scanner_patterns.*invalid_config.*MIGRATING-3\.0\.md/,
+                   ~r/:scanner_patterns.*invalid_config.*MIGRATING-1\.0\.md/,
                    fn ->
                      Config.validate!(scanner_patterns: :bundle)
                    end
     end
 
     test "raises typed errors for non-keyword config" do
-      assert_raise ConfigError, ~r/:sigil_guard.*invalid_config.*MIGRATING-3\.0\.md/, fn ->
+      assert_raise ConfigError, ~r/:sigil_guard.*invalid_config.*MIGRATING-1\.0\.md/, fn ->
         Config.validate!(:bad)
       end
     end
@@ -180,7 +180,7 @@ defmodule SigilGuard.ConfigTest do
         assert error.key == key
         assert error.reason == :legacy_contract_removed
         assert error.message =~ Atom.to_string(key)
-        assert error.message =~ "MIGRATING-3.0.md"
+        assert error.message =~ "MIGRATING-1.0.md"
       end
     end
 
@@ -196,7 +196,7 @@ defmodule SigilGuard.ConfigTest do
       assert error.key == :scanner_patterns
       assert error.reason == :legacy_contract_removed
       assert error.message =~ "scanner_patterns"
-      assert error.message =~ "MIGRATING-3.0.md"
+      assert error.message =~ "MIGRATING-1.0.md"
     end
   end
 

@@ -604,7 +604,7 @@ uses the CloudEvents distributed tracing extension (`traceparent`).
 - **CI verification:** the release workflow MUST verify before publish:
 
 ```bash
-gh attestation verify sigil_guard-3.0.0.tar --repo futhr/sigil_guard
+gh attestation verify sigil_guard-1.0.0.tar --repo futhr/sigil_guard
 ```
 
 - **Rekor:** anchoring release attestations in the public Rekor

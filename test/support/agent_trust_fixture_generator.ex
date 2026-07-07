@@ -110,7 +110,7 @@ defmodule SigilGuard.AgentTrustFixtureGenerator do
       "jsonrpc" => "2.0",
       "method" => "tools/call",
       "params" => %{
-        "arguments" => %{"content" => "## 3.0.0\n", "path" => "docs/CHANGELOG.md"},
+        "arguments" => %{"content" => "## 1.0.0\n", "path" => "docs/CHANGELOG.md"},
         "name" => "repo_file_write"
       }
     }
@@ -189,10 +189,10 @@ defmodule SigilGuard.AgentTrustFixtureGenerator do
     %{
       payload: %{
         "artifacts" => [
-          %{"name" => "sigil_guard-3.0.0.tar", "sha256" => String.duplicate("a", 64)}
+          %{"name" => "sigil_guard-1.0.0.tar", "sha256" => String.duplicate("a", 64)}
         ],
         "package" => "sigil_guard",
-        "version" => "3.0.0"
+        "version" => "1.0.0"
       },
       context: Map.merge(base_context(), %{phase: :repo_change, origin: :repo, sink: :registry}),
       predicate: nil

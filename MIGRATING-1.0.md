@@ -1,4 +1,4 @@
-# Migrating To SigilGuard 3.0
+# Migrating To SigilGuard 1.0
 
 ## Dependency Update
 
@@ -10,11 +10,8 @@ surface:
 {:sigil_guard, "~> 0.2"}
 
 # v3
-{:sigil_guard, "~> 3.0"}
+{:sigil_guard, "~> 1.0"}
 ```
-
-Release candidates require an exact pin such as `"3.0.0-rc.1"`; `~> 3.0` does
-not match prerelease versions.
 
 For pre-release validation against a local checkout, use a path dependency so
 the consumer exercises the exact branch under review:
@@ -23,8 +20,8 @@ the consumer exercises the exact branch under review:
 {:sigil_guard, path: "../sigil_guard", override: true}
 ```
 
-Keep that path dependency out of production branches. Replace it with the exact
-release-candidate pin during rc validation and with `~> 3.0` after GA.
+Keep that path dependency out of production branches. Replace it with `~> 1.0`
+when moving production code to the 1.0 release line.
 
 ## Migration Checklist
 
@@ -45,7 +42,7 @@ release-candidate pin during rc validation and with `~> 3.0` after GA.
 
 ## Policy Filenames
 
-SigilGuard 3.0 renames repo policy files from the old SIGIL filename family
+SigilGuard 1.0 renames repo policy files from the old SIGIL filename family
 to the SIGILGUARD filename family. Legacy filenames fail closed with
 `{:error, {:legacy_policy_filename, found, use}}` and are never parsed as
 fallbacks.
@@ -435,7 +432,7 @@ end
 ## Configuration Keys
 
 Remove deleted v2 keys before booting v3. Removed keys fail closed with
-`SigilGuard.ConfigError` naming `MIGRATING-3.0.md`, with reason
+`SigilGuard.ConfigError` naming `MIGRATING-1.0.md`, with reason
 `:legacy_contract_removed`.
 
 | Removed key | Replacement |
@@ -475,7 +472,7 @@ contracts.
 Configuration errors changed from permissive fallback behavior to boot-time
 failure. Removed keys raise `SigilGuard.ConfigError` with reason
 `:legacy_contract_removed`; unknown keys raise `SigilGuard.ConfigError` with
-reason `:unknown_config_key`. Both error messages name `MIGRATING-3.0.md`.
+reason `:unknown_config_key`. Both error messages name `MIGRATING-1.0.md`.
 
 ## Version Pinning
 
@@ -483,27 +480,18 @@ reason `:unknown_config_key`. Both error messages name `MIGRATING-3.0.md`.
 major-version break, so existing v2 consumers stay on the `0.2.x` line until
 they edit their dependency requirement.
 
-During the release-candidate soak, pin the rc exactly:
+For the 1.0 release line, use:
 
 ```elixir
-{:sigil_guard, "3.0.0-rc.1"}
+{:sigil_guard, "~> 1.0"}
 ```
 
-Do not use `~> 3.0` for an rc validation. In Hex version matching, `~> 3.0`
-does not match prerelease versions such as `3.0.0-rc.1`.
-
-After `3.0.0` GA, use:
-
-```elixir
-{:sigil_guard, "~> 3.0"}
-```
-
-That requirement admits compatible `3.x` releases according to normal Hex
+That requirement admits compatible `1.x` releases according to normal Hex
 semver rules and remains separate from the `0.2.x` line.
 
 ## MCP JSON-RPC Rejection Codes
 
-SigilGuard 3.0 moves MCP gateway rejection codes from the v0.2 `-32001..-32003`
+SigilGuard 1.0 moves MCP gateway rejection codes from the v0.2 `-32001..-32003`
 range to the dedicated `-32050..-32056` range:
 
 | v0.2 code | v3 code | Status |

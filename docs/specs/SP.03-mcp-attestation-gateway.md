@@ -322,7 +322,7 @@ bindings below.
 ## Threat Coverage And Host-Owned Exclusions
 
 Rows align 1:1 with R.06's control mapping; `TM.xx` names the M5 test
-family that MUST be green before 3.0.0.
+family that MUST be green before 1.0.0.
 
 | Attack (R.06 row) | SP.03 control | Family |
 |-------------------|---------------|--------|

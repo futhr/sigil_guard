@@ -12,9 +12,9 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatement do
   and `gh attestation verify` gates publish.
 
       mix sigil_guard.release_statement \\
-        --tarball dist/sigil_guard-3.0.0.tar \\
-        --sbom dist/sigil_guard-3.0.0.spdx.json \\
-        --output dist/sigil_guard-3.0.0.release.json
+        --tarball dist/sigil_guard-1.0.0.tar \\
+        --sbom dist/sigil_guard-1.0.0.spdx.json \\
+        --output dist/sigil_guard-1.0.0.release.json
   """
 
   use Mix.Task

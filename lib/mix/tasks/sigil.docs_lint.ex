@@ -146,7 +146,7 @@ defmodule Mix.Tasks.Sigil.DocsLint do
 
   defp old_vocabulary_exempt?(path) do
     path =~ "/test/fixtures/historical/" or
-      Path.basename(path) in ["MIGRATING-3.0.md", "CHANGELOG.md"]
+      Path.basename(path) in ["MIGRATING-1.0.md", "CHANGELOG.md"]
   end
 
   defp markdown_files(root) do

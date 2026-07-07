@@ -34,7 +34,7 @@ deterministic policy kernel rather than model-level guardrails alone.
 The decision is **adopted**. This threat model is the single source of truth for
 "what SigilGuard claims against which attack." Every row marked `mitigates` or
 `detects` MUST have a green test module under `test/sigil_guard/threat_model/`
-before the 3.0.0 release (milestone M5). Host-owned exclusions (OAuth flows,
+before the 1.0.0 release (milestone M5). Host-owned exclusions (OAuth flows,
 token issuance, session/transport security, sandbox execution, memory-store
 implementation, and model behavior) are declared explicitly so that no claim
 overreaches SigilGuard's boundary as an embedded library.
@@ -255,7 +255,7 @@ are the market evidence that this layer is missing and needed.
 This is the normative artifact. One row per attack. `Control` names the module
 or mechanism and its owning spec. `Claim` is one of `mitigates`, `detects`, or
 `out-of-scope` (definitions below). `Test` is the M5 family that MUST be green
-before 3.0.0.
+before 1.0.0.
 
 | # | Attack | ASI class | SigilGuard control (module / mechanism, spec) | Claim | Test |
 |---|--------|-----------|-----------------------------------------------|-------|------|
@@ -355,7 +355,7 @@ responsibility, and no control row may claim to secure them:
 ## Test Families
 
 Each family becomes a module under `test/sigil_guard/threat_model/`. Every
-`mitigates` and `detects` row MUST map to a green module before 3.0.0 (M5).
+`mitigates` and `detects` row MUST map to a green module before 1.0.0 (M5).
 Each module MUST include negative, tamper, replay, expiration, and malformed-
 input cases per repository rule 9, and MUST cite the sourced attack it defends.
 
@@ -399,7 +399,7 @@ research analog and CSA zero-trust guidance as the market rationale.
 
 This threat model is the normative control-mapping source for SigilGuard v3.
 Every row marked `mitigates` or `detects` MUST have a green test module under
-`test/sigil_guard/threat_model/` before the 3.0.0 release (milestone M5). The
+`test/sigil_guard/threat_model/` before the 1.0.0 release (milestone M5). The
 model also ratifies the v3 scope additions the mapping depends on:
 `agent_request` / `agent_response` statement types (D7), deepened sandbox
 identity (`sandbox_id` inside the context digest), and sink-aware output

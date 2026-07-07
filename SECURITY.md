@@ -4,9 +4,8 @@
 
 SigilGuard provides security fixes for the latest `3.x` release line.
 
-After `3.0.0` reaches GA, the final `0.2.x` release line receives security
-fixes for six months. Pre-release `3.0.0-rc.*` builds are supported only for
-release-candidate validation and should be upgraded promptly.
+After `1.0.0` is published, the final `0.2.x` release line receives security
+fixes for six months.
 
 ## Reporting A Vulnerability
 
