@@ -134,70 +134,87 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :agent_trust, :quarantine]
   ]
 
+  # V3 attribute namespace (SP.05 D16): `sigilguard.*` throughout. The mapping is
+  # mechanical - leading `sigil.` becomes `sigilguard.` and the redundant
+  # `.security.` segment is dropped - plus the exact-name exceptions (hashed
+  # actor/identity/confirmation.actor, `content_hash` to the SP.01 subject
+  # `payload.digest`, and the `<subject>.digest` family). The legacy
+  # `sigil.registry.*` and `sigil.envelope.*` attributes are removed (SP.12).
   @attribute_map %{
-    action: "sigil.security.action",
-    action_digest: "sigil.security.action_digest",
-    action_digest_error: "sigil.security.action_digest_error",
-    actor: "sigil.actor",
-    anchor_digest: "sigil.audit.anchor.digest",
-    anchor_storage: "sigil.audit.anchor.storage",
-    anchor_store: "sigil.audit.anchor.store",
-    anchor_uri_scheme: "sigil.audit.anchor.uri_scheme",
-    bundle_digest: "sigil.trust_bundle.digest",
-    bundle_id: "sigil.trust_bundle.id",
-    confirmation_actor: "sigil.confirmation.actor",
-    confirmation_expires_at: "sigil.confirmation.expires_at",
-    confirmation_issued_at: "sigil.confirmation.issued_at",
-    confirmation_nonce_hash: "sigil.confirmation.nonce_hash",
-    confirmation_reason: "sigil.confirmation.reason",
-    confirmation_status: "sigil.confirmation.status",
-    content_hash: "sigil.security.content_hash",
-    count: "sigil.registry.count",
-    detector: "sigil.boundary.adaptive.detector",
-    endpoint: "sigil.registry.endpoint",
-    error: "sigil.error.reason",
-    envelope_reason: "sigil.envelope.reason",
-    envelope_status: "sigil.envelope.status",
-    error_reason: "sigil.error.reason",
-    event_type: "sigil.audit.event_type",
-    hit_count: "sigil.security.hit_count",
-    hook_result: "sigil.boundary.hook.result",
-    identity: "sigil.identity",
-    indicator_count: "sigil.security.indicator_count",
-    indicator_ids: "sigil.security.indicator_ids",
-    mcp_server: "sigil.mcp.server",
-    module: "sigil.boundary.hook.module",
-    origin: "sigil.security.origin",
-    outcome: "sigil.outcome",
-    patterns_checked: "sigil.scanner.patterns_checked",
-    phase: "sigil.security.phase",
-    pipeline: "sigil.scanner.pipeline",
-    result: "sigil.audit.result",
-    resource_uri: "sigil.resource.uri",
-    repo_policy_error: "sigil.repo_policy.error",
-    repo_policy_rules: "sigil.repo_policy.rules",
-    repo_policy_verdict: "sigil.repo_policy.verdict",
-    repo_unmatched_paths: "sigil.repo_policy.unmatched_paths",
-    release_status: "sigil.release.status",
-    risk_level: "sigil.security.risk_level",
-    runtime_input_error: "sigil.security.runtime_input_error",
-    card_digest: "sigil.agent_trust.card_digest",
-    scanner_error: "sigil.scanner.error",
-    scanner_validate: "sigil.scanner.validate",
-    sink: "sigil.security.sink",
-    statement_type: "sigil.agent_trust.statement_type",
-    source: "sigil.registry.source",
-    sequence: "sigil.trust_bundle.sequence",
-    tool: "sigil.security.tool.name",
-    trust_level: "sigil.security.trust_level",
-    trust_required: "sigil.security.trust_required",
-    trust_zone: "sigil.security.trust_zone",
-    root_version: "sigil.trust_bundle.root_version",
-    dev: "sigil.trust_bundle.dev",
-    reason: "sigil.error.reason",
+    action: "sigilguard.action",
+    action_digest: "sigilguard.action.digest",
+    action_digest_error: "sigilguard.action.digest_error",
+    actor: "sigilguard.actor.hash",
+    anchor_digest: "sigilguard.audit.anchor.digest",
+    anchor_storage: "sigilguard.audit.anchor.storage",
+    anchor_store: "sigilguard.audit.anchor.store",
+    anchor_uri_scheme: "sigilguard.audit.anchor.uri_scheme",
+    bundle_digest: "sigilguard.trust_bundle.digest",
+    bundle_id: "sigilguard.trust_bundle.id",
+    card_digest: "sigilguard.agent_trust.card_digest",
+    confirmation_actor: "sigilguard.confirmation.actor.hash",
+    confirmation_expires_at: "sigilguard.confirmation.expires_at",
+    confirmation_issued_at: "sigilguard.confirmation.issued_at",
+    confirmation_nonce_hash: "sigilguard.confirmation.nonce_hash",
+    confirmation_reason: "sigilguard.confirmation.reason",
+    confirmation_status: "sigilguard.confirmation.status",
+    content_hash: "sigilguard.payload.digest",
+    detector: "sigilguard.boundary.adaptive.detector",
+    dev: "sigilguard.trust_bundle.dev",
+    error: "sigilguard.error.reason",
+    error_reason: "sigilguard.error.reason",
+    event_type: "sigilguard.audit.event_type",
+    hit_count: "sigilguard.hit_count",
+    hook_result: "sigilguard.boundary.hook.result",
+    identity: "sigilguard.identity.hash",
+    indicator_count: "sigilguard.indicator_count",
+    indicator_ids: "sigilguard.indicator_ids",
+    mcp_server: "sigilguard.mcp.server",
+    module: "sigilguard.boundary.hook.module",
+    origin: "sigilguard.origin",
+    outcome: "sigilguard.outcome",
+    patterns_checked: "sigilguard.scanner.patterns_checked",
+    phase: "sigilguard.phase",
+    pipeline: "sigilguard.scanner.pipeline",
+    reason: "sigilguard.error.reason",
+    release_status: "sigilguard.release.status",
+    repo_policy_error: "sigilguard.repo_policy.error",
+    repo_policy_rules: "sigilguard.repo_policy.rules",
+    repo_policy_verdict: "sigilguard.repo_policy.verdict",
+    repo_unmatched_paths: "sigilguard.repo_policy.unmatched_paths",
+    resource_uri: "sigilguard.resource.uri",
+    result: "sigilguard.audit.result",
+    risk_level: "sigilguard.risk_level",
+    root_version: "sigilguard.trust_bundle.root_version",
+    runtime_input_error: "sigilguard.runtime_input_error",
+    scanner_error: "sigilguard.scanner.error",
+    scanner_validate: "sigilguard.scanner.validate",
+    sequence: "sigilguard.trust_bundle.sequence",
+    sink: "sigilguard.sink",
+    statement_type: "sigilguard.agent_trust.statement_type",
+    tool: "sigilguard.tool.name",
+    trust_level: "sigilguard.trust_level",
+    trust_required: "sigilguard.trust_required",
+    trust_zone: "sigilguard.trust_zone",
     url: "url.full",
-    verdict: "sigil.security.verdict"
+    verdict: "sigilguard.verdict"
   }
+
+  # High-cardinality attributes (SP.05 D16): digests, hashes, opaque ids, and
+  # URIs. Dropped unless `include_high_cardinality: true` so metric pipelines
+  # stay bounded while span exporters can opt in.
+  @high_cardinality_attributes [
+    "sigilguard.action.digest",
+    "sigilguard.actor.hash",
+    "sigilguard.agent_trust.card_digest",
+    "sigilguard.audit.anchor.digest",
+    "sigilguard.confirmation.actor.hash",
+    "sigilguard.confirmation.nonce_hash",
+    "sigilguard.identity.hash",
+    "sigilguard.payload.digest",
+    "sigilguard.resource.uri",
+    "sigilguard.trust_bundle.digest"
+  ]
 
   @typedoc "OpenTelemetry-compatible scalar or scalar-array attribute value."
   @type otel_value :: String.t() | number() | boolean() | [String.t() | number() | boolean()]
@@ -239,12 +256,13 @@ defmodule SigilGuard.Telemetry do
   def attach_otel_forwarder(handler_id, forwarder, opts \\ [])
       when is_binary(handler_id) and is_function(forwarder, 4) do
     events = Keyword.get(opts, :events, @events)
+    attribute_opts = Keyword.take(opts, [:include_high_cardinality])
 
     :telemetry.attach_many(
       handler_id,
       events,
       fn event, measurements, metadata, _ ->
-        attributes = otel_attributes(event, measurements, metadata)
+        attributes = otel_attributes(event, measurements, metadata, attribute_opts)
         forwarder.(event, measurements, metadata, attributes)
       end,
       nil
@@ -261,26 +279,34 @@ defmodule SigilGuard.Telemetry do
   Convert SigilGuard telemetry metadata to OpenTelemetry-style attributes.
 
   Official semantic-convention names are used only where they clearly fit
-  (`url.full`). SigilGuard-specific security fields use the `sigil.*`
-  namespace to avoid depending on unstable security-event conventions.
+  (`url.full`). Every other attribute uses the `sigilguard.*` namespace (SP.05
+  D16). High-cardinality attributes (digests, hashes, opaque ids, URIs) are
+  dropped unless `include_high_cardinality: true` is passed in `opts`, so metric
+  pipelines stay bounded while span exporters can opt in.
   """
-  @spec otel_attributes(event_name(), map(), map()) :: %{String.t() => otel_value()}
-  def otel_attributes(event, measurements \\ %{}, metadata \\ %{}) do
+  @spec otel_attributes(event_name(), map(), map(), keyword()) :: %{String.t() => otel_value()}
+  def otel_attributes(event, measurements \\ %{}, metadata \\ %{}, opts \\ []) do
     %{
-      "sigil.event" => event_name(event),
-      "sigil.component" => component(event),
-      "sigil.operation" => operation(event)
+      "sigilguard.event" => event_name(event),
+      "sigilguard.component" => component(event),
+      "sigilguard.operation" => operation(event)
     }
     |> merge_measurements(measurements)
     |> merge_metadata(metadata)
+    |> drop_high_cardinality(Keyword.get(opts, :include_high_cardinality, false))
   end
 
   defp merge_measurements(attributes, measurements) do
     measurements
     |> Enum.reduce(attributes, fn {key, value}, acc ->
-      put_attribute(acc, "sigil.measurement.#{key}", value)
+      put_attribute(acc, "sigilguard.measurement.#{key}", value)
     end)
   end
+
+  defp drop_high_cardinality(attributes, true), do: attributes
+
+  defp drop_high_cardinality(attributes, _),
+    do: Map.drop(attributes, @high_cardinality_attributes)
 
   defp merge_metadata(attributes, metadata) do
     Enum.reduce(metadata, attributes, fn {key, value}, acc ->

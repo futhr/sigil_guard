@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 140 / 228 tasks done (61%).** Milestones: 6 complete, 1 partial,
-3 not started. **88 tasks left.** Current milestone: **M5** (6/26, 23%).
+**Overall: 141 / 228 tasks done (62%).** Milestones: 6 complete, 1 partial,
+3 not started. **87 tasks left.** Current milestone: **M5** (7/26, 27%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 6 | 26 | 23% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 7 | 26 | 27% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **140** | **228** | **61%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **141** | **228** | **62%** | 6 done / 1 partial / 3 to go |
 
-### What's left (88 tasks)
+### What's left (87 tasks)
 
-- **M5 - 20 left:** OTel/CloudEvents, audit query, attestation evidence refs,
-  HTTPClient/anchor stores, and the threat-model test suite. (M5.01-M5.06:
-  proofs, checkpoint statements, cosigning, signed exports, privacy done.)
+- **M5 - 19 left:** CloudEvents, audit query, attestation evidence refs,
+  HTTPClient/anchor stores, and the threat-model test suite. (M5.01-M5.07:
+  proofs, checkpoint statements, cosigning, exports, privacy, OTel rename done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1280,7 +1280,7 @@ section is post-3.0.0 parking; neither is counted here.
     Because the hash enters the chain preimage, crypto-erasure of the field-hash
     key leaves chain/proof verification green. A property asserts no raw actor
     survives in the signed canonical bytes; tamper and negative tests included.
-- [ ] M5.07 OTel attribute rename to `sigilguard.*` with cardinality
+- [x] M5.07 OTel attribute rename to `sigilguard.*` with cardinality
       opt-in.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Telemetry
     And OTel (D16 Resolution: Attribute Namespace; Attribute Cardinality
@@ -1294,6 +1294,18 @@ section is post-3.0.0 parking; neither is counted here.
     `include_high_cardinality: true`.
   - Tests: negative, golden mapping table, redaction (decision attributes
     never carry raw text).
+  - Done: rewrote the `Telemetry` `@attribute_map` to the `sigilguard.*`
+    namespace (mechanical `sigil.`->`sigilguard.` + drop `.security.`, the
+    hashed exceptions, and the `<subject>.digest` family), plus the
+    `sigilguard.event`/`component`/`operation`/`measurement.*` prefixes;
+    removed the `sigil.registry.*` (`count`/`endpoint`/`source`) and
+    `sigil.envelope.*` (`status`/`reason`) entries so they are never emitted.
+    `otel_attributes/4` and `attach_otel_forwarder/3` gained
+    `include_high_cardinality` (default `false`), dropping the digest/hash/id/
+    uri attributes unless opted in. A test asserts no attribute keeps the
+    retired `sigil.` prefix; the hashed exceptions, high-card opt-in, url.full,
+    and registry/envelope removal are covered. Pinned the digest-family form
+    and the complete high-card set in SP.05 D16.
 - [ ] M5.08 CloudEvents projection.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - CloudEvents
     Projection.

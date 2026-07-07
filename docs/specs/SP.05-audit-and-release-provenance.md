@@ -512,12 +512,24 @@ take the `sigilguard.` form).
 | `sigilguard.action.digest`, `sigilguard.payload.digest`, `sigilguard.context.digest`, `sigilguard.manifest.digest`, `sigilguard.policy.digest` | high cardinality (digests) | yes |
 | `sigilguard.sandbox.id`, `sigilguard.quarantine.ref`, `sigilguard.audit.event_id`, `sigilguard.audit.anchor.digest`, `sigilguard.resource.uri` | high cardinality | yes |
 
-`otel_attributes/3` gains `include_high_cardinality: boolean` (default
+The digest family uses the SP.01 subject form `sigilguard.<subject>.digest`
+(dot-separated), so the mechanical rename of the `*_digest` metadata keys
+yields `sigilguard.action.digest`, `sigilguard.payload.digest` (from
+`content_hash`), `sigilguard.audit.anchor.digest`,
+`sigilguard.trust_bundle.digest`, and `sigilguard.agent_trust.card_digest`;
+the related `sigilguard.action.digest_error` is a bounded error reason. The
+high-cardinality opt-in set is every emitted digest, hash, opaque id, or URI:
+the table rows above plus `sigilguard.confirmation.actor.hash`,
+`sigilguard.confirmation.nonce_hash`, `sigilguard.trust_bundle.digest`, and
+`sigilguard.agent_trust.card_digest`.
+
+`otel_attributes/4` gains `include_high_cardinality: boolean` (default
 `false`): high-cardinality attributes are dropped unless opted in, so
-metric pipelines stay bounded while span exporters can opt in. Sampling
-applies to the telemetry projection only, never to the audit chain, which
-is complete by construction; use parent-based sampling for `allow`
-verdicts and always record `block`, `quarantine`, and `confirm` outcomes.
+metric pipelines stay bounded while span exporters can opt in;
+`attach_otel_forwarder/3` forwards the same option. Sampling applies to the
+telemetry projection only, never to the audit chain, which is complete by
+construction; use parent-based sampling for `allow` verdicts and always
+record `block`, `quarantine`, and `confirm` outcomes.
 
 ### Correlation And Optional OTel Integration
 

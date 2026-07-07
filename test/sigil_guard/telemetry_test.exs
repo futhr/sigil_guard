@@ -28,8 +28,8 @@ defmodule SigilGuard.TelemetryTest do
     end
   end
 
-  describe "otel_attributes/3" do
-    test "maps runtime security metadata to OTel-style attributes" do
+  describe "otel_attributes/4" do
+    test "maps runtime security metadata to the sigilguard.* namespace" do
       attributes =
         Telemetry.otel_attributes(
           [:sigil_guard, :runtime, :gate],
@@ -60,44 +60,94 @@ defmodule SigilGuard.TelemetryTest do
             runtime_input_error: :invalid_action,
             scanner_error: :scanner_failed,
             content_hash: "abc123"
-          }
+          },
+          include_high_cardinality: true
         )
 
-      assert attributes["sigil.event"] == "sigil_guard.runtime.gate"
-      assert attributes["sigil.component"] == "runtime"
-      assert attributes["sigil.operation"] == "gate"
-      assert attributes["sigil.security.phase"] == "tool_request"
-      assert attributes["sigil.actor"] == "did:sigil:agent"
-      assert attributes["sigil.identity"] == "did:sigil:agent"
-      assert attributes["sigil.security.verdict"] == "blocked"
-      assert attributes["sigil.security.action_digest"] == "digest123"
-      assert attributes["sigil.security.action_digest_error"] == "invalid_payload"
-      assert attributes["sigil.security.hit_count"] == 1
-      assert attributes["sigil.security.indicator_ids"] == ["ignore_instructions"]
-      assert attributes["sigil.envelope.status"] == "invalid"
-      assert attributes["sigil.envelope.reason"] == "invalid_signature"
-      assert attributes["sigil.confirmation.status"] == "invalid"
-      assert attributes["sigil.confirmation.reason"] == "digest_mismatch"
-      assert attributes["sigil.confirmation.actor"] == "did:sigil:agent"
-      assert attributes["sigil.confirmation.nonce_hash"] == "nonce-hash"
-      assert attributes["sigil.release.status"] == "confirmed_sanitized"
-      assert attributes["sigil.security.runtime_input_error"] == "invalid_action"
-      assert attributes["sigil.scanner.error"] == "scanner_failed"
-      assert attributes["sigil.security.content_hash"] == "abc123"
-      refute Map.has_key?(attributes, "match")
+      # No attribute uses the retired sigil.* prefix; only sigilguard.* / url.full.
+      assert Enum.all?(Map.keys(attributes), fn key ->
+               String.starts_with?(key, "sigilguard.") or key == "url.full"
+             end)
+
+      assert attributes["sigilguard.event"] == "sigil_guard.runtime.gate"
+      assert attributes["sigilguard.component"] == "runtime"
+      assert attributes["sigilguard.operation"] == "gate"
+      assert attributes["sigilguard.phase"] == "tool_request"
+      assert attributes["sigilguard.actor.hash"] == "did:sigil:agent"
+      assert attributes["sigilguard.identity.hash"] == "did:sigil:agent"
+      assert attributes["sigilguard.verdict"] == "blocked"
+      assert attributes["sigilguard.action.digest"] == "digest123"
+      assert attributes["sigilguard.action.digest_error"] == "invalid_payload"
+      assert attributes["sigilguard.hit_count"] == 1
+      assert attributes["sigilguard.indicator_ids"] == ["ignore_instructions"]
+      assert attributes["sigilguard.confirmation.status"] == "invalid"
+      assert attributes["sigilguard.confirmation.reason"] == "digest_mismatch"
+      assert attributes["sigilguard.confirmation.actor.hash"] == "did:sigil:agent"
+      assert attributes["sigilguard.confirmation.nonce_hash"] == "nonce-hash"
+      assert attributes["sigilguard.release.status"] == "confirmed_sanitized"
+      assert attributes["sigilguard.runtime_input_error"] == "invalid_action"
+      assert attributes["sigilguard.scanner.error"] == "scanner_failed"
+      assert attributes["sigilguard.payload.digest"] == "abc123"
+
+      # The legacy registry/envelope attributes are never emitted (SP.12).
+      refute Map.has_key?(attributes, "sigil.envelope.status")
+      refute Map.has_key?(attributes, "sigil.envelope.reason")
+      refute Enum.any?(Map.keys(attributes), &String.contains?(&1, "envelope"))
     end
 
-    test "uses official URL attribute naming for registry URLs" do
+    test "drops high-cardinality attributes unless opted in" do
+      metadata = %{
+        verdict: :blocked,
+        actor: "did:sigil:agent",
+        identity: "did:sigil:agent",
+        action_digest: "digest123",
+        content_hash: "abc123",
+        confirmation_actor: "did:sigil:agent",
+        resource_uri: "file://x",
+        hit_count: 3
+      }
+
+      bounded = Telemetry.otel_attributes([:sigil_guard, :runtime, :gate], %{}, metadata)
+
+      # Bounded attributes are always present.
+      assert bounded["sigilguard.verdict"] == "blocked"
+      assert bounded["sigilguard.hit_count"] == 3
+
+      # High-cardinality attributes are dropped by default.
+      for key <- ~w(sigilguard.actor.hash sigilguard.identity.hash sigilguard.action.digest
+                    sigilguard.payload.digest sigilguard.confirmation.actor.hash
+                    sigilguard.resource.uri) do
+        refute Map.has_key?(bounded, key)
+      end
+
+      opted_in =
+        Telemetry.otel_attributes([:sigil_guard, :runtime, :gate], %{}, metadata,
+          include_high_cardinality: true
+        )
+
+      assert opted_in["sigilguard.actor.hash"] == "did:sigil:agent"
+      assert opted_in["sigilguard.payload.digest"] == "abc123"
+      assert opted_in["sigilguard.resource.uri"] == "file://x"
+    end
+
+    test "uses official URL attribute naming and drops removed registry keys" do
       attributes =
         Telemetry.otel_attributes(
           [:sigil_guard, :registry, :fetch, :stop],
           %{duration: 10},
-          %{url: "https://registry.example.test/patterns/bundle", endpoint: "patterns/bundle"}
+          %{
+            url: "https://registry.example.test/patterns/bundle",
+            endpoint: "patterns/bundle",
+            count: 5,
+            source: "remote"
+          }
         )
 
       assert attributes["url.full"] == "https://registry.example.test/patterns/bundle"
-      assert attributes["sigil.registry.endpoint"] == "patterns/bundle"
-      assert attributes["sigil.measurement.duration"] == 10
+      assert attributes["sigilguard.measurement.duration"] == 10
+      # The legacy sigil.registry.* attributes are removed (SP.12).
+      refute Enum.any?(Map.keys(attributes), &String.contains?(&1, "registry"))
+      refute Enum.member?(Map.values(attributes), "patterns/bundle")
     end
 
     test "maps audit anchor-store metadata without raw paths" do
@@ -113,17 +163,21 @@ defmodule SigilGuard.TelemetryTest do
             outcome: :ok,
             error_reason: nil,
             uri: "file:///private/path/anchors.jsonl"
-          }
+          },
+          include_high_cardinality: true
         )
 
-      assert attributes["sigil.event"] == "sigil_guard.audit.anchor_store.put.stop"
-      assert attributes["sigil.component"] == "audit"
-      assert attributes["sigil.operation"] == "anchor_store.put.stop"
-      assert attributes["sigil.audit.anchor.store"] == "SigilGuard.Audit.Anchor.Store.LocalFile"
-      assert attributes["sigil.audit.anchor.digest"] == "abc123"
-      assert attributes["sigil.audit.anchor.storage"] == "local_file"
-      assert attributes["sigil.audit.anchor.uri_scheme"] == "file"
-      assert attributes["sigil.outcome"] == "ok"
+      assert attributes["sigilguard.event"] == "sigil_guard.audit.anchor_store.put.stop"
+      assert attributes["sigilguard.component"] == "audit"
+      assert attributes["sigilguard.operation"] == "anchor_store.put.stop"
+
+      assert attributes["sigilguard.audit.anchor.store"] ==
+               "SigilGuard.Audit.Anchor.Store.LocalFile"
+
+      assert attributes["sigilguard.audit.anchor.digest"] == "abc123"
+      assert attributes["sigilguard.audit.anchor.storage"] == "local_file"
+      assert attributes["sigilguard.audit.anchor.uri_scheme"] == "file"
+      assert attributes["sigilguard.outcome"] == "ok"
       refute Map.has_key?(attributes, "uri")
       refute Map.has_key?(attributes, "url.full")
     end
@@ -141,11 +195,11 @@ defmodule SigilGuard.TelemetryTest do
           }
         )
 
-      assert attributes["sigil.event"] == "third_party.event"
-      assert attributes["sigil.component"] == "unknown"
-      assert attributes["sigil.operation"] == "unknown"
+      assert attributes["sigilguard.event"] == "third_party.event"
+      assert attributes["sigilguard.component"] == "unknown"
+      assert attributes["sigilguard.operation"] == "unknown"
 
-      assert attributes["sigil.security.indicator_ids"] == [
+      assert attributes["sigilguard.indicator_ids"] == [
                "ignore_instructions",
                "direct",
                42,
@@ -153,10 +207,10 @@ defmodule SigilGuard.TelemetryTest do
              ]
 
       refute Map.has_key?(attributes, "unknown")
-      refute Map.has_key?(attributes, "sigil.measurement.duration")
-      refute Map.has_key?(attributes, "sigil.measurement.unsupported")
-      refute Map.has_key?(attributes, "sigil.security.phase")
-      refute Map.has_key?(attributes, "sigil.repo_policy.rules")
+      refute Map.has_key?(attributes, "sigilguard.measurement.duration")
+      refute Map.has_key?(attributes, "sigilguard.measurement.unsupported")
+      refute Map.has_key?(attributes, "sigilguard.phase")
+      refute Map.has_key?(attributes, "sigilguard.repo_policy.rules")
     end
   end
 
@@ -186,8 +240,8 @@ defmodule SigilGuard.TelemetryTest do
                       attributes}
 
       assert metadata.action == "delete_database"
-      assert attributes["sigil.security.action"] == "delete_database"
-      assert attributes["sigil.security.risk_level"] == "high"
+      assert attributes["sigilguard.action"] == "delete_database"
+      assert attributes["sigilguard.risk_level"] == "high"
     end
 
     test "rejects duplicate handler IDs and reports missing detach targets" do
