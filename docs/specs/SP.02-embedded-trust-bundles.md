@@ -219,12 +219,12 @@ top-level fields fail with `{:error, :invalid_bundle_format}`.
 | `expires_at` | string | yes | Same format; MUST be later than `issued_at`. |
 | `roles` | map | yes | Exactly the keys `root` and `delegates`. |
 | `roles.root` | map | yes | `{"keyids": [string], "threshold": integer, "version": string, "expires_at": string}`; `version` matches `^[1-9][0-9]*$`. |
-| `roles.delegates` | list | yes | Entries `{"name": string, "keyids": [string], "threshold": integer, "expires_at": string}`; names unique; MUST include `"bundle"`. |
+| `roles.delegates` | list | yes | Entries `{"name": string, "keyids": [string], "threshold": integer, "expires_at": string}`; names unique; MUST include `"bundle"`. A delegate role named `"agent_card"` authorizes agent-card issuance (SP.13); its keyids are the trusted card signers. |
 | `keys` | map | yes | keyid to `{"alg": "ed25519", "public_key": string}`; `public_key` is base64url (no padding) of a 32-byte Ed25519 key; keyid MUST equal `"sha256:" <> hex` of the raw key (SP.01 convention). |
 | `tools` | list | no | Capability manifests or `{"name": string, "manifest_digest": string}` refs; entry shape owned by SP.03. |
 | `policies` | list | no | Boundary and repo policy rules; shapes owned by SP.04 and SP.11. |
 | `patterns` | list | no | Scanner pattern sets; shape owned by SP.04. |
-| `identity_issuers` | list | no | Trusted actor/issuer id strings (R.05, SP.10). |
+| `identity_issuers` | list | no | Trusted actor/issuer id strings for per-actor trust-level resolution (R.05, SP.10); distinct from the `"agent_card"` card-signing role above. |
 | `revocations` | list | no | Entries `{"kind": "key" \| "bundle" \| "manifest" \| "actor", "id": string, "revoked_at": string}`; closed `kind` set. |
 | `rollback_floor` | string | yes | `^[1-9][0-9]*$`; MUST be `<= sequence`. |
 | `rotation_chain` | list | no | DSSE envelopes of root rotation documents, ascending `root_version`. |

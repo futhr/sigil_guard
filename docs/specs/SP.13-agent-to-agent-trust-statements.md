@@ -160,6 +160,32 @@ bytes, discriminated by `kind`. Verification order is normative:
 `card_digest` is then the SHA-256 of the verified payload bytes. Card trust
 comes from the bundle, never from the transport that delivered the card.
 
+### Card-Issuer Role In The Trust Bundle (Normative)
+
+`AgentCard.verify/3` accepts either a plain `%{keyid => public_key}` map or a
+verified `%SigilGuard.TrustBundle{}` as `trust_material`. The two forms fix the
+step-2 resolution above:
+
+- **Plain map.** Every entry is an authorized card issuer directly (the host has
+  pre-resolved trust). A signature whose keyid is absent from the map fails
+  `:unknown_key_id`. Because the host chose each key, no `:untrusted_issuer`
+  distinction arises for this form.
+- **Trust bundle.** Card-issuer keys are the keyids of the bundle **delegate
+  role named `"agent_card"`**, resolved through the bundle `keys` map (SP.02).
+  This reuses the existing role/keys machinery: `roles.delegates` already
+  carries arbitrary uniquely-named roles, and the SP.02 schema already requires
+  every role keyid to appear in `keys` with `keyid == "sha256:" <> hex` of the
+  raw key. Resolution: a signing keyid absent from the bundle `keys` map fails
+  `:unknown_key_id`; a keyid present in `keys` but not listed in the
+  `"agent_card"` delegate role (an undeclared key, a self-signed card by a
+  non-issuer, or a bundle with no `"agent_card"` role) fails `:untrusted_issuer`.
+
+The `"agent_card"` role is distinct from SP.02's `identity_issuers` section,
+which carries trusted actor id strings for per-actor trust-level resolution
+(SP.10) and is used by the delegation-chain MIN-trust derivation below, not by
+card-signature verification. Agent keys (a card's own `public_keys`) never
+appear in the bundle; only issuer keys do, via this role.
+
 ### Canonical Example And Golden Vectors
 
 Fixed vector inputs, disjoint from SP.01's signer seed: issuer Ed25519 seed
