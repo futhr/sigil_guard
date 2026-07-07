@@ -1,0 +1,95 @@
+# SigilGuard Quick Start
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fquick-start.livemd)
+
+This notebook runs SigilGuard from a local checkout and demonstrates the first
+scan, gate verdicts, and redaction. It is designed for offline validation from
+inside the repository.
+
+## Setup
+
+```elixir
+Mix.install([
+  {:sigil_guard, path: Path.expand("..", __DIR__)}
+])
+```
+
+## First Scan
+
+```elixir
+secret_text = "Deploy with AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
+scan_result = SigilGuard.scan(secret_text)
+hits = case scan_result do
+  {:hit, hits} -> hits
+  :clean -> []
+end
+
+%{hit_count: length(hits), categories: Enum.map(hits, & &1.category)}
+```
+
+## Redaction
+
+```elixir
+redacted = SigilGuard.scan_and_redact(secret_text)
+
+%{
+  redacted: redacted,
+  leaked?: String.contains?(redacted, "AKIAIOSFODNN7EXAMPLE")
+}
+```
+
+## Gate Verdicts
+
+```elixir
+alias SigilGuard.Runtime.Gate
+
+base_context = [
+  phase: :tool_result,
+  source: :tool,
+  origin: :tool,
+  sink: :model,
+  trust_zone: :semi_trusted,
+  trust_level: :medium
+]
+
+allow_decision = Gate.evaluate("ordinary tool result", base_context)
+redact_decision = Gate.evaluate(secret_text, base_context, on_sensitive: :redact)
+block_decision = Gate.evaluate(secret_text, Keyword.put(base_context, :sink, :external))
+
+%{
+  ordinary: allow_decision.action,
+  redacted: redact_decision.action,
+  external_secret: block_decision.action
+}
+```
+
+## Tool Gateway
+
+```elixir
+alias SigilGuard.ToolGateway
+
+request = %{
+  "jsonrpc" => "2.0",
+  "id" => "call-1",
+  "method" => "tools/call",
+  "params" => %{"name" => "read_docs", "arguments" => %{"path" => "README.md"}}
+}
+
+context = [
+  phase: :tool_request,
+  source: :model,
+  origin: :model,
+  sink: :tool,
+  trust_zone: :trusted,
+  trust_level: :high,
+  tool: %{name: "read_docs", side_effects: ["read"], manifest_digest: String.duplicate("a", 64)},
+  action_digest: String.duplicate("a", 64),
+  payload_digest: String.duplicate("b", 64),
+  context_digest: String.duplicate("c", 64),
+  sandbox: %{isolation_level: :container}
+]
+
+decision = ToolGateway.guard_request(request, context)
+
+%{action: decision.action, verdict: decision.verdict, reason: decision.reason}
+```

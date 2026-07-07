@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 195 / 228 tasks done (86%).** Milestones: 7 complete, 2 partial,
-1 not started. **33 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 196 / 228 tasks done (86%).** Milestones: 7 complete, 2 partial,
+1 not started. **32 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 6 | 20 | 30% | In progress |
+| M7 | Integrations and adoption | 7 | 20 | 35% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **195** | **228** | **86%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **196** | **228** | **86%** | 7 done / 2 partial / 1 to go |
 
-### What's left (33 tasks)
+### What's left (32 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 14:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 13:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2192,12 +2192,16 @@ section is post-3.0.0 parking; neither is counted here.
     docs/schema reads to `:allow`; also ran `git diff --check`,
     `mix format --check-formatted mix.exs`, `mix sigil.docs_lint`, and
     `mix docs`.
-- [ ] M7.07 Livebook: quick start.
+- [x] M7.07 Livebook: quick start.
   - Spec: `SP.14` - Livebooks.
   - AC: `notebooks/quick-start.livemd` covers install, first scan, gate
     verdicts, and redaction with a Run in Livebook badge.
   - Validation: executes top-to-bottom offline via local-path
     `Mix.install` (M7.12).
+  - Done: added `notebooks/quick-start.livemd` with a Run in Livebook badge,
+    local-path `Mix.install`, first scan, redaction, gate verdict, and
+    `ToolGateway` examples. Manually ran the equivalent cells offline with
+    `mix run`; M7.12 will replace this with the notebook runner.
 - [ ] M7.08 Livebook: policy and lethal trifecta.
   - Spec: `SP.14` - Livebooks; `SP.04` - Dataflow Rules And Lethal
     Trifecta.
