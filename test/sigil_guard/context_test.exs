@@ -122,4 +122,52 @@ defmodule SigilGuard.ContextTest do
       assert Context.fetch_action_name(Context.new(%{}), payload) == {:error, :invalid_action}
     end
   end
+
+  describe "sandbox identity" do
+    test "normalizes string sandbox fields" do
+      context =
+        Context.new(%{
+          "phase" => "tool_request",
+          "sandbox_id" => "sbx-9c2e",
+          "isolation_level" => "remote_attested",
+          "workspace_root_digest" => "abc123",
+          "network_posture" => "bidirectional"
+        })
+
+      assert context.sandbox_id == "sbx-9c2e"
+      assert context.isolation_level == :remote_attested
+      assert context.workspace_root_digest == "abc123"
+      assert context.network_posture == :bidirectional
+    end
+
+    test "validate accepts every isolation level and a nil level" do
+      for level <- [nil, :none, :container, :vm, :remote_attested] do
+        assert Context.validate(Context.new(%{isolation_level: level})) == :ok, inspect(level)
+      end
+    end
+
+    test "validate rejects an out-of-enum isolation level" do
+      assert Context.validate(Context.new(%{isolation_level: :sandbox})) ==
+               {:error, :invalid_isolation_level}
+    end
+
+    test "validate rejects an out-of-enum network posture" do
+      assert Context.validate(Context.new(%{network_posture: :airgap})) ==
+               {:error, :invalid_network_posture}
+    end
+
+    test "an omitted isolation level is byte-distinct from :none in the context digest" do
+      alias SigilGuard.Attestation.Digest
+
+      {:ok, absent} = Digest.context_digest(:tool_request, Context.new(%{phase: :tool_request}))
+
+      {:ok, none} =
+        Digest.context_digest(
+          :tool_request,
+          Context.new(%{phase: :tool_request, isolation_level: :none})
+        )
+
+      refute absent == none
+    end
+  end
 end

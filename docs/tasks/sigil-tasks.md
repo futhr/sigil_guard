@@ -70,12 +70,12 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
 | M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
-| M4 - Boundary scanner and policy kernel | 25 | 7 | 0 | 18 |
+| M4 - Boundary scanner and policy kernel | 25 | 8 | 0 | 17 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **116** | **0** | **112** |
+| **Total** | **228** | **117** | **0** | **111** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -949,7 +949,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     resource, and phase appear on runtime decisions.
   - AC: D17 facade contracts stay byte-stable - M1.02 stays green.
   - Tests: negative, property (old-to-new verdict mapping), conformance.
-- [ ] M4.09 Sandbox identity fields on `SigilGuard.Context`.
+- [x] M4.09 Sandbox identity fields on `SigilGuard.Context`.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Sandbox Identity (Isolation Levels).
   - AC: `sandbox_id` and `isolation_level`

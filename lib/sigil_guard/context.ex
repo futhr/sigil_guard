@@ -19,6 +19,8 @@ defmodule SigilGuard.Context do
   @type trust_zone :: :trusted | :semi_trusted | :untrusted
   @type sink :: :internal | :model | :user | :tool | :external | :network | :log | :repo
   @type origin :: :unknown | :user | :model | :tool | :resource | :repo | :registry | atom()
+  @type isolation_level :: :none | :container | :vm | :remote_attested
+  @type network_posture :: :none | :outbound | :bidirectional
 
   @type t :: %__MODULE__{
           phase: phase(),
@@ -34,6 +36,10 @@ defmodule SigilGuard.Context do
           action: String.t() | nil,
           trust_zone: trust_zone(),
           intended_audience: atom(),
+          sandbox_id: String.t() | nil,
+          isolation_level: isolation_level() | nil,
+          workspace_root_digest: String.t() | nil,
+          network_posture: network_posture() | nil,
           metadata: map()
         }
 
@@ -51,6 +57,10 @@ defmodule SigilGuard.Context do
             action: nil,
             trust_zone: :semi_trusted,
             intended_audience: :internal,
+            sandbox_id: nil,
+            isolation_level: nil,
+            workspace_root_digest: nil,
+            network_posture: nil,
             metadata: %{}
 
   @phases ~w(inbound_user tool_request tool_result outbound_model repo_change)a
@@ -59,6 +69,8 @@ defmodule SigilGuard.Context do
   @trust_levels ~w(low medium high)a
   @trust_zones ~w(trusted semi_trusted untrusted)a
   @audiences ~w(internal model user tool external network log repo)a
+  @isolation_levels ~w(none container vm remote_attested)a
+  @network_postures ~w(none outbound bidirectional)a
 
   @doc """
   Normalize a context struct, map, or keyword list into `%SigilGuard.Context{}`.
@@ -91,7 +103,9 @@ defmodule SigilGuard.Context do
          :ok <- require_origin(context.origin),
          :ok <- require_member(context.trust_level, @trust_levels, :invalid_trust_level),
          :ok <- require_member(context.trust_zone, @trust_zones, :invalid_trust_zone),
-         :ok <- require_audience(context.intended_audience) do
+         :ok <- require_audience(context.intended_audience),
+         :ok <- require_isolation_level(context.isolation_level),
+         :ok <- require_network_posture(context.network_posture) do
       require_map(context.metadata, :invalid_metadata)
     end
   end
@@ -224,6 +238,8 @@ defmodule SigilGuard.Context do
     |> normalize_known_value(:trust_level, @trust_levels)
     |> normalize_known_value(:trust_zone, @trust_zones)
     |> normalize_known_value(:intended_audience, @audiences)
+    |> normalize_known_value(:isolation_level, @isolation_levels)
+    |> normalize_known_value(:network_posture, @network_postures)
   end
 
   defp normalize_known_value(context, key, allowed) do
@@ -246,6 +262,14 @@ defmodule SigilGuard.Context do
 
   defp require_origin(origin) when is_atom(origin), do: :ok
   defp require_origin(_), do: {:error, :invalid_origin}
+
+  defp require_isolation_level(nil), do: :ok
+  defp require_isolation_level(level) when level in @isolation_levels, do: :ok
+  defp require_isolation_level(_), do: {:error, :invalid_isolation_level}
+
+  defp require_network_posture(nil), do: :ok
+  defp require_network_posture(posture) when posture in @network_postures, do: :ok
+  defp require_network_posture(_), do: {:error, :invalid_network_posture}
 
   defp require_audience(audience) when is_atom(audience), do: :ok
   defp require_audience(_), do: {:error, :invalid_audience}
