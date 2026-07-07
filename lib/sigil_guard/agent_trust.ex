@@ -1,6 +1,6 @@
 defmodule SigilGuard.AgentTrust do
   @moduledoc """
-  Agent-to-agent trust helpers: attest and verify peer statements (SP.13).
+  Agent-to-agent trust helpers for peer attestations and responses.
 
   These helpers compose `SigilGuard.AgentCard`, `SigilGuard.Attestation`, and
   `SigilGuard.Identity` into the `agent_request` / `agent_response` flows. A
@@ -42,7 +42,7 @@ defmodule SigilGuard.AgentTrust do
   alias SigilGuard.Telemetry
   alias SigilGuard.TrustBundle
 
-  @sha256_regex ~r/^[0-9a-f]{64}$/
+  @sha256_regex ~r/\A[0-9a-f]{64}\z/
   @default_max_delegation_depth 8
   @unknown_peer_rule %{
     "id" => "agent.unknown_peer.quarantine",

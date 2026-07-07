@@ -1,8 +1,8 @@
 defmodule SigilGuard.BoundaryPolicy.File do
   @moduledoc """
-  Boundary-policy file grammar parser (SP.04).
+  Boundary-policy file grammar parser.
 
-  Parses the v3 line-oriented policy file into a compiled `%File{}`: an ordered
+  Parses the 1.0 line-oriented policy file into a compiled `%File{}`: an ordered
   list of `[rules]`, an optional `default` verdict, the `[contracts]` section
   compiled by `SigilGuard.BoundaryPolicy.Contract` into a `%{sink => contract}`
   map, and the `[repo]` section compiled through `SigilGuard.RepoPolicy`.
@@ -10,7 +10,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
   The mandatory first non-comment line is `version 3`. `#` starts a comment,
   blank lines are ignored, and inside `[rules]`/`[contracts]` a line beginning
   with whitespace continues the previous logical line (joined with one space).
-  The `[repo]` body is passed to the v2 repo parser verbatim, with no folding.
+  The `[repo]` body is passed to the repo-policy parser verbatim, with no folding.
   Files over 256 KiB fail `:policy_too_large`; any grammar violation fails
   `:invalid_policy_file`.
   """

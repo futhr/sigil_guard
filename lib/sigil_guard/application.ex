@@ -7,7 +7,7 @@ defmodule SigilGuard.Application do
   cache so that they are owned by a process that lives as long as the
   application.
 
-  Starts the supervision tree that manages optional runtime services. The v3
+  Starts the supervision tree that manages optional runtime services. The 1.0
   core has no legacy registry children; trust-bundle state is owned by ETS
   tables initialized during boot.
   """

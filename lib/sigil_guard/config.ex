@@ -72,7 +72,7 @@ defmodule SigilGuard.Config do
       type: {:custom, __MODULE__, :validate_trust_mappings, []},
       default: [],
       doc:
-        "Ordered `{pattern, trust_level}` actor-to-trust mappings (SP.10). " <>
+        "Ordered `{pattern, trust_level}` actor-to-trust mappings. " <>
           "Patterns are exact strings or a single trailing `*` prefix; " <>
           "`trust_level` is `:low | :medium | :high`. First match wins."
     ]
@@ -81,9 +81,9 @@ defmodule SigilGuard.Config do
   @schema_keys Keyword.keys(@schema)
 
   @doc """
-  Validate the v3 SigilGuard configuration surface.
+  Validate the 1.0 SigilGuard configuration surface.
 
-  Unknown keys and removed v2 keys raise `SigilGuard.ConfigError` with a
+  Unknown keys and removed legacy keys raise `SigilGuard.ConfigError` with a
   migration-guide pointer. The returned keyword list includes schema defaults.
   """
   @spec validate!() :: keyword()
@@ -120,7 +120,7 @@ defmodule SigilGuard.Config do
   end
 
   @doc """
-  Return generated documentation for the v3 configuration schema.
+  Return generated documentation for the 1.0 configuration schema.
   """
   @spec schema_docs() :: String.t()
   def schema_docs do

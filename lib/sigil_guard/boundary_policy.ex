@@ -1,6 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy do
   @moduledoc """
-  Deterministic boundary decision kernel (SP.04).
+  Deterministic boundary decision kernel.
 
   `evaluate/2` takes a `SigilGuard.Boundary` (or a map/keyword coercible to one)
   and returns a `SigilGuard.Decision`. Each decision source contributes at most

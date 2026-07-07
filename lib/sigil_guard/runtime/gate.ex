@@ -17,6 +17,7 @@ defmodule SigilGuard.Runtime.Gate do
   package.
   """
 
+  alias SigilGuard.Attestation.Digest
   alias SigilGuard.Boundary
   alias SigilGuard.BoundaryPolicy
   alias SigilGuard.Confirmation
@@ -419,10 +420,24 @@ defmodule SigilGuard.Runtime.Gate do
       hits: state.hits,
       action_digest: derived_digest("action:" <> payload_digest),
       payload_digest: payload_digest,
-      context_digest: derived_digest("context:" <> inspect(context)),
+      context_digest: boundary_context_digest(context),
       sandbox: boundary_sandbox(context)
     })
   end
+
+  defp boundary_context_digest(context) do
+    statement_type = boundary_statement_type(context.phase)
+
+    case Digest.context_digest(statement_type, context) do
+      {:ok, digest} -> digest
+      {:error, reason} -> derived_digest("context_digest_error:" <> Atom.to_string(reason))
+    end
+  end
+
+  defp boundary_statement_type(:inbound_user), do: :model_ingress
+  defp boundary_statement_type(:outbound_model), do: :model_egress
+  defp boundary_statement_type(:repo_change), do: :repo_change
+  defp boundary_statement_type(phase), do: phase
 
   defp boundary_opts(state) do
     [
@@ -471,7 +486,7 @@ defmodule SigilGuard.Runtime.Gate do
     end
   end
 
-  # Map a (v2 verdict, action) pair to its unified-enum strength so gate and
+  # Map a legacy verdict/action pair to its unified-enum strength so gate and
   # kernel contributions combine by the SP.07 total order.
   defp unified_strength(:blocked, :quarantine), do: :quarantine
   defp unified_strength(:blocked, _), do: :block

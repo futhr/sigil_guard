@@ -2,18 +2,17 @@ defmodule SigilGuard.Decision do
   @moduledoc """
   Runtime gate decision returned by boundary-aware SigilGuard checks.
 
-  `:action` carries the unified verdict vocabulary (SP.07 V3 Decision
-  Contract): `:allow | :redact | :confirm | :quarantine | :block`, totally
+  `:action` carries the unified verdict vocabulary: `:allow | :redact | :confirm | :quarantine | :block`, totally
   ordered `:allow < :redact < :confirm < :quarantine < :block`. `:verdict`
-  keeps the v2 dual vocabulary (`:allowed | :blocked | {:confirm, reason}`)
-  populated alongside for compatibility; it is removed in the M6 removal wave.
+  keeps the legacy dual vocabulary (`:allowed | :blocked | {:confirm, reason}`)
+  populated alongside for compatibility.
 
   On a `:confirm` decision, `:action` is the unified verdict `:confirm` while
   `:effect` records the executable action (`:allow | :redact | :quarantine`) to
   run once confirmation is accepted; the confirmation dispatch keys off `:effect`,
   and the confirmation token binding is unchanged (SP.07).
 
-  V3 adds `matched_rules` and `evidence_refs` so verdicts are explainable and
+  The 1.0 contract adds `matched_rules` and `evidence_refs` so verdicts are explainable and
   evidence-linked without raw payloads, and surfaces the boundary labels
   (`source`, `sink`, `trust_zone`, `actor`, `resource`, `phase`) on the
   decision.
@@ -23,7 +22,7 @@ defmodule SigilGuard.Decision do
   @type effect :: :allow | :redact | :quarantine | nil
   @type verdict :: SigilGuard.Policy.verdict()
 
-  @typedoc "A rule that contributed to the verdict (SP.07); mirrors SP.01 `predicate.matched_rules`."
+  @typedoc "A rule that contributed to the verdict; mirrors attestation matched rules."
   @type matched_rule :: %{rule_id: String.t(), explanation: String.t()}
 
   @type t :: %__MODULE__{

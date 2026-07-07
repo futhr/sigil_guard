@@ -1,6 +1,6 @@
 defmodule SigilGuard.TrustBundle.Schema do
   @moduledoc """
-  Schema validation for SP.02 trust-bundle documents.
+  Schema validation for trust-bundle documents.
 
   This module validates decoded bundle and root-rotation documents. It does
   not perform signature, threshold, revocation, expiry, rollback-cache, or
@@ -14,9 +14,9 @@ defmodule SigilGuard.TrustBundle.Schema do
   @bundle_profile_stem "sigil_guard_trust_bundle/"
   @rotation_profile "sigil_guard_root_rotation/v1"
   @rotation_profile_stem "sigil_guard_root_rotation/"
-  @positive_integer_string ~r/^[1-9][0-9]*$/
-  @iso8601_utc_ms ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
-  @keyid_regex ~r/^sha256:[0-9a-f]{64}$/
+  @positive_integer_string ~r/\A[1-9][0-9]*\z/
+  @iso8601_utc_ms ~r/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\z/
+  @keyid_regex ~r/\Asha256:[0-9a-f]{64}\z/
   @bundle_fields ~w(
                    profile
                    bundle_id

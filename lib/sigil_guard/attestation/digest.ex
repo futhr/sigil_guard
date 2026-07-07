@@ -1,6 +1,6 @@
 defmodule SigilGuard.Attestation.Digest do
   @moduledoc """
-  SP.01 digest computation for SigilGuard agent-trust Statements.
+  Digest computation for SigilGuard agent-trust Statements.
 
   Digests are lowercase SHA-256 hex strings. Structured preimages are
   normalized according to the trust profile and encoded with RFC 8785 JCS

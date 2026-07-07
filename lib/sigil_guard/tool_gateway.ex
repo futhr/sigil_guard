@@ -2,9 +2,27 @@ defmodule SigilGuard.ToolGateway do
   @moduledoc """
   Manifest-aware tool gateway entry points.
 
-  `SigilGuard.MCP.Gateway` remains the transport-facing MCP adapter. This
-  module layers capability-manifest checks above it so manifest failures happen
-  before runtime execution.
+  This is the enforcement core for MCP-shaped tool calls and results. It
+  combines capability-manifest checks, Agent Trust attestation verification,
+  confirmation tokens, and `SigilGuard.Runtime.Gate` boundary decisions.
+  `SigilGuard.MCP.Gateway` is the stable transport-facing facade that delegates
+  here with MCP compatibility defaults.
+
+  Use this module when the host owns request/result maps and wants the full
+  policy surface. Use `SigilGuard.MCP.Gateway` when wiring an MCP adapter that
+  wants JSON-RPC-compatible helper names and tuple shapes.
+
+  ## Examples
+
+      request = %{
+        "method" => "tools/call",
+        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+      }
+
+      context = [phase: :tool_request, origin: :model, sink: :tool, trust_level: :medium]
+
+      decision = SigilGuard.ToolGateway.guard_request(request, context)
+      decision.action in [:allow, :redact, :confirm, :quarantine, :block]
   """
 
   alias SigilGuard.Attestation
@@ -190,7 +208,7 @@ defmodule SigilGuard.ToolGateway do
   def attest_result(_, _, _), do: {:error, :invalid_payload}
 
   @doc """
-  Issue a v2 confirmation token for a confirm-required tool request or result.
+  Issue a confirmation token for a confirm-required tool request or result.
 
   Pass `direction: :request` (default) for tool calls and `direction: :result`
   for tool output. The token is bound to the same normalized payload and context
@@ -238,7 +256,7 @@ defmodule SigilGuard.ToolGateway do
   end
 
   @doc """
-  Guard a tool request and return the v2 JSON-RPC-compatible tuple shape.
+  Guard a tool request and return the JSON-RPC-compatible tuple shape.
   """
   @spec guarded_request(term(), Context.t() | map() | keyword(), keyword()) ::
           {:ok, Decision.t()} | {:error, map(), Decision.t()}
@@ -253,7 +271,7 @@ defmodule SigilGuard.ToolGateway do
   end
 
   @doc """
-  Guard a tool result and return the v2 JSON-RPC-compatible tuple shape.
+  Guard a tool result and return the JSON-RPC-compatible tuple shape.
   """
   @spec guarded_result(term(), Context.t() | map() | keyword(), keyword()) ::
           {:ok, map(), Decision.t()} | {:error, map(), Decision.t()}
@@ -272,24 +290,24 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  @doc "Return the v2 JSON-RPC-compatible decision response."
+  @doc "Return the JSON-RPC-compatible decision response."
   @spec response_for_decision(Decision.t(), term(), keyword()) :: map()
   def response_for_decision(%Decision{} = decision, id \\ nil, opts \\ []) do
     GatewayBase.response_for_decision(decision, id, opts)
   end
 
-  @doc "Start the v2 result stream sanitizer."
+  @doc "Start the result stream sanitizer."
   @spec stream_result(Context.t() | map() | keyword(), keyword()) :: SigilGuard.Runtime.Stream.t()
   def stream_result(context \\ %{}, opts \\ []), do: GatewayBase.stream_result(context, opts)
 
-  @doc "Guard one result stream chunk using the v2 tuple shape."
+  @doc "Guard one result stream chunk using the JSON-RPC-compatible tuple shape."
   @spec guarded_result_chunk(SigilGuard.Runtime.Stream.t(), String.t(), keyword()) ::
           {SigilGuard.Runtime.Stream.t(),
            {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
   def guarded_result_chunk(stream, chunk, opts \\ []),
     do: GatewayBase.guarded_result_chunk(stream, chunk, opts)
 
-  @doc "Flush a guarded result stream using the v2 tuple shape."
+  @doc "Flush a guarded result stream using the JSON-RPC-compatible tuple shape."
   @spec finish_guarded_result_stream(SigilGuard.Runtime.Stream.t(), keyword()) ::
           {SigilGuard.Runtime.Stream.t(),
            {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}

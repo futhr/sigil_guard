@@ -1,11 +1,22 @@
 defmodule SigilGuard.Attestation do
   @moduledoc """
-  V3 attestation facade and reserved metadata helpers.
+  Agent Trust attestation facade and reserved metadata helpers.
 
   The `_agent_trust` and `_agent_confirmation` keys carry SigilGuard trust
   evidence on guarded payloads. These helpers attach and fetch that metadata
   while `strip_metadata/1` applies the SP.01 digest strip rule before payload
   digest computation.
+
+  ## Examples
+
+      request = %{"method" => "tools/call", "params" => %{"name" => "read_file"}}
+      envelope = %{"payload" => "base64url-payload", "signatures" => []}
+
+      request = SigilGuard.Attestation.attach(request, envelope)
+      {:ok, ^envelope} = SigilGuard.Attestation.fetch(request)
+
+      stripped = SigilGuard.Attestation.strip_metadata(request)
+      :error = SigilGuard.Attestation.fetch(stripped)
   """
 
   alias SigilGuard.Attestation.AgentPredicate
@@ -195,11 +206,11 @@ defmodule SigilGuard.Attestation do
   end
 
   def attach(payload, envelope) when is_map(payload) and not is_map(envelope) do
-    raise ArgumentError, "expected attestation envelope to be a map, got: #{inspect(envelope)}"
+    raise ArgumentError, "expected attestation envelope to be a map"
   end
 
-  def attach(payload, _) do
-    raise ArgumentError, "expected attestation payload to be a map, got: #{inspect(payload)}"
+  def attach(_, _) do
+    raise ArgumentError, "expected attestation payload to be a map"
   end
 
   @doc """
@@ -224,12 +235,12 @@ defmodule SigilGuard.Attestation do
     Map.put(payload, @confirmation_key, token)
   end
 
-  def attach_confirmation(payload, token) when is_map(payload) do
-    raise ArgumentError, "expected confirmation token to be a string, got: #{inspect(token)}"
+  def attach_confirmation(payload, _) when is_map(payload) do
+    raise ArgumentError, "expected confirmation token to be a string"
   end
 
-  def attach_confirmation(payload, _) do
-    raise ArgumentError, "expected attestation payload to be a map, got: #{inspect(payload)}"
+  def attach_confirmation(_, _) do
+    raise ArgumentError, "expected attestation payload to be a map"
   end
 
   @doc """

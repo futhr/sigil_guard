@@ -1,6 +1,6 @@
 defmodule SigilGuard.Hooks do
   @moduledoc """
-  Host lifecycle hooks for the boundary kernel (SP.04).
+  Host lifecycle hooks for the boundary kernel.
 
   Hooks let a host extend `SigilGuard.BoundaryPolicy` with deny-side verdicts
   and advisory signals; they can never weaken a deterministic decision. Each

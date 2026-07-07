@@ -2,10 +2,29 @@ defmodule SigilGuard.MCP.Gateway do
   @moduledoc """
   Transport-facing MCP facade.
 
-  This module remains the stable MCP entry point and keeps the historical
-  helper names and tuple shapes. Enforcement is owned by `SigilGuard.ToolGateway`;
-  this facade only selects the compatibility option combinations for each
-  helper.
+  This module is the permanent MCP adapter facade. It keeps JSON-RPC-compatible
+  helper names and tuple shapes for host MCP servers while delegating
+  enforcement to `SigilGuard.ToolGateway`.
+
+  Use `SigilGuard.ToolGateway` directly for the full manifest, attestation, and
+  confirmation policy surface. Use this facade when integrating an MCP transport
+  and you want stable request/result helper names with MCP compatibility
+  defaults.
+
+  ## Examples
+
+      request = %{
+        "id" => "call-1",
+        "method" => "tools/call",
+        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+      }
+
+      context = [phase: :tool_request, origin: :model, sink: :tool]
+
+      case SigilGuard.MCP.Gateway.guarded_request(request, context) do
+        {:ok, decision} -> {:execute, decision}
+        {:error, response, decision} -> {:reject, response, decision}
+      end
   """
 
   alias SigilGuard.Context

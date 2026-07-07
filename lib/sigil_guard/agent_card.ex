@@ -1,6 +1,6 @@
 defmodule SigilGuard.AgentCard do
   @moduledoc """
-  Agent cards as DSSE-signed capability-manifest analogs (SP.13).
+  Agent cards as DSSE-signed capability-manifest analogs.
 
   An agent card is to an agent what a capability manifest is to a tool: signed
   metadata that steers a counterpart's behavior. It is supply-chain input, never
@@ -57,7 +57,7 @@ defmodule SigilGuard.AgentCard do
 
   @kind "sigil_guard_agent_card"
   @schema_version "1"
-  @timestamp_regex ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+  @timestamp_regex ~r/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\z/
   @public_key_algorithm "ed25519"
   @ed25519_public_key_bytes 32
   @default_max_skew_ms 60_000

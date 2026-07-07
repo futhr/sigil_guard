@@ -1,6 +1,6 @@
 defmodule SigilGuard.Identity.Static do
   @moduledoc """
-  Config-driven actor-to-trust mapping (SP.10), a small core default.
+  Config-driven actor-to-trust mapping for simple host deployments.
 
   Hosts repeatedly hand-roll actor-to-trust maps; this implements the
   `SigilGuard.Identity` behaviour over the `:trust_mappings` config so a simple

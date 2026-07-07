@@ -141,7 +141,7 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :agent_trust, :quarantine]
   ]
 
-  # V3 attribute namespace (SP.05 D16): `sigilguard.*` throughout. The mapping is
+  # 1.0 attribute namespace (SP.05 D16): `sigilguard.*` throughout. The mapping is
   # mechanical - leading `sigil.` becomes `sigilguard.` and the redundant
   # `.security.` segment is dropped - plus the exact-name exceptions (hashed
   # actor/identity/confirmation.actor, `content_hash` to the SP.01 subject

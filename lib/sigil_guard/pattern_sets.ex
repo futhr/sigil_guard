@@ -1,6 +1,6 @@
 defmodule SigilGuard.PatternSets do
   @moduledoc """
-  Resolve bundle-supplied scanner pattern sets (SP.04).
+  Resolve bundle-supplied scanner pattern sets.
 
   The three pattern sets - `secret`, `injection`, `poisoning` - are distinct and
   each is independently overridable by a trust bundle. `resolve/1` compiles the

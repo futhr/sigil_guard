@@ -1,6 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy.Contract do
   @moduledoc """
-  Sink-aware output contracts and their transforms (SP.04, D8).
+  Sink-aware output contracts and their transforms.
 
   A contract is a per-sink guarantee applied to content the final verdict lets
   cross a boundary: a byte cap, a credential re-scan, PII digesting, and an

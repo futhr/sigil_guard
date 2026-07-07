@@ -1,6 +1,6 @@
 defmodule SigilGuard.TrustBundle.Verify do
   @moduledoc """
-  Pure verification pipeline for SP.02 trust-bundle envelopes.
+  Pure verification pipeline for trust-bundle envelopes.
 
   This module validates one DSSE-signed trust-bundle document. It does not
   load sources, cache snapshots, walk root-rotation chains, or write
@@ -20,6 +20,22 @@ defmodule SigilGuard.TrustBundle.Verify do
 
   @doc """
   Verify a decoded trust-bundle DSSE envelope.
+
+  By default this enforces the D3/1.0 effective bundle-role threshold of `1`,
+  even when the role declaration carries a larger threshold. Pass
+  `enforce_declared_threshold: true` to require the role's declared threshold.
+  Root rotation documents always require the full declared old-root and
+  new-root thresholds regardless of this option.
+
+  Options:
+
+    * `:now` - `DateTime` used for freshness checks. Defaults to current UTC
+      time.
+    * `:max_skew_ms` - accepted future clock skew in milliseconds.
+    * `:genesis_root` - previously pinned root descriptor used to verify a
+      rotation chain.
+    * `:enforce_declared_threshold` - opt in to declared bundle-role threshold
+      enforcement. Defaults to `false` for D3 compatibility.
   """
   @spec verify(map(), keyword()) :: {:ok, TrustBundle.t()} | {:error, verify_error()}
   def verify(envelope, opts \\ [])
@@ -164,13 +180,16 @@ defmodule SigilGuard.TrustBundle.Verify do
   defp bundle_role(_), do: {:error, :unknown_role}
 
   defp public_keys(%{"keys" => keys}) do
-    public_keys =
-      Map.new(keys, fn {keyid, descriptor} ->
-        {:ok, public_key} = decode_base64(Map.fetch!(descriptor, "public_key"))
-        {keyid, public_key}
-      end)
-
-    {:ok, public_keys}
+    keys
+    |> Enum.reduce_while({:ok, %{}}, fn {keyid, descriptor}, {:ok, public_keys} ->
+      with %{} <- descriptor,
+           public_key when is_binary(public_key) <- Map.get(descriptor, "public_key"),
+           {:ok, decoded} <- decode_base64(public_key) do
+        {:cont, {:ok, Map.put(public_keys, keyid, decoded)}}
+      else
+        _ -> {:halt, {:error, :invalid_base64}}
+      end
+    end)
   end
 
   defp verify_rotation_chain(document, opts) do
@@ -548,7 +567,15 @@ defmodule SigilGuard.TrustBundle.Verify do
   end
 
   @spec positive_integer!(String.t()) :: pos_integer()
-  defp positive_integer!(value), do: String.to_integer(value)
+  defp positive_integer!(value) do
+    integer = String.to_integer(value)
+
+    if integer > 0 do
+      integer
+    else
+      raise ArgumentError, "expected a positive integer string"
+    end
+  end
 
   defp dev?(document) do
     get_in(document, ["provenance", "issuer_class"]) == "dev"

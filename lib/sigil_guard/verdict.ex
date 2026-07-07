@@ -1,6 +1,6 @@
 defmodule SigilGuard.Verdict do
   @moduledoc """
-  The unified v3 verdict vocabulary and its total order (SP.07, SP.04).
+  The unified 1.0 verdict vocabulary and its total order.
 
   Five closed verdicts, totally ordered by strictness:
 

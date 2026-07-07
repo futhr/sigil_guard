@@ -2,7 +2,7 @@ defmodule SigilGuard.TrustProfile do
   @moduledoc """
   SigilGuard agent-trust profile registry and Statement validator.
 
-  The registry is closed over the SP.01 statement types. Validation accepts a
+  The registry is closed over the SigilGuard statement types. Validation accepts a
   decoded in-toto Statement, normalizes its Statement envelope shape through
   `SigilGuard.Attestation.Statement`, and then checks SigilGuard profile and
   statement-type constraints without deriving atoms from external strings.
@@ -47,7 +47,7 @@ defmodule SigilGuard.TrustProfile do
           | :invalid_payload
 
   @doc """
-  Return the SP.01 SigilGuard agent-trust profile id.
+  Return the SigilGuard agent-trust profile id.
   """
   @spec profile_id() :: String.t()
   def profile_id, do: @profile_id

@@ -1,6 +1,6 @@
 defmodule SigilGuard.AdaptiveDetector do
   @moduledoc """
-  Advisory adaptive-detection behaviour for the boundary kernel (SP.04, D5).
+  Advisory adaptive-detection behaviour for the boundary kernel.
 
   The behaviour lives in core; model-backed implementations (e.g. an ONNX
   classifier) live in optional post-GA packages. Results are strictly advisory:

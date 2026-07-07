@@ -78,6 +78,7 @@ defmodule SigilGuard.RepoPolicy do
           agents: [String.t()],
           actions: [String.t()],
           paths: [String.t()],
+          path_matchers: [term()],
           message: String.t() | nil,
           index: non_neg_integer()
         }
@@ -103,7 +104,11 @@ defmodule SigilGuard.RepoPolicy do
     * `:message` - optional operator-facing reason.
   """
   @spec compile(t() | map() | keyword()) :: {:ok, t()} | {:error, atom() | {atom(), term()}}
-  def compile(%__MODULE__{} = policy), do: {:ok, policy}
+  def compile(%__MODULE__{} = policy) do
+    with {:ok, rules} <- ensure_compiled_rules(policy.rules) do
+      {:ok, %{policy | rules: rules}}
+    end
+  end
 
   def compile(raw) when is_list(raw) do
     try do
@@ -161,7 +166,7 @@ defmodule SigilGuard.RepoPolicy do
 
   Legacy policy filenames fail closed with
   `{:error, {:legacy_policy_filename, found, use}}`. Legacy files are never
-  parsed and never silently used as fallbacks, including when a v3 policy file
+  parsed and never silently used as fallbacks, including when a 1.0 policy file
   is also present.
 
   Options:
@@ -314,6 +319,37 @@ defmodule SigilGuard.RepoPolicy do
 
   defp compile_rules(_), do: {:error, :invalid_rules}
 
+  defp ensure_compiled_rules(rules) when is_list(rules) do
+    result =
+      rules
+      |> Enum.with_index()
+      |> Enum.reduce_while({:ok, []}, fn {rule, index}, {:ok, acc} ->
+        case ensure_compiled_rule(rule, index) do
+          {:ok, compiled} -> {:cont, {:ok, [compiled | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, compiled} -> {:ok, Enum.reverse(compiled)}
+      error -> error
+    end
+  end
+
+  defp ensure_compiled_rules(_), do: {:error, :invalid_rules}
+
+  defp ensure_compiled_rule(%{path_matchers: path_matchers} = rule, _)
+       when is_list(path_matchers),
+       do: {:ok, rule}
+
+  defp ensure_compiled_rule(%{paths: paths} = rule, _) do
+    with {:ok, path_matchers} <- compile_path_matchers(paths) do
+      {:ok, Map.put(rule, :path_matchers, path_matchers)}
+    end
+  end
+
+  defp ensure_compiled_rule(_, index), do: compile_rule(nil, index)
+
   defp compile_rule(raw, index) when is_list(raw) do
     raw
     |> Map.new()
@@ -327,6 +363,7 @@ defmodule SigilGuard.RepoPolicy do
          {:ok, actions} <-
            normalize_matchers(field_or_default(raw, ["actions", "action"], ["*"])),
          {:ok, paths} <- normalize_patterns(field_or_default(raw, ["paths", "path"], nil)),
+         {:ok, path_matchers} <- compile_path_matchers(paths),
          {:ok, id} <- normalize_id(field(raw, "id"), index) do
       {:ok,
        %{
@@ -335,6 +372,7 @@ defmodule SigilGuard.RepoPolicy do
          agents: agents,
          actions: actions,
          paths: paths,
+         path_matchers: path_matchers,
          message: optional_string(field(raw, "message")),
          index: index
        }}
@@ -494,21 +532,21 @@ defmodule SigilGuard.RepoPolicy do
   defp rule_matches?(rule, agent, action, path) do
     matcher_matches?(rule.agents, agent) and
       matcher_matches?(rule.actions, action) and
-      Enum.any?(rule.paths, &path_matches?(&1, path))
+      Enum.any?(rule.path_matchers, &path_matches?(&1, path))
   end
 
   defp matcher_matches?(matchers, nil), do: "*" in matchers
   defp matcher_matches?(matchers, value), do: "*" in matchers or value in matchers
 
-  defp path_matches?(pattern, path) do
-    match_segments?(String.split(pattern, "/", trim: true), String.split(path, "/", trim: true))
+  defp path_matches?(matcher, path) do
+    match_segments?(matcher, String.split(path, "/", trim: true))
   end
 
   defp match_segments?([], []), do: true
   defp match_segments?([], _), do: false
-  defp match_segments?(["**"], _), do: true
+  defp match_segments?([:globstar], _), do: true
 
-  defp match_segments?(["**" | pattern_rest] = pattern, path) do
+  defp match_segments?([:globstar | pattern_rest] = pattern, path) do
     match_segments?(pattern_rest, path) or
       case path do
         [] -> false
@@ -516,21 +554,14 @@ defmodule SigilGuard.RepoPolicy do
       end
   end
 
-  defp match_segments?([pattern_segment | pattern_rest], [path_segment | path_rest]) do
-    segment_matches?(pattern_segment, path_segment) and match_segments?(pattern_rest, path_rest)
+  defp match_segments?([matcher_segment | pattern_rest], [path_segment | path_rest]) do
+    segment_matches?(matcher_segment, path_segment) and match_segments?(pattern_rest, path_rest)
   end
 
   defp match_segments?(_, _), do: false
 
-  defp segment_matches?(pattern, segment) do
-    pattern =
-      pattern
-      |> Regex.escape()
-      |> String.replace("\\*", ".*")
-      |> String.replace("\\?", ".")
-
-    Regex.match?(Regex.compile!("^#{pattern}$"), segment)
-  end
+  defp segment_matches?({:literal, expected}, segment), do: segment == expected
+  defp segment_matches?({:regex, regex}, segment), do: Regex.match?(regex, segment)
 
   defp normalize_decision(value) when value in @decisions, do: {:ok, value}
   defp normalize_decision(:allowed), do: {:ok, :allow}
@@ -616,6 +647,50 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   defp normalize_patterns(_), do: {:error, :missing_paths}
+
+  defp compile_path_matchers(paths) when is_list(paths) do
+    result =
+      Enum.reduce_while(paths, {:ok, []}, fn path, {:ok, acc} ->
+        case compile_path_matcher(path) do
+          {:ok, matcher} -> {:cont, {:ok, [matcher | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, matchers} -> {:ok, Enum.reverse(matchers)}
+      error -> error
+    end
+  end
+
+  defp compile_path_matchers(_), do: {:error, :missing_paths}
+
+  defp compile_path_matcher(pattern) when is_binary(pattern) do
+    {:ok,
+     pattern
+     |> String.split("/", trim: true)
+     |> Enum.map(&compile_segment_matcher/1)}
+  end
+
+  defp compile_path_matcher(_), do: {:error, :invalid_path_pattern}
+
+  defp compile_segment_matcher("**"), do: :globstar
+
+  defp compile_segment_matcher(segment) do
+    if String.contains?(segment, ["*", "?"]) do
+      regex =
+        segment
+        |> Regex.escape()
+        |> String.replace("\\*", ".*")
+        |> String.replace("\\?", ".")
+        |> then(&"^#{&1}$")
+        |> Regex.compile!()
+
+      {:regex, regex}
+    else
+      {:literal, segment}
+    end
+  end
 
   defp normalize_policy_paths(paths) when is_binary(paths), do: normalize_policy_paths([paths])
 

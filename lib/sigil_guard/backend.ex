@@ -21,6 +21,8 @@ defmodule SigilGuard.Backend do
   alias SigilGuard.Patterns
   alias SigilGuard.Policy
 
+  @impl_cache_key {__MODULE__, :impl_cache}
+
   @typedoc "Backend module types"
   @type backend_module :: SigilGuard.Backend.Elixir | module()
 
@@ -78,7 +80,21 @@ defmodule SigilGuard.Backend do
   """
   @spec impl() :: backend_module()
   def impl do
-    case Application.get_env(:sigil_guard, :backend, :elixir) do
+    configured = Application.get_env(:sigil_guard, :backend, :elixir)
+
+    case :persistent_term.get(@impl_cache_key, :none) do
+      {^configured, module} -> module
+      _ -> cache_impl(configured, resolve_impl(configured))
+    end
+  end
+
+  defp cache_impl(configured, module) do
+    :persistent_term.put(@impl_cache_key, {configured, module})
+    module
+  end
+
+  defp resolve_impl(configured) do
+    case configured do
       :elixir ->
         SigilGuard.Backend.Elixir
 

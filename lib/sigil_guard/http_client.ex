@@ -1,6 +1,6 @@
 defmodule SigilGuard.HTTPClient do
   @moduledoc """
-  Host-provided HTTP client behaviour - the only sanctioned HTTP seam in v3 (D9).
+  Host-provided HTTP client behaviour for audit-anchor integrations.
 
   SigilGuard performs no HTTP in any scan, gate, policy, or attestation decision
   path (CLAUDE.md rule 8). The single exception is the optional, host-triggered

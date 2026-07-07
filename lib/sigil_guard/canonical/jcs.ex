@@ -20,7 +20,7 @@ defmodule SigilGuard.Canonical.JCS do
   Encode a JSON-representable term as RFC 8785 canonical JSON bytes.
 
   Atom keys and non-literal atom values are normalized with `Atom.to_string/1`
-  to match the SigilGuard v3 digest preimage rules. Any key collision after
+  to match the SigilGuard 1.0 digest preimage rules. Any key collision after
   that normalization returns `{:error, :invalid_map}`.
   """
   @spec encode(term()) :: {:ok, binary()} | {:error, error_reason()}

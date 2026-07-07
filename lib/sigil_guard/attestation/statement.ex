@@ -11,7 +11,7 @@ defmodule SigilGuard.Attestation.Statement do
   @required_subjects ~w(action payload context)
   @manifest_subject "manifest"
   @subject_order ~w(action payload context manifest)
-  @sha256_regex ~r/^[0-9a-f]{64}$/
+  @sha256_regex ~r/\A[0-9a-f]{64}\z/
 
   @type digest_name :: :action | :payload | :context | :manifest | String.t()
   @type digests :: %{required(digest_name()) => String.t()}

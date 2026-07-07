@@ -100,16 +100,8 @@ defmodule SigilGuard.ToolGateway.Base do
           keyword()
         ) ::
           {:ok, String.t()} | {:error, term()}
-  def issue_signed_confirmation_token(request, context, %Decision{} = decision, key, opts \\ []) do
-    with {:ok, claims} <- verify_request_envelope(request, opts) do
-      issue_confirmation_token(
-        request,
-        signed_context(context, claims.identity),
-        decision,
-        key,
-        opts
-      )
-    end
+  def issue_signed_confirmation_token(request, _, %Decision{}, _, opts \\ []) do
+    verify_request_envelope(request, opts)
   end
 
   @doc """
@@ -178,16 +170,6 @@ defmodule SigilGuard.ToolGateway.Base do
           Decision.t()
   def guard_signed_confirmed_request(request, context \\ %{}, opts \\ []) do
     case verify_request_envelope(request, opts) do
-      {:ok, claims} ->
-        signed = signed_context(context, claims.identity)
-        decision = guard_request(request, signed, opts)
-
-        confirmed =
-          maybe_apply_confirmation(decision, request, request_context(request, signed), opts)
-
-        emit_signed_request(confirmed, :valid, nil)
-        confirmed
-
       {:error, reason} ->
         envelope_decision(request, context, reason)
     end
@@ -197,15 +179,11 @@ defmodule SigilGuard.ToolGateway.Base do
   Fail closed for signed, possibly confirmed MCP requests and return a JSON-RPC error.
   """
   @spec guarded_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
-          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+          {:error, map(), Decision.t()}
   def guarded_signed_confirmed_request(request, context \\ %{}, opts \\ []) do
     decision = guard_signed_confirmed_request(request, context, opts)
 
-    if executable?(decision) do
-      {:ok, decision}
-    else
-      {:error, response_for_decision(decision, request_id(request), opts), decision}
-    end
+    {:error, response_for_decision(decision, request_id(request), opts), decision}
   end
 
   @doc """
@@ -217,11 +195,6 @@ defmodule SigilGuard.ToolGateway.Base do
   @spec guard_signed_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_signed_request(request, context \\ %{}, opts \\ []) do
     case verify_request_envelope(request, opts) do
-      {:ok, claims} ->
-        decision = guard_request(request, signed_context(context, claims.identity), opts)
-        emit_signed_request(decision, :valid, nil)
-        decision
-
       {:error, reason} ->
         envelope_decision(request, context, reason)
     end
@@ -231,28 +204,23 @@ defmodule SigilGuard.ToolGateway.Base do
   Guard a signed MCP tool request and return either an allow decision or JSON-RPC error.
   """
   @spec guarded_signed_request(term(), Context.t() | map() | keyword(), keyword()) ::
-          {:ok, Decision.t()} | {:error, map(), Decision.t()}
+          {:error, map(), Decision.t()}
   def guarded_signed_request(request, context \\ %{}, opts \\ []) do
     decision = guard_signed_request(request, context, opts)
 
-    if executable?(decision) do
-      {:ok, decision}
-    else
-      {:error, response_for_decision(decision, request_id(request), opts), decision}
-    end
+    {:error, response_for_decision(decision, request_id(request), opts), decision}
   end
 
   @doc """
   Verify Agent Trust metadata on an MCP request.
 
-  The v3 runtime removed verdict-only envelopes, so envelope-shaped metadata
+  The 1.0 runtime removed verdict-only envelopes, so envelope-shaped metadata
   currently fails closed with `:legacy_envelope_removed`.
   """
-  @spec verify_request_envelope(term(), keyword()) ::
-          {:ok, %{identity: String.t(), envelope: map()}} | {:error, atom()}
-  def verify_request_envelope(request, _opts \\ []) do
+  @spec verify_request_envelope(term(), keyword()) :: {:error, atom()}
+  def verify_request_envelope(request, _ \\ []) do
     with {:ok, envelope} <- request_envelope(request),
-         {:ok, _identity} <- envelope_identity(envelope) do
+         {:ok, _} <- envelope_identity(envelope) do
       {:error, :legacy_envelope_removed}
     end
   end
@@ -422,13 +390,6 @@ defmodule SigilGuard.ToolGateway.Base do
     |> context_overrides()
     |> then(&Map.merge(defaults, &1))
     |> Context.new()
-  end
-
-  defp signed_context(context, identity) do
-    context
-    |> context_overrides()
-    |> Map.put(:identity, identity)
-    |> Map.put(:actor, identity)
   end
 
   defp context_overrides(%Context{} = context), do: Map.from_struct(context)

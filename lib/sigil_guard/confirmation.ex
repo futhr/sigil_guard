@@ -12,6 +12,24 @@ defmodule SigilGuard.Confirmation do
   to the action digest, manifest digest when present, and expiry. Pass
   `consume: true` to `verify/5` or `valid?/5` to enforce single-use semantics
   with `SigilGuard.ReplayStore`.
+
+  ## Examples
+
+      decision = %SigilGuard.Decision{
+        verdict: {:confirm, "approval required"},
+        action: :confirm,
+        reason: "approval required",
+        phase: :tool_request,
+        risk_level: :medium,
+        trust_level: :high
+      }
+
+      key = :crypto.hash(:sha256, "host confirmation key")
+      payload = %{"tool" => "send_webhook", "url" => "https://example.invalid/hook"}
+      context = [phase: :tool_request, origin: :model, sink: :external]
+
+      {:ok, token} = SigilGuard.Confirmation.issue(payload, context, decision, key)
+      {:ok, _claims} = SigilGuard.Confirmation.verify(token, payload, context, key)
   """
 
   alias SigilGuard.Attestation.Digest
@@ -23,8 +41,8 @@ defmodule SigilGuard.Confirmation do
   @token_type "sigil_guard.confirmation.v2"
   @default_ttl_ms 300_000
   @min_key_bytes 16
-  @sha256_regex ~r/^[0-9a-f]{64}$/
-  @nonce_regex ~r/^[0-9a-f]{32}$/
+  @sha256_regex ~r/\A[0-9a-f]{64}\z/
+  @nonce_regex ~r/\A[0-9a-f]{32}\z/
 
   @type claims :: %{
           required(String.t()) => String.t() | integer()

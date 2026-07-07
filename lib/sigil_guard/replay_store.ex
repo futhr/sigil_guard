@@ -9,6 +9,8 @@ defmodule SigilGuard.ReplayStore do
   """
 
   @table :sigil_guard_replay
+  @prune_key {:sigil_guard_replay_store, :meta, :last_prune}
+  @prune_interval_ms 60_000
 
   @doc "Create the replay table if it does not already exist."
   @spec ensure_table() :: :ok
@@ -24,12 +26,16 @@ defmodule SigilGuard.ReplayStore do
             write_concurrency: true
           ])
 
+          :ets.insert_new(@table, {@prune_key, 0})
           :ok
         rescue
-          ArgumentError -> :ok
+          ArgumentError ->
+            :ets.insert_new(@table, {@prune_key, 0})
+            :ok
         end
 
       _ ->
+        :ets.insert_new(@table, {@prune_key, 0})
         :ok
     end
   end
@@ -47,16 +53,25 @@ defmodule SigilGuard.ReplayStore do
     ensure_table()
     now = System.system_time(:millisecond)
     key = {identity, nonce}
+    expires_at = now + ttl_ms
 
-    prune_expired(now)
+    maybe_prune_expired(now)
 
-    case :ets.lookup(@table, key) do
-      [{^key, expires_at}] when expires_at > now ->
+    cond do
+      :ets.insert_new(@table, {key, expires_at}) ->
+        :ok
+
+      live?(key, now) ->
         {:error, :replay_detected}
 
-      _ ->
-        :ets.insert(@table, {key, now + ttl_ms})
-        :ok
+      true ->
+        delete_expired_key(key, now)
+
+        if :ets.insert_new(@table, {key, expires_at}) do
+          :ok
+        else
+          {:error, :replay_detected}
+        end
     end
   end
 
@@ -65,7 +80,32 @@ defmodule SigilGuard.ReplayStore do
   def clear do
     ensure_table()
     :ets.delete_all_objects(@table)
+    :ets.insert_new(@table, {@prune_key, 0})
     :ok
+  end
+
+  defp live?(key, now) do
+    case :ets.lookup(@table, key) do
+      [{^key, expires_at}] when expires_at > now -> true
+      _ -> false
+    end
+  end
+
+  defp delete_expired_key(key, now) do
+    :ets.select_delete(@table, [
+      {{key, :"$1"}, [{:"=<", :"$1", now}], [true]}
+    ])
+  end
+
+  defp maybe_prune_expired(now) do
+    case :ets.lookup(@table, @prune_key) do
+      [{@prune_key, last_prune}] when now - last_prune < @prune_interval_ms ->
+        :ok
+
+      _ ->
+        :ets.insert(@table, {@prune_key, now})
+        prune_expired(now)
+    end
   end
 
   defp prune_expired(now) do

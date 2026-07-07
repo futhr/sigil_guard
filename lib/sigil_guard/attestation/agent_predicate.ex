@@ -1,6 +1,6 @@
 defmodule SigilGuard.Attestation.AgentPredicate do
   @moduledoc """
-  SP.13 predicate extension validation for agent-to-agent trust statements.
+  Predicate extension validation for agent-to-agent trust statements.
 
   This module covers the `agent_request` and `agent_response` fields owned by
   SP.13 and the SP.01 action-digest preimage rows for those statement types.

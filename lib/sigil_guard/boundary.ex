@@ -1,6 +1,6 @@
 defmodule SigilGuard.Boundary do
   @moduledoc """
-  Normalized policy decision input for the boundary kernel (SP.04).
+  Normalized policy decision input for the boundary kernel.
 
   A `%SigilGuard.Boundary{}` gathers everything `SigilGuard.BoundaryPolicy`
   needs to reach a deterministic verdict: the lifecycle phase, the source and

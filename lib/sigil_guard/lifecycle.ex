@@ -1,6 +1,6 @@
 defmodule SigilGuard.Lifecycle do
   @moduledoc """
-  The v3 lifecycle phase taxonomy (SP.04).
+  The 1.0 lifecycle phase taxonomy.
 
   Nine phases form a closed set shared by `SigilGuard.Boundary`, the
   `SigilGuard.Hooks` behaviour, and policy-file `phase:` matchers. Each phase is

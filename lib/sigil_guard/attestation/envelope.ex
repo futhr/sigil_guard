@@ -2,7 +2,7 @@ defmodule SigilGuard.Attestation.Envelope do
   @moduledoc """
   DSSE envelope encoding, PAE construction, and Ed25519 verification.
 
-  This module owns the v3 envelope byte contract. It signs and verifies
+  This module owns the Agent Trust envelope byte contract. It signs and verifies
   opaque payload bytes; callers must not re-canonicalize payloads during
   signature verification.
   """

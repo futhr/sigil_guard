@@ -1,6 +1,6 @@
 defmodule SigilGuard.Audit.Proof do
   @moduledoc """
-  Inclusion proofs over the existing signed audit Merkle tree (SP.05).
+  Inclusion proofs over signed audit Merkle trees.
 
   A proof lets a verifier holding only a trusted checkpoint root confirm that a
   single event's `hmac` is committed by that root, without the event body or the

@@ -1,6 +1,6 @@
 defmodule SigilGuard.BoundaryPolicy.Match do
   @moduledoc """
-  Match compiled `[rules]` against a `SigilGuard.Boundary` (SP.04).
+  Match compiled `[rules]` against a `SigilGuard.Boundary`.
 
   A rule matches when every matcher key matches (AND); a matcher key matches
   when the input field equals one of the rule's values (OR). An absent matcher

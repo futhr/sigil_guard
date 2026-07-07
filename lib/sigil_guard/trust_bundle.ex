@@ -4,10 +4,19 @@ defmodule SigilGuard.TrustBundle do
 
   Trust bundles are local, DSSE-signed JSON documents. The full schema,
   role-threshold verification, cache, quarantine, and development bootstrap
-  behavior are implemented in the staged `TrustBundle.*` modules. Until those
-  stages are present this module fails closed for unverified input while
-  exposing the stable struct, source type, error taxonomy, and section
-  accessors from SP.02.
+  behavior are implemented in the staged `TrustBundle.*` modules. Core
+  verification never fetches remote material; hosts own any transport and pass
+  verified bytes, maps, files, or `priv/` sources into this API.
+
+  ## Examples
+
+      {:ok, bundle} = SigilGuard.TrustBundle.dev_bundle(cache: false)
+      bundle.dev?
+      #=> true
+
+      source = {:map, bundle.envelope}
+      {:ok, loaded} = SigilGuard.TrustBundle.load(source, cache: false)
+      loaded.bundle_id == bundle.bundle_id
   """
 
   alias SigilGuard.Attestation.Envelope
@@ -197,9 +206,21 @@ defmodule SigilGuard.TrustBundle do
   Verify a decoded DSSE trust-bundle envelope.
 
   This verifies the envelope, schema, bundle role, signature threshold,
-  revocations, and freshness checks implemented in SP.02. Loading sources,
-  cache rollback checks, quarantine records, and rotation-chain walking are
-  staged in later trust-bundle modules.
+  revocations, and freshness checks implemented in SP.02.
+
+  ## Options
+
+    * `:now` - `DateTime` used for freshness checks. Defaults to current UTC
+      time.
+    * `:max_skew_ms` - accepted future clock skew for bundle and role expiry.
+      Defaults to `60_000`.
+    * `:enforce_declared_threshold` - when `true`, enforce the bundle role's
+      declared threshold. The 1.0 release line defaults to the D3 effective
+      threshold of `1`; bundle documents still carry their declared threshold,
+      and root rotation documents always enforce full declared old-root and
+      new-root thresholds.
+    * `:quarantine` - when `true`, records failed verification attempts in
+      `SigilGuard.TrustBundle.Quarantine`. Defaults to `true`.
   """
   @spec verify(envelope :: map(), opts :: keyword()) :: {:ok, t()} | {:error, verify_error()}
   def verify(envelope, opts \\ [])
