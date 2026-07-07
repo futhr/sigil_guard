@@ -17,15 +17,19 @@ defmodule SigilGuard.Runtime.Gate do
   package.
   """
 
+  alias SigilGuard.Boundary
+  alias SigilGuard.BoundaryPolicy
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
+  alias SigilGuard.Lifecycle
   alias SigilGuard.Policy
   alias SigilGuard.Quarantine
   alias SigilGuard.RepoPolicy
   alias SigilGuard.RepoPolicy.Decision, as: RepoDecision
   alias SigilGuard.Scanner
   alias SigilGuard.Telemetry
+  alias SigilGuard.Verdict
 
   @external_sinks ~w(external network log repo tool)a
   @risk_levels ~w(low medium high)a
@@ -341,7 +345,15 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp decide(state) do
     source_sink = source_sink_verdict(state)
-    {verdict, raw_action, reason} = strongest_verdict(state.policy_verdict, source_sink)
+
+    {gate_verdict, gate_action, gate_reason} =
+      strongest_verdict(state.policy_verdict, source_sink)
+
+    boundary_decision = evaluate_boundary(state)
+
+    {verdict, raw_action, reason} =
+      combine_with_boundary({gate_verdict, gate_action, gate_reason}, boundary_decision)
+
     action = unified_action(raw_action)
 
     {verdict, action, reason, action_digest, action_digest_error} =
@@ -358,7 +370,7 @@ defmodule SigilGuard.Runtime.Gate do
       trust_level: state.context.trust_level,
       hits: state.hits,
       indicators: state.quarantine.indicators,
-      matched_rules: matched_rules(reason),
+      matched_rules: matched_rules(gate_reason) ++ boundary_matched_rules(boundary_decision),
       evidence_refs: [],
       source: state.context.origin,
       sink: state.context.sink,
@@ -370,6 +382,97 @@ defmodule SigilGuard.Runtime.Gate do
       audit_metadata: audit_metadata(state, verdict, action, action_digest, action_digest_error)
     }
   end
+
+  # SP.07 Gate <-> Kernel Delegation: evaluate the boundary policy kernel over a
+  # normalized `Boundary` and fold its verdict into the gate's combination. The
+  # kernel contributes policy-file `[rules]`, the sandbox matrix, hooks, adaptive
+  # signals, and the shared invariants (untrusted-tool-request, secret->external);
+  # the gate keeps scanner-failure, quarantine gradations, risk x trust, and the
+  # broader sensitive-content rules it alone observes. A malformed Boundary is
+  # skipped so it can never override the gate.
+  defp evaluate_boundary(state) do
+    boundary = build_boundary(state)
+
+    case Boundary.validate(boundary) do
+      :ok -> BoundaryPolicy.evaluate(boundary, boundary_opts(state))
+      {:error, _} -> nil
+    end
+  end
+
+  defp build_boundary(state) do
+    context = state.context
+    payload_digest = state.quarantine.content_hash
+
+    Boundary.new(%{
+      phase: boundary_phase(context.phase),
+      source: context.origin,
+      sink: context.sink,
+      origin: context.origin,
+      trust_level: context.trust_level,
+      trust_zone: context.trust_zone,
+      hits: state.hits,
+      action_digest: derived_digest("action:" <> payload_digest),
+      payload_digest: payload_digest,
+      context_digest: derived_digest("context:" <> inspect(context)),
+      sandbox: boundary_sandbox(context)
+    })
+  end
+
+  defp boundary_opts(state) do
+    [
+      on_sensitive: Keyword.get(state.opts, :on_sensitive, :block),
+      policy: Keyword.get(state.opts, :boundary_policy),
+      hooks: Keyword.get(state.opts, :hooks, []),
+      adaptive_detector: Keyword.get(state.opts, :adaptive_detector),
+      hook_timeout_ms: Keyword.get(state.opts, :hook_timeout_ms, 5_000),
+      text: state.text || ""
+    ]
+  end
+
+  # Only supply a sandbox when the host declared an isolation level, keeping the
+  # sandbox matrix opt-in in the gate (SP.07); the gate carries no tool
+  # side-effect facts, so it never sets `tool`.
+  defp boundary_sandbox(%Context{isolation_level: nil}), do: nil
+
+  defp boundary_sandbox(%Context{isolation_level: level, sandbox_id: id}) do
+    %{"isolation_level" => level, "sandbox_id" => id}
+  end
+
+  defp boundary_phase(context_phase) do
+    case Lifecycle.from_context_phase(context_phase) do
+      {:ok, phase} -> phase
+      :error -> :tool_request
+    end
+  end
+
+  defp derived_digest(seed) do
+    Base.encode16(:crypto.hash(:sha256, seed), case: :lower)
+  end
+
+  defp boundary_matched_rules(nil), do: []
+  defp boundary_matched_rules(%Decision{matched_rules: rules}), do: rules
+
+  defp combine_with_boundary(gate, nil), do: gate
+
+  defp combine_with_boundary({gate_verdict, gate_action, _} = gate, %Decision{} = boundary) do
+    gate_rank = Verdict.rank(unified_strength(gate_verdict, gate_action))
+    boundary_rank = Verdict.rank(unified_strength(boundary.verdict, boundary.action))
+
+    if boundary_rank > gate_rank do
+      {boundary.verdict, boundary.action, boundary.reason}
+    else
+      gate
+    end
+  end
+
+  # Map a (v2 verdict, action) pair to its unified-enum strength so gate and
+  # kernel contributions combine by the SP.07 total order.
+  defp unified_strength(:blocked, :quarantine), do: :quarantine
+  defp unified_strength(:blocked, _), do: :block
+  defp unified_strength({:confirm, _}, :quarantine), do: :quarantine
+  defp unified_strength({:confirm, _}, _), do: :confirm
+  defp unified_strength(:allowed, :redact), do: :redact
+  defp unified_strength(:allowed, _), do: :allow
 
   # SP.07 closes the unified verdict enum: the repo-approval `:require_approval`
   # action (emitted outside the declared set) maps to `:confirm`, with the

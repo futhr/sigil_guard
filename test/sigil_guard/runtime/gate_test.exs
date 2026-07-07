@@ -709,6 +709,36 @@ defmodule SigilGuard.Runtime.GateTest do
       assert decision.audit_metadata.repo_policy_verdict == :require_approval
     end
 
+    test "the gate's verdict flows through BoundaryPolicy (boundary rule ids appear)" do
+      decision =
+        Gate.evaluate(%{"tool" => "read_file", "text" => "README.md"},
+          phase: :tool_request,
+          origin: :model,
+          sink: :tool,
+          trust_zone: :untrusted,
+          trust_level: :high
+        )
+
+      assert decision.action == :block
+
+      assert "boundary.untrusted.tool_request" in Enum.map(decision.matched_rules, & &1.rule_id)
+    end
+
+    test "a host-supplied boundary policy file contributes through the gate" do
+      {:ok, policy} =
+        SigilGuard.BoundaryPolicy.File.parse("version 3\n[rules]\nblock sink:external\n")
+
+      decision =
+        Gate.evaluate(
+          "clean output",
+          [phase: :outbound_model, origin: :model, sink: :external, trust_level: :high],
+          boundary_policy: policy
+        )
+
+      assert decision.action == :block
+      assert "line_3" in Enum.map(decision.matched_rules, & &1.rule_id)
+    end
+
     defp consistent_verdict?(:allowed, action), do: action in [:allow, :redact]
     defp consistent_verdict?(:blocked, action), do: action == :block
     # A confirming verdict never blocks; the post-confirmation action it carries
