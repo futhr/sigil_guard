@@ -13,15 +13,11 @@ defmodule SigilGuard do
   6. **Runtime Gating** — Boundary-aware MCP/tool request and result decisions
   7. **Repo Policy** — Deterministic repo path governance
 
-  ## Backend Configuration
+  ## Runtime Configuration
 
-  Configure the processing backend in your application config:
-
-      config :sigil_guard,
-        backend: :elixir
-
+  SigilGuard validates a closed v3 configuration surface at application boot.
   The built-in backend is native Elixir and uses OTP `:crypto`, Regex, ETS,
-  and ordinary OTP supervision.
+  and ordinary OTP supervision; no backend selector is required.
 
   ## Quick Start
 

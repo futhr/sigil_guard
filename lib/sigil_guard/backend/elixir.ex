@@ -14,11 +14,6 @@ defmodule SigilGuard.Backend.Elixir do
   This is the only built-in backend. It keeps deployment simple, avoids
   native crash risk, and uses OTP `:crypto` plus BEAM regex/ETS primitives.
 
-  ## Configuration
-
-      config :sigil_guard,
-        backend: :elixir
-
   ## Example
 
       SigilGuard.Backend.Elixir.scan("API_KEY=sk_live_abc123", [])

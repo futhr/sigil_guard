@@ -24,7 +24,8 @@ defmodule SigilGuard.ConfigTest do
     :attestation_ttl_ms,
     :max_skew_ms,
     :replay_ttl_ms,
-    :vault_master_key
+    :vault_master_key,
+    :trust_mappings
   ]
 
   setup do
@@ -152,34 +153,24 @@ defmodule SigilGuard.ConfigTest do
     end
   end
 
-  describe "backend/0" do
-    test "defaults to :elixir" do
-      Application.delete_env(:sigil_guard, :backend)
-      assert Config.backend() == :elixir
-    end
+  describe "removed v2 accessors" do
+    test "legacy config readers are not exported" do
+      removed = [
+        {:backend, 0},
+        {:protocol_profile, 0},
+        {:registry_url, 0},
+        {:registry_ttl_ms, 0},
+        {:registry_timeout_ms, 0},
+        {:registry_retry_ms, 0},
+        {:registry_enabled?, 0},
+        {:registry_require_signed_bundles?, 0},
+        {:registry_bundle_public_keys, 0},
+        {:registry_bundle_max_age_seconds, 0},
+        {:registry_bundle_clock_skew_seconds, 0}
+      ]
 
-    test "returns configured backend" do
-      Application.put_env(:sigil_guard, :backend, SigilGuard.Backend.Elixir)
-      assert Config.backend() == SigilGuard.Backend.Elixir
-    end
-  end
-
-  describe "protocol_profile/0" do
-    test "defaults to :auto" do
-      Application.delete_env(:sigil_guard, :protocol_profile)
-      assert Config.protocol_profile() == :auto
-    end
-
-    test "returns configured profile" do
-      Application.put_env(:sigil_guard, :protocol_profile, :sigil_reference_0_1)
-      assert Config.protocol_profile() == :sigil_reference_0_1
-    end
-
-    test "raises for invalid profile" do
-      Application.put_env(:sigil_guard, :protocol_profile, :bogus)
-
-      assert_raise ArgumentError, ~r/invalid :sigil_guard protocol_profile/, fn ->
-        Config.protocol_profile()
+      for {function, arity} <- removed do
+        refute function_exported?(Config, function, arity)
       end
     end
   end
@@ -191,117 +182,8 @@ defmodule SigilGuard.ConfigTest do
     end
 
     test "returns configured scanner patterns source" do
-      Application.put_env(:sigil_guard, :scanner_patterns, :registry)
-      assert Config.scanner_patterns() == :registry
-    end
-  end
-
-  describe "registry_url/0" do
-    test "defaults to nil" do
-      Application.delete_env(:sigil_guard, :registry_url)
-      assert Config.registry_url() == nil
-    end
-
-    test "returns configured URL" do
-      Application.put_env(:sigil_guard, :registry_url, "https://custom.example.com")
-      assert Config.registry_url() == "https://custom.example.com"
-    end
-  end
-
-  describe "registry_ttl_ms/0" do
-    test "returns default TTL (1 hour)" do
-      Application.delete_env(:sigil_guard, :registry_ttl_ms)
-      assert Config.registry_ttl_ms() == :timer.hours(1)
-    end
-
-    test "returns configured TTL" do
-      Application.put_env(:sigil_guard, :registry_ttl_ms, 30_000)
-      assert Config.registry_ttl_ms() == 30_000
-    end
-  end
-
-  describe "registry_timeout_ms/0" do
-    test "returns default timeout (5 seconds)" do
-      Application.delete_env(:sigil_guard, :registry_timeout_ms)
-      assert Config.registry_timeout_ms() == 5_000
-    end
-
-    test "returns configured timeout" do
-      Application.put_env(:sigil_guard, :registry_timeout_ms, 10_000)
-      assert Config.registry_timeout_ms() == 10_000
-    end
-  end
-
-  describe "registry_retry_ms/0" do
-    test "returns default retry interval (1 minute)" do
-      Application.delete_env(:sigil_guard, :registry_retry_ms)
-      assert Config.registry_retry_ms() == :timer.minutes(1)
-    end
-
-    test "returns configured retry interval" do
-      Application.put_env(:sigil_guard, :registry_retry_ms, 15_000)
-      assert Config.registry_retry_ms() == 15_000
-    end
-  end
-
-  describe "registry_enabled?/0" do
-    test "defaults to false" do
-      Application.delete_env(:sigil_guard, :registry_enabled)
-      refute Config.registry_enabled?()
-    end
-
-    test "returns configured value" do
-      Application.put_env(:sigil_guard, :registry_enabled, true)
-      assert Config.registry_enabled?()
-    end
-  end
-
-  describe "registry_require_signed_bundles?/0" do
-    test "defaults to false" do
-      Application.delete_env(:sigil_guard, :registry_require_signed_bundles)
-      refute Config.registry_require_signed_bundles?()
-    end
-
-    test "returns configured value" do
-      Application.put_env(:sigil_guard, :registry_require_signed_bundles, true)
-      assert Config.registry_require_signed_bundles?()
-    end
-  end
-
-  describe "registry_bundle_public_keys/0" do
-    test "defaults to empty map" do
-      Application.delete_env(:sigil_guard, :registry_bundle_public_keys)
-      assert Config.registry_bundle_public_keys() == %{}
-    end
-
-    test "returns configured issuer keys" do
-      keys = %{"did:sigil:registry" => "pub"}
-      Application.put_env(:sigil_guard, :registry_bundle_public_keys, keys)
-      assert Config.registry_bundle_public_keys() == keys
-    end
-  end
-
-  describe "registry_bundle_max_age_seconds/0" do
-    test "defaults to nil" do
-      Application.delete_env(:sigil_guard, :registry_bundle_max_age_seconds)
-      assert Config.registry_bundle_max_age_seconds() == nil
-    end
-
-    test "returns configured maximum bundle age" do
-      Application.put_env(:sigil_guard, :registry_bundle_max_age_seconds, 86_400)
-      assert Config.registry_bundle_max_age_seconds() == 86_400
-    end
-  end
-
-  describe "registry_bundle_clock_skew_seconds/0" do
-    test "defaults to 60 seconds" do
-      Application.delete_env(:sigil_guard, :registry_bundle_clock_skew_seconds)
-      assert Config.registry_bundle_clock_skew_seconds() == 60
-    end
-
-    test "returns configured clock skew" do
-      Application.put_env(:sigil_guard, :registry_bundle_clock_skew_seconds, 10)
-      assert Config.registry_bundle_clock_skew_seconds() == 10
+      Application.put_env(:sigil_guard, :scanner_patterns, :bundle)
+      assert Config.scanner_patterns() == :bundle
     end
   end
 

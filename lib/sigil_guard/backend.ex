@@ -6,11 +6,6 @@ defmodule SigilGuard.Backend do
   remains as an extension point for applications that need a custom scanner,
   signer, policy, or audit implementation behind the public facade.
 
-  ## Configuration
-
-      config :sigil_guard,
-        backend: :elixir
-
   ## Example
 
       # Get the configured backend module

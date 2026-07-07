@@ -1789,7 +1789,7 @@ section is post-3.0.0 parking; neither is counted here.
     v3 fail-closed behavior and point to Agent Trust attestations instead of
     showing sign/verify examples. A README/lib/docs scan confirms no public
     example calls `SigilGuard.Envelope`, `sign_envelope`, or `verify_envelope`.
-- [ ] M6.08 `SigilGuard.Config` strict closed-key validation.
+- [x] M6.08 `SigilGuard.Config` strict closed-key validation.
   - Spec: `SP.01` - V3 Configuration Surface.
   - AC: `SigilGuard.Config.validate!/0` runs at `Application.start/2` and
     fails closed with `SigilGuard.ConfigError`: reason
@@ -1799,6 +1799,13 @@ section is post-3.0.0 parking; neither is counted here.
     `:http_client`, `:attestation_ttl_ms`, `:max_skew_ms`,
     `:replay_ttl_ms`, `:vault_master_key`) validate per their table rows.
   - Tests: negative (per kept-key validation rule), malformed.
+  - Done: `validate!/0` already runs from `Application.start/2`; tightened
+    the public config surface by deleting removed v2 accessors
+    (`backend`, `protocol_profile`, and all `registry_*` readers), removing
+    backend-selector examples from ExDoc, and keeping only v3 schema-backed
+    readers. Config tests now assert kept-key defaults/validation, removed
+    key/value `ConfigError` behavior, malformed values, cross-option failure,
+    and absence of legacy accessor exports.
 - [ ] M6.09 Removed-key error matrix.
   - Spec: `SP.01` - Removed Keys; `SP.12` - V3 Removal Map.
   - AC: `:backend`, `:protocol_profile`, all nine `registry_*` keys, and
