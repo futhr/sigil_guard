@@ -178,24 +178,17 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
                package["name"] == "jason" and package["versionInfo"] == "1.4.5"
              end)
 
-      assert MapSet.member?(package_names, "finch")
-      assert MapSet.member?(package_names, "mint")
+      refute MapSet.member?(package_names, "finch")
+      refute MapSet.member?(package_names, "mint")
       refute MapSet.member?(package_names, "credo")
       refute MapSet.member?(package_names, "benchee")
 
       assert direct_dependency_ids(sbom) ==
                MapSet.new([
-                 "SPDXRef-Package-finch",
                  "SPDXRef-Package-jason",
                  "SPDXRef-Package-nimble-options",
                  "SPDXRef-Package-telemetry"
                ])
-
-      assert Enum.any?(sbom["relationships"], fn relationship ->
-               relationship["spdxElementId"] == "SPDXRef-Package-finch" and
-                 relationship["relationshipType"] == "DEPENDS_ON" and
-                 relationship["relatedSpdxElement"] == "SPDXRef-Package-mint"
-             end)
     end
 
     test "excludes non-runtime two-tuple keyword dependencies" do

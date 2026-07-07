@@ -140,6 +140,28 @@ defmodule SigilGuard.RegistryRemovalTest do
                id in [SigilGuard.Finch, @cache_module] or @cache_module in List.wrap(modules)
              end)
     end
+
+    test "runtime source has no Finch dependency or callsite" do
+      direct_deps =
+        Mix.Project.config()
+        |> Keyword.fetch!(:deps)
+        |> Enum.map(fn
+          {app, _requirement} -> app
+          {app, _requirement, _opts} -> app
+        end)
+
+      refute :finch in direct_deps
+
+      runtime_finch_references =
+        "lib/sigil_guard/**/*.ex"
+        |> Path.wildcard()
+        |> Enum.filter(fn path ->
+          source = File.read!(path)
+          String.contains?(source, "Finch.") or String.contains?(source, "SigilGuard.Finch")
+        end)
+
+      assert runtime_finch_references == []
+    end
   end
 
   describe "v3 legacy profile removal" do

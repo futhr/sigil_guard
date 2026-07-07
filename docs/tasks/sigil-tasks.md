@@ -1835,7 +1835,7 @@ section is post-3.0.0 parking; neither is counted here.
     legacy file is not used as a fallback or accepted beside a v3/explicit
     candidate, and added the four-row filename migration table to
     `MIGRATING-3.0.md`.
-- [ ] M6.11 Remove finch and the `SigilGuard.Finch` pool.
+- [x] M6.11 Remove finch and the `SigilGuard.Finch` pool.
   - Spec: `SP.12` - Dependency Removal (D9); `SP.05` -
     SigilGuard.HTTPClient Behaviour (D9).
   - AC: `{:finch, _}` leaves `mix.exs`; the pool leaves the application
@@ -1843,6 +1843,13 @@ section is post-3.0.0 parking; neither is counted here.
     the anchor store runs solely on `SigilGuard.HTTPClient` (M5.11); a
     reference finch adapter remains documentation only.
   - Tests: negative (boot without finch), no-network sweep stays green.
+  - Done: removed the direct `:finch` runtime dependency from `mix.exs` and
+    replaced the test-support Finch adapter/pool with a `SigilGuard.TestHTTPClient`
+    adapter over Erlang `:httpc`. Extended removal coverage to assert no direct
+    `:finch` dependency remains, the application supervisor has no
+    `SigilGuard.Finch` child, and runtime source has no `Finch.` or
+    `SigilGuard.Finch` callsite while the anchor HTTP store still runs through
+    `SigilGuard.HTTPClient`.
 - [ ] M6.12 Runtime dependency-set assertion test.
   - Spec: `SP.12` - Dependency Removal (D9).
   - AC: a permanent test fails whenever the runtime dependency set differs

@@ -18,8 +18,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
 
   setup do
     bypass = Bypass.open()
-    start_supervised!({Finch, name: SigilGuard.Finch})
-    Application.put_env(:sigil_guard, :http_client, SigilGuard.FinchHTTPClient)
+    Application.put_env(:sigil_guard, :http_client, SigilGuard.TestHTTPClient)
     on_exit(fn -> Application.delete_env(:sigil_guard, :http_client) end)
     %{bypass: bypass, url: "http://localhost:#{bypass.port}"}
   end

@@ -247,7 +247,7 @@ go/no-go gate.
 - [ ] The runtime dependency-set assertion test is in the tree and fails
       when the set differs from `:telemetry`, `:nimble_options`, and `jason`
       plus OTP/stdlib applications.
-- [ ] `:nimble_options` is adopted for config/option validation; zero finch
+- [x] `:nimble_options` is adopted for config/option validation; zero finch
       references remain in the runtime tree after M6.
 - [ ] The 0.2.1 package diff against 0.2.0 contains zero `lib/` changes.
 - [ ] A post-tag `mix git_ops.release --dry-run` resumes cleanly after the
@@ -270,7 +270,7 @@ go/no-go gate.
 - [ ] Move old registry tests to migration/removal tests.
 - [ ] M1: adopt `:nimble_options` for config/option schemas; keep `jason`;
       floor `~> 1.18`.
-- [ ] M6: remove finch; rebuild the anchor store on `SigilGuard.HTTPClient` (SP.05).
+- [x] M6: remove finch; rebuild the anchor store on `SigilGuard.HTTPClient` (SP.05).
 - [ ] M6: land the dependency-set assertion test pinning `:telemetry`,
       `:nimble_options`, and `jason`.
 - [ ] M8: execute the D11 release sequence with its go/no-go gates.

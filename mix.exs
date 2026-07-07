@@ -50,7 +50,6 @@ defmodule SigilGuard.MixProject do
   defp deps do
     [
       # Core
-      {:finch, "~> 0.19"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:telemetry, "~> 1.0"},

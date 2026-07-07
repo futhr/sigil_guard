@@ -763,7 +763,7 @@ are unchanged.
       true`; the rename table is test-covered.
 - [ ] CloudEvents projection emits `specversion` `1.0`, type
       `io.sigilguard.decision.v1`, privacy-filtered `data` only.
-- [ ] The HTTP anchor store has zero direct `Finch.` calls and fails with
+- [x] The HTTP anchor store has zero direct `Finch.` calls and fails with
       `:http_client_not_configured` when no client resolves; LocalFile is
       unchanged.
 - [ ] Tagged releases produce SLSA v1 provenance and the SPDX SBOM, run
@@ -790,7 +790,7 @@ cut lands in M6 per SP.12.
       no-network tests.
 - [ ] M5: release workflow: `attest-build-provenance`, SBOM attachment,
       `gh attestation verify` gate, SP.01 `release` statement.
-- [ ] M6: remove finch and the `SigilGuard.Finch` pool per SP.12;
+- [x] M6: remove finch and the `SigilGuard.Finch` pool per SP.12;
       runtime-dependency assertion test.
 
 ## Success Metrics
