@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 129 / 228 tasks done (57%).** Milestones: 5 complete, 1 partial,
-4 not started. **99 tasks left.** Current milestone: **M4** (20/25, 80%).
+**Overall: 130 / 228 tasks done (57%).** Milestones: 5 complete, 1 partial,
+4 not started. **98 tasks left.** Current milestone: **M4** (21/25, 84%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -73,18 +73,18 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 | Core groundwork | 19 | 19 | 100% | Complete |
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
-| M4 | Boundary scanner and policy kernel | 20 | 25 | 80% | In progress |
+| M4 | Boundary scanner and policy kernel | 21 | 25 | 84% | In progress |
 | M5 | Audit, telemetry, provenance, threat suite | 0 | 26 | 0% | Not started |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **129** | **228** | **57%** | 5 done / 1 partial / 4 to go |
+| — | **Total** | **130** | **228** | **57%** | 5 done / 1 partial / 4 to go |
 
-### What's left (99 tasks)
+### What's left (98 tasks)
 
-- **M4 - 5 left:** M4.08 runtime-gate rewire onto `BoundaryPolicy`; M4.20
-  pattern-set split + bundle wiring; M4.23-M4.24 streaming property tests +
-  split-secret vectors; M4.25 config-driven trust mapping.
+- **M4 - 4 left:** M4.08 runtime-gate rewire onto `BoundaryPolicy`; M4.20
+  pattern-set split + bundle wiring; M4.24 curated split-secret vector file;
+  M4.25 config-driven trust mapping.
 - **M5 - 26:** audit, telemetry, provenance, and the threat-model test suite.
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
@@ -1093,7 +1093,7 @@ section is post-3.0.0 parking; neither is counted here.
     largest active `max_match_bytes` when the configured window is
     smaller.
   - Tests: negative, property (window >= max pattern bound).
-- [ ] M4.23 Streaming property tests: every byte-offset split.
+- [x] M4.23 Streaming property tests: every byte-offset split.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Streaming Property-Test Specification (Generators; Latency Budget).
   - AC: for every secret-pattern fixture text: exhaustive two-chunk splits

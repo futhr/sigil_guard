@@ -5,8 +5,10 @@ defmodule SigilGuard.Runtime.StreamTest do
 
   use ExUnitProperties
 
+  alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.Patterns
+  alias SigilGuard.Runtime.Gate
   alias SigilGuard.Runtime.Stream
 
   describe "push/2 and finish/1" do
@@ -98,6 +100,89 @@ defmodule SigilGuard.Runtime.StreamTest do
       assert third_decision == second_decision
       assert first <> second <> third =~ "safe"
       refute first <> second <> third =~ "Ignore previous instructions"
+    end
+  end
+
+  describe "streaming equivalence (SP.04)" do
+    @stream_ctx [phase: :tool_result, sink: :model, trust_level: :medium]
+
+    # Secret-bearing fixtures: ASCII secrets, plus multi-byte and grapheme
+    # codepoints adjacent to the secret to exercise mid-codepoint splits.
+    @secret "AKIAIOSFODNN7EXAMPLE"
+    @fixtures [
+      "log line #{@secret} end of line",
+      "café #{@secret} 日本語",
+      "emoji 👨‍👩‍👧 #{@secret} combining é tail"
+    ]
+
+    defp single_shot(text) do
+      decision = Gate.evaluate(text, Context.new(@stream_ctx), [])
+      assert Decision.allowed?(decision)
+      decision.sanitized_text || ""
+    end
+
+    defp stream_output(chunks) do
+      {stream, emitted} =
+        Enum.reduce(chunks, {Stream.new(@stream_ctx, []), []}, fn chunk, {stream, acc} ->
+          {stream, decision, piece} = Stream.push(stream, chunk)
+          assert decision.verdict == :allowed
+          # No emitted prefix ever carries the raw secret bytes (SP.04).
+          refute piece =~ @secret
+          {stream, [piece | acc]}
+        end)
+
+      {_, final_decision, final} = Stream.finish(stream)
+      assert final_decision.verdict == :allowed
+      IO.iodata_to_binary([Enum.reverse(emitted), final])
+    end
+
+    defp two_chunk_splits(text) do
+      for offset <- 1..(byte_size(text) - 1) do
+        [binary_part(text, 0, offset), binary_part(text, offset, byte_size(text) - offset)]
+      end
+    end
+
+    defp all_one_byte(text), do: for(<<byte <- text>>, do: <<byte>>)
+
+    defp chunk_by_cuts(text, cuts) do
+      cut_positions = for {true, i} <- Enum.with_index(cuts, 1), do: i
+      positions = Enum.uniq(Enum.concat([[0], cut_positions, [byte_size(text)]]))
+
+      positions
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.map(fn [a, b] -> binary_part(text, a, b - a) end)
+      |> Enum.reject(&(&1 == ""))
+    end
+
+    test "every two-chunk byte split reconstructs the single-shot output" do
+      for text <- @fixtures, chunks <- two_chunk_splits(text) do
+        assert stream_output(chunks) == single_shot(text), inspect({text, chunks})
+      end
+    end
+
+    test "all-1-byte chunking (mid-codepoint splits) reconstructs the output" do
+      for text <- @fixtures do
+        output = stream_output(all_one_byte(text))
+        assert output == single_shot(text)
+        assert String.valid?(output)
+      end
+    end
+
+    test "the single-shot output redacts the secret and stays valid UTF-8" do
+      for text <- @fixtures do
+        output = single_shot(text)
+        refute output =~ @secret
+        assert output =~ "[AWS_KEY]"
+        assert String.valid?(output)
+      end
+    end
+
+    property "any random multi-chunk partition reconstructs the single-shot output" do
+      check all(text <- member_of(@fixtures), cuts <- list_of(boolean(), length: 24)) do
+        cuts = Enum.take(cuts, byte_size(text) - 1)
+        chunks = chunk_by_cuts(text, cuts)
+        assert stream_output(chunks) == single_shot(text)
+      end
     end
   end
 
