@@ -20,6 +20,20 @@ defmodule SigilGuard.BoundaryPolicy.File do
 
   @max_bytes 256 * 1024
   @version_line "version 3"
+
+  @default_candidates [
+    "SIGILGUARD_POLICY",
+    ".sigilguard-policy",
+    ".sigilguard/policy",
+    ".github/sigilguard-policy"
+  ]
+
+  @legacy_replacements [
+    {"SIGIL_POLICY", "SIGILGUARD_POLICY"},
+    {".sigil-policy", ".sigilguard-policy"},
+    {".sigil/policy", ".sigilguard/policy"},
+    {".github/sigil-policy", ".github/sigilguard-policy"}
+  ]
   @sections ~w([rules] [repo] [contracts])
   @section_regex ~r/^\[[a-z_]+\]$/
   @decisions ~w(allow redact confirm quarantine block)
@@ -96,6 +110,78 @@ defmodule SigilGuard.BoundaryPolicy.File do
   @spec digest(binary()) :: String.t()
   def digest(bytes) when is_binary(bytes) do
     Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+  end
+
+  @doc """
+  Load and parse the boundary policy from a repo root (D13, SP.11).
+
+  Candidate paths are checked in order: `SIGILGUARD_POLICY`,
+  `.sigilguard-policy`, `.sigilguard/policy`, `.github/sigilguard-policy`. A
+  legacy filename (`SIGIL_POLICY`, `.sigil-policy`, `.sigil/policy`,
+  `.github/sigil-policy`) present under the repo root fails closed with
+  `{:error, {:legacy_policy_filename, found, use}}` - even when a new-name file
+  also exists. There is no silent fallback or coexistence; candidate paths
+  resolve inside the repo root only.
+  """
+  @spec load(Path.t(), keyword()) ::
+          {:ok, t()}
+          | {:error,
+             parse_error()
+             | :not_found
+             | {:legacy_policy_filename, Path.t(), Path.t()}}
+  def load(repo_root, opts \\ []) when is_binary(repo_root) do
+    root = Path.expand(repo_root)
+
+    with :ok <- reject_legacy(root, opts) do
+      candidates = Keyword.get(opts, :candidates, @default_candidates)
+
+      case first_existing(root, candidates) do
+        nil -> {:error, :not_found}
+        path -> read_and_parse(path, opts)
+      end
+    end
+  end
+
+  defp reject_legacy(root, opts) do
+    legacy = Keyword.get(opts, :legacy_replacements, @legacy_replacements)
+
+    Enum.reduce_while(legacy, :ok, fn {found_name, use_name}, :ok ->
+      path = Path.expand(found_name, root)
+
+      if inside_root?(root, path) and File.regular?(path) do
+        {:halt, {:error, {:legacy_policy_filename, path, use_name}}}
+      else
+        {:cont, :ok}
+      end
+    end)
+  end
+
+  defp first_existing(root, candidates) do
+    Enum.find_value(candidates, fn relative ->
+      path = Path.expand(relative, root)
+      if inside_root?(root, path) and File.regular?(path), do: path
+    end)
+  end
+
+  # sobelow_skip ["Traversal.FileModule"]
+  defp read_and_parse(path, opts) do
+    max_bytes = Keyword.get(opts, :max_bytes, @max_bytes)
+
+    with {:ok, %{type: :regular, size: size}} <- File.stat(path),
+         :ok <- within_size(size, max_bytes),
+         {:ok, bytes} <- File.read(path) do
+      parse(bytes)
+    else
+      {:error, :policy_too_large} -> {:error, :policy_too_large}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp within_size(size, max_bytes) when size <= max_bytes, do: :ok
+  defp within_size(_, _), do: {:error, :policy_too_large}
+
+  defp inside_root?(root, path) do
+    path == root or String.starts_with?(path, root <> "/")
   end
 
   # -- Top-level line walk ----------------------------------------------------

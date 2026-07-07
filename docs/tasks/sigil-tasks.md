@@ -70,12 +70,12 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
 | M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
-| M4 - Boundary scanner and policy kernel | 25 | 5 | 0 | 20 |
+| M4 - Boundary scanner and policy kernel | 25 | 6 | 0 | 19 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **114** | **0** | **114** |
+| **Total** | **228** | **115** | **0** | **113** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -916,7 +916,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `canonical.expected.json` reproducing rules, contracts, repo section,
     and digest byte-deterministically.
   - Tests: golden vectors, negative.
-- [ ] M4.06 D13 policy filenames and the legacy-filename typed error.
+- [x] M4.06 D13 policy filenames and the legacy-filename typed error.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` - Policy
     Filenames (D13, Jointly Owned With SP.11);
     `docs/specs/SP.11-repo-policy-kernel-contracts.md` - V3 Policy
