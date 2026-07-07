@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 152 / 228 tasks done (67%).** Milestones: 6 complete, 1 partial,
-3 not started. **76 tasks left.** Current milestone: **M5** (18/26, 69%).
+**Overall: 153 / 228 tasks done (67%).** Milestones: 6 complete, 1 partial,
+3 not started. **75 tasks left.** Current milestone: **M5** (19/26, 73%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 18 | 26 | 69% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 19 | 26 | 73% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **152** | **228** | **67%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **153** | **228** | **67%** | 6 done / 1 partial / 3 to go |
 
-### What's left (76 tasks)
+### What's left (75 tasks)
 
-- **M5 - 8 left:** the threat-model test suite TM.05-TM.12
-  (move-don't-duplicate). (M5.01-M5.18 done, incl. TM.01-TM.04.)
+- **M5 - 7 left:** the threat-model test suite TM.06-TM.12
+  (move-don't-duplicate). (M5.01-M5.19 done, incl. TM.01-TM.05.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1502,12 +1502,27 @@ section is post-3.0.0 parking; neither is counted here.
     `:schema_digest_mismatch` via `verify_manifest/2` (detects). Negative
     (benign allowed), tamper (undisclosed/drifted schemas), and malformed
     (bad `suspicious_params` list, empty/unknown manifest) fail closed.
-- [ ] M5.19 TM.05 threat family - rug pull / TOFU drift.
+- [x] M5.19 TM.05 threat family - rug pull / TOFU drift.
   - Spec: `R.06` - Control Mapping rows 5 and 18; `SP.03` (list_changed).
   - AC: `.../tm05_rug_pull_test.exs` proves drift rejection and that
     `tools/list_changed` drops cached approvals and forces re-verification,
     covering the config-swap analog (mitigates).
   - Tests: negative, tamper, replay.
+  - Done: added the TM.05 module (R.06 rows 5 and 18, ASI04/ASI05, claim
+    **mitigates**; row 18 out-of-scope for the IDE, mitigates the analogous
+    config-swap pattern) citing the rug-pull / Cursor "MCPoison"
+    (CVE-2025-54136) attack and referencing the base tests by exact name.
+    Drives re-verification and token binding with rug-pull fixtures: a swapped
+    description or input schema on a `tools/list_changed` refresh is rejected by
+    `verify_list_changed/2` (`:manifest_digest_mismatch` / `:schema_digest_mismatch`)
+    while an unchanged tool re-lists cleanly; a confirmation token bound to the
+    benign manifest digest stops applying once the tool rug-pulls or its config
+    is swapped (version bump) - `Confirmation.verify/5` fails
+    `:manifest_digest_mismatch`, so any change forces fresh confirmation
+    (the config-swap analog for row 18). Replay (single-use consume then
+    `:replay_detected`), expiration (`:expired` past TTL), and malformed
+    (non-list refresh -> `:invalid_manifest`) fail closed. Uses real
+    `CapabilityManifest.digest/1` values so the drift is a genuine digest change.
 - [ ] M5.20 TM.06 threat family - confused deputy and consent replay.
   - Spec: `R.06` - Control Mapping rows 6 and 21; `SP.01`, `SP.03`.
   - AC: `.../tm06_confused_deputy_test.exs` proves audience/resource/actor
