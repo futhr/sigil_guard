@@ -21,6 +21,14 @@ defmodule SigilGuard.Audit.ProofTest do
       assert File.read!(Fixture.path("consistency_3_5.json")) == Fixture.consistency_json(3)
       assert File.read!(Fixture.path("consistency_4_5.json")) == Fixture.consistency_json(4)
       assert File.read!(Fixture.path("checkpoint_5.json")) == Fixture.checkpoint_json()
+      assert File.read!(Fixture.path("expected.json")) == Fixture.expected_json()
+    end
+
+    test "the checkpoint-state statement matches the committed golden vector" do
+      {:ok, statement} = Checkpoint.to_statement(Fixture.checkpoint())
+      assert statement == load("expected.json")["checkpoint_statement"]
+      assert statement["predicate"]["merkle_root"] == @root_5
+      assert statement["predicate"]["tree_size"] == "5"
     end
 
     test "roots at each size match the normative construction" do

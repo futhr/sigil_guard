@@ -378,6 +378,61 @@ defmodule SigilGuard.Audit.CheckpointTest do
     end
   end
 
+  describe "to_statement/1" do
+    test "builds the checkpoint-state in-toto statement" do
+      {:ok, checkpoint} = create_checkpoint(build_signed_chain(3))
+      assert {:ok, statement} = Checkpoint.to_statement(checkpoint)
+
+      assert statement["_type"] == "https://in-toto.io/Statement/v1"
+      assert statement["predicateType"] == "https://sigilguard.dev/audit-checkpoint-state/v1"
+
+      predicate = statement["predicate"]
+      assert predicate["merkle_root"] == checkpoint["merkle_root"]
+      assert predicate["generated_at"] == @generated_at
+      assert predicate["profile"] == "sigil_guard_agent_trust/v1"
+      # tree_size is the event count as a JSON string (SP.01 growable counter).
+      assert predicate["tree_size"] == "3"
+      assert predicate["chain_id"] == "chain-a"
+
+      assert statement["subject"] == [
+               %{"name" => "checkpoint", "digest" => %{"sha256" => Checkpoint.digest(checkpoint)}}
+             ]
+    end
+
+    test "the subject digest is identical for the signed and unsigned record" do
+      {:ok, unsigned} = create_checkpoint(build_signed_chain(2))
+      signed = Checkpoint.sign(unsigned, TestSigner, issuer: @issuer, issued_at: @generated_at)
+
+      {:ok, unsigned_statement} = Checkpoint.to_statement(unsigned)
+      {:ok, signed_statement} = Checkpoint.to_statement(signed)
+
+      assert subject_digest(unsigned_statement) == Checkpoint.digest(unsigned)
+      assert subject_digest(signed_statement) == subject_digest(unsigned_statement)
+    end
+
+    test "omits chain_id when the checkpoint has none" do
+      {:ok, checkpoint} = Checkpoint.create(build_signed_chain(1), generated_at: @generated_at)
+      assert {:ok, statement} = Checkpoint.to_statement(checkpoint)
+      refute Map.has_key?(statement["predicate"], "chain_id")
+    end
+
+    test "a malformed or non-checkpoint map fails :invalid_checkpoint" do
+      {:ok, checkpoint} = create_checkpoint(build_signed_chain(1))
+
+      assert Checkpoint.to_statement("nope") == {:error, :invalid_checkpoint}
+      assert Checkpoint.to_statement(%{}) == {:error, :invalid_checkpoint}
+      assert Checkpoint.to_statement(%{"kind" => "other"}) == {:error, :invalid_checkpoint}
+
+      assert Checkpoint.to_statement(Map.delete(checkpoint, "merkle_root")) ==
+               {:error, :invalid_checkpoint}
+
+      assert Checkpoint.to_statement(%{checkpoint | "version" => 2}) ==
+               {:error, :invalid_checkpoint}
+    end
+  end
+
+  defp subject_digest(statement), do: hd(statement["subject"])["digest"]["sha256"]
+
   defp signed_checkpoint(events \\ build_signed_chain(2)) do
     {:ok, checkpoint} = create_checkpoint(events)
     Checkpoint.sign(checkpoint, TestSigner, issuer: @issuer, issued_at: @generated_at)

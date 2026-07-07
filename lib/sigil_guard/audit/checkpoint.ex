@@ -20,12 +20,15 @@ defmodule SigilGuard.Audit.Checkpoint do
   leaking audit metadata.
   """
 
+  alias SigilGuard.Attestation.Statement
   alias SigilGuard.Audit
 
   @kind "sigil_guard.audit.checkpoint"
   @version 1
   @algorithm "sha256-merkle-v1"
   @signature_algorithm "Ed25519"
+  @checkpoint_state_predicate_type "https://sigilguard.dev/audit-checkpoint-state/v1"
+  @checkpoint_profile "sigil_guard_agent_trust/v1"
   @empty_root_input "sigil-audit-empty-v1"
   @leaf_prefix "sigil-audit-leaf-v1:"
   @node_prefix "sigil-audit-node-v1:"
@@ -195,6 +198,30 @@ defmodule SigilGuard.Audit.Checkpoint do
   end
 
   @doc """
+  Build the DSSE checkpoint-state statement for `checkpoint` (SP.05, SP.09).
+
+  Returns the in-toto Statement whose registered predicate type is
+  `https://sigilguard.dev/audit-checkpoint-state/v1` and whose predicate binds
+  the audit state `(merkle_root, tree_size, generated_at)` - `tree_size` is the
+  event count as a JSON string per the SP.01 growable-counter rule, and
+  `chain_id` is included only when present. The single subject `checkpoint` is
+  digested with `digest/1` over the unchanged local record, so signed and
+  unsigned checkpoints yield the same subject digest. This wraps exports and
+  cosigning only; the local checkpoint record is never modified.
+
+  A checkpoint missing the required fields fails `{:error, :invalid_checkpoint}`.
+  """
+  @spec to_statement(t()) :: {:ok, map()} | {:error, :invalid_checkpoint}
+  def to_statement(checkpoint) when is_map(checkpoint) do
+    case verify_static_fields(checkpoint) do
+      :ok -> {:ok, checkpoint_statement(checkpoint)}
+      {:error, _} -> {:error, :invalid_checkpoint}
+    end
+  end
+
+  def to_statement(_), do: {:error, :invalid_checkpoint}
+
+  @doc """
   Sign a checkpoint with an Ed25519 `SigilGuard.Signer` module.
 
   Options:
@@ -297,6 +324,33 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp require_integer(value, _) when is_integer(value) and value >= 0, do: :ok
   defp require_integer(_, reason), do: {:error, reason}
+
+  defp checkpoint_statement(checkpoint) do
+    %{
+      "_type" => Statement.statement_type(),
+      "predicateType" => @checkpoint_state_predicate_type,
+      "predicate" => checkpoint_predicate(checkpoint),
+      "subject" => [
+        %{"name" => "checkpoint", "digest" => %{"sha256" => digest(checkpoint)}}
+      ]
+    }
+  end
+
+  defp checkpoint_predicate(checkpoint) do
+    base = %{
+      "generated_at" => field(checkpoint, "generated_at"),
+      "merkle_root" => field(checkpoint, "merkle_root"),
+      "profile" => @checkpoint_profile,
+      "tree_size" => Integer.to_string(field(checkpoint, "event_count"))
+    }
+
+    put_chain_id(base, field(checkpoint, "chain_id"))
+  end
+
+  defp put_chain_id(predicate, chain_id) when is_binary(chain_id),
+    do: Map.put(predicate, "chain_id", chain_id)
+
+  defp put_chain_id(predicate, _), do: predicate
 
   defp generated_at(opts) do
     case Keyword.get_lazy(opts, :generated_at, &timestamp/0) do

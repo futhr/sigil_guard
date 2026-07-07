@@ -84,6 +84,13 @@ defmodule SigilGuard.AuditProofFixture do
     Checkpoint.sign(unsigned, SeedSigner, issuer: @issuer, issued_at: @generated_at)
   end
 
+  @doc false
+  @spec statement() :: map()
+  def statement do
+    {:ok, statement} = Checkpoint.to_statement(checkpoint())
+    statement
+  end
+
   # -- Fixture files ----------------------------------------------------------
 
   @doc false
@@ -96,6 +103,7 @@ defmodule SigilGuard.AuditProofFixture do
     File.write!(path("consistency_3_5.json"), consistency_json(3))
     File.write!(path("consistency_4_5.json"), consistency_json(4))
     File.write!(path("checkpoint_5.json"), checkpoint_json())
+    File.write!(path("expected.json"), expected_json())
     :ok
   end
 
@@ -135,6 +143,10 @@ defmodule SigilGuard.AuditProofFixture do
   @doc false
   @spec checkpoint_json() :: binary()
   def checkpoint_json, do: encode(checkpoint())
+
+  @doc false
+  @spec expected_json() :: binary()
+  def expected_json, do: encode(%{"checkpoint_statement" => statement()})
 
   # -- Helpers ----------------------------------------------------------------
 

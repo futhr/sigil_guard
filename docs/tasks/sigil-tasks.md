@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 136 / 228 tasks done (60%).** Milestones: 6 complete, 1 partial,
-3 not started. **92 tasks left.** Current milestone: **M5** (2/26, 8%).
+**Overall: 137 / 228 tasks done (60%).** Milestones: 6 complete, 1 partial,
+3 not started. **91 tasks left.** Current milestone: **M5** (3/26, 12%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 2 | 26 | 8% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 3 | 26 | 12% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **136** | **228** | **60%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **137** | **228** | **60%** | 6 done / 1 partial / 3 to go |
 
-### What's left (92 tasks)
+### What's left (91 tasks)
 
-- **M5 - 24 left:** DSSE checkpoints, witness cosigning, signed exports, privacy
-  classification, OTel/CloudEvents, audit query, and the threat-model test
-  suite. (M5.01 inclusion + M5.02 consistency proofs done.)
+- **M5 - 23 left:** witness cosigning, signed exports, privacy classification,
+  OTel/CloudEvents, audit query, and the threat-model test suite. (M5.01
+  inclusion + M5.02 consistency proofs + M5.03 DSSE checkpoint statements done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1196,7 +1196,7 @@ section is post-3.0.0 parking; neither is counted here.
     for every size 1..256, plus StreamData round-trip properties for random
     consistency `m <= n` and inclusion leaves. Negative/tamper coverage:
     forked roots, tampered/truncated/over-long node lists, unparseable roots.
-- [ ] M5.03 DSSE checkpoint statements.
+- [x] M5.03 DSSE checkpoint statements.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Witness
     Cosigning (checkpoint statement);
     `docs/specs/SP.09-audit-chain-and-anchor-contracts.md` - Normative
@@ -1206,6 +1206,16 @@ section is post-3.0.0 parking; neither is counted here.
     exactly `(merkle_root, tree_size, generated_at)`; existing checkpoint
     records are unchanged.
   - Tests: golden vectors, negative, malformed.
+  - Done: added `Checkpoint.to_statement/1` building the in-toto Statement
+    whose predicate binds `(merkle_root, tree_size, generated_at)` -
+    `tree_size` the event count as a JSON string, `chain_id` included only
+    when present, `profile` `sigil_guard_agent_trust/v1` - with a single
+    `checkpoint` subject digested by `digest/1` over the unchanged local
+    record (signed and unsigned yield the same subject digest). Validates via
+    the existing `verify_static_fields/1` (malformed/non-checkpoint maps fail
+    `:invalid_checkpoint`). Committed the `expected.json` golden statement
+    (byte-identical regeneration asserted); the local record is never
+    modified.
 - [ ] M5.04 Witness cosigning and threshold verification.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Witness
     Cosigning.
