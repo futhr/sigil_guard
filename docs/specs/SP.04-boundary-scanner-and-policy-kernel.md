@@ -105,6 +105,15 @@ Allow-side contributions take effect only where no stronger contribution
 exists. Output contracts run after combination, on content the final verdict
 permits to cross.
 
+This list is the kernel's own combination. When the runtime gate (SP.07)
+evaluates through `BoundaryPolicy`, it treats the kernel verdict as one
+contribution and composes additional gate-owned signals it alone observes -
+scanner failure (fail-closed block), the richer `Quarantine.inspect`
+gradations (`:blocked`/`:suspicious` with the `tool_result`+`:model` confirm
+downgrade), and the D17 risk×trust ladder - by the same strongest-wins rule.
+See SP.07 *Gate ↔ Kernel Delegation*. `BoundaryPolicy.evaluate/2` used directly
+by a host applies only the kernel contributions above.
+
 ### Data Flow
 
 ```mermaid
@@ -179,6 +188,15 @@ or host-loaded values.
 malformed-input block). An absent (`nil`) level is valid context input and is
 treated as untrusted by policy. An omitted level is byte-distinct from
 `"none"` in the SP.01 context digest; policy treats both as untrusted.
+
+**Runtime-gate default (SP.07).** Standalone `BoundaryPolicy.evaluate/2` is
+fail-closed as above. In the runtime gate the matrix is **opt-in by presence**:
+it applies at the tool phases only when the boundary carries a `sandbox`
+(isolation level) or a `tool` with a verified `manifest_digest`. A tool-phase
+boundary with neither yields no sandbox contribution, so hosts that have not
+declared tool/sandbox context are not auto-quarantined; once a host declares
+either, the full matrix (including the `absent`/`:none` quarantine default)
+applies. See SP.07 *Gate ↔ Kernel Delegation*.
 
 `absent` is NOT a member of the `isolation_level` enum — it is the nil /
 no-value case. The four enum values are the only values `Context` stores or

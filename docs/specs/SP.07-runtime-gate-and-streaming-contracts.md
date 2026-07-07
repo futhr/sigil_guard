@@ -87,10 +87,62 @@ sequenceDiagram
 |-----------------|-----------|
 | `SigilGuard.Context` | Replace or wrap with `SigilGuard.Boundary` normalized context. |
 | `SigilGuard.Decision` | Unify verdict vocabulary and add typed fields per the V3 Decision Contract below. |
-| `SigilGuard.Runtime.Gate` | Delegate policy evaluation to `BoundaryPolicy.evaluate/1` (SP.04); the gate keeps extraction, scanning, and decision assembly. |
+| `SigilGuard.Runtime.Gate` | Evaluate the boundary policy through `BoundaryPolicy.evaluate/2` (SP.04) as a decision contribution; the gate keeps extraction, scanning, quarantine inspection, output sanitization, confirmation, and decision assembly. See *Gate ↔ Kernel Delegation* below. |
 | `SigilGuard.Runtime.Stream` | Keep holdback logic; bind stream chunks to payload/context digests. Property-test obligations live in SP.04's Streaming Property-Test Specification. |
 | `SigilGuard.Quarantine` indicators | Become bundle-provided and pluggable; the current seven ship as built-in defaults. Contract owned by SP.04. |
 | Runtime telemetry | Emit SP.05 decision attributes and no raw payloads. |
+
+### Gate ↔ Kernel Delegation (Normative)
+
+`SigilGuard.BoundaryPolicy` (SP.04) is the deterministic policy kernel. The gate
+does not reimplement policy; it **composes the kernel's verdict as one
+contribution** with the runtime-only signals it alone can observe. "Delegate
+policy evaluation" (above) and SP.04's *V3 API Changes* ("`BoundaryPolicy.evaluate`
+replaces `Policy.policy_verdict` as the central gate") mean the kernel is the
+**central policy authority**, not that it is the sole verdict source — the gate
+still owns scanning, quarantine inspection, and output assembly.
+
+Per call, the gate:
+
+1. **Extracts, scans, inspects (gate-owned).** Normalize `Context`; `Scanner.scan`
+   (hits + a scanner-failure signal); `Quarantine.inspect` (verdict, indicators,
+   sanitized text); optionally compile+evaluate `RepoPolicy` into
+   `RepoPolicy.policy_facts/2`.
+2. **Builds a `SigilGuard.Boundary`.** Bridge the `Context` phase to a lifecycle
+   phase with `Lifecycle.from_context_phase/1`; carry `source`/`sink`/`trust_zone`/
+   `trust_level`, the scanner `hits` (closed `:secret` category), and — only when
+   the host supplied them — `tool` and `sandbox` (see *Sandbox default* below).
+   Populate the three SP.01 digests from `Attestation.Digest.digests/4` (they are
+   evidence, inert to the verdict) so `evidence_refs`/audit are grounded.
+3. **Evaluates the kernel.** `BoundaryPolicy.evaluate(boundary, policy:,
+   repo_facts:, on_sensitive:, hooks:, adaptive_detector:, hook_timeout_ms:)`
+   contributes the policy-file `[rules]`, sandbox matrix, hook, adaptive, and the
+   shared kernel invariants (untrusted-tool-request, secret→external-sink,
+   repo-facts). Its unified verdict maps back to the v2 dual vocabulary and folds
+   into the gate's `strongest_verdict` combination.
+4. **Composes gate-owned signals.** The gate keeps the verdicts the kernel does not
+   reproduce: scanner-failure (fail-closed block), quarantine gradations
+   (`:blocked`/`:suspicious`) with the `tool_result`+`:model` confirm downgrade, the
+   D17 risk×trust ladder (`SigilGuard.Policy.evaluate`), the broad sensitive-content
+   rule (any hit category; `log`/`repo`/`tool` sinks; non-external redaction), and
+   the repo-policy-compile-error block. The strongest contribution wins.
+5. **Assembles (gate-owned).** Apply output sanitization to content the verdict
+   permits, compute `content_hash`, enforce the confirmable action digest, and
+   build the final `%Decision{}`.
+
+Because `BoundaryPolicy` is *silent* wherever it would disagree with the broader
+gate rules (it fires only on `:secret` hits to `[:external, :network]`, and never
+on the gate's `%{id, severity}` quarantine indicators, which lack a `quarantine`
+key), the composition is behavior-preserving; the M1.02 facade shapes
+(`scan/1`, `scan_and_redact/1`, `policy_verdict/3`) are unaffected.
+
+**Sandbox default.** The sandbox mismatch matrix (SP.04) is fail-closed by
+construction, but in the runtime gate it is **opt-in by presence**: it applies at
+`:tool_request`/`:tool_result` only when the boundary carries a `sandbox`
+(isolation level) or a `tool` with a verified `manifest_digest`. A tool-phase
+boundary with neither does not auto-quarantine, so hosts that do not declare
+tool/sandbox context keep today's behavior; hosts that do declare it get the
+full fail-closed matrix.
 
 ## V3 Decision Contract
 
@@ -148,6 +200,11 @@ evidence-linked without raw payloads:
 |-------|------|-------------|
 | `matched_rules` | `[%{rule_id: String.t(), explanation: String.t()}]` | Every rule that contributed to the verdict; MAY be empty. Mirrors into SP.01's `predicate.matched_rules`, where `rule_id` is emitted as `id`. |
 | `evidence_refs` | `[String.t()]` | Audit event ids and checkpoint digests supporting the decision (SP.05). Each ref becomes the `ref` value of a `predicate.evidence` entry in SP.01. |
+| `effect` | `:allow \| :redact \| :quarantine \| nil` | The post-confirmation executable action, separated from the unified verdict. On a `:confirm` decision, `action` is the unified verdict `:confirm` while `effect` records what to execute once confirmation is accepted. On non-confirm decisions `effect` MAY mirror `action` or be `nil`. The confirmation dispatch (`ToolGateway`/`Base`) reads `effect`, not `action`, to decide what runs after acceptance; the confirmation token binding is unchanged (it never depended on `action`). |
+
+Additionally, runtime decisions surface the boundary labels `source`, `sink`,
+`trust_zone`, `actor`, `resource`, and `phase` so evidence is complete without
+raw payloads.
 
 ## Stability Guarantees
 
@@ -196,10 +253,14 @@ milestone exit. They MUST NOT change in 3.0.0.
 | `indicators` | list | yes | Quarantine indicators. |
 | `sanitized_text` | string or nil | no | Redacted/quarantined output. |
 | `audit_metadata` | map | yes | Raw-payload-free evidence metadata. |
+| `matched_rules` | list | yes | Contributing rules (V3 Decision Contract). |
+| `evidence_refs` | list | yes | Supporting audit/checkpoint refs (V3). |
+| `effect` | atom or nil | no | Post-confirmation executable action (V3). |
+| `source`, `sink`, `trust_zone`, `actor`, `resource` | atom/string or nil | no | Boundary labels on the decision (V3). |
 
-The table above is the implemented v2 struct. V3 field changes (unified
-verdict, `matched_rules`, `evidence_refs`) are normative in the V3 Decision
-Contract section.
+The table above is the implemented struct. The V3 field additions (unified
+verdict via `action`, `matched_rules`, `evidence_refs`, `effect`, and the
+boundary labels) are normative in the V3 Decision Contract section.
 
 ## Module Map
 
