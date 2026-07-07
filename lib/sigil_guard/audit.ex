@@ -284,7 +284,223 @@ defmodule SigilGuard.Audit do
     IO.iodata_to_binary(canonical_iodata(event))
   end
 
+  @typedoc "The chain tip's coordinates (`tip/1`)."
+  @type tip :: %{
+          index: non_neg_integer(),
+          event_id: String.t(),
+          hmac: String.t(),
+          timestamp: String.t()
+        }
+
+  @typedoc "One checkpoint's located event span (`checkpoint_boundaries/2`)."
+  @type boundary :: %{
+          checkpoint_digest: String.t(),
+          tree_size: non_neg_integer(),
+          first_index: non_neg_integer() | nil,
+          last_index: non_neg_integer() | nil
+        }
+
+  @query_keys [:from_index, :to_index, :id, :type, :from_time, :to_time]
+
+  @doc """
+  Return the last event's coordinates without verifying the chain (SP.05).
+
+  A pure read: it never writes and emits no telemetry (verification stays in
+  `verify_chain/3`). An empty list fails `:empty_chain`; an unsigned last event
+  fails `:unsigned_event`.
+  """
+  @spec tip([t()]) :: {:ok, tip()} | {:error, :empty_chain | :unsigned_event}
+  def tip([]), do: {:error, :empty_chain}
+
+  def tip(events) when is_list(events) do
+    case List.last(events) do
+      %__MODULE__{hmac: hmac} = event when is_binary(hmac) and hmac != "" ->
+        {:ok,
+         %{index: length(events) - 1, event_id: event.id, hmac: hmac, timestamp: event.timestamp}}
+
+      _ ->
+        {:error, :unsigned_event}
+    end
+  end
+
+  @doc """
+  Return the events matching a closed set of filters, in chain order (SP.05).
+
+  A pure read: no writes, no telemetry. The options `:from_index`, `:to_index`,
+  `:id`, `:type`, `:from_time`, and `:to_time` compose with AND. An unknown key
+  or an unparsable time fails `:invalid_query`; an index outside `0..length-1`
+  (or `:to_index` below `:from_index`) fails `:out_of_range`. An empty match is
+  `{:ok, []}`, never an error.
+  """
+  @spec query([t()], keyword()) :: {:ok, [t()]} | {:error, :out_of_range | :invalid_query}
+  def query(events, opts \\ [])
+
+  def query(events, opts) when is_list(events) and is_list(opts) do
+    with :ok <- validate_query_keys(opts),
+         {:ok, from_index, to_index} <- query_index_range(opts, length(events)),
+         {:ok, from_time, to_time} <- query_time_range(opts) do
+      bounds = {from_index, to_index, from_time, to_time}
+
+      matched =
+        events
+        |> Enum.with_index()
+        |> Enum.filter(&query_match?(&1, opts, bounds))
+        |> Enum.map(fn {event, _} -> event end)
+
+      {:ok, matched}
+    end
+  end
+
+  def query(_, _), do: {:error, :invalid_query}
+
+  @doc """
+  Locate each checkpoint's event span within `events` (SP.05).
+
+  A pure read: no writes, no telemetry. For each checkpoint it finds the
+  `first_event_id`/`last_event_id` in `events` and checks the span length
+  against `event_count`; any mismatch fails `:checkpoint_mismatch`. An empty
+  checkpoint yields `nil` indices, and a non-checkpoint term fails
+  `:invalid_query`.
+  """
+  @spec checkpoint_boundaries([t()], [SigilGuard.Audit.Checkpoint.t()]) ::
+          {:ok, [boundary()]} | {:error, :checkpoint_mismatch | :invalid_query}
+  def checkpoint_boundaries(events, checkpoints)
+      when is_list(events) and is_list(checkpoints) do
+    index_by_id = Map.new(Enum.with_index(events), fn {event, index} -> {event.id, index} end)
+
+    result =
+      Enum.reduce_while(checkpoints, {:ok, []}, fn checkpoint, {:ok, acc} ->
+        case checkpoint_boundary(checkpoint, index_by_id) do
+          {:ok, boundary} -> {:cont, {:ok, [boundary | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, boundaries} -> {:ok, Enum.reverse(boundaries)}
+      error -> error
+    end
+  end
+
+  def checkpoint_boundaries(_, _), do: {:error, :invalid_query}
+
   # -- Private --
+
+  defp validate_query_keys(opts) do
+    if Enum.all?(Keyword.keys(opts), &(&1 in @query_keys)),
+      do: :ok,
+      else: {:error, :invalid_query}
+  end
+
+  defp query_index_range(opts, count) do
+    with {:ok, from} <- validate_from_index(Keyword.get(opts, :from_index), count),
+         {:ok, to} <- validate_to_index(Keyword.get(opts, :to_index), count, from) do
+      {:ok, from, to}
+    end
+  end
+
+  defp validate_from_index(nil, _), do: {:ok, 0}
+
+  defp validate_from_index(from, count) when is_integer(from) and from >= 0 do
+    if from >= count, do: {:error, :out_of_range}, else: {:ok, from}
+  end
+
+  defp validate_from_index(_, _), do: {:error, :invalid_query}
+
+  defp validate_to_index(nil, count, _), do: {:ok, count - 1}
+
+  defp validate_to_index(to, count, from) when is_integer(to) and to >= 0 do
+    if to >= count or to < from, do: {:error, :out_of_range}, else: {:ok, to}
+  end
+
+  defp validate_to_index(_, _, _), do: {:error, :invalid_query}
+
+  defp query_time_range(opts) do
+    with {:ok, from} <- parse_query_time(Keyword.get(opts, :from_time)),
+         {:ok, to} <- parse_query_time(Keyword.get(opts, :to_time)) do
+      {:ok, from, to}
+    end
+  end
+
+  defp parse_query_time(nil), do: {:ok, nil}
+
+  defp parse_query_time(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, datetime, _} -> {:ok, datetime}
+      _ -> {:error, :invalid_query}
+    end
+  end
+
+  defp parse_query_time(_), do: {:error, :invalid_query}
+
+  defp query_match?({event, index}, opts, {from_index, to_index, from_time, to_time}) do
+    index >= from_index and index <= to_index and
+      option_match?(Keyword.get(opts, :id), event.id) and
+      option_match?(Keyword.get(opts, :type), event.type) and
+      within_time?(event.timestamp, from_time, to_time)
+  end
+
+  defp option_match?(nil, _), do: true
+  defp option_match?(expected, value), do: expected == value
+
+  defp within_time?(_, nil, nil), do: true
+
+  defp within_time?(timestamp, from, to) do
+    case DateTime.from_iso8601(timestamp) do
+      {:ok, datetime, _} ->
+        after_or_equal?(datetime, from) and before_or_equal?(datetime, to)
+
+      _ ->
+        false
+    end
+  end
+
+  defp after_or_equal?(_, nil), do: true
+  defp after_or_equal?(datetime, from), do: DateTime.compare(datetime, from) != :lt
+
+  defp before_or_equal?(_, nil), do: true
+  defp before_or_equal?(datetime, to), do: DateTime.compare(datetime, to) != :gt
+
+  defp checkpoint_boundary(checkpoint, index_by_id) when is_map(checkpoint) do
+    case Map.get(checkpoint, "event_count") do
+      count when is_integer(count) and count >= 0 ->
+        build_boundary(checkpoint, count, index_by_id)
+
+      _ ->
+        {:error, :invalid_query}
+    end
+  end
+
+  defp checkpoint_boundary(_, _), do: {:error, :invalid_query}
+
+  defp build_boundary(checkpoint, count, index_by_id) do
+    case locate_span(checkpoint, count, index_by_id) do
+      {:ok, first_index, last_index} ->
+        {:ok,
+         %{
+           checkpoint_digest: SigilGuard.Audit.Checkpoint.digest(checkpoint),
+           tree_size: count,
+           first_index: first_index,
+           last_index: last_index
+         }}
+
+      error ->
+        error
+    end
+  end
+
+  defp locate_span(_, 0, _), do: {:ok, nil, nil}
+
+  defp locate_span(checkpoint, count, index_by_id) do
+    first = Map.get(index_by_id, Map.get(checkpoint, "first_event_id"))
+    last = Map.get(index_by_id, Map.get(checkpoint, "last_event_id"))
+
+    if is_integer(first) and is_integer(last) and first <= last and last - first + 1 == count do
+      {:ok, first, last}
+    else
+      {:error, :checkpoint_mismatch}
+    end
+  end
 
   defp canonical_iodata(%__MODULE__{} = event) do
     [

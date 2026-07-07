@@ -5,9 +5,11 @@ defmodule SigilGuard.AuditTest do
   use ExUnitProperties
 
   alias SigilGuard.Audit
+  alias SigilGuard.Audit.Checkpoint
 
   @secret_key :crypto.strong_rand_bytes(32)
   @field_hash_key :crypto.hash(:sha256, "audit field hash test key")
+  @query_key :crypto.hash(:sha256, "audit query test key")
 
   describe "new_event/5" do
     test "creates an unsigned event with all required fields" do
@@ -454,6 +456,191 @@ defmodule SigilGuard.AuditTest do
         refute String.contains?(canonical, actor)
       end
     end
+  end
+
+  describe "tip/1 (SP.05)" do
+    test "returns the last event's coordinates" do
+      events = query_events()
+      last = List.last(events)
+
+      assert Audit.tip(events) ==
+               {:ok, %{index: 4, event_id: last.id, hmac: last.hmac, timestamp: last.timestamp}}
+    end
+
+    test "fails :empty_chain on an empty list and :unsigned_event on an unsigned tail" do
+      assert Audit.tip([]) == {:error, :empty_chain}
+
+      unsigned = Audit.new_event("test", "alice", "act", "ok")
+      assert Audit.tip([unsigned]) == {:error, :unsigned_event}
+      assert Audit.tip(Enum.concat(query_events(), [unsigned])) == {:error, :unsigned_event}
+    end
+  end
+
+  describe "query/2 (SP.05)" do
+    test "filters by type, id, and index range, preserving chain order" do
+      events = query_events()
+
+      assert {:ok, gate} = Audit.query(events, type: "gate")
+      assert Enum.map(gate, & &1.id) == ["id0", "id2", "id4"]
+
+      assert {:ok, [one]} = Audit.query(events, id: "id2")
+      assert one.id == "id2"
+
+      assert {:ok, span} = Audit.query(events, from_index: 1, to_index: 3)
+      assert Enum.map(span, & &1.id) == ["id1", "id2", "id3"]
+    end
+
+    test "filters by an inclusive time window" do
+      events = query_events()
+
+      assert {:ok, window} =
+               Audit.query(events,
+                 from_time: "2026-07-02T12:00:02.000Z",
+                 to_time: "2026-07-02T12:00:03.000Z"
+               )
+
+      assert Enum.map(window, & &1.id) == ["id2", "id3"]
+    end
+
+    test "composes filters with AND and returns {:ok, []} for no match" do
+      events = query_events()
+
+      assert {:ok, both} = Audit.query(events, type: "gate", from_index: 2)
+      assert Enum.map(both, & &1.id) == ["id2", "id4"]
+
+      assert Audit.query(events, id: "missing") == {:ok, []}
+      assert Audit.query(events, []) == {:ok, events}
+    end
+
+    test "an unknown key or malformed option value fails :invalid_query" do
+      events = query_events()
+
+      assert Audit.query(events, bogus: 1) == {:error, :invalid_query}
+      assert Audit.query(events, from_time: "not-a-date") == {:error, :invalid_query}
+      assert Audit.query(events, from_time: 123) == {:error, :invalid_query}
+      assert Audit.query(events, from_index: "0") == {:error, :invalid_query}
+      assert Audit.query(events, to_index: "x") == {:error, :invalid_query}
+      assert Audit.query("not a list", []) == {:error, :invalid_query}
+    end
+
+    test "excludes events with an unparsable timestamp from a time window" do
+      undated = %{query_event(0) | timestamp: "not-a-date"}
+      events = Audit.build_chain([undated], @query_key)
+      assert Audit.query(events, from_time: "2026-07-02T12:00:00.000Z") == {:ok, []}
+    end
+
+    test "an out-of-range index fails :out_of_range" do
+      events = query_events()
+
+      assert Audit.query(events, from_index: 5) == {:error, :out_of_range}
+      assert Audit.query(events, to_index: 5) == {:error, :out_of_range}
+      assert Audit.query(events, from_index: 3, to_index: 1) == {:error, :out_of_range}
+    end
+  end
+
+  describe "checkpoint_boundaries/2 (SP.05)" do
+    test "locates each checkpoint's event span" do
+      events = query_events()
+
+      {:ok, checkpoint} =
+        Checkpoint.create(Enum.take(events, 3), generated_at: "2026-07-02T12:00:03.000Z")
+
+      assert {:ok, [boundary]} = Audit.checkpoint_boundaries(events, [checkpoint])
+
+      assert boundary == %{
+               checkpoint_digest: Checkpoint.digest(checkpoint),
+               tree_size: 3,
+               first_index: 0,
+               last_index: 2
+             }
+    end
+
+    test "a span that disagrees with event_count fails :checkpoint_mismatch" do
+      events = query_events()
+
+      {:ok, checkpoint} =
+        Checkpoint.create(Enum.take(events, 3), generated_at: "2026-07-02T12:00:03.000Z")
+
+      inflated = Map.put(checkpoint, "event_count", 99)
+
+      assert Audit.checkpoint_boundaries(events, [inflated]) == {:error, :checkpoint_mismatch}
+    end
+
+    test "an empty checkpoint yields nil indices" do
+      events = query_events()
+      {:ok, empty} = Checkpoint.create([], generated_at: "2026-07-02T12:00:00.000Z")
+
+      assert {:ok, [%{tree_size: 0, first_index: nil, last_index: nil}]} =
+               Audit.checkpoint_boundaries(events, [empty])
+    end
+
+    test "a non-checkpoint term or non-list input fails :invalid_query" do
+      assert Audit.checkpoint_boundaries(query_events(), ["nope"]) == {:error, :invalid_query}
+      assert Audit.checkpoint_boundaries(query_events(), [%{}]) == {:error, :invalid_query}
+      assert Audit.checkpoint_boundaries("not a list", []) == {:error, :invalid_query}
+    end
+  end
+
+  describe "read purity (SP.05)" do
+    test "tip/query/checkpoint_boundaries emit no telemetry" do
+      # A unique actor so the handler ignores audit events from concurrent tests;
+      # the events are signed before the handler attaches, so only a read that
+      # (wrongly) emits could reach it.
+      actor = "purity-actor-#{System.unique_integer()}"
+
+      events =
+        Enum.map(0..2, fn i ->
+          %Audit{
+            id: "p#{i}",
+            type: "gate",
+            actor: actor,
+            action: "a",
+            result: "ok",
+            timestamp: "2026-07-02T12:00:0#{i}.000Z"
+          }
+        end)
+        |> Audit.build_chain(@query_key)
+
+      {:ok, checkpoint} = Checkpoint.create(events, generated_at: "2026-07-02T12:00:05.000Z")
+
+      parent = self()
+      handler_id = "audit-read-purity-#{System.unique_integer()}"
+
+      :telemetry.attach_many(
+        handler_id,
+        [[:sigil_guard, :audit, :logged]],
+        fn event, _, metadata, _ ->
+          if metadata[:actor] == actor, do: send(parent, {:emitted, event})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      assert {:ok, _} = Audit.tip(events)
+      assert {:ok, _} = Audit.query(events, type: "gate")
+      assert {:ok, _} = Audit.checkpoint_boundaries(events, [checkpoint])
+
+      refute_receive {:emitted, _}, 50
+    end
+  end
+
+  # A five-event signed chain with fixed ids/types/timestamps for query tests.
+  defp query_events do
+    0..4
+    |> Enum.map(&query_event/1)
+    |> Audit.build_chain(@query_key)
+  end
+
+  defp query_event(i) do
+    %Audit{
+      id: "id#{i}",
+      type: if(rem(i, 2) == 0, do: "gate", else: "mcp"),
+      actor: "alice",
+      action: "act#{i}",
+      result: "ok",
+      timestamp: "2026-07-02T12:00:0#{i}.000Z"
+    }
   end
 
   defp build_signed_chain(count) do

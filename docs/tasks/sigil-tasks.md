@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 142 / 228 tasks done (62%).** Milestones: 6 complete, 1 partial,
-3 not started. **86 tasks left.** Current milestone: **M5** (8/26, 31%).
+**Overall: 143 / 228 tasks done (63%).** Milestones: 6 complete, 1 partial,
+3 not started. **85 tasks left.** Current milestone: **M5** (9/26, 35%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 8 | 26 | 31% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 9 | 26 | 35% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **142** | **228** | **62%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **143** | **228** | **63%** | 6 done / 1 partial / 3 to go |
 
-### What's left (86 tasks)
+### What's left (85 tasks)
 
-- **M5 - 18 left:** audit query, attestation evidence refs, HTTPClient/anchor
-  stores, and the threat-model test suite. (M5.01-M5.08: proofs, checkpoint
-  statements, cosigning, exports, privacy, OTel rename, CloudEvents done.)
+- **M5 - 17 left:** attestation evidence refs, HTTPClient/anchor stores, and the
+  threat-model test suite. (M5.01-M5.09: proofs, checkpoint statements,
+  cosigning, exports, privacy, OTel rename, CloudEvents, read/query done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1323,7 +1323,7 @@ section is post-3.0.0 parking; neither is counted here.
     reserved SP.05 keys - raw content and unclassified host keys are omitted,
     and `trace_id`/`span_id` never appear in `data`. A golden-shape test pins
     the envelope; negative tests assert no raw prompt/actor/host key leaks.
-- [ ] M5.09 Audit read and query API (pure reads).
+- [x] M5.09 Audit read and query API (pure reads).
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Audit Read
     And Query API.
   - AC: `Audit.tip/1`, `Audit.query/2`, and `checkpoint_boundaries/2` are
@@ -1335,6 +1335,16 @@ section is post-3.0.0 parking; neither is counted here.
     `:invalid_query` errors; `checkpoint_boundaries/2` fails span
     mismatches with `:checkpoint_mismatch`.
   - Tests: negative, malformed, property (purity: state unchanged).
+  - Done: added the three additive pure reads to `SigilGuard.Audit`. `tip/1`
+    returns the last event's `{index, event_id, hmac, timestamp}` without
+    verifying the chain (`:empty_chain`/`:unsigned_event`). `query/2` validates
+    a closed option set (unknown key or malformed value/time -> `:invalid_query`;
+    index outside `0..length-1` or `to < from` -> `:out_of_range`), AND-composes
+    the filters, preserves chain order, and returns `{:ok, []}` for no match.
+    `checkpoint_boundaries/2` locates each checkpoint's `first`/`last_event_id`
+    span and checks its length against `event_count` (`:checkpoint_mismatch`),
+    yielding `nil` indices for empty checkpoints and `:invalid_query` for a
+    non-checkpoint term. A purity test asserts the reads emit no telemetry.
 - [ ] M5.10 Bind attestations to audit evidence refs.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Data Model;
     `docs/specs/SP.01-sigilguard-trust-profile.md` - Data Model (evidence).
