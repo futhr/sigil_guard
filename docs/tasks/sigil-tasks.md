@@ -61,9 +61,10 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 208 / 220 tasks done (95%).** Milestones: 7 complete, 3 partial,
-0 not started. **12 tasks left.** Current milestone: **M6/M7/M8** (blocked
-consumer gate; docs/adoption work started).
+**Overall: 209 / 234 tasks done (89%).** Milestones: 7 complete, 3 partial,
+1 not started. **25 tasks left.** Current milestone: **M6/M7/M7A/M8**
+(blocked consumer gate; docs/adoption work started; pre-release audit
+hardening queued).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -76,17 +77,22 @@ consumer gate; docs/adoption work started).
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
 | M7 | Integrations and adoption | 13 | 17 | 76% | In progress |
-| M8 | Release | 6 | 12 | 50% | In progress |
-| — | **Total** | **208** | **220** | **95%** | 7 done / 3 partial / 0 to go |
+| M7A | Pre-release audit hardening | 0 | 14 | 0% | Not started |
+| M8 | Release | 7 | 12 | 58% | In progress |
+| — | **Total** | **209** | **234** | **89%** | 7 done / 3 partial / 1 to go |
 
-### What's left (12 tasks)
+### What's left (25 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
 - **M7 - 4:** benchmark and comparison artifacts.
-- **M8 - 6:** release engineering and validation.
+- **M7A - 14:** pre-release audit hardening (replay-store atomicity,
+  benchmark repair, coverage gate, canonical context digest, HexDocs
+  surface, packaging, and hygiene from the 2026-07-07 audit).
+- **M8 - 5:** release engineering and validation.
 
-The table counts every milestone task (F through M8) exactly once. The
+The table counts every milestone task (F through M8, including M7A) exactly
+once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
 section is post-1.0.0 parking; neither is counted here.
 
@@ -2299,10 +2305,170 @@ section is post-1.0.0 parking; neither is counted here.
     vulnerability reporting instructions, 72 h / 7 d / 90 d response targets,
     scope boundaries, and the SP.02 signer-compromise rotation pointer.
     Verified `git diff --check` and `mix sigil.docs_lint`.
+
+## M7A - Pre-Release Audit Hardening
+
+> Source: 2026-07-07 pre-release audit (three-track sweep: security and
+> anti-patterns across all lib modules; HexDocs, docs, and naming; tests,
+> fixtures, performance, and release readiness). Verified against Closed
+> Decisions - nothing here reopens D1-D19. Depends on: M7. M7A.01, M7A.02,
+> and M7A.03 block M8 exit; the rest should land before GA but do not gate
+> publication mechanics.
+> Audit verdicts recorded, no task needed: `test/fixtures/` depth is
+> justified (golden-vector triplets, generator-driven, byte-identical
+> regeneration tests) and stays; README architecture narrative matches
+> `lib/`; crypto discipline (constant-time compares, verify-before-parse,
+> pinned Ed25519, strong randomness, no network in decision paths) verified
+> clean.
+
+- [ ] M7A.01 Make replay-store check-and-put atomic.
+  - Spec: `SP.01` - replay defense; audit finding (TOCTOU).
+  - AC: `SigilGuard.ReplayStore.check_and_put/3` uses `:ets.insert_new/2`
+    (or equivalent atomic claim) so two concurrent calls with the same
+    identity/nonce cannot both return `:ok`; expired-entry re-claim stays
+    correct; `prune_expired/1` no longer runs a full-table
+    `:ets.select_delete` on every call (amortized: interval, probabilistic,
+    or on-hit pruning).
+  - Tests: dedicated `replay_store_test.exs` (currently missing) with a
+    concurrent-replay race test (many tasks, one nonce, exactly one `:ok`),
+    TTL expiry re-claim, and prune behavior; confirmation and attestation
+    `consume: true` paths re-exercised.
+- [ ] M7A.02 Repair the benchmark suite and published benchmark doc.
+  - Spec: `SP.15` - Benchmark Methodology; `R.07`.
+  - AC: `bench/run.exs` compiles and runs against the 1.0.0 API - the
+    removed envelope/registry-bundle scenarios and the nonexistent backend
+    envelope calls are rewritten against `SigilGuard.Attestation` and
+    `SigilGuard.TrustBundle`; `bench/output/benchmarks.md` is regenerated
+    on the 1.0.0 line before it ships as the HexDocs Performance extra; a
+    CI or gate step compiles the bench script so it cannot rot again.
+    Blocks M8.08 (the SLO matrix cannot run on a bench suite that does not
+    compile).
+  - Validation: `mix bench` completes; regenerated doc cites only live
+    modules; gate step green.
+- [ ] M7A.03 Remove the tool-gateway coverage exclusion.
+  - Spec: CLAUDE.md rule 9; `SP.03`.
+  - AC: `lib/sigil_guard/tool_gateway/base.ex` (1160 lines of shared
+    enforcement code) is removed from `coveralls.json` `skip_files` and the
+    suite still meets the >= 95% floor; any genuine coverage-attribution
+    problem is documented in `coveralls.json` with the exact reason instead
+    of a bare skip.
+  - Validation: `mix test --cover` >= 95% with the file measured.
+- [ ] M7A.04 Use canonical digests for the runtime-gate context digest.
+  - Spec: `SP.04` - boundary decision inputs.
+  - AC: `SigilGuard.Runtime.Gate.build_boundary/1` derives `context_digest`
+    from a canonical serialization (reuse `SigilGuard.Attestation.Digest`)
+    instead of `inspect(context)`, which truncates at the default inspect
+    limit and is not version-stable; distinct contexts can no longer
+    collide via truncation.
+  - Tests: collision regression (two contexts differing only past the old
+    truncation horizon produce distinct digests); digest stability vector.
+- [ ] M7A.05 Align trust-bundle threshold docs with D3 semantics.
+  - Spec: `SP.02`; Closed Decision D3 (v1 enforces threshold 1).
+  - AC: `SigilGuard.TrustBundle.verify/2` and `TrustBundle.Verify` docs
+    state explicitly that the declared role threshold is enforced only with
+    `enforce_declared_threshold: true` and that v1 defaults to 1 per D3;
+    the option is documented in the options list and the cheatsheet. No
+    default behavior change (D3 stays closed).
+  - Tests: doc-alignment assertions in the multisig suite (threshold
+    ignored by default, enforced with the flag) if not already present.
+- [ ] M7A.06 Precompile repo-policy glob segments.
+  - Spec: `SP.04`; audit finding (hot-path `Regex.compile!`).
+  - AC: `SigilGuard.RepoPolicy.compile/1` precompiles glob segment
+    matchers; `segment_matches?/2` never calls `Regex.compile!` during
+    evaluation; behavior is byte-identical on the existing policy fixtures.
+  - Tests: existing repo-policy suite green; bench scenario (post-M7A.02)
+    shows evaluate no longer recompiling.
+- [ ] M7A.07 Fix HexDocs extras, module groups, and reference warnings.
+  - Spec: `SP.06` - docs surface; HexDocs best practice.
+  - AC: the architecture page reachable from README (currently
+    `docs/README.md`, linked four times but absent from `extras`, so it
+    404s on hexdocs.pm) is added to `extras` or moved to
+    `guides/architecture.md` with links updated; `SECURITY.md` joins
+    `extras` under Reference; every public module appears in
+    `groups_for_modules` (currently ~21 ungrouped, including the
+    BoundaryPolicy kernel, `ToolGateway`, `Verdict`, `Lifecycle`, `Hooks`,
+    `CapabilityManifest`, `AgentTrust`, `AgentCard`, `HTTPClient`,
+    `Identity.Static`, and four Audit modules);
+    `skip_undefined_reference_warnings` covers the migration guide and
+    changelog references to removed modules so `mix docs` is warning-clean.
+  - Validation: `mix docs` clean; spot-check rendered nav grouping.
+- [ ] M7A.08 Correct the Hex package file set.
+  - Spec: `SP.12` - release packaging.
+  - AC: package `files` ships `guides/`, `SECURITY.md`, and
+    `CONTRIBUTING.md`, and stops shipping the internal `docs/` tree (specs,
+    research, tasks, templates) - at most the architecture page remains;
+    the tarball is inspected to confirm contents.
+  - Validation: `mix hex.build` + tarball listing archived in the release
+    notes draft.
+- [ ] M7A.09 Normalize version vocabulary in reader-facing docs.
+  - Spec: `SP.06`; `SP.12`.
+  - AC: rendered API docs no longer use internal "v2"/"v3" generation
+    labels (`lifecycle.ex`, `sigil_guard.ex`, `decision.ex`, `config.ex`,
+    `telemetry.ex` moduledocs); README, CHANGELOG, and MIGRATING-1.0.md
+    speak in release-line terms ("0.2.x" vs "1.0"), defining the
+    generation label once if kept for internal docs; the CHANGELOG
+    Conventional Commits link scheme typo (`Https://`) is fixed and the
+    unreleased 1.0.0 section is ready to cut as a dated release entry at
+    tag time.
+  - Validation: docs grep gate for the old vocabulary in rendered surfaces.
+- [ ] M7A.10 Anchor validation regexes with `\A...\z`.
+  - Spec: `SP.01`/`SP.02` error-handling tables; audit finding.
+  - AC: timestamp/hex/id regexes in `trust_bundle/schema.ex`,
+    `confirmation.ex`, `agent_card.ex`, `capability_manifest.ex`,
+    `attestation/statement.ex`, and `agent_trust.ex` use `\A...\z` anchors
+    (matching the existing correct pattern in `audit/proof.ex`) so values
+    with trailing newlines no longer pass; `capability_manifest.ex`
+    `expires_at` gains a semantic parse check, not regex-only.
+  - Tests: malformed-input cases with trailing-newline payloads across the
+    six modules.
+- [ ] M7A.11 Minor hardening and hygiene sweep.
+  - Spec: audit findings (grouped small items).
+  - AC: `SigilGuard.Attestation.attach/2` and `attach_confirmation/2` stop
+    embedding `inspect(payload)` in raise messages (truncate or omit -
+    payloads may carry secret material); `TrustBundle.Verify` key loading
+    handles malformed base64 as a typed error instead of a `MatchError`
+    depending on upstream schema ordering, and `positive_integer!/1`'s
+    spec matches its behavior; `Backend.impl/0` memoizes custom-backend
+    reflection (`Code.ensure_loaded?`/`function_exported?` per call
+    today); the near-unused Mox dependency gets an explicit keep-or-drop
+    decision recorded.
+  - Tests: negative tests for the attach raise paths and malformed key
+    material; existing suites green.
+- [ ] M7A.12 Centralize test fixture path resolution.
+  - Spec: audit verdict on `test/fixtures/` layout.
+  - AC: the golden-vector triplet layout stays as-is (verdict: depth is
+    justified and generator-driven); a small shared fixtures helper in
+    `test/support/` replaces the literal relative path strings in
+    `test/sigil_guard/threat_model/tm*_test.exs` and other inline
+    `Path.expand` call sites, so fixture paths resolve independent of cwd
+    and have one owner.
+  - Validation: suite green from repo root and from a subdirectory runner.
+- [ ] M7A.13 Remove real-clock sleeps from tests.
+  - Spec: CLAUDE.md rule 9 (deterministic security tests).
+  - AC: the `Process.sleep(500)` waits in `adaptive_detector_test.exs` and
+    `hooks_test.exs` are replaced with injected clocks, telemetry
+    assertions, or message-based synchronization; no real-time waits
+    remain in the suite outside genuinely time-bound TTL tests that use
+    short, bounded budgets.
+  - Validation: suite wall-clock drops; repeated CI runs stable.
+- [ ] M7A.14 Document the gateway layering and add entry-point examples.
+  - Spec: `SP.03`/`SP.08`; Closed Decision D14 (facade stays - no rename).
+  - AC: one canonical "start here" explanation of the
+    `SigilGuard.ToolGateway` (enforcement core) versus
+    `SigilGuard.MCP.Gateway` (permanent thin facade) split, cross-linked
+    from both moduledocs, the README, and the cheatsheet, resolving the
+    current each-points-at-the-other ambiguity; `## Examples` sections
+    (doctested where practical) are added to the high-traffic public
+    modules currently lacking them (`ToolGateway`, `MCP.Gateway`,
+    `Confirmation`, `Attestation`, `TrustBundle`); `audit/logger.ex` gains
+    direct unit coverage alongside the M7A.01 replay-store tests.
+  - Validation: `mix docs` + doctests green.
+
 ## M8 - Release
 
 > Specs: `SP.12` (Release Sequence (D11)), `SP.15` (SLO Ratification),
-> `SP.05` (Release Provenance). Depends on: M6 (M7 required before GA).
+> `SP.05` (Release Provenance). Depends on: M6 (M7 required before GA;
+> M7A.01-M7A.03 block M8 exit).
 > Exit criteria (tier-3 gate): `mix check --no-retry` clean; M1.02
 > conformance green; the reference consumer validates green against the
 > 1.0.0 package; 1.0.0 is published with provenance and SBOM.
@@ -2345,7 +2511,7 @@ section is post-1.0.0 parking; neither is counted here.
     tarball plus SBOM with `actions/attest-build-provenance`, signs the
     release predicate with `actions/attest`, verifies both subjects with
     `gh attestation verify`, and only then runs `mix hex.publish --yes`.
-- [ ] M8.05 Socket-denying no-network sweep.
+- [x] M8.05 Socket-denying no-network sweep.
   - Spec: `SP.02` - Loading Sources (No-network guarantee); `SP.05` -
     SigilGuard.HTTPClient Behaviour (trust model).
   - AC: a suite-wide sweep proves every scan/gate/policy/attestation/
@@ -2353,6 +2519,13 @@ section is post-1.0.0 parking; neither is counted here.
     sole, explicitly host-triggered exception); runs in CI on the release
     branch.
   - Tests: negative (port-list and socket-deny assertions across paths).
+  - Done: added `test/sigil_guard/release_no_network_sweep_test.exs` covering
+    scanner, boundary policy, runtime gate, attestation statement building,
+    trust-bundle verification, and local audit anchor put/fetch/verify under
+    unchanged current-process port assertions. Added a static source scan
+    proving core decision paths do not directly reference `:httpc`, `:gen_tcp`,
+    `:ssl`, or `SigilGuard.HTTPClient`; HTTP anchor-store tests remain the
+    explicit host-triggered exception.
 - [x] M8.06 Fuzz final pass over attestations, bundles, manifests, and
       policy files.
   - Spec: `SP.01`/`SP.02`/`SP.03`/`SP.04` - Error Handling tables.
