@@ -1887,12 +1887,17 @@ section is post-3.0.0 parking; neither is counted here.
     `_agent_trust` DSSE Agent Trust metadata under `params`, and documented the
     mixed-traffic rollout rule that v3 treats `_sigil` as ordinary user content
     and must not receive both metadata keys on the same endpoint.
-- [ ] M6.15 MIGRATING: `_sigil_confirmation` to `_agent_confirmation`
+- [x] M6.15 MIGRATING: `_sigil_confirmation` to `_agent_confirmation`
       before/after examples.
   - Spec: `SP.08` - Metadata Namespace.
   - AC: literal before/after examples including the `:confirmation_token`
     option path.
   - Validation: completeness script.
+  - Done: replaced the `MIGRATING-3.0.md` confirmation metadata placeholder with
+    literal JSON-RPC before/after examples mapping `_sigil_confirmation` to
+    `_agent_confirmation` under `params`, documented the digest-strip behavior,
+    and added the out-of-band `:confirmation_token` option path for confirmed
+    request, signed-confirmed request, and confirmed-result helpers.
 - [ ] M6.16 MIGRATING: `Registry.fetch_bundle/1` to `TrustBundle.load/1`.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: code-level mapping with source construction

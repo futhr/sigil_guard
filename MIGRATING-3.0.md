@@ -110,8 +110,59 @@ digest instead of being treated as transport metadata.
 ## MCP Confirmation Metadata
 
 Use `_agent_confirmation` instead of `_sigil_confirmation` for confirmation
-metadata. Literal payload examples and the `:confirmation_token` option path are
-filled in by M6.15.
+metadata. Like `_agent_trust`, v3 strips `_agent_confirmation` at the JSON-RPC
+payload root and inside `params` before computing action digests.
+
+Before:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "call-2",
+  "method": "tools/call",
+  "params": {
+    "name": "send_webhook",
+    "arguments": {
+      "url": "https://hooks.example.invalid/deploy",
+      "body": "deploy"
+    },
+    "_sigil_confirmation": "legacy-confirmation-token"
+  }
+}
+```
+
+After:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "call-2",
+  "method": "tools/call",
+  "params": {
+    "name": "send_webhook",
+    "arguments": {
+      "url": "https://hooks.example.invalid/deploy",
+      "body": "deploy"
+    },
+    "_agent_confirmation": "v3-confirmation-token"
+  }
+}
+```
+
+When the token is already held out-of-band, pass it through the existing
+`:confirmation_token` option instead of embedding transport metadata:
+
+```elixir
+SigilGuard.MCP.Gateway.guard_confirmed_request(
+  request,
+  [trust_level: :medium],
+  confirmation_token: token
+)
+```
+
+The same option path applies to `guarded_confirmed_request/3`,
+`guard_signed_confirmed_request/3`, `guarded_signed_confirmed_request/3`,
+`guard_confirmed_result/3`, and `guarded_confirmed_result/3`.
 
 ## Registry To Trust Bundles
 
