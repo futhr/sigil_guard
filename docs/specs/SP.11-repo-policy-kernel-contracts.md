@@ -111,11 +111,12 @@ Legacy filename handling is fail-closed:
   `{:error, {:legacy_policy_filename, legacy_path, replacement}}` naming
   the found legacy path and its v3 replacement filename. Legacy files are
   never parsed and never silently ignored.
-- When a v3 candidate exists, it loads normally; a legacy file present
-  alongside it does not affect loading.
-- The legacy check applies to the default candidate set only. An explicit
-  `:candidates` option overrides the defaults verbatim, including legacy
-  paths; that is deliberate host intent, not a silent fallback.
+- Legacy detection runs before v3 candidate selection. A legacy file present
+  alongside a v3 policy still fails closed; there is no silent coexistence
+  path.
+- The legacy check applies before an explicit `:candidates` override as well.
+  Explicit candidates may add non-default v3 paths, but they do not authorize
+  old `SIGIL` filenames as fallbacks.
 
 Migration table (reproduced 1:1 in `MIGRATING-3.0.md`):
 
@@ -276,13 +277,13 @@ In v3 the repo policy kernel contributes exactly this map to
 
 ## Acceptance Criteria
 
-- [ ] The loader searches `SIGILGUARD_POLICY`, `.sigilguard-policy`,
+- [x] The loader searches `SIGILGUARD_POLICY`, `.sigilguard-policy`,
       `.sigilguard/policy`, `.github/sigilguard-policy` in that exact order
       and loads the first existing file.
-- [ ] Each of the four legacy filenames, present without any v3 candidate,
+- [x] Each of the four legacy filenames, present without any v3 candidate,
       yields `{:error, {:legacy_policy_filename, legacy, replacement}}`
       naming its v3 replacement; nothing is parsed or silently ignored.
-- [ ] An explicit `:candidates` option bypasses the legacy-name check.
+- [x] An explicit `:candidates` option does not bypass the legacy-name check.
 - [ ] The policy-facts map contains exactly the five specified keys, and
       `policy_file_digest` differs from `Decision.digest` for the same
       evaluation.
@@ -290,7 +291,7 @@ In v3 the repo policy kernel contributes exactly this map to
       shared normalization; a file `allow` beats a bundle `block` on the
       same path; a path matched only by a bundle rule is decided by it; and
       merged bundle rule ids carry the `bundle:` prefix in `matched_rules`.
-- [ ] The filename migration table is reproduced 1:1 in `MIGRATING-3.0.md`.
+- [x] The filename migration table is reproduced 1:1 in `MIGRATING-3.0.md`.
 
 ## Implementation Roadmap
 
@@ -300,7 +301,7 @@ In v3 the repo policy kernel contributes exactly this map to
 - [x] Decision digest implemented.
 - [x] Runtime integration implemented.
 - [ ] Implement bundle-carried repo policy rules and composition (schema above).
-- [ ] Implement the D13 filename candidates and the `:legacy_policy_filename` error.
+- [x] Implement the D13 filename candidates and the `:legacy_policy_filename` error.
 - [ ] Emit the policy-facts map to `BoundaryPolicy` and audit metadata.
 
 ## Success Metrics

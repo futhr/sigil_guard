@@ -174,7 +174,7 @@ defmodule SigilGuard.RepoPolicyTest do
 
     test "loads the first deterministic policy file from a repo root", %{dir: dir} do
       File.write!(
-        Path.join(dir, "SIGIL_POLICY"),
+        Path.join(dir, "SIGILGUARD_POLICY"),
         """
         default require_approval
         allow agent:did:web:codex action:modify docs/**
@@ -198,24 +198,24 @@ defmodule SigilGuard.RepoPolicyTest do
       github_dir = Path.join(dir, ".github")
       File.mkdir_p!(github_dir)
 
-      File.write!(Path.join(dir, ".sigil-policy"), "default block\n")
-      File.write!(Path.join(github_dir, "sigil-policy"), "default allow\n")
+      File.write!(Path.join(dir, ".sigilguard-policy"), "default block\n")
+      File.write!(Path.join(github_dir, "sigilguard-policy"), "default allow\n")
 
       assert {:ok, path} = RepoPolicy.find_file(dir)
-      assert path == Path.join(dir, ".sigil-policy")
+      assert path == Path.join(dir, ".sigilguard-policy")
 
       assert {:error, :policy_path_traversal} =
                RepoPolicy.find_file(dir, candidates: ["../SIGIL_POLICY"])
 
       assert {:error, :absolute_policy_path} =
-               RepoPolicy.find_file(dir, candidates: [Path.join(dir, ".sigil-policy")])
+               RepoPolicy.find_file(dir, candidates: [Path.join(dir, ".sigilguard-policy")])
     end
 
     test "accepts a single candidate path and rejects invalid candidate sets", %{dir: dir} do
-      File.write!(Path.join(dir, ".sigil-policy"), "default allow\n")
+      File.write!(Path.join(dir, ".custom-policy"), "default allow\n")
 
-      assert {:ok, path} = RepoPolicy.find_file(dir, candidates: ".sigil-policy")
-      assert path == Path.join(dir, ".sigil-policy")
+      assert {:ok, path} = RepoPolicy.find_file(dir, candidates: ".custom-policy")
+      assert path == Path.join(dir, ".custom-policy")
 
       assert {:error, :missing_policy_paths} = RepoPolicy.find_file(dir, candidates: [])
       assert {:error, :invalid_policy_paths} = RepoPolicy.find_file(dir, candidates: :bad)
@@ -228,7 +228,7 @@ defmodule SigilGuard.RepoPolicyTest do
     end
 
     test "rejects oversized or invalid policy files", %{dir: dir} do
-      path = Path.join(dir, "SIGIL_POLICY")
+      path = Path.join(dir, "SIGILGUARD_POLICY")
       File.write!(path, "default allow\n")
 
       assert {:error, :policy_too_large} = RepoPolicy.load_file(path, max_bytes: 4)
@@ -238,11 +238,47 @@ defmodule SigilGuard.RepoPolicyTest do
 
     test "returns file read and parse errors", %{dir: dir} do
       missing = Path.join(dir, "missing")
-      invalid = Path.join(dir, "SIGIL_POLICY")
+      invalid = Path.join(dir, "SIGILGUARD_POLICY")
       File.write!(invalid, "default nope\n")
 
       assert {:error, :enoent} = RepoPolicy.load_file(missing)
       assert {:error, :invalid_decision} = RepoPolicy.load_file(invalid)
+    end
+
+    test "rejects every legacy policy filename with its v3 replacement", %{dir: dir} do
+      legacy_names = [
+        {"SIGIL_POLICY", "SIGILGUARD_POLICY"},
+        {".sigil-policy", ".sigilguard-policy"},
+        {".sigil/policy", ".sigilguard/policy"},
+        {".github/sigil-policy", ".github/sigilguard-policy"}
+      ]
+
+      for {legacy, replacement} <- legacy_names do
+        root = Path.join(dir, "legacy-#{System.unique_integer([:positive])}")
+        File.mkdir_p!(root)
+        path = Path.join(root, legacy)
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, "default allow\n")
+
+        assert RepoPolicy.find_file(root) ==
+                 {:error, {:legacy_policy_filename, path, replacement}}
+
+        assert RepoPolicy.load(root) ==
+                 {:error, {:legacy_policy_filename, path, replacement}}
+      end
+    end
+
+    test "legacy policy filenames are not silent fallbacks or coexistent", %{dir: dir} do
+      legacy = Path.join(dir, "SIGIL_POLICY")
+      File.write!(legacy, "default allow\n")
+      File.write!(Path.join(dir, "SIGILGUARD_POLICY"), "default block\n")
+      File.write!(Path.join(dir, ".custom-policy"), "default allow\n")
+
+      assert RepoPolicy.find_file(dir) ==
+               {:error, {:legacy_policy_filename, legacy, "SIGILGUARD_POLICY"}}
+
+      assert RepoPolicy.find_file(dir, candidates: ".custom-policy") ==
+               {:error, {:legacy_policy_filename, legacy, "SIGILGUARD_POLICY"}}
     end
   end
 

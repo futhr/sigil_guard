@@ -1819,7 +1819,7 @@ section is post-3.0.0 parking; neither is counted here.
     removed key/value, calls `SigilGuard.Application.start/2`, and asserts a
     `SigilGuard.ConfigError` with the offending key, reason
     `:legacy_contract_removed`, and `MIGRATING-3.0.md` in the message.
-- [ ] M6.10 D13 policy filename rename verification.
+- [x] M6.10 D13 policy filename rename verification.
   - Spec: `docs/specs/SP.11-repo-policy-kernel-contracts.md` - V3 Policy
     Filenames (D13); `SP.04` - Policy Filenames.
   - AC: with M4.06 shipped, every legacy filename
@@ -1828,6 +1828,13 @@ section is post-3.0.0 parking; neither is counted here.
     fallback path exists anywhere; `MIGRATING-3.0.md` carries the four
     positional rename rows.
   - Tests: negative (all four legacy names), conformance.
+  - Done: aligned `SigilGuard.RepoPolicy.find_file/2` with the D13 v3
+    candidate names, added pre-selection legacy filename rejection for all four
+    old `SIGIL` paths, and verified both `find_file/2` and `load/2` return
+    `{:error, {:legacy_policy_filename, found, use}}`. Added coverage that a
+    legacy file is not used as a fallback or accepted beside a v3/explicit
+    candidate, and added the four-row filename migration table to
+    `MIGRATING-3.0.md`.
 - [ ] M6.11 Remove finch and the `SigilGuard.Finch` pool.
   - Spec: `SP.12` - Dependency Removal (D9); `SP.05` -
     SigilGuard.HTTPClient Behaviour (D9).

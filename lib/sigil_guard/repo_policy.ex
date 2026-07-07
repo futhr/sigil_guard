@@ -35,7 +35,19 @@ defmodule SigilGuard.RepoPolicy do
 
   @version 1
   @default_decision :require_approval
-  @default_policy_paths ["SIGIL_POLICY", ".sigil-policy", ".sigil/policy", ".github/sigil-policy"]
+  @default_policy_paths [
+    "SIGILGUARD_POLICY",
+    ".sigilguard-policy",
+    ".sigilguard/policy",
+    ".github/sigilguard-policy"
+  ]
+
+  @legacy_policy_replacements [
+    {"SIGIL_POLICY", "SIGILGUARD_POLICY"},
+    {".sigil-policy", ".sigilguard-policy"},
+    {".sigil/policy", ".sigilguard/policy"},
+    {".github/sigil-policy", ".github/sigilguard-policy"}
+  ]
   @default_max_policy_bytes 262_144
   @decisions [:allow, :require_approval, :block]
   @decision_rank %{allow: 0, require_approval: 1, block: 2}
@@ -138,10 +150,15 @@ defmodule SigilGuard.RepoPolicy do
 
   By default the loader checks these repo-relative paths in order:
 
-    * `SIGIL_POLICY`
-    * `.sigil-policy`
-    * `.sigil/policy`
-    * `.github/sigil-policy`
+    * `SIGILGUARD_POLICY`
+    * `.sigilguard-policy`
+    * `.sigilguard/policy`
+    * `.github/sigilguard-policy`
+
+  Legacy policy filenames fail closed with
+  `{:error, {:legacy_policy_filename, found, use}}`. Legacy files are never
+  parsed and never silently used as fallbacks, including when a v3 policy file
+  is also present.
 
   Options:
 
@@ -165,7 +182,8 @@ defmodule SigilGuard.RepoPolicy do
   def find_file(repo_root, opts \\ []) when is_binary(repo_root) do
     root = Path.expand(repo_root)
 
-    with {:ok, candidates} <-
+    with :ok <- reject_legacy_policy_paths(root),
+         {:ok, candidates} <-
            normalize_policy_paths(Keyword.get(opts, :candidates, @default_policy_paths)) do
       case first_existing_policy_path(root, candidates) do
         nil -> {:error, :not_found}
@@ -627,6 +645,18 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   defp normalize_policy_path(_), do: {:error, :invalid_policy_path}
+
+  defp reject_legacy_policy_paths(root) do
+    Enum.reduce_while(@legacy_policy_replacements, :ok, fn {legacy, replacement}, :ok ->
+      path = Path.expand(legacy, root)
+
+      if inside_root?(root, path) and File.regular?(path) do
+        {:halt, {:error, {:legacy_policy_filename, path, replacement}}}
+      else
+        {:cont, :ok}
+      end
+    end)
+  end
 
   defp normalize_pattern(pattern) when is_binary(pattern) do
     pattern = String.trim(pattern)

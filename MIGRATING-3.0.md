@@ -1,5 +1,19 @@
 # Migrating To SigilGuard 3.0
 
+## Policy Filenames
+
+SigilGuard 3.0 renames repo policy files from the old SIGIL filename family
+to the SIGILGUARD filename family. Legacy filenames fail closed with
+`{:error, {:legacy_policy_filename, found, use}}` and are never parsed as
+fallbacks.
+
+| V2 Filename | V3 Filename |
+|-------------|-------------|
+| `SIGIL_POLICY` | `SIGILGUARD_POLICY` |
+| `.sigil-policy` | `.sigilguard-policy` |
+| `.sigil/policy` | `.sigilguard/policy` |
+| `.github/sigil-policy` | `.github/sigilguard-policy` |
+
 ## MCP JSON-RPC Rejection Codes
 
 SigilGuard 3.0 moves MCP gateway rejection codes from the v0.2 `-32001..-32003`
