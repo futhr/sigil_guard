@@ -235,6 +235,44 @@ defmodule SigilGuard.RepoPolicy do
     |> sha256_hex()
   end
 
+  @doc """
+  Build the SP.11 policy-facts map from a compiled policy and a decision.
+
+  This is the exact shape the repo kernel contributes to
+  `SigilGuard.BoundaryPolicy` and to `repo_change` audit evidence: the repo
+  `verdict`, one `matched_rules` entry per applied rule (its `rule_id` and the
+  rule `message`, else the decision `reason`), the `unmatched_paths` governed
+  by the default, the compiled-policy `policy_file_digest`, and the
+  `default_decision`.
+  """
+  @spec policy_facts(t(), Decision.t()) :: %{
+          verdict: Decision.verdict(),
+          matched_rules: [%{rule_id: String.t(), explanation: String.t()}],
+          unmatched_paths: [String.t()],
+          policy_file_digest: String.t(),
+          default_decision: Decision.verdict()
+        }
+  def policy_facts(%__MODULE__{} = policy, %Decision{} = decision) do
+    %{
+      verdict: decision.verdict,
+      matched_rules: matched_rule_facts(policy, decision),
+      unmatched_paths: decision.unmatched_paths,
+      policy_file_digest: digest(policy),
+      default_decision: policy.default
+    }
+  end
+
+  defp matched_rule_facts(policy, decision) do
+    by_id = Map.new(policy.rules, &{&1.id, &1})
+
+    Enum.map(decision.matched_rule_ids, fn id ->
+      %{rule_id: id, explanation: rule_explanation(Map.get(by_id, id), decision)}
+    end)
+  end
+
+  defp rule_explanation(%{message: message}, _) when is_binary(message), do: message
+  defp rule_explanation(_, decision), do: decision.reason
+
   defp compile_rules(rules) when is_list(rules) do
     result =
       rules

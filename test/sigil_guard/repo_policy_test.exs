@@ -578,6 +578,68 @@ defmodule SigilGuard.RepoPolicyTest do
     end
   end
 
+  describe "policy_facts/2" do
+    test "builds the SP.11 facts shape using rule messages" do
+      policy =
+        compile!(
+          rules: [
+            %{
+              id: "docs",
+              decision: :block,
+              agents: ["*"],
+              actions: ["*"],
+              paths: ["docs/**"],
+              message: "docs are locked"
+            }
+          ],
+          default: :require_approval
+        )
+
+      decision =
+        RepoPolicy.evaluate(policy, agent: "bot", action: "modify", changed_paths: ["docs/x.md"])
+
+      assert RepoPolicy.policy_facts(policy, decision) == %{
+               verdict: :block,
+               matched_rules: [%{rule_id: "docs", explanation: "docs are locked"}],
+               unmatched_paths: [],
+               policy_file_digest: RepoPolicy.digest(policy),
+               default_decision: :require_approval
+             }
+    end
+
+    test "falls back to the decision reason when a rule has no message" do
+      policy = compile!(rules: [rule("docs", :allow, ["docs/**"])], default: :block)
+
+      decision =
+        RepoPolicy.evaluate(policy,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["docs/x.md"]
+        )
+
+      facts = RepoPolicy.policy_facts(policy, decision)
+      assert [%{rule_id: "docs", explanation: explanation}] = facts.matched_rules
+      assert explanation == decision.reason
+    end
+
+    test "carries unmatched paths, the policy digest, and the default decision" do
+      policy = compile!(rules: [rule("docs", :allow, ["docs/**"])], default: :require_approval)
+
+      decision =
+        RepoPolicy.evaluate(policy,
+          agent: "did:web:codex",
+          action: "modify",
+          changed_paths: ["docs/a.md", "lib/x.ex"]
+        )
+
+      facts = RepoPolicy.policy_facts(policy, decision)
+      assert facts.verdict == :require_approval
+      assert facts.unmatched_paths == ["lib/x.ex"]
+      assert facts.policy_file_digest == RepoPolicy.digest(policy)
+      assert facts.default_decision == :require_approval
+    end
+  end
+
   defp compile!(policy) do
     {:ok, compiled} = RepoPolicy.compile(policy)
     compiled
