@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 151 / 228 tasks done (66%).** Milestones: 6 complete, 1 partial,
-3 not started. **77 tasks left.** Current milestone: **M5** (17/26, 65%).
+**Overall: 152 / 228 tasks done (67%).** Milestones: 6 complete, 1 partial,
+3 not started. **76 tasks left.** Current milestone: **M5** (18/26, 69%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 17 | 26 | 65% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 18 | 26 | 69% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **151** | **228** | **66%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **152** | **228** | **67%** | 6 done / 1 partial / 3 to go |
 
-### What's left (77 tasks)
+### What's left (76 tasks)
 
-- **M5 - 9 left:** the threat-model test suite TM.04-TM.12
-  (move-don't-duplicate). (M5.01-M5.17 done, incl. TM.01-TM.03.)
+- **M5 - 8 left:** the threat-model test suite TM.05-TM.12
+  (move-don't-duplicate). (M5.01-M5.18 done, incl. TM.01-TM.04.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1482,13 +1482,26 @@ section is post-3.0.0 parking; neither is counted here.
     description is rejected with `:manifest_digest_mismatch` before exposure, a
     tool absent from the pinned set fails `:unknown_manifest`, and a refreshed
     list with a poisoned entry (and malformed input) fails closed.
-- [ ] M5.18 TM.04 threat family - schema injection.
+- [x] M5.18 TM.04 threat family - schema injection.
   - Spec: `R.06` - Control Mapping row 4; `SP.03` (Suspicious Required
     Parameters).
   - AC: `.../tm04_schema_injection_test.exs` proves adversarial required
     params (for example credential-shaped names) are disclosed, digest
     bound, recomputed, and force confirm (mitigates + detects).
   - Tests: negative, tamper, malformed.
+  - Done: added the TM.04 module (R.06 row 4, ASI02/ASI03, claim
+    **mitigates + detects**) citing the schema-injection credential-theft
+    attack and referencing the base tests by exact name. Drives both facets
+    of the `suspicious_params` disclosure/digest control: `guard_request/3`
+    forces `{:confirm, "suspicious_required_param"}` (with `deny_reason`,
+    `suspicious_params`, a 64-hex `action_digest`, and `manifest_digest`) for
+    an honestly disclosed credential-shaped required param - including one
+    buried in a nested `allOf` - while a benign manifest does not (mitigates);
+    an undisclosed suspicious param fails `:suspicious_required_param` and an
+    injected required param drifting a pinned schema fails
+    `:schema_digest_mismatch` via `verify_manifest/2` (detects). Negative
+    (benign allowed), tamper (undisclosed/drifted schemas), and malformed
+    (bad `suspicious_params` list, empty/unknown manifest) fail closed.
 - [ ] M5.19 TM.05 threat family - rug pull / TOFU drift.
   - Spec: `R.06` - Control Mapping rows 5 and 18; `SP.03` (list_changed).
   - AC: `.../tm05_rug_pull_test.exs` proves drift rejection and that
