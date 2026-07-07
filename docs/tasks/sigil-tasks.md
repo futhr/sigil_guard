@@ -1978,12 +1978,17 @@ section is post-3.0.0 parking; neither is counted here.
     that `~> 0.2` remains on the v2 line, release candidates require exact pins
     such as `"3.0.0-rc.1"`, `~> 3.0` does not match prereleases, and `~> 3.0`
     is the post-GA dependency requirement.
-- [ ] M6.23 CHANGELOG breaking-change section.
+- [x] M6.23 CHANGELOG breaking-change section.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: a breaking-change section enumerates removals with MIGRATING
     anchors; git_ops conventions untouched (generated entries are not
     hand-edited elsewhere).
   - Validation: link check; completeness script.
+  - Done: added a manual `Unreleased Breaking Changes For 3.0.0` section above
+    the git_ops `<!-- changelog -->` marker, leaving generated entries
+    untouched. The section enumerates registry, envelope, metadata, profile,
+    config, policy filename, Finch dependency, error atom, and version-pinning
+    breaks with anchors into `MIGRATING-3.0.md`.
 - [ ] M6.24 Migration completeness-gate script.
   - Spec: `SP.12` - Acceptance Criteria.
   - AC: a repo script cross-references the M6 deletion diff (removed

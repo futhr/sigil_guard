@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](Https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased Breaking Changes For 3.0.0
+
+SigilGuard 3.0 is a deliberate breaking release. Apply
+[`MIGRATING-3.0.md`](MIGRATING-3.0.md) before moving a v2 consumer to the v3
+line.
+
+- Removed `SigilGuard.Registry`, `SigilGuard.Registry.Bundle`, and
+  `SigilGuard.Registry.Cache`; use
+  [`SigilGuard.TrustBundle`](MIGRATING-3.0.md#registry-to-trust-bundles).
+- Removed `SigilGuard.Envelope` and verdict-only `_sigil` metadata; use
+  [`SigilGuard.Attestation`](MIGRATING-3.0.md#envelope-to-attestation) and
+  [`_agent_trust`](MIGRATING-3.0.md#mcp-trust-metadata).
+- Removed `SigilGuard.Profile`; use
+  [`SigilGuard.TrustProfile`](MIGRATING-3.0.md#profile-to-trustprofile).
+- Removed legacy config keys including `:backend`, `:protocol_profile`, and all
+  `registry_*` keys; see
+  [Configuration Keys](MIGRATING-3.0.md#configuration-keys).
+- Renamed policy files from the old SIGIL family to the
+  [SIGILGUARD policy filenames](MIGRATING-3.0.md#policy-filenames).
+- Renamed confirmation metadata from `_sigil_confirmation` to
+  [`_agent_confirmation`](MIGRATING-3.0.md#mcp-confirmation-metadata).
+- Removed Finch from the runtime dependency set; HTTP anchor stores use the
+  host-provided `SigilGuard.HTTPClient` behaviour.
+- Changed selected trust-bundle error atoms and config boot errors; see
+  [Error Changes](MIGRATING-3.0.md#error-changes).
+- Version adoption is explicit: `~> 0.2` remains on v2, release candidates
+  require exact pins, and `~> 3.0` is for GA; see
+  [Version Pinning](MIGRATING-3.0.md#version-pinning).
+
 <!-- changelog -->
 
 ## [v0.2.0](https://github.com/futhr/sigil_guard/compare/v0.1.1...v0.2.0) (2026-06-10)
