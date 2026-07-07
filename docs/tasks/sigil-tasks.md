@@ -2016,7 +2016,7 @@ section is post-3.0.0 parking; neither is counted here.
     confirmation and signed-gateway tests to `_agent_*`; added explicit inert
     legacy metadata coverage and digest tests that keep SP.01 metadata
     digest-neutral while treating `_sigil*` as ordinary payload content.
-- [ ] M6.26 README rewrite: installation, examples, configuration.
+- [x] M6.26 README rewrite: installation, examples, configuration.
   - Spec: `SP.01` - V3 Configuration Surface; `SP.14` - Announcement Kit
     And Listings (tagline).
   - AC: installation snippet says `{:sigil_guard, "~> 3.0"}`; MCP examples
@@ -2024,6 +2024,11 @@ section is post-3.0.0 parking; neither is counted here.
     table lists exactly the SP.01 kept keys.
   - Validation: docs vocabulary scan; `mix docs`; README snippets compile
     as doctests where applicable.
+  - Done: updated the README tagline and navigation, kept the 3.0 dependency
+    snippet, added `ToolGateway` Agent Trust examples for manifest guarding,
+    `_agent_trust` attestation attachment, and `_agent_confirmation`
+    confirmations, and added the closed v3 configuration table from the
+    validated application surface.
 - [ ] M6.27 README rewrite: profile section and legacy-language cleanup.
   - Spec: `SP.01` - V3 Position; `SP.12` - V3 Removal Map.
   - AC: the protocol-profile section becomes an Agent Trust Profile

@@ -1,6 +1,6 @@
 # SigilGuard
 
-**Embedded security runtime for MCP and agent-tool boundaries, in native Elixir.**
+**In-process. OTP-supervised. Deterministic. No sidecar. Signed evidence.**
 
 [![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg)](https://hex.pm/packages/sigil_guard)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/sigil_guard)
@@ -10,14 +10,17 @@
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
+[Agent Trust Gateway](#agent-trust-gateway) ·
+[Configuration](#configuration) ·
 [Capabilities](#capabilities) ·
 [Architecture](docs/README.md)
 
 ---
 
-SigilGuard sits between a language model and the tools it can reach. It decides
-whether a tool call, a tool result, or a model output is allowed to cross a
-given boundary, and it produces signed, tamper-evident evidence of every
+SigilGuard is an embedded security runtime for MCP and agent-tool boundaries,
+in native Elixir. It sits between a language model and the tools it can reach,
+decides whether a tool call, a tool result, or a model output is allowed to
+cross a given boundary, and produces signed, tamper-evident evidence of every
 decision. It runs in-process on the BEAM: no sidecar, no proxy hop, no network
 call on the decision path.
 
@@ -120,6 +123,106 @@ calls it before tool execution, after tool results, and before outbound writes,
 without pulling any specific MCP adapter into the core. The MCP gateway,
 attestation signing, confirmation flow, trust bundles, and audit chain build on
 this same decision. The [architecture](docs/README.md) covers the full surface.
+
+## Agent Trust Gateway
+
+`SigilGuard.ToolGateway` is the v3 entry point for MCP-shaped tool calls and
+tool results. It combines capability-manifest checks, boundary policy,
+confirmation tokens, and Agent Trust attestations.
+
+Guard a tool request against a pinned manifest:
+
+```elixir
+request = %{
+  "method" => "tools/call",
+  "params" => %{
+    "name" => "repo_file_write",
+    "arguments" => %{"path" => "README.md", "content" => "updated"}
+  }
+}
+
+context = [
+  actor: "spiffe://agents/editor",
+  trust_level: :medium,
+  sandbox_id: "sandbox-123",
+  isolation_level: :filesystem
+]
+
+decision =
+  SigilGuard.ToolGateway.guard_request(request, context,
+    manifests: %{"repo_file_write" => pinned_manifest},
+    require_manifest: true
+  )
+```
+
+Attach and require Agent Trust evidence with the `_agent_trust` metadata key:
+
+```elixir
+{:ok, envelope} =
+  SigilGuard.ToolGateway.attest_request(decision, context,
+    signer: MyApp.AgentSigner,
+    keyid: "agent-ed25519-1",
+    nonce: "unique-request-nonce",
+    manifest: pinned_manifest
+  )
+
+trusted_request = SigilGuard.Attestation.attach(request, envelope)
+
+verified =
+  SigilGuard.ToolGateway.guard_request(trusted_request, context,
+    manifests: %{"repo_file_write" => pinned_manifest},
+    attestation: :required,
+    trust_material: %{"agent-ed25519-1" => agent_public_key}
+  )
+```
+
+Confirmation tokens use `_agent_confirmation` when a decision requires human
+approval:
+
+```elixir
+{:ok, token} =
+  SigilGuard.ToolGateway.issue_confirmation(
+    request,
+    context,
+    decision,
+    confirmation_key,
+    manifest: pinned_manifest
+  )
+
+confirmed_request = SigilGuard.Attestation.attach_confirmation(request, token)
+
+confirmed =
+  SigilGuard.ToolGateway.guard_request(confirmed_request, context,
+    manifests: %{"repo_file_write" => pinned_manifest},
+    confirmation_key: confirmation_key
+  )
+```
+
+## Configuration
+
+All configuration lives under the `:sigil_guard` application environment and is
+validated at boot. Unknown keys and removed v2 keys fail closed with
+`SigilGuard.ConfigError` and a pointer to `MIGRATING-3.0.md`.
+
+```elixir
+config :sigil_guard,
+  trust_bundle: {:priv, :my_app, "sigil/trust_bundle.json"},
+  scanner_patterns: :bundle,
+  attestation_ttl_ms: 300_000,
+  max_skew_ms: 60_000,
+  replay_ttl_ms: 300_000
+```
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `:trust_bundle` | `:none` | Local trust-bundle source: `:none`, `{:file, path}`, `{:priv, app, path}`, `{:map, map}`, or `{:binary, bytes}`. |
+| `:scanner_patterns` | `:built_in` | Pattern source, either `:built_in` or `:bundle`; `:bundle` requires `:trust_bundle`. |
+| `:http_client` | `nil` | Host-provided module implementing `SigilGuard.HTTPClient` for audit anchor HTTP stores. |
+| `:attestation_ttl_ms` | `300_000` | Attestation lifetime in milliseconds. |
+| `:max_skew_ms` | `60_000` | Maximum accepted clock skew in milliseconds. |
+| `:replay_ttl_ms` | `300_000` | Replay cache lifetime in milliseconds. |
+| `:vault_master_key` | `nil` | Optional base64-encoded key for `SigilGuard.Vault.InMemory`. |
+| `:trust_mappings` | `[]` | Ordered `{pattern, trust_level}` actor mappings; patterns are exact strings or one trailing `*`. |
 
 ## Extension Points
 
