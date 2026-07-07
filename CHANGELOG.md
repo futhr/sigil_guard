@@ -26,6 +26,10 @@ line.
   [`_agent_confirmation`](MIGRATING-1.0.md#mcp-confirmation-metadata).
 - Removed Finch from the runtime dependency set; HTTP anchor stores use the
   host-provided `SigilGuard.HTTPClient` behaviour.
+- Runtime dependencies are intentionally limited to `:telemetry`,
+  `:nimble_options`, and `:jason`; integrations, notebooks, and adaptive
+  detector examples add no runtime dependency, and `mix deps.audit` is clean
+  for the 1.0.0 release line.
 - Changed selected trust-bundle error atoms and config boot errors; see
   [Error Changes](MIGRATING-1.0.md#error-changes).
 - Version adoption is explicit: `~> 0.2` remains on v2 and `~> 1.0` adopts the

@@ -61,8 +61,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 204 / 220 tasks done (93%).** Milestones: 7 complete, 3 partial,
-0 not started. **16 tasks left.** Current milestone: **M6/M7/M8** (blocked
+**Overall: 206 / 220 tasks done (94%).** Milestones: 7 complete, 3 partial,
+0 not started. **14 tasks left.** Current milestone: **M6/M7/M8** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -76,15 +76,15 @@ consumer gate; docs/adoption work started).
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
 | M7 | Integrations and adoption | 13 | 17 | 76% | In progress |
-| M8 | Release | 2 | 12 | 17% | In progress |
-| — | **Total** | **204** | **220** | **93%** | 7 done / 3 partial / 0 to go |
+| M8 | Release | 4 | 12 | 33% | In progress |
+| — | **Total** | **206** | **220** | **94%** | 7 done / 3 partial / 0 to go |
 
-### What's left (16 tasks)
+### What's left (14 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
 - **M7 - 4:** benchmark and comparison artifacts.
-- **M8 - 10:** release engineering and validation.
+- **M8 - 8:** release engineering and validation.
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
@@ -2332,7 +2332,7 @@ section is post-1.0.0 parking; neither is counted here.
     not a path dependency: full suite plus its security-conformance acceptance
     tests; this gate blocks publication.
   - Validation: gate record; failures reopen M6.30 fold-back before publish.
-- [ ] M8.04 SLSA L3 provenance and SBOM on the release workflow.
+- [x] M8.04 SLSA L3 provenance and SBOM on the release workflow.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15).
   - AC: the 1.0.0 tag produces SLSA v1 provenance via
@@ -2340,6 +2340,11 @@ section is post-1.0.0 parking; neither is counted here.
     attestation verify` gates publish; the SP.01 `release` statement signs
     tarball and SBOM digests.
   - Tests: workflow run on tag; negative (verification failure blocks).
+  - Done: `.github/workflows/publish.yml` builds the Hex tarball and SPDX
+    SBOM, verifies the SBOM digest, emits the SP.01 release statement, attests
+    tarball plus SBOM with `actions/attest-build-provenance`, signs the
+    release predicate with `actions/attest`, verifies both subjects with
+    `gh attestation verify`, and only then runs `mix hex.publish --yes`.
 - [ ] M8.05 Socket-denying no-network sweep.
   - Spec: `SP.02` - Loading Sources (No-network guarantee); `SP.05` -
     SigilGuard.HTTPClient Behaviour (trust model).
@@ -2376,13 +2381,15 @@ section is post-1.0.0 parking; neither is counted here.
   - AC: the checklist covering docs, SBOM, provenance, benchmarks, and Hex
     metadata is executed and archived for the GA release.
   - Validation: checklist archived with the GA tag.
-- [ ] M8.10 Dependency-audit posture note.
+- [x] M8.10 Dependency-audit posture note.
   - Spec: `SP.12` - Dependency Removal (D9); `R.07`.
   - AC: release notes record the audited posture: runtime deps are the
     intended minimal set (`:telemetry`, `:nimble_options`, `:jason`) chosen
     on merit; integrations and adaptive detectors add no runtime deps
     (docs/optional packages only); `mix deps.audit` clean at tag.
   - Validation: note present; M6.12 assertion green at tag.
+  - Done: recorded the runtime dependency posture in `CHANGELOG.md`; verified
+    `mix deps.audit` reports no vulnerabilities for the 1.0.0 release line.
 - [ ] M8.11 Publish 1.0.0 GA with the git_ops resume check.
   - Spec: `SP.12` - Release Sequence (D11) step 4.
   - AC: GA is published; a post-publish `mix git_ops.release --dry-run`
