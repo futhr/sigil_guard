@@ -82,8 +82,8 @@ defmodule SigilGuard.MixProject do
   end
 
   defp description do
-    "Native Elixir security runtime for MCP and agent tool boundaries: scanning, " <>
-      "envelope contracts, policy, audit evidence, and signed trust bundles."
+    "In-process, OTP-supervised security runtime for MCP and agent-tool " <>
+      "boundaries with deterministic policy, Agent Trust attestations, and signed evidence."
   end
 
   defp package do
@@ -92,7 +92,8 @@ defmodule SigilGuard.MixProject do
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,
-        "Historical upstream SIGIL repository" => "https://github.com/sigil-eu/sigil"
+        "Documentation" => "https://hexdocs.pm/sigil_guard",
+        "Migration Guide" => @source_url <> "/blob/main/MIGRATING-3.0.md"
       },
       files: ~w[
         lib

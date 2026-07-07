@@ -2041,12 +2041,17 @@ section is post-3.0.0 parking; neither is counted here.
     documented the per-boot trust-bundle ETS cache and durable signed-bundle
     source of truth; removed the remaining Finch example from README extension
     prose; verified forbidden terms and local README links.
-- [ ] M6.28 Package metadata cleanup: hosted-registry language removed.
+- [x] M6.28 Package metadata cleanup: hosted-registry language removed.
   - Spec: `SP.12` - V3 Removal Map; `SP.14` - Announcement Kit And
     Listings.
   - AC: `mix.exs` package description/links carry no hosted-registry or
     NIF language; metadata matches the v3 positioning.
   - Validation: `mix hex.build` dry inspection; vocabulary scan.
+  - Done: rewrote the Hex package description around the v3 in-process Agent
+    Trust positioning, replaced the historical upstream package link with
+    documentation and migration-guide links, removed a stale empty registry
+    directory from the package file list, and verified `mix hex.build`
+    inspection plus package-metadata vocabulary scan.
 - [ ] M6.29 Reference-consumer upgrade-branch validation (tier-2 gate).
   - Spec: `SP.12` - Release Sequence (D11); `SP.07` - Stability
     Guarantees (D17).
