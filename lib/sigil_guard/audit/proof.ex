@@ -14,23 +14,31 @@ defmodule SigilGuard.Audit.Proof do
   Because leaves are HMAC outputs, a proof reveals only the target event's HMAC
   and unrelated sibling hashes.
 
-  The verification algorithm is adapted from RFC 9162 section 2.1.3.2.
-  Consistency proofs (`consistency/2`, `verify_consistency/3`) are specified in
-  the same SP.05 section and land alongside the consistency-proof task.
+  Inclusion verification is adapted from RFC 9162 section 2.1.3.2 and
+  consistency verification from section 2.1.4.2. A consistency proof shows the
+  size-`m` tree is an unmodified prefix of the size-`n` tree; a truncated or
+  forked newer chain fails `:inconsistent_tree`.
   """
 
   alias SigilGuard.Audit
   alias SigilGuard.Audit.Checkpoint
 
   @inclusion_kind "sigil_guard.audit.inclusion_proof"
+  @consistency_kind "sigil_guard.audit.consistency_proof"
   @version 1
   # Sizes at or above 2^53 are rejected (JSON-safe integer bound, SP.05).
   @max_size 9_007_199_254_740_992
   @inclusion_keys ~w(kind version leaf_index tree_size audit_path)
+  @consistency_keys ~w(kind version first_size second_size proof_nodes)
   @hex_64 ~r/\A[0-9a-f]{64}\z/
 
   @typedoc "An inclusion proof object (closed shape; serializes as JSON, SP.05)."
   @type inclusion_proof :: %{
+          required(String.t()) => String.t() | non_neg_integer() | [String.t()]
+        }
+
+  @typedoc "A consistency proof object (closed shape; serializes as JSON, SP.05)."
+  @type consistency_proof :: %{
           required(String.t()) => String.t() | non_neg_integer() | [String.t()]
         }
 
@@ -88,6 +96,60 @@ defmodule SigilGuard.Audit.Proof do
 
   def verify_inclusion(_, _, _), do: {:error, :invalid_proof}
 
+  @doc """
+  Generate a consistency proof from `first_size` to the full `events` tree.
+
+  Proves the `first_size`-event tree is an unmodified prefix of the current
+  `length(events)`-event tree. Fails `{:error, :out_of_range}` when `first_size`
+  is outside `1..length(events)` and `{:error, :unsigned_event}` when any event
+  lacks an `hmac`.
+  """
+  @spec consistency([Audit.t()], pos_integer()) ::
+          {:ok, consistency_proof()} | {:error, :out_of_range | :unsigned_event}
+  def consistency(events, first_size)
+      when is_list(events) and is_integer(first_size) and first_size >= 1 do
+    with {:ok, leaves} <- Checkpoint.leaf_hashes(events),
+         second_size = length(leaves),
+         true <- first_size <= second_size do
+      nodes = subproof(first_size, leaves, true)
+
+      {:ok,
+       %{
+         "kind" => @consistency_kind,
+         "version" => @version,
+         "first_size" => first_size,
+         "second_size" => second_size,
+         "proof_nodes" => Enum.map(nodes, &Base.encode16(&1, case: :lower))
+       }}
+    else
+      false -> {:error, :out_of_range}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def consistency(_, _), do: {:error, :out_of_range}
+
+  @doc """
+  Verify a consistency `proof` between two trusted checkpoint roots.
+
+  Follows RFC 9162 section 2.1.4.2: a malformed proof fails
+  `{:error, :invalid_proof}`, `first_size` outside `1..second_size` fails
+  `{:error, :out_of_range}`, and a proof whose recomputed roots do not match
+  both `first_root` and `second_root` fails `{:error, :inconsistent_tree}` (a
+  truncated or forked newer chain).
+  """
+  @spec verify_consistency(map(), String.t(), String.t()) ::
+          :ok | {:error, :invalid_proof | :out_of_range | :inconsistent_tree}
+  def verify_consistency(proof, first_root, second_root)
+      when is_binary(first_root) and is_binary(second_root) do
+    with {:ok, first_size, second_size, nodes} <- decode_consistency_proof(proof),
+         :ok <- consistency_in_range(first_size, second_size) do
+      verify_consistency_sizes(first_size, second_size, nodes, first_root, second_root)
+    end
+  end
+
+  def verify_consistency(_, _, _), do: {:error, :invalid_proof}
+
   # -- Generation -------------------------------------------------------------
 
   # Walk every level except the root, collecting the sibling of the current
@@ -117,6 +179,44 @@ defmodule SigilGuard.Audit.Proof do
       true -> nil
     end
   end
+
+  # RFC 9162 2.1.4.1 SUBPROOF over the promotion tree (root-equal to the RFC
+  # split construction for sizes 1..256, R.04). `m` is the older size, `leaves`
+  # the newer leaf hashes, `b` the "on the boundary" flag.
+  defp subproof(m, leaves, b) do
+    n = length(leaves)
+
+    cond do
+      m == n and b -> []
+      m == n -> [subtree_root(leaves)]
+      m <= largest_pow2_below(n) -> left_subproof(m, leaves, b)
+      true -> right_subproof(m, leaves)
+    end
+  end
+
+  defp left_subproof(m, leaves, b) do
+    k = largest_pow2_below(length(leaves))
+    Enum.concat(subproof(m, Enum.take(leaves, k), b), [subtree_root(Enum.drop(leaves, k))])
+  end
+
+  defp right_subproof(m, leaves) do
+    k = largest_pow2_below(length(leaves))
+
+    Enum.concat(subproof(m - k, Enum.drop(leaves, k), false), [subtree_root(Enum.take(leaves, k))])
+  end
+
+  defp subtree_root(leaves) do
+    leaves
+    |> Checkpoint.levels()
+    |> List.last()
+    |> hd()
+  end
+
+  # Largest power of two strictly less than `n` (`n >= 2`).
+  defp largest_pow2_below(n), do: pow2_below(1, n)
+
+  defp pow2_below(p, n) when p * 2 < n, do: pow2_below(p * 2, n)
+  defp pow2_below(p, _), do: p
 
   # -- Verification -----------------------------------------------------------
 
@@ -160,6 +260,91 @@ defmodule SigilGuard.Audit.Proof do
 
   defp shift_until_odd(fn_, sn), do: {fn_, sn}
 
+  # -- Consistency verification (RFC 9162 2.1.4.2) ----------------------------
+
+  defp consistency_in_range(first_size, second_size)
+       when first_size >= 1 and first_size <= second_size,
+       do: :ok
+
+  defp consistency_in_range(_, _), do: {:error, :out_of_range}
+
+  # Step 3: equal sizes prove consistency only when the roots already match.
+  defp verify_consistency_sizes(size, size, nodes, first_root, second_root) do
+    cond do
+      nodes != [] -> {:error, :invalid_proof}
+      first_root == second_root -> :ok
+      true -> {:error, :inconsistent_tree}
+    end
+  end
+
+  # Steps 4-11: a strictly older first tree.
+  defp verify_consistency_sizes(first_size, second_size, nodes, first_root, second_root) do
+    with {:ok, nodes} <- non_empty(nodes),
+         {:ok, nodes} <- maybe_prepend_root(first_size, nodes, first_root) do
+      run_consistency(first_size, second_size, nodes, first_root, second_root)
+    end
+  end
+
+  defp non_empty([]), do: {:error, :invalid_proof}
+  defp non_empty(nodes), do: {:ok, nodes}
+
+  # Step 5: a power-of-two first size prepends the (decoded) first root.
+  defp maybe_prepend_root(first_size, nodes, first_root) do
+    if power_of_two?(first_size) do
+      case Base.decode16(first_root, case: :lower) do
+        {:ok, bin} -> {:ok, [bin | nodes]}
+        :error -> {:error, :inconsistent_tree}
+      end
+    else
+      {:ok, nodes}
+    end
+  end
+
+  defp run_consistency(first_size, second_size, [first_node | rest], first_root, second_root) do
+    {fn0, sn0} = shift_while_odd(first_size - 1, second_size - 1)
+    seed = {:ok, {first_node, first_node, fn0, sn0}}
+
+    case Enum.reduce_while(rest, seed, &fold_consistency/2) do
+      {:ok, {fr, sr, _, sn}} -> finalize_consistency(fr, sr, sn, first_root, second_root)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp fold_consistency(_, {:ok, {_, _, _, 0}}), do: {:halt, {:error, :invalid_proof}}
+
+  defp fold_consistency(c, {:ok, {fr, sr, fn_, sn}}) do
+    {fr2, sr2, fn2, sn2} =
+      if rem(fn_, 2) == 1 or fn_ == sn do
+        {f3, s3} = shift_until_odd(fn_, sn)
+        {Checkpoint.node_hash(c, fr), Checkpoint.node_hash(c, sr), f3, s3}
+      else
+        {fr, Checkpoint.node_hash(sr, c), fn_, sn}
+      end
+
+    {:cont, {:ok, {fr2, sr2, div(fn2, 2), div(sn2, 2)}}}
+  end
+
+  defp finalize_consistency(fr, sr, 0, first_root, second_root) do
+    if Base.encode16(fr, case: :lower) == first_root and
+         Base.encode16(sr, case: :lower) == second_root do
+      :ok
+    else
+      {:error, :inconsistent_tree}
+    end
+  end
+
+  defp finalize_consistency(_, _, _, _, _), do: {:error, :invalid_proof}
+
+  # Step 7: right-shift `fn` and `sn` together while `fn` is odd.
+  defp shift_while_odd(fn_, sn) when rem(fn_, 2) == 1,
+    do: shift_while_odd(div(fn_, 2), div(sn, 2))
+
+  defp shift_while_odd(fn_, sn), do: {fn_, sn}
+
+  defp power_of_two?(1), do: true
+  defp power_of_two?(n) when n > 1 and rem(n, 2) == 0, do: power_of_two?(div(n, 2))
+  defp power_of_two?(_), do: false
+
   # -- Proof object validation (closed shape) ---------------------------------
 
   defp decode_inclusion_proof(proof) when is_map(proof) do
@@ -176,11 +361,43 @@ defmodule SigilGuard.Audit.Proof do
 
   defp decode_inclusion_proof(_), do: {:error, :invalid_proof}
 
+  defp decode_consistency_proof(proof) when is_map(proof) do
+    with true <- closed_keys?(proof, @consistency_keys),
+         %{"kind" => @consistency_kind, "version" => @version} <- proof,
+         {:ok, first_size} <- fetch_int(proof, "first_size"),
+         {:ok, second_size} <- fetch_int(proof, "second_size"),
+         {:ok, nodes} <- fetch_nodes(proof) do
+      {:ok, first_size, second_size, nodes}
+    else
+      _ -> {:error, :invalid_proof}
+    end
+  end
+
+  defp decode_consistency_proof(_), do: {:error, :invalid_proof}
+
   defp closed_keys?(map, allowed), do: Enum.sort(Map.keys(map)) == Enum.sort(allowed)
 
   defp fetch_size(proof, key, min) do
     case Map.fetch(proof, key) do
       {:ok, value} when is_integer(value) and value >= min and value < @max_size -> {:ok, value}
+      _ -> :error
+    end
+  end
+
+  # The `first_size < 1` / `first_size > second_size` relationships are checked
+  # separately (`:out_of_range`); here only the JSON-safe integer bound applies.
+  defp fetch_int(proof, key) do
+    case Map.fetch(proof, key) do
+      {:ok, value} when is_integer(value) and value < @max_size -> {:ok, value}
+      _ -> :error
+    end
+  end
+
+  defp fetch_nodes(proof) do
+    with list when is_list(list) <- Map.get(proof, "proof_nodes"),
+         {:ok, decoded} <- decode_hex_list(list) do
+      {:ok, decoded}
+    else
       _ -> :error
     end
   end

@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 135 / 228 tasks done (59%).** Milestones: 6 complete, 1 partial,
-3 not started. **93 tasks left.** Current milestone: **M5** (1/26, 4%).
+**Overall: 136 / 228 tasks done (60%).** Milestones: 6 complete, 1 partial,
+3 not started. **92 tasks left.** Current milestone: **M5** (2/26, 8%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 1 | 26 | 4% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 2 | 26 | 8% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **135** | **228** | **59%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **136** | **228** | **60%** | 6 done / 1 partial / 3 to go |
 
-### What's left (93 tasks)
+### What's left (92 tasks)
 
-- **M5 - 25 left:** consistency proofs, checkpoints, witness cosigning, signed
-  exports, privacy classification, OTel/CloudEvents, audit query, and the
-  threat-model test suite. (M5.01 inclusion proofs done.)
+- **M5 - 24 left:** DSSE checkpoints, witness cosigning, signed exports, privacy
+  classification, OTel/CloudEvents, audit query, and the threat-model test
+  suite. (M5.01 inclusion + M5.02 consistency proofs done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1176,7 +1176,7 @@ section is post-3.0.0 parking; neither is counted here.
     `SigilGuard.AuditProofFixture` with byte-identical regeneration asserted;
     proofs verify against the unmodified checkpoint root. Consistency proofs
     (`consistency/2`, `verify_consistency/3`) land in M5.02.
-- [ ] M5.02 Consistency proofs and the 1..256 equivalence property.
+- [x] M5.02 Consistency proofs and the 1..256 equivalence property.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Inclusion
     And Consistency Proofs (Consistency Proof Verification; Golden Vector:
     Five-Event Tree).
@@ -1185,6 +1185,17 @@ section is post-3.0.0 parking; neither is counted here.
     equality for sizes 1..256; truncation and fork attempts fail
     `:inconsistent_tree`.
   - Tests: golden vectors, property, tamper, negative.
+  - Done: added `SigilGuard.Audit.Proof.consistency/2` (RFC 9162 2.1.4.1
+    SUBPROOF over the promotion tree, `:out_of_range`/`:unsigned_event`) and
+    `verify_consistency/3` (2.1.4.2: `:invalid_proof` for a malformed closed
+    proof object, `:out_of_range` for `first_size` outside `1..second_size`,
+    `:inconsistent_tree` on a forked/truncated newer root). Committed the
+    `consistency_3_5`/`consistency_4_5` golden vectors (`[H2,H3,N01,H4]` /
+    `[H4]`) with byte-identical regeneration asserted. Added a property
+    asserting the promotion root equals an independent RFC 9162 recursive root
+    for every size 1..256, plus StreamData round-trip properties for random
+    consistency `m <= n` and inclusion leaves. Negative/tamper coverage:
+    forked roots, tampered/truncated/over-long node lists, unparseable roots.
 - [ ] M5.03 DSSE checkpoint statements.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Witness
     Cosigning (checkpoint statement);

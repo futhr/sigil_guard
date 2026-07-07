@@ -1,7 +1,9 @@
 defmodule SigilGuard.Audit.ProofTest do
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias SigilGuard.Audit
+  alias SigilGuard.Audit.Checkpoint
   alias SigilGuard.Audit.Proof
   alias SigilGuard.AuditProofFixture, as: Fixture
 
@@ -16,6 +18,8 @@ defmodule SigilGuard.Audit.ProofTest do
       assert File.read!(Fixture.path("events.json")) == Fixture.events_json()
       assert File.read!(Fixture.path("tree.json")) == Fixture.tree_json()
       assert File.read!(Fixture.path("inclusion_5.json")) == Fixture.inclusion_json()
+      assert File.read!(Fixture.path("consistency_3_5.json")) == Fixture.consistency_json(3)
+      assert File.read!(Fixture.path("consistency_4_5.json")) == Fixture.consistency_json(4)
       assert File.read!(Fixture.path("checkpoint_5.json")) == Fixture.checkpoint_json()
     end
 
@@ -210,6 +214,238 @@ defmodule SigilGuard.Audit.ProofTest do
       end
     end
   end
+
+  describe "consistency/2 generation" do
+    test "the committed proofs match the SP.05 node table" do
+      tree = load("tree.json")
+      [_, _, h2, h3, _] = tree["leaves"]
+      h4 = tree["nodes"]["H4"]
+      n01 = tree["nodes"]["N01"]
+
+      assert load("consistency_3_5.json")["proof_nodes"] == [h2, h3, n01, h4]
+      assert load("consistency_4_5.json")["proof_nodes"] == [h4]
+    end
+
+    test "reproduces the committed proofs" do
+      events = Fixture.signed_events()
+      assert {:ok, proof3} = Proof.consistency(events, 3)
+      assert {:ok, proof4} = Proof.consistency(events, 4)
+      assert proof3 == load("consistency_3_5.json")
+      assert proof4 == load("consistency_4_5.json")
+    end
+
+    test "a first size outside 1..length is out of range" do
+      events = Fixture.signed_events()
+      assert Proof.consistency(events, 0) == {:error, :out_of_range}
+      assert Proof.consistency(events, 6) == {:error, :out_of_range}
+      assert Proof.consistency([], 1) == {:error, :out_of_range}
+    end
+
+    test "an unsigned event fails :unsigned_event" do
+      events = Fixture.signed_events()
+      %Audit{} = last = List.last(events)
+      unsigned = %{last | hmac: nil}
+      assert Proof.consistency(Enum.concat(events, [unsigned]), 3) == {:error, :unsigned_event}
+    end
+  end
+
+  describe "verify_consistency/3" do
+    setup do
+      %{events: Fixture.signed_events(), roots: load("tree.json")["roots"]}
+    end
+
+    test "the 3-to-5, 4-to-5, and 5-to-5 vectors verify", ctx do
+      for first <- [3, 4, 5] do
+        {:ok, proof} = Proof.consistency(ctx.events, first)
+
+        assert Proof.verify_consistency(
+                 proof,
+                 ctx.roots[Integer.to_string(first)],
+                 ctx.roots["5"]
+               ) == :ok
+      end
+    end
+
+    test "an equal-size proof requires matching roots and empty nodes", ctx do
+      {:ok, proof} = Proof.consistency(ctx.events, 5)
+      assert Proof.verify_consistency(proof, ctx.roots["5"], ctx.roots["5"]) == :ok
+
+      # Equal sizes with different roots is an inconsistent (forked) tree.
+      assert Proof.verify_consistency(proof, ctx.roots["5"], ctx.roots["4"]) ==
+               {:error, :inconsistent_tree}
+
+      # Equal sizes MUST carry no proof nodes.
+      nonempty = Map.put(proof, "proof_nodes", [ctx.roots["5"]])
+
+      assert Proof.verify_consistency(nonempty, ctx.roots["5"], ctx.roots["5"]) ==
+               {:error, :invalid_proof}
+    end
+
+    test "a forked newer root fails :inconsistent_tree", ctx do
+      {:ok, proof} = Proof.consistency(ctx.events, 3)
+
+      assert Proof.verify_consistency(proof, ctx.roots["3"], ctx.roots["4"]) ==
+               {:error, :inconsistent_tree}
+
+      assert Proof.verify_consistency(proof, ctx.roots["4"], ctx.roots["5"]) ==
+               {:error, :inconsistent_tree}
+    end
+
+    test "a tampered proof node fails :inconsistent_tree", ctx do
+      {:ok, proof} = Proof.consistency(ctx.events, 3)
+      [first | rest] = proof["proof_nodes"]
+      tampered = Map.put(proof, "proof_nodes", [flip_hex(first) | rest])
+
+      assert Proof.verify_consistency(tampered, ctx.roots["3"], ctx.roots["5"]) ==
+               {:error, :inconsistent_tree}
+    end
+
+    test "first_size outside 1..second_size is out of range", ctx do
+      {:ok, proof} = Proof.consistency(ctx.events, 3)
+
+      oob = %{
+        "kind" => "sigil_guard.audit.consistency_proof",
+        "version" => 1,
+        "first_size" => 0,
+        "second_size" => 5,
+        "proof_nodes" => proof["proof_nodes"]
+      }
+
+      assert Proof.verify_consistency(oob, ctx.roots["3"], ctx.roots["5"]) ==
+               {:error, :out_of_range}
+
+      bigger_first = Map.merge(oob, %{"first_size" => 6, "second_size" => 5})
+
+      assert Proof.verify_consistency(bigger_first, ctx.roots["5"], ctx.roots["5"]) ==
+               {:error, :out_of_range}
+    end
+
+    test "malformed consistency proofs fail :invalid_proof", ctx do
+      base = load("consistency_3_5.json")
+
+      malformed = [
+        %{},
+        "not a map",
+        Map.delete(base, "proof_nodes"),
+        Map.put(base, "extra", 1),
+        Map.put(base, "kind", "sigil_guard.audit.inclusion_proof"),
+        Map.put(base, "version", 2),
+        Map.put(base, "first_size", "3"),
+        Map.put(base, "second_size", 9_007_199_254_740_992),
+        Map.put(base, "proof_nodes", "nope"),
+        Map.put(base, "proof_nodes", ["short"]),
+        # A strictly-older first tree cannot carry an empty node list.
+        Map.put(base, "proof_nodes", [])
+      ]
+
+      for proof <- malformed do
+        assert Proof.verify_consistency(proof, ctx.roots["3"], ctx.roots["5"]) ==
+                 {:error, :invalid_proof},
+               "expected :invalid_proof for #{inspect(proof)}"
+      end
+    end
+
+    test "a non-binary root is rejected", ctx do
+      {:ok, proof} = Proof.consistency(ctx.events, 3)
+      assert Proof.verify_consistency(proof, nil, ctx.roots["5"]) == {:error, :invalid_proof}
+      assert Proof.verify_consistency(proof, ctx.roots["3"], 5) == {:error, :invalid_proof}
+    end
+
+    test "a power-of-two first size with an unparseable first root is inconsistent", ctx do
+      # first_size 4 prepends the (here malformed) first root before climbing.
+      {:ok, proof} = Proof.consistency(ctx.events, 4)
+      bad_root = String.duplicate("z", 64)
+
+      assert Proof.verify_consistency(proof, bad_root, ctx.roots["5"]) ==
+               {:error, :inconsistent_tree}
+    end
+
+    test "a truncated node list cannot reconstruct the roots", ctx do
+      # 3-to-5 needs four nodes; dropping one leaves `sn` non-zero.
+      {:ok, proof} = Proof.consistency(ctx.events, 3)
+      short = Map.update!(proof, "proof_nodes", fn nodes -> Enum.drop(nodes, -1) end)
+
+      assert Proof.verify_consistency(short, ctx.roots["3"], ctx.roots["5"]) ==
+               {:error, :invalid_proof}
+    end
+
+    test "an over-long node list over-consumes the proof", ctx do
+      {:ok, proof} = Proof.consistency(ctx.events, 3)
+
+      long =
+        Map.update!(proof, "proof_nodes", fn nodes -> Enum.concat(nodes, [List.last(nodes)]) end)
+
+      assert Proof.verify_consistency(long, ctx.roots["3"], ctx.roots["5"]) ==
+               {:error, :invalid_proof}
+    end
+  end
+
+  describe "properties (SP.05 promotion/RFC equality; R.04)" do
+    test "the promotion tree root equals the RFC 9162 root for every size 1..256" do
+      events = build_chain(256)
+      {:ok, leaves} = Checkpoint.leaf_hashes(events)
+
+      for size <- 1..256 do
+        {:ok, promotion} = Checkpoint.merkle_root(Enum.take(events, size))
+        assert Base.encode16(rfc_root(Enum.take(leaves, size)), case: :lower) == promotion
+      end
+    end
+
+    property "consistency proofs round-trip for random m <= n" do
+      events = build_chain(256)
+
+      check all(n <- integer(1..256), m <- integer(1..n), max_runs: 200) do
+        segment = Enum.take(events, n)
+        {:ok, proof} = Proof.consistency(segment, m)
+        {:ok, first_root} = Checkpoint.merkle_root(Enum.take(events, m))
+        {:ok, second_root} = Checkpoint.merkle_root(segment)
+        assert Proof.verify_consistency(proof, first_root, second_root) == :ok
+      end
+    end
+
+    property "inclusion proofs round-trip for random leaf in a random tree" do
+      events = build_chain(256)
+
+      check all(n <- integer(1..256), i <- integer(0..(n - 1)), max_runs: 200) do
+        segment = Enum.take(events, n)
+        {:ok, proof} = Proof.inclusion(segment, i)
+        {:ok, root} = Checkpoint.merkle_root(segment)
+        assert Proof.verify_inclusion(proof, Enum.at(segment, i).hmac, root) == :ok
+      end
+    end
+  end
+
+  # A deterministic n-event signed chain for the size properties.
+  defp build_chain(n) do
+    {events, _} =
+      Enum.reduce(1..n, {[], nil}, fn i, {acc, prev} ->
+        event = %Audit{
+          id: Integer.to_string(i),
+          type: "runtime.gate",
+          actor: "actor",
+          action: "x",
+          result: "allow",
+          timestamp: "2026-07-02T12:00:00.000Z"
+        }
+
+        signed = Audit.sign_event(event, "sigil-guard-audit-property-key", prev)
+        {[signed | acc], signed.hmac}
+      end)
+
+    Enum.reverse(events)
+  end
+
+  # Independent RFC 9162 recursive Merkle root over leaf hashes.
+  defp rfc_root([leaf]), do: leaf
+
+  defp rfc_root(leaves) do
+    k = rfc_split(length(leaves))
+    Checkpoint.node_hash(rfc_root(Enum.take(leaves, k)), rfc_root(Enum.drop(leaves, k)))
+  end
+
+  defp rfc_split(n), do: rfc_split(1, n)
+  defp rfc_split(p, n) when p * 2 < n, do: rfc_split(p * 2, n)
+  defp rfc_split(p, _), do: p
 
   defp path(proofs, index), do: Enum.at(proofs, index)["audit_path"]
 

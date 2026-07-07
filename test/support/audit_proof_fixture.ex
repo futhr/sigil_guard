@@ -72,6 +72,12 @@ defmodule SigilGuard.AuditProofFixture do
   end
 
   @doc false
+  @spec consistency_proof(pos_integer()) :: map()
+  def consistency_proof(first_size) do
+    elem(Proof.consistency(signed_events(), first_size), 1)
+  end
+
+  @doc false
   @spec checkpoint() :: map()
   def checkpoint do
     {:ok, unsigned} = Checkpoint.create(signed_events(), generated_at: @generated_at)
@@ -87,6 +93,8 @@ defmodule SigilGuard.AuditProofFixture do
     File.write!(path("events.json"), events_json())
     File.write!(path("tree.json"), tree_json())
     File.write!(path("inclusion_5.json"), inclusion_json())
+    File.write!(path("consistency_3_5.json"), consistency_json(3))
+    File.write!(path("consistency_4_5.json"), consistency_json(4))
     File.write!(path("checkpoint_5.json"), checkpoint_json())
     :ok
   end
@@ -119,6 +127,10 @@ defmodule SigilGuard.AuditProofFixture do
   @doc false
   @spec inclusion_json() :: binary()
   def inclusion_json, do: encode(%{"proofs" => inclusion_proofs()})
+
+  @doc false
+  @spec consistency_json(pos_integer()) :: binary()
+  def consistency_json(first_size), do: encode(consistency_proof(first_size))
 
   @doc false
   @spec checkpoint_json() :: binary()
