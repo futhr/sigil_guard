@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 139 / 228 tasks done (61%).** Milestones: 6 complete, 1 partial,
-3 not started. **89 tasks left.** Current milestone: **M5** (5/26, 19%).
+**Overall: 140 / 228 tasks done (61%).** Milestones: 6 complete, 1 partial,
+3 not started. **88 tasks left.** Current milestone: **M5** (6/26, 23%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 5 | 26 | 19% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 6 | 26 | 23% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **139** | **228** | **61%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **140** | **228** | **61%** | 6 done / 1 partial / 3 to go |
 
-### What's left (89 tasks)
+### What's left (88 tasks)
 
-- **M5 - 21 left:** privacy classification, OTel/CloudEvents, audit query, and
-  the threat-model test suite. (M5.01-M5.05: inclusion + consistency proofs,
-  DSSE checkpoint statements, witness cosigning, signed exports done.)
+- **M5 - 20 left:** OTel/CloudEvents, audit query, attestation evidence refs,
+  HTTPClient/anchor stores, and the threat-model test suite. (M5.01-M5.06:
+  proofs, checkpoint statements, cosigning, signed exports, privacy done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1260,7 +1260,7 @@ section is post-3.0.0 parking; neither is counted here.
     Asserted the frozen event-hash field list (`action, actor, id, result,
     timestamp, type`) and committed the `export.json` golden package
     (byte-identical regeneration + evidence verification).
-- [ ] M5.06 Privacy classification enforcement.
+- [x] M5.06 Privacy classification enforcement.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Privacy
     Classification (Normative) (GDPR Stance (Digest-First)).
   - AC: the per-field class table (clear/hashed/redacted/omitted) is
@@ -1269,6 +1269,17 @@ section is post-3.0.0 parking; neither is counted here.
     `"redacted-v1"`; raw secrets never appear in chain events; key
     destruction (crypto-erasure) leaves all verification green.
   - Tests: negative, property (no plaintext survives), tamper.
+  - Done: added `SigilGuard.Audit.hash_field/2` (`"fh1:" <> lowercase-hex
+    HMAC-SHA256(field_hash_key, value)`, failing closed to `"redacted-v1"`
+    for a nil/empty/non-binary key or value) and `classify/2`, which applies
+    the class table to the six signed fields - the `hashed` `actor` becomes its
+    `hash_field/2` form, the `clear` fields stay verbatim, and unsigned
+    host-classified `metadata` is untouched. `classify/2` fails closed to
+    `"redacted-v1"` when no field-hash key is given or when it reuses the chain
+    key (`:chain_key`), and is idempotent on an already-classified actor.
+    Because the hash enters the chain preimage, crypto-erasure of the field-hash
+    key leaves chain/proof verification green. A property asserts no raw actor
+    survives in the signed canonical bytes; tamper and negative tests included.
 - [ ] M5.07 OTel attribute rename to `sigilguard.*` with cardinality
       opt-in.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Telemetry

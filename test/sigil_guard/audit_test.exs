@@ -2,10 +2,12 @@ defmodule SigilGuard.AuditTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias SigilGuard.Audit
 
   @secret_key :crypto.strong_rand_bytes(32)
+  @field_hash_key :crypto.hash(:sha256, "audit field hash test key")
 
   describe "new_event/5" do
     test "creates an unsigned event with all required fields" do
@@ -341,6 +343,122 @@ defmodule SigilGuard.AuditTest do
       refute Map.has_key?(decoded, "hmac")
       refute Map.has_key?(decoded, "prev_hmac")
       refute Map.has_key?(decoded, "metadata")
+    end
+  end
+
+  describe "hash_field/2 (SP.05 privacy)" do
+    test "returns the fh1: HMAC form for a value and key" do
+      hashed = Audit.hash_field("did:web:alice", @field_hash_key)
+
+      assert String.starts_with?(hashed, "fh1:")
+      assert byte_size(hashed) == byte_size("fh1:") + 64
+      # Deterministic and key-bound.
+      assert Audit.hash_field("did:web:alice", @field_hash_key) == hashed
+      refute Audit.hash_field("did:web:bob", @field_hash_key) == hashed
+      refute Audit.hash_field("did:web:alice", :crypto.hash(:sha256, "other")) == hashed
+    end
+
+    test "fails closed to redacted-v1 without a usable key" do
+      assert Audit.hash_field("did:web:alice", nil) == "redacted-v1"
+      assert Audit.hash_field("did:web:alice", "") == "redacted-v1"
+      assert Audit.hash_field(123, @field_hash_key) == "redacted-v1"
+    end
+  end
+
+  describe "classify/2 (SP.05 privacy)" do
+    setup do
+      event = %Audit{
+        id: "00000000000000000000000000000001",
+        type: "runtime.gate",
+        actor: "did:web:alice",
+        action: "repo_file_write",
+        result: "block",
+        timestamp: "2026-07-02T12:00:00.000Z",
+        metadata: %{"decision_id" => "abc"}
+      }
+
+      %{event: event}
+    end
+
+    test "hashes the actor and leaves the clear fields and metadata untouched", ctx do
+      classified = Audit.classify(ctx.event, field_hash_key: @field_hash_key)
+
+      assert classified.actor == Audit.hash_field("did:web:alice", @field_hash_key)
+      assert classified.id == ctx.event.id
+      assert classified.type == ctx.event.type
+      assert classified.action == ctx.event.action
+      assert classified.result == ctx.event.result
+      assert classified.timestamp == ctx.event.timestamp
+      assert classified.metadata == ctx.event.metadata
+    end
+
+    test "fails closed when no field-hash key is supplied", ctx do
+      assert Audit.classify(ctx.event).actor == "redacted-v1"
+    end
+
+    test "fails closed when the field-hash key reuses the chain key", ctx do
+      classified = Audit.classify(ctx.event, field_hash_key: @secret_key, chain_key: @secret_key)
+      assert classified.actor == "redacted-v1"
+    end
+
+    test "is idempotent on an already-classified actor", ctx do
+      once = Audit.classify(ctx.event, field_hash_key: @field_hash_key)
+      twice = Audit.classify(once, field_hash_key: @field_hash_key)
+      assert twice.actor == once.actor
+
+      redacted = Audit.classify(ctx.event)
+      assert Audit.classify(redacted, field_hash_key: @field_hash_key).actor == "redacted-v1"
+    end
+
+    test "crypto-erasure of the field-hash key leaves chain verification green", ctx do
+      classified = Audit.classify(ctx.event, field_hash_key: @field_hash_key)
+      signed = Audit.sign_event(classified, @secret_key)
+
+      # Verification uses only the chain key; the field-hash key is never needed.
+      assert Audit.verify_chain([signed], @secret_key) == :ok
+      refute Audit.canonical_bytes(signed) =~ "did:web:alice"
+    end
+
+    test "tampering with the hashed actor breaks the chain" do
+      signed =
+        %Audit{
+          id: "id",
+          type: "t",
+          actor: "did:web:alice",
+          action: "a",
+          result: "ok",
+          timestamp: "2026-07-02T12:00:00.000Z"
+        }
+        |> Audit.classify(field_hash_key: @field_hash_key)
+        |> Audit.sign_event(@secret_key)
+
+      tampered = %{signed | actor: Audit.hash_field("did:web:mallory", @field_hash_key)}
+      assert Audit.verify_chain([tampered], @secret_key) == {:broken, 0}
+    end
+
+    property "no raw actor value survives in the signed canonical bytes" do
+      # A distinctive prefix that cannot occur inside a lowercase-hex hash or the
+      # short clear fields, so the substring check reflects a real leak only.
+      check all(suffix <- string(:alphanumeric), max_runs: 200) do
+        actor = "raw-actor:" <> suffix
+
+        classified =
+          %Audit{
+            id: "id",
+            type: "t",
+            actor: actor,
+            action: "a",
+            result: "ok",
+            timestamp: "2026-07-02T12:00:00.000Z"
+          }
+          |> Audit.classify(field_hash_key: @field_hash_key)
+          |> Audit.sign_event(@secret_key)
+
+        canonical = Audit.canonical_bytes(classified)
+
+        assert String.starts_with?(classified.actor, "fh1:")
+        refute String.contains?(canonical, actor)
+      end
     end
   end
 

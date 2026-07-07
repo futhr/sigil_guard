@@ -86,6 +86,77 @@ defmodule SigilGuard.Audit do
   ]
 
   @genesis_marker "genesis"
+  @field_hash_prefix "fh1:"
+  @redacted_placeholder "redacted-v1"
+
+  @doc """
+  Return the privacy-hashed form of a field value (SP.05).
+
+  `hash_field(value, field_hash_key)` returns
+  `"fh1:" <> lowercase-hex HMAC-SHA256(field_hash_key, value)`. The field-hash
+  key is host-supplied per call and MUST differ from the chain HMAC key. When no
+  key (or an empty/non-binary key or value) is supplied the value fails closed to
+  the fixed `"redacted-v1"` placeholder - never a silent clear value.
+
+  ## Examples
+
+      SigilGuard.Audit.hash_field("did:web:alice", field_hash_key)
+      #=> "fh1:9a0b..."
+
+      SigilGuard.Audit.hash_field("did:web:alice", nil)
+      #=> "redacted-v1"
+
+  """
+  @spec hash_field(String.t(), binary() | nil) :: String.t()
+  def hash_field(value, field_hash_key)
+
+  def hash_field(value, field_hash_key)
+      when is_binary(value) and is_binary(field_hash_key) and field_hash_key != "" do
+    @field_hash_prefix <>
+      Base.encode16(:crypto.mac(:hmac, :sha256, field_hash_key, value), case: :lower)
+  end
+
+  def hash_field(_, _), do: @redacted_placeholder
+
+  @doc """
+  Apply the SP.05 per-field privacy classification to an event's signed fields.
+
+  The `hashed`-class `actor` field is replaced by its `hash_field/2` form; the
+  `clear`-class fields (`id`, `type`, `action`, `result`, `timestamp`) are left
+  verbatim. `metadata` is outside the chain preimage (host-classified) and is not
+  transformed. Apply `classify/2` **before** `sign_event/3` so the chain HMAC and
+  Merkle root cover the hashed actor - destroying the field-hash key
+  (crypto-erasure) then leaves every chain and proof verification green.
+
+  Options:
+
+    * `:field_hash_key` - HMAC key for hashing the actor (host-supplied).
+    * `:chain_key` - when equal to `:field_hash_key`, the actor fails closed to
+      `"redacted-v1"` (the field-hash key MUST differ from the chain key).
+
+  An already-classified `actor` (`"fh1:"`-prefixed or the redacted placeholder)
+  is left unchanged, so `classify/2` is idempotent.
+  """
+  @spec classify(t(), keyword()) :: t()
+  def classify(event, opts \\ [])
+
+  def classify(%__MODULE__{} = event, opts) when is_list(opts) do
+    %{event | actor: classify_actor(event.actor, effective_field_hash_key(opts))}
+  end
+
+  defp effective_field_hash_key(opts) do
+    field_hash_key = Keyword.get(opts, :field_hash_key)
+
+    if is_binary(field_hash_key) and field_hash_key == Keyword.get(opts, :chain_key) do
+      nil
+    else
+      field_hash_key
+    end
+  end
+
+  defp classify_actor(@redacted_placeholder, _), do: @redacted_placeholder
+  defp classify_actor(@field_hash_prefix <> _ = actor, _), do: actor
+  defp classify_actor(actor, field_hash_key), do: hash_field(actor, field_hash_key)
 
   @doc """
   Create a new audit event (unsigned).
