@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 190 / 228 tasks done (83%).** Milestones: 7 complete, 2 partial,
-1 not started. **38 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 191 / 228 tasks done (84%).** Milestones: 7 complete, 2 partial,
+1 not started. **37 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 1 | 20 | 5% | In progress |
+| M7 | Integrations and adoption | 2 | 20 | 10% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **190** | **228** | **83%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **191** | **228** | **84%** | 7 done / 2 partial / 1 to go |
 
-### What's left (38 tasks)
+### What's left (37 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 19:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 18:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2126,12 +2126,18 @@ section is post-3.0.0 parking; neither is counted here.
     attestation sign/verify attachment, and action-bound confirmation. Verified
     `git diff --check`, `mix format --check-formatted mix.exs`,
     `mix sigil.docs_lint`, and `mix docs`.
-- [ ] M7.02 Threat-model guide rendered from R.06.
+- [x] M7.02 Threat-model guide rendered from R.06.
   - Spec: `SP.14` - ExDoc Artifacts; `R.06` - Control Mapping.
   - AC: `guides/threat-model.md` reproduces the control-mapping table,
     claim-level definitions, and host-owned exclusions in substance; no
     claim exceeds its R.06 claim level.
   - Validation: `mix docs`; claim-level cross-check against R.06.
+  - Done: added `guides/threat-model.md`, wired it into ExDoc extras, and
+    reproduced the control-mapping table, claim levels, host-owned exclusions,
+    and test-family mapping from R.06 in operator-facing form. Verified
+    `git diff --check`, `mix format --check-formatted mix.exs`,
+    `mix sigil.docs_lint`, `mix docs`, and a claim-column cross-check against
+    R.06.
 - [ ] M7.03 hermes_mcp integration guide.
   - Spec: `SP.14` - Tier 1: hermes_mcp; Per-Target Acceptance.
   - AC: interceptor and middleware/plug placements both shown; the
