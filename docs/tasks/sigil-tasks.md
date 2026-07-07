@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 200 / 228 tasks done (88%).** Milestones: 7 complete, 2 partial,
-1 not started. **28 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 201 / 228 tasks done (88%).** Milestones: 7 complete, 2 partial,
+1 not started. **27 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 11 | 20 | 55% | In progress |
+| M7 | Integrations and adoption | 12 | 20 | 60% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **200** | **228** | **88%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **201** | **228** | **88%** | 7 done / 2 partial / 1 to go |
 
-### What's left (28 tasks)
+### What's left (27 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 9:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 8:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2247,12 +2247,19 @@ section is post-3.0.0 parking; neither is counted here.
     invalidation after drift, schema-injection confirmation, and undisclosed
     schema-injection fail-closed behavior. Manually ran the equivalent cells
     offline with `mix run`; M7.12 will replace this with the notebook runner.
-- [ ] M7.12 Livebook offline validation script.
+- [x] M7.12 Livebook offline validation script.
   - Spec: `SP.14` - Livebooks (validation rule).
   - AC: a script runs every notebook's code cells via `Mix.install` on the
     local repository path in a network-denied environment and fails on any
     error; wired into CI or the release checklist.
   - Tests: script test (a failing cell fails the run; clean run passes).
+  - Done: added `mix sigil.livebook_check`, which extracts Elixir cells from
+    `notebooks/*.livemd`, executes each notebook in an offline child `elixir`
+    process beside the source file so `__DIR__` matches Livebook, and fails on
+    the first non-zero notebook execution. Added fixture-driven task tests for
+    clean notebooks, failing cells, selected paths, missing files, and cell
+    extraction. Verified `mix test test/mix/tasks/sigil_livebook_check_test.exs`
+    and `mix sigil.livebook_check`.
 - [ ] M7.13 Benchmark corpus and harness matrix (BM.01-BM.08).
   - Spec: `docs/specs/SP.15-benchmark-methodology-and-baselines.md` -
     Scenario Matrix.
