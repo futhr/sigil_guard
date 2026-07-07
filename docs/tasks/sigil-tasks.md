@@ -2144,6 +2144,11 @@ section is post-3.0.0 parking; neither is counted here.
     anubis_mcp compile variant passes; denials map onto the SP.03 JSON-RPC
     error registry; pinned-version compile validation recorded.
   - Validation: guide example compiles warnings-as-errors at its pin.
+  - Attempt 2026-07-07: added the ExDoc guide draft with the current
+    `hermes_mcp` and `anubis_mcp` pins, interceptor-style request/result
+    placement, Plug/Phoenix placement, JSON-RPC denial mapping, and an explicit
+    scratch-project validation procedure. Verified docs render only; keep open
+    until the pinned Hermes and Anubis compile variants pass.
 - [ ] M7.04 Jido integration guide.
   - Spec: `SP.14` - Tier 1: Jido; Per-Target Acceptance.
   - AC: denial surfaces as a Jido action error without raising; `actor` is
