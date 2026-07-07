@@ -1898,11 +1898,16 @@ section is post-3.0.0 parking; neither is counted here.
     `_agent_confirmation` under `params`, documented the digest-strip behavior,
     and added the out-of-band `:confirmation_token` option path for confirmed
     request, signed-confirmed request, and confirmed-result helpers.
-- [ ] M6.16 MIGRATING: `Registry.fetch_bundle/1` to `TrustBundle.load/1`.
+- [x] M6.16 MIGRATING: `Registry.fetch_bundle/1` to `TrustBundle.load/1`.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: code-level mapping with source construction
     (`{:file, _}`/`{:priv, _, _}`/`{:binary, _}`) guidance.
   - Validation: completeness script.
+  - Done: expanded the `MIGRATING-3.0.md` Fetch Bundle section with a
+    `Registry.fetch_bundle/1` before snippet and `TrustBundle.load/1` after
+    snippets for `{:file, path}`, `{:priv, app, rel}`, and `{:binary, bytes}`.
+    The guidance states that host-owned transport supplies remote bytes outside
+    SigilGuard and that v3 does not fetch bundles from a registry.
 - [ ] M6.17 MIGRATING: `Registry.resolve_key/2` and `resolve_did/2` to
       trust-bundle issuer lookup.
   - Spec: `SP.12` - V3 Removal Map.

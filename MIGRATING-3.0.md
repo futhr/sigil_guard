@@ -172,8 +172,39 @@ sources loaded by `SigilGuard.TrustBundle`.
 ### Fetch Bundle
 
 `SigilGuard.Registry.fetch_bundle/1` maps to `SigilGuard.TrustBundle.load/1`.
-Source-construction examples for `{:file, path}`, `{:priv, app, path}`, and
-`{:binary, bytes}` are filled in by M6.16.
+
+Before:
+
+```elixir
+{:ok, bundle} = SigilGuard.Registry.fetch_bundle("agent-policy")
+```
+
+After, for a bundle file managed by the host:
+
+```elixir
+source = {:file, "/etc/sigil_guard/trust_bundle.json"}
+{:ok, bundle} = SigilGuard.TrustBundle.load(source)
+```
+
+After, for a bundle shipped in an OTP application's `priv/` directory:
+
+```elixir
+source = {:priv, :my_app, "sigil_guard/trust_bundle.json"}
+{:ok, bundle} = SigilGuard.TrustBundle.load(source)
+```
+
+After, for bytes fetched by host-owned transport and accepted as the bundle
+envelope JSON:
+
+```elixir
+source = {:binary, verified_bundle_json}
+{:ok, bundle} = SigilGuard.TrustBundle.load(source)
+```
+
+`TrustBundle.load/1` verifies the DSSE envelope and bundle metadata before the
+bundle enters the runtime. SigilGuard v3 does not fetch bundles from a registry;
+if a host downloads bundle bytes, that transport, caching, authentication, and
+retry policy live outside SigilGuard and feed only the `{:binary, bytes}` source.
 
 ### Resolve DID And Key
 
