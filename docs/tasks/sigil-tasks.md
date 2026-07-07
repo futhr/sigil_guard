@@ -2029,13 +2029,18 @@ section is post-3.0.0 parking; neither is counted here.
     `_agent_trust` attestation attachment, and `_agent_confirmation`
     confirmations, and added the closed v3 configuration table from the
     validated application surface.
-- [ ] M6.27 README rewrite: profile section and legacy-language cleanup.
+- [x] M6.27 README rewrite: profile section and legacy-language cleanup.
   - Spec: `SP.01` - V3 Position; `SP.12` - V3 Removal Map.
   - AC: the protocol-profile section becomes an Agent Trust Profile
     section; Rust/NIF backend references are gone; the historical upstream
     link remains only as historical context; registry cache prose is
     replaced by trust-bundle cache docs.
   - Validation: vocabulary scan; forbidden-terms scan; link check.
+  - Done: added an Agent Trust Profile section with the v3 profile id,
+    `_agent_trust`/`_agent_confirmation` metadata, and SP.01 strip behavior;
+    documented the per-boot trust-bundle ETS cache and durable signed-bundle
+    source of truth; removed the remaining Finch example from README extension
+    prose; verified forbidden terms and local README links.
 - [ ] M6.28 Package metadata cleanup: hosted-registry language removed.
   - Spec: `SP.12` - V3 Removal Map; `SP.14` - Announcement Kit And
     Listings.

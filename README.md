@@ -10,6 +10,7 @@
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
+[Agent Trust Profile](#agent-trust-profile) ·
 [Agent Trust Gateway](#agent-trust-gateway) ·
 [Configuration](#configuration) ·
 [Capabilities](#capabilities) ·
@@ -124,6 +125,22 @@ without pulling any specific MCP adapter into the core. The MCP gateway,
 attestation signing, confirmation flow, trust bundles, and audit chain build on
 this same decision. The [architecture](docs/README.md) covers the full surface.
 
+## Agent Trust Profile
+
+V3 has one wire profile: `sigil_guard_agent_trust/v1`. Agent Trust evidence is
+a DSSE envelope over a JCS-canonical in-toto-style statement, with payload and
+context digests bound to the boundary decision. The public metadata keys are:
+
+| Key | Purpose |
+|-----|---------|
+| `_agent_trust` | Carries an Agent Trust attestation envelope for a tool request or result. |
+| `_agent_confirmation` | Carries a short-lived confirmation token for a confirm-required action. |
+| `confirmation_token` | Compatibility-neutral token field for hosts that do not want a SigilGuard-prefixed metadata name. |
+
+`SigilGuard.Attestation.strip_metadata/1` removes those keys at the payload
+root and inside `params` before digest computation, in atom and string forms.
+All other fields are ordinary user payload.
+
 ## Agent Trust Gateway
 
 `SigilGuard.ToolGateway` is the v3 entry point for MCP-shaped tool calls and
@@ -224,6 +241,13 @@ config :sigil_guard,
 | `:vault_master_key` | `nil` | Optional base64-encoded key for `SigilGuard.Vault.InMemory`. |
 | `:trust_mappings` | `[]` | Ordered `{pattern, trust_level}` actor mappings; patterns are exact strings or one trailing `*`. |
 
+Configured trust bundles are loaded and verified at application boot. Verified
+snapshots are cached for the current BEAM boot in the
+`:sigil_guard_trust_bundle` ETS table, along with rollback floors, root pins,
+rotation digests, and revoked key ids. The signed bundle remains the durable
+source of truth across boots; remote distribution, if needed, belongs to the
+host application before bytes are passed to `SigilGuard.TrustBundle.load/2`.
+
 ## Extension Points
 
 Host applications own their transports, auth, storage, and deployment.
@@ -235,7 +259,7 @@ SigilGuard plugs into them through behaviours:
 | `SigilGuard.Vault` | Encrypted storage | HashiCorp Vault, AWS KMS, database |
 | `SigilGuard.Audit.Logger` | Audit persistence | Database, file, external service |
 | `SigilGuard.Identity` | Trust and identity context | Your auth system |
-| `SigilGuard.HTTPClient` | Outbound HTTP for anchor stores | Req, Finch, or your own client |
+| `SigilGuard.HTTPClient` | Outbound HTTP for anchor stores | Req or your own client |
 
 ## Telemetry
 
