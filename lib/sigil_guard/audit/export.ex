@@ -7,16 +7,22 @@ defmodule SigilGuard.Audit.Export do
   append-only or WORM storage while keeping raw audit events local.
   """
 
+  alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Audit
   alias SigilGuard.Audit.Anchor
   alias SigilGuard.Audit.Checkpoint
+  alias SigilGuard.Audit.Proof
+  alias SigilGuard.Canonical.JCS
 
   @kind "sigil_guard.audit.export"
   @version 1
   @atom_fields %{
     "anchor" => :anchor,
     "checkpoint" => :checkpoint,
+    "checkpoint_statement" => :checkpoint_statement,
+    "consistency_proof" => :consistency_proof,
     "generated_at" => :generated_at,
+    "inclusion_proofs" => :inclusion_proofs,
     "kind" => :kind,
     "version" => :version
   }
@@ -41,6 +47,16 @@ defmodule SigilGuard.Audit.Export do
     * `:signer`, `:issuer`, `:issued_at` - sign the checkpoint when supplied.
     * `:anchor` - `true`, a keyword list, or map to include an external anchor
       record created with `SigilGuard.Audit.Anchor.create/2`.
+    * `:checkpoint_statement` - when `true`, embed the DSSE checkpoint-state
+      envelope (`SigilGuard.Audit.Checkpoint.to_statement/1` signed with
+      `:signer`; requires `:signer`).
+    * `:inclusion_proofs` - `:all` or a list of zero-based leaf indices to embed
+      `SigilGuard.Audit.Proof.inclusion/2` proofs.
+    * `:consistency_proof` - a `first_size` to embed a
+      `SigilGuard.Audit.Proof.consistency/2` proof.
+
+  The three evidence keys are optional and additive: a package created without
+  them is byte-identical to a 0.2.x export (D17).
   """
   @spec create([Audit.t()], keyword()) :: {:ok, t()} | {:error, atom()}
   def create(events, opts \\ [])
@@ -53,15 +69,19 @@ defmodule SigilGuard.Audit.Export do
 
     with {:ok, checkpoint} <- Checkpoint.create(events, checkpoint_opts),
          {:ok, checkpoint} <- maybe_sign_checkpoint(checkpoint, opts),
-         {:ok, anchor} <- maybe_anchor(checkpoint, opts) do
-      {:ok,
-       %{
-         "kind" => @kind,
-         "version" => @version,
-         "generated_at" => Keyword.get_lazy(opts, :generated_at, &timestamp/0),
-         "checkpoint" => checkpoint,
-         "anchor" => anchor
-       }}
+         {:ok, anchor} <- maybe_anchor(checkpoint, opts),
+         {:ok, statement} <- maybe_statement(checkpoint, opts),
+         {:ok, inclusion} <- maybe_inclusion_proofs(events, opts),
+         {:ok, consistency} <- maybe_consistency_proof(events, opts) do
+      base = %{
+        "kind" => @kind,
+        "version" => @version,
+        "generated_at" => Keyword.get_lazy(opts, :generated_at, &timestamp/0),
+        "checkpoint" => checkpoint,
+        "anchor" => anchor
+      }
+
+      {:ok, put_evidence(base, statement, inclusion, consistency)}
     end
   end
 
@@ -82,6 +102,7 @@ defmodule SigilGuard.Audit.Export do
          {:ok, checkpoint} <- export_checkpoint(export),
          {:ok, checkpoint_status} <- Checkpoint.verify(checkpoint, events, opts),
          {:ok, anchor_status} <- verify_anchor(export, checkpoint, opts),
+         :ok <- verify_evidence(export, checkpoint, events),
          {:ok, export_digest} <- safe_digest(export) do
       {:ok,
        %{
@@ -169,6 +190,73 @@ defmodule SigilGuard.Audit.Export do
     end
   end
 
+  # Only present evidence keys are added, so an export without them stays
+  # byte-identical to a 0.2.x package (D17).
+  defp put_evidence(base, statement, inclusion, consistency) do
+    base
+    |> maybe_put("checkpoint_statement", statement)
+    |> maybe_put("inclusion_proofs", inclusion)
+    |> maybe_put("consistency_proof", consistency)
+  end
+
+  defp maybe_put(map, _, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp maybe_statement(checkpoint, opts) do
+    if Keyword.get(opts, :checkpoint_statement, false) do
+      build_statement_envelope(checkpoint, opts)
+    else
+      {:ok, nil}
+    end
+  end
+
+  defp build_statement_envelope(checkpoint, opts) do
+    with {:ok, signer} <- statement_signer(opts),
+         {:ok, statement} <- Checkpoint.to_statement(checkpoint),
+         {:ok, payload} <- JCS.encode(statement) do
+      Envelope.sign(payload, signer)
+    end
+  end
+
+  defp statement_signer(opts) do
+    case Keyword.get(opts, :signer) do
+      signer when is_atom(signer) and not is_nil(signer) -> {:ok, signer}
+      _ -> {:error, :missing_signer}
+    end
+  end
+
+  defp maybe_inclusion_proofs(events, opts) do
+    case Keyword.get(opts, :inclusion_proofs) do
+      nil -> {:ok, nil}
+      :all -> inclusion_proofs(events, 0..(length(events) - 1))
+      indices when is_list(indices) -> inclusion_proofs(events, indices)
+      _ -> {:error, :invalid_inclusion_proofs}
+    end
+  end
+
+  defp inclusion_proofs(events, indices) do
+    result =
+      Enum.reduce_while(indices, {:ok, []}, fn index, {:ok, acc} ->
+        case Proof.inclusion(events, index) do
+          {:ok, proof} -> {:cont, {:ok, [proof | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:ok, proofs} -> {:ok, Enum.reverse(proofs)}
+      error -> error
+    end
+  end
+
+  defp maybe_consistency_proof(events, opts) do
+    case Keyword.get(opts, :consistency_proof) do
+      nil -> {:ok, nil}
+      first_size when is_integer(first_size) -> Proof.consistency(events, first_size)
+      _ -> {:error, :invalid_consistency_proof}
+    end
+  end
+
   defp anchor_opts(anchor_opts) do
     Enum.flat_map(anchor_opts, fn
       {key, value} when key in [:anchored_at, "anchored_at"] -> [anchored_at: value]
@@ -210,6 +298,84 @@ defmodule SigilGuard.Audit.Export do
         {:error, :invalid_anchor}
     end
   end
+
+  # Validate the optional evidence keys against the verified checkpoint. Absent
+  # keys are a no-op; a present statement must digest the same checkpoint and a
+  # present inclusion proof must recompute the checkpoint's Merkle root.
+  defp verify_evidence(export, checkpoint, events) do
+    with :ok <- verify_statement_evidence(export, checkpoint) do
+      verify_inclusion_evidence(export, checkpoint, events)
+    end
+  end
+
+  defp verify_statement_evidence(export, checkpoint) do
+    case field(export, "checkpoint_statement") do
+      nil -> :ok
+      envelope when is_map(envelope) -> match_statement_digest(envelope, checkpoint)
+      _ -> {:error, :invalid_checkpoint_statement}
+    end
+  end
+
+  defp match_statement_digest(envelope, checkpoint) do
+    with {:ok, subject_digest} <- statement_subject_digest(envelope) do
+      if subject_digest == Checkpoint.digest(checkpoint) do
+        :ok
+      else
+        {:error, :statement_mismatch}
+      end
+    end
+  end
+
+  defp statement_subject_digest(envelope) do
+    with payload when is_binary(payload) <- Map.get(envelope, "payload"),
+         {:ok, bytes} <- Base.url_decode64(payload, padding: false),
+         {:ok, decoded} <- Jason.decode(bytes),
+         digest when is_binary(digest) <- subject_digest(decoded) do
+      {:ok, digest}
+    else
+      _ -> {:error, :invalid_checkpoint_statement}
+    end
+  end
+
+  defp subject_digest(%{"subject" => [%{"digest" => %{"sha256" => digest}} | _]}), do: digest
+  defp subject_digest(_), do: nil
+
+  defp verify_inclusion_evidence(export, checkpoint, events) do
+    case field(export, "inclusion_proofs") do
+      nil -> :ok
+      proofs when is_list(proofs) -> verify_each_inclusion(proofs, checkpoint, events)
+      _ -> {:error, :invalid_inclusion_proofs}
+    end
+  end
+
+  defp verify_each_inclusion(proofs, checkpoint, events) do
+    root = Map.get(checkpoint, "merkle_root")
+
+    Enum.reduce_while(proofs, :ok, fn proof, :ok ->
+      case verify_one_inclusion(proof, root, events) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp verify_one_inclusion(proof, root, events) when is_map(proof) and is_binary(root) do
+    case event_hmac(events, Map.get(proof, "leaf_index")) do
+      hmac when is_binary(hmac) -> Proof.verify_inclusion(proof, hmac, root)
+      _ -> {:error, :invalid_inclusion_proof}
+    end
+  end
+
+  defp verify_one_inclusion(_, _, _), do: {:error, :invalid_inclusion_proof}
+
+  defp event_hmac(events, index) when is_integer(index) and index >= 0 do
+    case Enum.at(events, index) do
+      %Audit{hmac: hmac} -> hmac
+      _ -> nil
+    end
+  end
+
+  defp event_hmac(_, _), do: nil
 
   defp require_field(map, key, value, reason) do
     if field(map, key) == value, do: :ok, else: {:error, reason}

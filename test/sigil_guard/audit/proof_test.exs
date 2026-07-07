@@ -22,6 +22,21 @@ defmodule SigilGuard.Audit.ProofTest do
       assert File.read!(Fixture.path("consistency_4_5.json")) == Fixture.consistency_json(4)
       assert File.read!(Fixture.path("checkpoint_5.json")) == Fixture.checkpoint_json()
       assert File.read!(Fixture.path("expected.json")) == Fixture.expected_json()
+      assert File.read!(Fixture.path("export.json")) == Fixture.export_json()
+    end
+
+    test "the committed export package verifies with the embedded evidence" do
+      export = load("export.json")
+      pk = Base.url_encode64(Fixture.signer().public_key(), padding: false)
+
+      assert {:ok, _} =
+               SigilGuard.Audit.Export.verify(export, Fixture.signed_events(),
+                 public_key_b64u: pk
+               )
+
+      assert Enum.map(export["inclusion_proofs"], & &1["leaf_index"]) == [0, 1, 2, 3, 4]
+      assert export["consistency_proof"]["first_size"] == 3
+      assert export["checkpoint_statement"]["payloadType"] == "application/vnd.sigilguard+json"
     end
 
     test "the checkpoint-state statement matches the committed golden vector" do

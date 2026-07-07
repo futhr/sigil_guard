@@ -7,6 +7,7 @@ defmodule SigilGuard.AuditProofFixture do
 
   alias SigilGuard.Audit
   alias SigilGuard.Audit.Checkpoint
+  alias SigilGuard.Audit.Export
   alias SigilGuard.Audit.Proof
   alias SigilGuard.Canonical.JCS
 
@@ -91,6 +92,23 @@ defmodule SigilGuard.AuditProofFixture do
     statement
   end
 
+  @doc false
+  @spec export() :: map()
+  def export do
+    {:ok, export} =
+      Export.create(signed_events(),
+        generated_at: @generated_at,
+        signer: SeedSigner,
+        issuer: @issuer,
+        issued_at: @generated_at,
+        checkpoint_statement: true,
+        inclusion_proofs: :all,
+        consistency_proof: 3
+      )
+
+    export
+  end
+
   # -- Fixture files ----------------------------------------------------------
 
   @doc false
@@ -104,6 +122,7 @@ defmodule SigilGuard.AuditProofFixture do
     File.write!(path("consistency_4_5.json"), consistency_json(4))
     File.write!(path("checkpoint_5.json"), checkpoint_json())
     File.write!(path("expected.json"), expected_json())
+    File.write!(path("export.json"), export_json())
     :ok
   end
 
@@ -147,6 +166,10 @@ defmodule SigilGuard.AuditProofFixture do
   @doc false
   @spec expected_json() :: binary()
   def expected_json, do: encode(%{"checkpoint_statement" => statement()})
+
+  @doc false
+  @spec export_json() :: binary()
+  def export_json, do: encode(export())
 
   # -- Helpers ----------------------------------------------------------------
 

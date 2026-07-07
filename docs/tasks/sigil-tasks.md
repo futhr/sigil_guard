@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 138 / 228 tasks done (61%).** Milestones: 6 complete, 1 partial,
-3 not started. **90 tasks left.** Current milestone: **M5** (4/26, 15%).
+**Overall: 139 / 228 tasks done (61%).** Milestones: 6 complete, 1 partial,
+3 not started. **89 tasks left.** Current milestone: **M5** (5/26, 19%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 4 | 26 | 15% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 5 | 26 | 19% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **138** | **228** | **61%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **139** | **228** | **61%** | 6 done / 1 partial / 3 to go |
 
-### What's left (90 tasks)
+### What's left (89 tasks)
 
-- **M5 - 22 left:** signed exports, privacy classification, OTel/CloudEvents,
-  audit query, and the threat-model test suite. (M5.01-M5.04: inclusion +
-  consistency proofs, DSSE checkpoint statements, witness cosigning done.)
+- **M5 - 21 left:** privacy classification, OTel/CloudEvents, audit query, and
+  the threat-model test suite. (M5.01-M5.05: inclusion + consistency proofs,
+  DSSE checkpoint statements, witness cosigning, signed exports done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1239,7 +1239,7 @@ section is post-3.0.0 parking; neither is counted here.
     whose signatures verify (tampered/unresolved tolerated), returns the sorted
     verified keyids, fails `:witness_threshold_not_met` below `m`, and surfaces
     structural DSSE errors (`:duplicate_keyid`, `:invalid_payload_type`).
-- [ ] M5.05 Signed audit event exports and export-package DSSE form.
+- [x] M5.05 Signed audit event exports and export-package DSSE form.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Data Model
     (Signed Audit Event; Event Hash Field List (Exact, Ordered); Export
     Package DSSE Form).
@@ -1249,6 +1249,17 @@ section is post-3.0.0 parking; neither is counted here.
     `%SigilGuard.Audit{}` and `sign_event/3` are unchanged (D17).
   - Tests: golden vectors, tamper, negative, plus truncation detection
     (dropped/reordered events in exports are detected).
+  - Done: extended `Export.create/2` with `:checkpoint_statement` (the DSSE
+    envelope over `Checkpoint.to_statement/1`, signed with `:signer`),
+    `:inclusion_proofs` (`:all` or an index list), and `:consistency_proof`
+    (`first_size`) - all optional and additive, so a package without them stays
+    byte-identical to a 0.2.x export (D17). `Export.verify/3` now matches an
+    embedded statement's subject digest to the checkpoint (`:statement_mismatch`)
+    and recomputes each embedded inclusion proof against the checkpoint root;
+    dropped/reordered events fail `:checkpoint_mismatch` via `Checkpoint.verify`.
+    Asserted the frozen event-hash field list (`action, actor, id, result,
+    timestamp, type`) and committed the `export.json` golden package
+    (byte-identical regeneration + evidence verification).
 - [ ] M5.06 Privacy classification enforcement.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Privacy
     Classification (Normative) (GDPR Stance (Digest-First)).
