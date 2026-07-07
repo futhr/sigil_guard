@@ -14,7 +14,7 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
   use Mix.Task
 
-  @switches [output: :string, verify: :string]
+  @switches [output: :string, verify: :string, sha256: :string]
   @default_output "dist/sigil_guard.spdx.json"
   @spdx_version "SPDX-2.3"
   @data_license "CC0-1.0"
@@ -34,7 +34,7 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     end
 
     case Keyword.fetch(opts, :verify) do
-      {:ok, path} -> verify_file!(path)
+      {:ok, path} -> verify_file!(path, Keyword.get(opts, :sha256))
       :error -> write_generated_sbom(opts)
     end
   end
@@ -55,6 +55,37 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   end
 
   def verify_file(_), do: {:error, :invalid_path}
+
+  @doc """
+  Verify an SPDX document on disk against the current project and an expected
+  SHA-256 digest.
+
+  The file's raw bytes are hashed and compared to `expected_sha256` (the value
+  attested in the SP.01 `release` statement / SLSA provenance); drift fails with
+  `{:error, :sbom_digest_mismatch}` before the structural checks run.
+  """
+  @spec verify_file(String.t(), String.t()) :: :ok | {:error, term()}
+  def verify_file(path, expected_sha256) when is_binary(path) and is_binary(expected_sha256) do
+    with {:ok, body} <- File.read(path),
+         :ok <- verify_sbom_digest(body, expected_sha256),
+         {:ok, document} <- Jason.decode(body),
+         :ok <- verify_document(document) do
+      :ok
+    else
+      {:error, %Jason.DecodeError{}} -> {:error, :invalid_json}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def verify_file(_, _), do: {:error, :invalid_path}
+
+  defp verify_sbom_digest(body, expected_sha256) do
+    if sha256_hex(body) == String.downcase(expected_sha256) do
+      :ok
+    else
+      {:error, :sbom_digest_mismatch}
+    end
+  end
 
   @doc """
   Verify an SPDX document map against the current Mix project.
@@ -101,15 +132,16 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
     Mix.shell().info("Generated SBOM at #{output}")
   end
 
-  defp verify_file!(path) do
-    case verify_file(path) do
-      :ok ->
-        Mix.shell().info("Verified SBOM at #{path}")
+  defp verify_file!(path, nil), do: verify_file!(path)
 
-      {:error, reason} ->
-        Mix.raise("invalid SBOM: #{inspect(reason)}")
-    end
+  defp verify_file!(path, sha256) when is_binary(sha256) do
+    handle_verify(verify_file(path, sha256), path)
   end
+
+  defp verify_file!(path), do: handle_verify(verify_file(path), path)
+
+  defp handle_verify(:ok, path), do: Mix.shell().info("Verified SBOM at #{path}")
+  defp handle_verify({:error, reason}, _), do: Mix.raise("invalid SBOM: #{inspect(reason)}")
 
   @doc """
   Build an SPDX document map for the current Mix project.

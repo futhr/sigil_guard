@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 145 / 228 tasks done (64%).** Milestones: 6 complete, 1 partial,
-3 not started. **83 tasks left.** Current milestone: **M5** (11/26, 42%).
+**Overall: 146 / 228 tasks done (64%).** Milestones: 6 complete, 1 partial,
+3 not started. **82 tasks left.** Current milestone: **M5** (12/26, 46%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 11 | 26 | 42% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 12 | 26 | 46% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **145** | **228** | **64%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **146** | **228** | **64%** | 6 done / 1 partial / 3 to go |
 
-### What's left (83 tasks)
+### What's left (82 tasks)
 
-- **M5 - 15 left:** WORM anchor adapter, provenance/SBOM, and the threat-model
-  test suite. (M5.01-M5.11: proofs, checkpoint statements, cosigning, exports,
-  privacy, OTel, CloudEvents, read/query, evidence refs, HTTPClient seam.)
+- **M5 - 14 left:** the release-provenance workflow (SLSA L3) and the
+  threat-model test suite (twelve TM families). (M5.01-M5.12 done, through the
+  HTTPClient seam and WORM/SBOM verification docs.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1389,7 +1389,7 @@ section is post-3.0.0 parking; neither is counted here.
     through a test-support Finch adapter injected via app env, plus new contract
     tests (resolution, error/crash/no-status surfacing, oversized/mangled body,
     timeout pass-through) with stub adapters.
-- [ ] M5.12 WORM anchor adapter and release SBOM verification docs.
+- [x] M5.12 WORM anchor adapter and release SBOM verification docs.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15); Security Considerations.
   - AC: host-owned WORM/append-only anchor adapter guidance and SBOM
@@ -1397,6 +1397,14 @@ section is post-3.0.0 parking; neither is counted here.
     verification fails with `:sbom_digest_mismatch`.
   - Validation: `mix docs` renders; commands in the docs execute as
     written.
+  - Done: added `Mix.Tasks.SigilGuard.Sbom.verify_file/2` and a `--sha256`
+    switch that hash the SBOM's raw bytes and fail `:sbom_digest_mismatch` on
+    drift (case-insensitive on the expected digest) before the structural
+    checks. Added the ExDoc-rendered `guides/release-and-anchoring.md`
+    (wired into `mix.exs` extras under a Guides group) covering SBOM generation
+    and two-level verification, `gh attestation verify`, the `SigilGuard.HTTPClient`
+    seam, and a `require_worm`/signed-receipt WORM anchor-store recipe - every
+    command verified to execute as written.
 - [ ] M5.13 Release provenance workflow (SLSA L3).
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15).

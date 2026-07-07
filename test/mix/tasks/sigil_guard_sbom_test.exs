@@ -442,6 +442,34 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
     end
   end
 
+  describe "verify_file/2 (SHA-256 digest verification)" do
+    test "accepts a file whose digest matches the expected value" do
+      output = tmp_path("digest-ok")
+      body = Jason.encode!(verifiable_sbom())
+      File.write!(output, body)
+      sha256 = Base.encode16(:crypto.hash(:sha256, body), case: :lower)
+
+      assert :ok = Sbom.verify_file(output, sha256)
+      # The expected digest is compared case-insensitively.
+      assert :ok = Sbom.verify_file(output, String.upcase(sha256))
+    end
+
+    test "fails :sbom_digest_mismatch on digest drift, before structural checks" do
+      output = tmp_path("digest-drift")
+      File.write!(output, Jason.encode!(verifiable_sbom()))
+
+      assert {:error, :sbom_digest_mismatch} =
+               Sbom.verify_file(output, String.duplicate("0", 64))
+    end
+
+    test "rejects malformed inputs" do
+      assert {:error, :invalid_path} = Sbom.verify_file(:not_a_path, "abc")
+
+      assert {:error, :enoent} =
+               Sbom.verify_file(tmp_path("missing"), String.duplicate("0", 64))
+    end
+  end
+
   describe "run/1" do
     test "writes pretty JSON to the selected output path" do
       output = tmp_path("write")

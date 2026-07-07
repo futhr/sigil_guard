@@ -114,6 +114,7 @@ defmodule SigilGuard.MixProject do
       main: "readme",
       extras: [
         "README.md": [title: "Overview"],
+        "guides/release-and-anchoring.md": [title: "Release and Anchoring"],
         "bench/output/benchmarks.md": [title: "Benchmarks"],
         "MIGRATING-3.0.md": [title: "Migrating to 3.0"],
         "CHANGELOG.md": [title: "Changelog"],
@@ -123,6 +124,7 @@ defmodule SigilGuard.MixProject do
       ],
       groups_for_extras: [
         "Getting Started": ~r/README/,
+        Guides: ~r/guides/,
         Performance: ~r/benchmarks/,
         Reference: ~r/MIGRATING|CHANGELOG|CONTRIBUTING|AGENTS|LICENSE/
       ],
