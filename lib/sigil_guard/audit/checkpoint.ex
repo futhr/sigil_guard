@@ -116,6 +116,61 @@ defmodule SigilGuard.Audit.Checkpoint do
   def merkle_root(_), do: {:error, :invalid_events}
 
   @doc """
+  Return the domain-separated leaf hash `LEAF(h) = SHA-256("sigil-audit-leaf-v1:" || h)`.
+
+  `h` is the event `hmac` exactly as stored (64 lowercase-hex ASCII bytes, never
+  the decoded 32 bytes). The result is the raw 32-byte hash (SP.05, SP.09).
+  """
+  @spec leaf_hash(String.t()) :: binary()
+  def leaf_hash(hmac) when is_binary(hmac), do: :crypto.hash(:sha256, [@leaf_prefix, hmac])
+
+  @doc """
+  Return the domain-separated node hash `NODE(l, r) = SHA-256("sigil-audit-node-v1:" || l || r)`.
+
+  `l` and `r` are raw 32-byte child hashes; the result is the raw 32-byte parent
+  hash (SP.05, SP.09).
+  """
+  @spec node_hash(binary(), binary()) :: binary()
+  def node_hash(left, right) when is_binary(left) and is_binary(right),
+    do: :crypto.hash(:sha256, [@node_prefix, left, right])
+
+  @doc """
+  Return the ordered raw leaf hashes for a signed event list.
+
+  Each leaf is `leaf_hash/1` over the event `hmac`; any unsigned event fails
+  `{:error, :unsigned_event}`.
+  """
+  @spec leaf_hashes([Audit.t()]) :: {:ok, [binary()]} | {:error, :unsigned_event}
+  def leaf_hashes(events) when is_list(events) do
+    result =
+      Enum.reduce_while(events, {:ok, []}, fn
+        %Audit{hmac: hmac}, {:ok, acc} when is_binary(hmac) and byte_size(hmac) > 0 ->
+          {:cont, {:ok, [leaf_hash(hmac) | acc]}}
+
+        _, _ ->
+          {:halt, {:error, :unsigned_event}}
+      end)
+
+    case result do
+      {:ok, leaves} -> {:ok, Enum.reverse(leaves)}
+      error -> error
+    end
+  end
+
+  @doc """
+  Return the Merkle tree levels bottom-up for a non-empty list of raw hashes.
+
+  Level 0 is `leaves`; each subsequent level pairs the previous left-to-right
+  via `node_hash/2` with an unpaired last node promoted upward; the final level
+  is the single root. `SigilGuard.Audit.Proof` reads sibling hashes from these
+  levels. The empty tree has no levels (proofs over it fail `:out_of_range`).
+  """
+  @spec levels([binary()]) :: [[binary()]]
+  def levels([root]), do: [[root]]
+
+  def levels([_ | _] = leaves), do: [leaves | levels(pair_level(leaves, []))]
+
+  @doc """
   Return canonical checkpoint bytes used for digesting and signatures.
 
   Top-level signature metadata is excluded so a signed checkpoint verifies
@@ -469,22 +524,6 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp signed_event?(%Audit{hmac: hmac}) when is_binary(hmac) and byte_size(hmac) > 0, do: true
   defp signed_event?(_), do: false
 
-  defp leaf_hashes(events) do
-    result =
-      Enum.reduce_while(events, {:ok, []}, fn
-        %Audit{hmac: hmac}, {:ok, acc} when is_binary(hmac) and byte_size(hmac) > 0 ->
-          {:cont, {:ok, [:crypto.hash(:sha256, [@leaf_prefix, hmac]) | acc]}}
-
-        _, _ ->
-          {:halt, {:error, :unsigned_event}}
-      end)
-
-    case result do
-      {:ok, leaves} -> {:ok, Enum.reverse(leaves)}
-      error -> error
-    end
-  end
-
   defp root_hash([]), do: :crypto.hash(:sha256, @empty_root_input)
   defp root_hash([root]), do: root
 
@@ -498,7 +537,7 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp pair_level([node], acc), do: Enum.reverse([node | acc])
 
   defp pair_level([left, right | rest], acc) do
-    pair_level(rest, [:crypto.hash(:sha256, [@node_prefix, left, right]) | acc])
+    pair_level(rest, [node_hash(left, right) | acc])
   end
 
   defp unsigned_checkpoint(checkpoint) do
