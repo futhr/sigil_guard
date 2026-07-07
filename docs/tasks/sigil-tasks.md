@@ -1969,11 +1969,15 @@ section is post-3.0.0 parking; neither is counted here.
     boot-time `SigilGuard.ConfigError` behavior for removed keys
     (`:legacy_contract_removed`) and unknown keys (`:unknown_config_key`), both
     naming `MIGRATING-3.0.md`.
-- [ ] M6.22 MIGRATING: pin note for v2 users.
+- [x] M6.22 MIGRATING: pin note for v2 users.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: states that `~> 0.2` users never auto-upgrade to v3 and that
     `~> 3.0` does not match release candidates (exact rc pin required).
   - Validation: completeness script.
+  - Done: expanded the `MIGRATING-3.0.md` Version Pinning section to state
+    that `~> 0.2` remains on the v2 line, release candidates require exact pins
+    such as `"3.0.0-rc.1"`, `~> 3.0` does not match prereleases, and `~> 3.0`
+    is the post-GA dependency requirement.
 - [ ] M6.23 CHANGELOG breaking-change section.
   - Spec: `SP.12` - Release Sequence (D11).
   - AC: a breaking-change section enumerates removals with MIGRATING

@@ -452,8 +452,27 @@ reason `:unknown_config_key`. Both error messages name `MIGRATING-3.0.md`.
 
 ## Version Pinning
 
-`~> 0.2` users do not auto-upgrade to v3. Release-candidate and final-release
-pinning guidance is expanded by M6.22.
+`~> 0.2` users do not auto-upgrade to v3. The v3 release is intentionally a
+major-version break, so existing v2 consumers stay on the `0.2.x` line until
+they edit their dependency requirement.
+
+During the release-candidate soak, pin the rc exactly:
+
+```elixir
+{:sigil_guard, "3.0.0-rc.1"}
+```
+
+Do not use `~> 3.0` for an rc validation. In Hex version matching, `~> 3.0`
+does not match prerelease versions such as `3.0.0-rc.1`.
+
+After `3.0.0` GA, use:
+
+```elixir
+{:sigil_guard, "~> 3.0"}
+```
+
+That requirement admits compatible `3.x` releases according to normal Hex
+semver rules and remains separate from the `0.2.x` line.
 
 ## MCP JSON-RPC Rejection Codes
 
