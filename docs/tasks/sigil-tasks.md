@@ -2086,6 +2086,12 @@ section is post-3.0.0 parking; neither is counted here.
     `MIGRATING-3.0.md` is added; the M6.24 script and M6.29 build are
     re-run green afterward.
   - Validation: completeness script green on the updated doc.
+  - Attempt 2026-07-07: folded the reference-consumer upgrade findings into
+    `MIGRATING-3.0.md`: local path-dependency validation, the two observed
+    `_sigil` migration sites (tool-call metadata and socket/session auth), and
+    the rule that host-owned sigil-prefixed boot keys stay untouched unless
+    they configure SigilGuard itself. Keep M6.30 open until M6.29 can be rerun
+    green without the skipped full consumer suite.
 - [ ] M6.31 CLAUDE.md final flip and docs/README v3 diagrams.
   - Spec: this file - Closed Decisions; `SP.01` - Public API Surface.
   - AC: CLAUDE.md rule 3 names the `_agent_trust`/`_agent_confirmation`

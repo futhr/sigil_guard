@@ -16,6 +16,16 @@ surface:
 Release candidates require an exact pin such as `"3.0.0-rc.1"`; `~> 3.0` does
 not match prerelease versions.
 
+For pre-release validation against a local checkout, use a path dependency so
+the consumer exercises the exact branch under review:
+
+```elixir
+{:sigil_guard, path: "../sigil_guard", override: true}
+```
+
+Keep that path dependency out of production branches. Replace it with the exact
+release-candidate pin during rc validation and with `~> 3.0` after GA.
+
 ## Migration Checklist
 
 - Rename policy files to the SIGILGUARD filename family.
@@ -28,6 +38,10 @@ not match prerelease versions.
 - Replace profile compatibility calls with `SigilGuard.TrustProfile`.
 - Remove deleted v2 configuration keys before booting v3.
 - Update expected error atoms and boot-error handling.
+- Re-check socket, channel, or session-auth code that previously carried
+  `_sigil`; it must now carry or verify `_agent_trust`.
+- Leave host-owned sigil-prefixed boot keys untouched unless they configure
+  SigilGuard itself.
 
 ## Policy Filenames
 
@@ -106,6 +120,15 @@ Upgrade producers and consumers as a pair, or route v2 traffic to the old v2
 deployment until both sides emit and verify `_agent_trust`. In v3, `_sigil` is
 ordinary user content for digest purposes and can change the signed action
 digest instead of being treated as transport metadata.
+
+Check both common attachment sites during migration:
+
+- **Tool-call arguments**: replace any code that inserts `_sigil` into MCP
+  `params` or `arguments` with `SigilGuard.Attestation.attach/2`.
+- **Socket or session authentication**: replace any code that accepts `_sigil`
+  as an auth payload with `SigilGuard.Attestation.fetch/1` and
+  `SigilGuard.Attestation.verify/3`, using trust material from a verified
+  bundle or host-owned authentication.
 
 ## MCP Confirmation Metadata
 
@@ -429,6 +452,10 @@ Kept v3 keys are `:trust_bundle`, `:scanner_patterns`, `:http_client`,
 `:attestation_ttl_ms`, `:max_skew_ms`, `:replay_ttl_ms`, `:vault_master_key`,
 and `:trust_mappings`. Unknown keys fail closed with reason
 `:unknown_config_key`.
+
+Only remove keys that configure SigilGuard. Host application boot keys may
+still use sigil-prefixed names for unrelated local concerns; v3 does not reserve
+or inspect those names outside the `:sigil_guard` application environment.
 
 ## Error Changes
 
