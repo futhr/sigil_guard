@@ -94,6 +94,40 @@ defmodule SigilGuard.Attestation.Envelope do
   def sign_many(_, _), do: {:error, :invalid_envelope}
 
   @doc """
+  Append a signature to an existing envelope over its identical PAE bytes.
+
+  DSSE cosigning (SP.05): the `payload` and existing signatures are unchanged and
+  the appended signature covers the same PAE bytes. A key id already present in
+  the envelope (or produced by `signer`) fails `:duplicate_keyid`; a signer that
+  cannot produce an Ed25519 signature fails `:invalid_signer`.
+  """
+  @spec add_signature(envelope() | term(), signer(), keyword()) ::
+          {:ok, envelope()}
+          | {:error,
+             :invalid_envelope
+             | :invalid_payload_type
+             | :invalid_base64
+             | :duplicate_keyid
+             | :invalid_signer}
+  def add_signature(envelope, signer, opts \\ [])
+
+  def add_signature(envelope, signer, opts) when is_map(envelope) do
+    keyid = Keyword.get(opts, :keyid)
+
+    with {:ok, fields} <- envelope_fields(envelope),
+         :ok <- require_payload_type(fields.payload_type),
+         {:ok, existing} <- signature_fields(fields.signatures),
+         :ok <- reject_duplicate_keyids(existing),
+         {:ok, payload} <- decode_base64(fields.payload),
+         {:ok, [entry]} <- sign_all([{signer, keyid}], pae(fields.payload_type, payload), []),
+         :ok <- reject_present_keyid(existing, entry) do
+      {:ok, Map.put(envelope, "signatures", Enum.concat(fields.signatures, [entry]))}
+    end
+  end
+
+  def add_signature(_, _, _), do: {:error, :invalid_envelope}
+
+  @doc """
   Verify a DSSE envelope and return the signed payload bytes.
 
   `public_keys` maps key ids to raw 32-byte Ed25519 public keys or base64 /
@@ -248,6 +282,12 @@ defmodule SigilGuard.Attestation.Envelope do
     else
       {:error, :duplicate_keyid}
     end
+  end
+
+  defp reject_present_keyid(existing, entry) do
+    if Enum.any?(existing, &(&1.keyid == entry["keyid"])),
+      do: {:error, :duplicate_keyid},
+      else: :ok
   end
 
   defp verify_signatures(signatures, public_keys, pae, payload) do

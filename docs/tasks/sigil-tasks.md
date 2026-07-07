@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 137 / 228 tasks done (60%).** Milestones: 6 complete, 1 partial,
-3 not started. **91 tasks left.** Current milestone: **M5** (3/26, 12%).
+**Overall: 138 / 228 tasks done (61%).** Milestones: 6 complete, 1 partial,
+3 not started. **90 tasks left.** Current milestone: **M5** (4/26, 15%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 3 | 26 | 12% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 4 | 26 | 15% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **137** | **228** | **60%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **138** | **228** | **61%** | 6 done / 1 partial / 3 to go |
 
-### What's left (91 tasks)
+### What's left (90 tasks)
 
-- **M5 - 23 left:** witness cosigning, signed exports, privacy classification,
-  OTel/CloudEvents, audit query, and the threat-model test suite. (M5.01
-  inclusion + M5.02 consistency proofs + M5.03 DSSE checkpoint statements done.)
+- **M5 - 22 left:** signed exports, privacy classification, OTel/CloudEvents,
+  audit query, and the threat-model test suite. (M5.01-M5.04: inclusion +
+  consistency proofs, DSSE checkpoint statements, witness cosigning done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1216,7 +1216,7 @@ section is post-3.0.0 parking; neither is counted here.
     `:invalid_checkpoint`). Committed the `expected.json` golden statement
     (byte-identical regeneration asserted); the local record is never
     modified.
-- [ ] M5.04 Witness cosigning and threshold verification.
+- [x] M5.04 Witness cosigning and threshold verification.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Witness
     Cosigning.
   - AC: `Audit.Witness.cosign/3` appends `{keyid, sig}` over identical PAE
@@ -1228,6 +1228,17 @@ section is post-3.0.0 parking; neither is counted here.
     unwitnessed single-signature checkpoints stay valid where no threshold
     policy applies.
   - Tests: negative, tamper, replay (stale previous checkpoint), malformed.
+  - Done: added `SigilGuard.Audit.Witness.cosign/3` and `verify_threshold/3`,
+    plus the reusable `SigilGuard.Attestation.Envelope.add_signature/3` DSSE
+    cosigning primitive (append over identical PAE, payload unchanged,
+    duplicate/present keyid fails `:duplicate_keyid`, bad signer
+    `:invalid_signer`). `cosign/3`'s `:previous` gate verifies the consistency
+    proof from the prior checkpoint to the current envelope's statement first,
+    refusing with the proof's error (`:invalid_proof`/`:out_of_range`/
+    `:inconsistent_tree`). `verify_threshold/3` counts only witness keyids
+    whose signatures verify (tampered/unresolved tolerated), returns the sorted
+    verified keyids, fails `:witness_threshold_not_met` below `m`, and surfaces
+    structural DSSE errors (`:duplicate_keyid`, `:invalid_payload_type`).
 - [ ] M5.05 Signed audit event exports and export-package DSSE form.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Data Model
     (Signed Audit Event; Event Hash Field List (Exact, Ordered); Export
