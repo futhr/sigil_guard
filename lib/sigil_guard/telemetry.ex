@@ -32,17 +32,19 @@ defmodule SigilGuard.Telemetry do
       Metadata: `%{hit_count: integer, patterns_checked: integer, pipeline: atom,
       scanner_validate: boolean}`
 
-    * `[:sigil_guard, :envelope, :sign | :verify]`
-      Measurements: `%{duration: integer}`
-      Metadata: `%{identity: String.t(), verdict: atom, outcome: :ok | :error}`
-
-    * `[:sigil_guard, :registry, :fetch, :start | :stop | :exception]`
-      Measurements: `%{duration: integer}`
-      Metadata: `%{url: String.t(), count: integer, source: atom}`
-
     * `[:sigil_guard, :policy, :decision]`
       Measurements: `%{system_time: integer}`
-      Metadata: `%{action: String.t(), risk_level: atom, verdict: atom, trust_required: atom}`
+      Metadata: `%{action: String.t(), risk_level: atom, trust_level: atom,
+      trust_required: atom, error_reason: atom | nil}`
+
+    * `[:sigil_guard, :boundary, :hook]`
+      Measurements: `%{}`
+      Metadata: `%{module: String.t(), phase: atom, hook_result: atom}`
+
+    * `[:sigil_guard, :boundary, :adaptive]`
+      Measurements: `%{}`
+      Metadata: `%{detector: String.t(), indicator_count: integer,
+      error: atom | nil}`
 
     * `[:sigil_guard, :runtime, :gate]`
       Measurements: `%{system_time: integer}`
@@ -89,17 +91,22 @@ defmodule SigilGuard.Telemetry do
       Metadata: `%{reason: atom(), bundle_id: String.t() | nil,
       bundle_digest: String.t() | nil, dev: boolean()}`
 
+    * `[:sigil_guard, :agent_trust, :card_verify | :attest | :verify,
+      :start | :stop | :exception]`
+      Measurements: `%{system_time: integer}` (start), `%{duration: integer}` (stop)
+      Metadata: `%{statement_type: atom | nil, result: :ok | :error | nil,
+      error: atom | nil}`
+
+    * `[:sigil_guard, :agent_trust, :quarantine]`
+      Measurements: `%{}`
+      Metadata: `%{reason: atom, card_digest: String.t() | nil}`
+
   """
 
   @events [
     [:sigil_guard, :scan, :start],
     [:sigil_guard, :scan, :stop],
     [:sigil_guard, :scan, :exception],
-    [:sigil_guard, :envelope, :sign],
-    [:sigil_guard, :envelope, :verify],
-    [:sigil_guard, :registry, :fetch, :start],
-    [:sigil_guard, :registry, :fetch, :stop],
-    [:sigil_guard, :registry, :fetch, :exception],
     [:sigil_guard, :policy, :decision],
     [:sigil_guard, :boundary, :hook],
     [:sigil_guard, :boundary, :adaptive],

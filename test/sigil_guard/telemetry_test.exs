@@ -15,16 +15,58 @@ defmodule SigilGuard.TelemetryTest do
   @generated_at "2026-01-01T00:00:00.000Z"
   @anchored_at "2026-01-01T00:00:05.000Z"
   @issuer "did:web:anchor-telemetry.example"
+  @expected_events [
+    [:sigil_guard, :scan, :start],
+    [:sigil_guard, :scan, :stop],
+    [:sigil_guard, :scan, :exception],
+    [:sigil_guard, :policy, :decision],
+    [:sigil_guard, :boundary, :hook],
+    [:sigil_guard, :boundary, :adaptive],
+    [:sigil_guard, :runtime, :gate],
+    [:sigil_guard, :mcp, :request],
+    [:sigil_guard, :audit, :logged],
+    [:sigil_guard, :audit, :anchor_store, :put, :start],
+    [:sigil_guard, :audit, :anchor_store, :put, :stop],
+    [:sigil_guard, :audit, :anchor_store, :put, :exception],
+    [:sigil_guard, :audit, :anchor_store, :fetch, :start],
+    [:sigil_guard, :audit, :anchor_store, :fetch, :stop],
+    [:sigil_guard, :audit, :anchor_store, :fetch, :exception],
+    [:sigil_guard, :audit, :anchor_store, :verify, :start],
+    [:sigil_guard, :audit, :anchor_store, :verify, :stop],
+    [:sigil_guard, :audit, :anchor_store, :verify, :exception],
+    [:sigil_guard, :trust_bundle, :load, :start],
+    [:sigil_guard, :trust_bundle, :load, :stop],
+    [:sigil_guard, :trust_bundle, :load, :exception],
+    [:sigil_guard, :trust_bundle, :verify, :start],
+    [:sigil_guard, :trust_bundle, :verify, :stop],
+    [:sigil_guard, :trust_bundle, :verify, :exception],
+    [:sigil_guard, :trust_bundle, :quarantine],
+    [:sigil_guard, :agent_trust, :card_verify, :start],
+    [:sigil_guard, :agent_trust, :card_verify, :stop],
+    [:sigil_guard, :agent_trust, :card_verify, :exception],
+    [:sigil_guard, :agent_trust, :attest, :start],
+    [:sigil_guard, :agent_trust, :attest, :stop],
+    [:sigil_guard, :agent_trust, :attest, :exception],
+    [:sigil_guard, :agent_trust, :verify, :start],
+    [:sigil_guard, :agent_trust, :verify, :stop],
+    [:sigil_guard, :agent_trust, :verify, :exception],
+    [:sigil_guard, :agent_trust, :quarantine]
+  ]
 
   describe "events/0" do
     test "lists known SigilGuard telemetry events" do
-      assert [:sigil_guard, :runtime, :gate] in Telemetry.events()
-      assert [:sigil_guard, :mcp, :request] in Telemetry.events()
-      assert [:sigil_guard, :scan, :stop] in Telemetry.events()
-      assert [:sigil_guard, :audit, :logged] in Telemetry.events()
-      assert [:sigil_guard, :audit, :anchor_store, :put, :stop] in Telemetry.events()
-      assert [:sigil_guard, :audit, :anchor_store, :fetch, :stop] in Telemetry.events()
-      assert [:sigil_guard, :audit, :anchor_store, :verify, :stop] in Telemetry.events()
+      assert Telemetry.events() == @expected_events
+    end
+
+    test "exposes only current SigilGuard event families" do
+      assert Enum.uniq(Telemetry.events()) == Telemetry.events()
+      assert Enum.all?(Telemetry.events(), &match?([:sigil_guard | _], &1))
+
+      refute Enum.any?(Telemetry.events(), fn
+               [:sigil_guard, :registry | _] -> true
+               [:sigil_guard, :envelope | _] -> true
+               _ -> false
+             end)
     end
   end
 

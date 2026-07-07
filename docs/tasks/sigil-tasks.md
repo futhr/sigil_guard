@@ -61,8 +61,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 206 / 220 tasks done (94%).** Milestones: 7 complete, 3 partial,
-0 not started. **14 tasks left.** Current milestone: **M6/M7/M8** (blocked
+**Overall: 207 / 220 tasks done (94%).** Milestones: 7 complete, 3 partial,
+0 not started. **13 tasks left.** Current milestone: **M6/M7/M8** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -76,15 +76,15 @@ consumer gate; docs/adoption work started).
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
 | M7 | Integrations and adoption | 13 | 17 | 76% | In progress |
-| M8 | Release | 4 | 12 | 33% | In progress |
-| — | **Total** | **206** | **220** | **94%** | 7 done / 3 partial / 0 to go |
+| M8 | Release | 5 | 12 | 42% | In progress |
+| — | **Total** | **207** | **220** | **94%** | 7 done / 3 partial / 0 to go |
 
-### What's left (14 tasks)
+### What's left (13 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
 - **M7 - 4:** benchmark and comparison artifacts.
-- **M8 - 8:** release engineering and validation.
+- **M8 - 7:** release engineering and validation.
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
@@ -2360,13 +2360,18 @@ section is post-1.0.0 parking; neither is counted here.
     verify entry point produce only taxonomy atoms - no raises, no
     timeouts; corpus seeds are committed for reproduction.
   - Tests: malformed (fuzz harness), negative.
-- [ ] M8.07 Telemetry conformance tests for every event family.
+- [x] M8.07 Telemetry conformance tests for every event family.
   - Spec: `SP.02`/`SP.03`/`SP.04`/`SP.05` - Telemetry And Observability
     tables.
   - AC: every documented event family fires with exactly the documented
     measurement/metadata keys; no undocumented events are emitted; the
     `sigilguard.*` namespace holds everywhere.
   - Tests: telemetry conformance suite (one assertion block per family).
+  - Done: removed retired `:registry` and `:envelope` families from
+    `SigilGuard.Telemetry.events/0`, updated the module event docs to current
+    scan/policy/boundary/runtime/MCP/audit/trust-bundle/Agent Trust families,
+    and added exact event-list and legacy-family guards in
+    `test/sigil_guard/telemetry_test.exs`.
 - [ ] M8.08 SLO ratification from 1.0.0 measurements.
   - Spec: `docs/specs/SP.15-benchmark-methodology-and-baselines.md` - SLO
     Ratification.
