@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 193 / 228 tasks done (85%).** Milestones: 7 complete, 2 partial,
-1 not started. **35 tasks left.** Current milestone: **M6/M7** (blocked
+**Overall: 194 / 228 tasks done (85%).** Milestones: 7 complete, 2 partial,
+1 not started. **34 tasks left.** Current milestone: **M6/M7** (blocked
 consumer gate; docs/adoption work started).
 
 | # | Milestone | Done | Total | % | Status |
@@ -77,15 +77,15 @@ consumer gate; docs/adoption work started).
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 29 | 31 | 94% | Blocked on consumer gate |
-| M7 | Integrations and adoption | 4 | 20 | 20% | In progress |
+| M7 | Integrations and adoption | 5 | 20 | 25% | In progress |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **193** | **228** | **85%** | 7 done / 2 partial / 1 to go |
+| — | **Total** | **194** | **228** | **85%** | 7 done / 2 partial / 1 to go |
 
-### What's left (35 tasks)
+### What's left (34 tasks)
 
 - **M6 - 2:** reference-consumer full-suite validation and final migration
   fold-back after that gate is green.
-- **M7 - 16:** host integrations, guides, livebooks, benchmarks, security
+- **M7 - 15:** host integrations, guides, livebooks, benchmarks, security
   posture, and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
 
@@ -2163,11 +2163,19 @@ section is post-3.0.0 parking; neither is counted here.
     scratch project with `mix compile --warnings-as-errors`, plus
     `git diff --check`, `mix format --check-formatted mix.exs`,
     `mix sigil.docs_lint`, and `mix docs`.
-- [ ] M7.05 LangChain/ReqLLM integration guide.
+- [x] M7.05 LangChain/ReqLLM integration guide.
   - Spec: `SP.14` - Tier 1: LangChain Elixir And ReqLLM.
   - AC: request and result sides both gated; the ReqLLM pipeline-step
     variant appears in the same guide; pinned compile validation recorded.
   - Validation: guide example compiles at its pin.
+  - Done: added `guides/integrations/langchain-reqllm.md` with resolved
+    `langchain` 0.8.14 and `req_llm` 1.17.1 pins, a shared guarded tool
+    module for request/result gating, LangChain `Function` registration,
+    ReqLLM `Tool` execution, pipeline-step placement, and denial handling.
+    Verified the shared examples in a scratch project with
+    `mix compile --warnings-as-errors`, plus `git diff --check`,
+    `mix format --check-formatted mix.exs`, `mix sigil.docs_lint`, and
+    `mix docs`.
 - [ ] M7.06 Tidewave gating guide with shipped example policy.
   - Spec: `SP.14` - Tier 1: Tidewave; Per-Target Acceptance.
   - AC: the shipped policy blocks eval-class tools, requires approval for
