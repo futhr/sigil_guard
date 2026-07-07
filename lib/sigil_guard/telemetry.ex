@@ -119,7 +119,17 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :trust_bundle, :verify, :start],
     [:sigil_guard, :trust_bundle, :verify, :stop],
     [:sigil_guard, :trust_bundle, :verify, :exception],
-    [:sigil_guard, :trust_bundle, :quarantine]
+    [:sigil_guard, :trust_bundle, :quarantine],
+    [:sigil_guard, :agent_trust, :card_verify, :start],
+    [:sigil_guard, :agent_trust, :card_verify, :stop],
+    [:sigil_guard, :agent_trust, :card_verify, :exception],
+    [:sigil_guard, :agent_trust, :attest, :start],
+    [:sigil_guard, :agent_trust, :attest, :stop],
+    [:sigil_guard, :agent_trust, :attest, :exception],
+    [:sigil_guard, :agent_trust, :verify, :start],
+    [:sigil_guard, :agent_trust, :verify, :stop],
+    [:sigil_guard, :agent_trust, :verify, :exception],
+    [:sigil_guard, :agent_trust, :quarantine]
   ]
 
   @attribute_map %{
@@ -166,9 +176,11 @@ defmodule SigilGuard.Telemetry do
     release_status: "sigil.release.status",
     risk_level: "sigil.security.risk_level",
     runtime_input_error: "sigil.security.runtime_input_error",
+    card_digest: "sigil.agent_trust.card_digest",
     scanner_error: "sigil.scanner.error",
     scanner_validate: "sigil.scanner.validate",
     sink: "sigil.security.sink",
+    statement_type: "sigil.agent_trust.statement_type",
     source: "sigil.registry.source",
     sequence: "sigil.trust_bundle.sequence",
     tool: "sigil.security.tool.name",

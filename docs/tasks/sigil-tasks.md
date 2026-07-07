@@ -69,13 +69,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M0 - Decision lock and docs foundation | 22 | 22 | 0 | 0 |
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
-| M3 - Manifests, gateway, and agent trust | 22 | 19 | 0 | 3 |
+| M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
 | M4 - Boundary scanner and policy kernel | 25 | 0 | 0 | 25 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **106** | **0** | **122** |
+| **Total** | **228** | **109** | **0** | **119** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -823,7 +823,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     stdio/in-process tools (host-assigned local runner id); both compile
     as doctests or included example modules.
   - Validation: `mix docs` renders both examples; doctests green.
-- [ ] M3.20 `SigilGuard.AgentCard`: canonical form, digest, sign, verify.
+- [x] M3.20 `SigilGuard.AgentCard`: canonical form, digest, sign, verify.
   - Spec: `docs/specs/SP.13-agent-to-agent-trust-statements.md` - Agent
     Card As Capability-Manifest Analog (Card Fields (Normative); Card
     Digest; Card Signing And Verification).
@@ -838,7 +838,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `:card_expired`; card golden vectors under
     `test/fixtures/agent_cards/` round-trip byte-identically.
   - Tests: golden vectors, negative, tamper, expiration, malformed.
-- [ ] M3.21 `SigilGuard.AgentTrust` helpers with delegation-chain
+- [x] M3.21 `SigilGuard.AgentTrust` helpers with delegation-chain
       validation and unknown-peer quarantine.
   - Spec: `docs/specs/SP.13-agent-to-agent-trust-statements.md` -
     Delegation-Chain Validation; Public API Sketch.
@@ -855,7 +855,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
     `verify_agent_response/3` enforce back-reference, card binding, and
     status/quarantined shape in order.
   - Tests: negative, tamper, replay, expiration, malformed.
-- [ ] M3.22 JWS-to-DSSE card parity and result-pipeline routing.
+- [x] M3.22 JWS-to-DSSE card parity and result-pipeline routing.
   - Spec: `docs/specs/SP.13-agent-to-agent-trust-statements.md` - Card
     Signing And Verification (JWS migration subsection); Acceptance
     Criteria.
