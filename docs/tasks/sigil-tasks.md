@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 157 / 228 tasks done (69%).** Milestones: 6 complete, 1 partial,
-3 not started. **71 tasks left.** Current milestone: **M5** (23/26, 88%).
+**Overall: 158 / 228 tasks done (69%).** Milestones: 6 complete, 1 partial,
+3 not started. **70 tasks left.** Current milestone: **M5** (24/26, 92%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,16 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 23 | 26 | 88% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 24 | 26 | 92% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **157** | **228** | **69%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **158** | **228** | **69%** | 6 done / 1 partial / 3 to go |
 
-### What's left (71 tasks)
+### What's left (70 tasks)
 
-- **M5 - 3 left:** the threat-model test suite TM.10-TM.12
-  (move-don't-duplicate). (M5.01-M5.23 done, incl. TM.01-TM.09.)
+- **M5 - 2 left:** the threat-model test suite TM.11-TM.12
+  (move-don't-duplicate). (M5.01-M5.24 done, incl. TM.01-TM.10.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1616,12 +1616,28 @@ section is post-3.0.0 parking; neither is counted here.
     that would execute is out of scope. Tamper: a scrubbed benign-looking
     payload still blocks (the verdict is label-driven, not a content classifier);
     malformed: a boundary missing required digests fails closed to `:block`.
-- [ ] M5.24 TM.10 threat family - A2A impersonation and delegation abuse.
+- [x] M5.24 TM.10 threat family - A2A impersonation and delegation abuse.
   - Spec: `R.06` - Control Mapping rows 12, 13, and 20; `SP.13`.
   - AC: `.../tm10_a2a_abuse_test.exs` proves card verification against
     bundle issuers, unknown-agent quarantine, and the delegation-chain
     tamper/depth rules (mitigates; detects-at-boundary for rogue agents).
   - Tests: negative, tamper, replay, expiration.
+  - Done: added the TM.10 module (R.06 rows 12, 13, 20, ASI03/ASI07/ASI10,
+    claim **mitigates** for rows 12/13 / **detects-at-boundary** for row 20)
+    citing the A2A impersonation / delegation-scope-abuse / rogue-agent attacks
+    and referencing the base tests by exact name. Drives `AgentCard.verify/3`
+    and `AgentTrust` with A2A-abuse fixtures: a bundle-issued card verifies while
+    an unrecognized issuer fails `:unknown_key_id`, a bundle key lacking the
+    `agent_card` role fails `:untrusted_issuer`, an expired card fails
+    `:card_expired`, and a payload swapped under a valid signature fails
+    `:invalid_signature` (row 12). A peer with no verified card attests a
+    `quarantine` verdict with the `agent.unknown_peer.quarantine` rule, and
+    `require_peer_card` denies with `:unknown_agent` (row 20). Delegation chains
+    accept depth 8 but reject depth 9 with `:delegation_too_deep`, and a
+    reordered chain fails `:delegation_chain_tampered` against its signed mirror
+    (row 13). A single-use agent-response nonce cannot be replayed
+    (`:replay_detected`), and a non-envelope card fails closed
+    (`:invalid_envelope`). Uses Issuer/Agent/Local/Impostor Ed25519 signers.
 - [ ] M5.25 TM.11 threat family - supply chain.
   - Spec: `R.06` - Control Mapping rows 14-17; `SP.02` (verification,
     quarantine).
