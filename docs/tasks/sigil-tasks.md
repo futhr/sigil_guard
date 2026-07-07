@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 141 / 228 tasks done (62%).** Milestones: 6 complete, 1 partial,
-3 not started. **87 tasks left.** Current milestone: **M5** (7/26, 27%).
+**Overall: 142 / 228 tasks done (62%).** Milestones: 6 complete, 1 partial,
+3 not started. **86 tasks left.** Current milestone: **M5** (8/26, 31%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 7 | 26 | 27% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 8 | 26 | 31% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **141** | **228** | **62%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **142** | **228** | **62%** | 6 done / 1 partial / 3 to go |
 
-### What's left (87 tasks)
+### What's left (86 tasks)
 
-- **M5 - 19 left:** CloudEvents, audit query, attestation evidence refs,
-  HTTPClient/anchor stores, and the threat-model test suite. (M5.01-M5.07:
-  proofs, checkpoint statements, cosigning, exports, privacy, OTel rename done.)
+- **M5 - 18 left:** audit query, attestation evidence refs, HTTPClient/anchor
+  stores, and the threat-model test suite. (M5.01-M5.08: proofs, checkpoint
+  statements, cosigning, exports, privacy, OTel rename, CloudEvents done.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1306,12 +1306,23 @@ section is post-3.0.0 parking; neither is counted here.
     retired `sigil.` prefix; the hashed exceptions, high-card opt-in, url.full,
     and registry/envelope removal are covered. Pinned the digest-family form
     and the complete high-card set in SP.05 D16.
-- [ ] M5.08 CloudEvents projection.
+- [x] M5.08 CloudEvents projection.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - CloudEvents
     Projection.
   - AC: projection emits `specversion` `1.0`, type
     `io.sigilguard.decision.v1`, and privacy-filtered `data` only.
   - Tests: golden shape, negative (privacy filter).
+  - Done: added `SigilGuard.Audit.CloudEvents.project/2`, mapping a signed
+    event to a CloudEvents 1.0 envelope (`specversion` `1.0`, `type`
+    `io.sigilguard.decision.v1`, host-configured `:source` defaulting to
+    `urn:sigilguard`, `time`/`id` from the event, `datacontenttype`
+    `application/json`). Trace context projects to the `traceparent` extension
+    only when both `trace_id` and `span_id` are present. `data` is the
+    privacy-filtered event: scalar fields verbatim (the `actor` is whatever the
+    event carries, so `classify/2` runs first) plus a metadata allowlist of the
+    reserved SP.05 keys - raw content and unclassified host keys are omitted,
+    and `trace_id`/`span_id` never appear in `data`. A golden-shape test pins
+    the envelope; negative tests assert no raw prompt/actor/host key leaks.
 - [ ] M5.09 Audit read and query API (pure reads).
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Audit Read
     And Query API.
