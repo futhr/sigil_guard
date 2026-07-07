@@ -22,10 +22,6 @@ defmodule SigilGuard.ToolGateway do
     "_agent_trust",
     :_agent_confirmation,
     "_agent_confirmation",
-    :_sigil,
-    "_sigil",
-    :_sigil_confirmation,
-    "_sigil_confirmation",
     :confirmation_token,
     "confirmation_token"
   ]
@@ -1291,20 +1287,14 @@ defmodule SigilGuard.ToolGateway do
     [
       [:_agent_confirmation],
       ["_agent_confirmation"],
-      [:_sigil_confirmation],
-      ["_sigil_confirmation"],
       [:confirmation_token],
       ["confirmation_token"],
       [:params, :_agent_confirmation],
       [:params, "_agent_confirmation"],
-      [:params, :_sigil_confirmation],
-      [:params, "_sigil_confirmation"],
       [:params, :confirmation_token],
       [:params, "confirmation_token"],
       ["params", :_agent_confirmation],
       ["params", "_agent_confirmation"],
-      ["params", :_sigil_confirmation],
-      ["params", "_sigil_confirmation"],
       ["params", :confirmation_token],
       ["params", "confirmation_token"]
     ]

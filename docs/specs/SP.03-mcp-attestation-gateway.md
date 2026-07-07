@@ -639,7 +639,7 @@ removal lands in M6.
 - [ ] M3: JSON-RPC codes `-32050..-32056` and `data` shapes.
 - [ ] M3: `MCP.Gateway` rewired as the permanent facade per the table.
 - [ ] M5: threat-model modules for the TM rows owned here.
-- [ ] M6: remove `_sigil*` reading; the strip rule reduces to SP.01's six
+- [x] M6: remove `_sigil*` reading; the strip rule reduces to SP.01's six
       keys.
 
 ## Success Metrics

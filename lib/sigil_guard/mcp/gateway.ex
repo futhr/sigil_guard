@@ -48,10 +48,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Fail closed for legacy signed MCP requests.
-
-  The v3 runtime removed verdict-only `_sigil` envelopes. Use Agent Trust
-  attestations for signed request evidence.
+  Fail closed for signed MCP requests that lack valid Agent Trust evidence.
   """
   @spec issue_signed_confirmation_token(term(), ctx(), Decision.t(), binary(), keyword()) ::
           {:ok, String.t()} | {:error, term()}

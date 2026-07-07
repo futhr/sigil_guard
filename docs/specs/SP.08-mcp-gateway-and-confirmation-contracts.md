@@ -257,7 +257,7 @@ that registry for every code. This is a breaking change from v0.2's
       and string forms, payload root and `params` level) are stripped before
       every digest, and digests are identical with and without them,
       mirroring SP.01's strip-rule tests.
-- [ ] Released 3.0.0 gives `_sigil` and `_sigil_confirmation` no special
+- [x] Released 3.0.0 gives `_sigil` and `_sigil_confirmation` no special
       handling anywhere under `lib/`.
 - [ ] Every helper in the Gateway Function Mapping keeps its v2 name and
       arity on the `MCP.Gateway` facade and delegates to `ToolGateway`.

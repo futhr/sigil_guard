@@ -2002,7 +2002,7 @@ section is post-3.0.0 parking; neither is counted here.
     `MIGRATING-3.0.md`, validates local migration-doc links and anchors, and is
     wired into the CI docs job. Added focused tests for a clean guide, missing
     mapping failure, broken-anchor failure, and rejected task arguments.
-- [ ] M6.25 Remove legacy `_sigil*` reading; strip rule reduces to the six
+- [x] M6.25 Remove legacy `_sigil*` reading; strip rule reduces to the six
       SP.01 keys.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Implementation
     Roadmap (M6); `SP.01` - Metadata Strip Rule.
@@ -2011,6 +2011,11 @@ section is post-3.0.0 parking; neither is counted here.
     is documented only in `MIGRATING-3.0.md`.
   - Tests: negative (legacy metadata is inert), property (digest
     stability), conformance.
+  - Done: removed `_sigil` and `_sigil_confirmation` fetch/strip aliases from
+    `Attestation`, `ToolGateway`, and `MCP.Gateway` base paths; converted
+    confirmation and signed-gateway tests to `_agent_*`; added explicit inert
+    legacy metadata coverage and digest tests that keep SP.01 metadata
+    digest-neutral while treating `_sigil*` as ordinary payload content.
 - [ ] M6.26 README rewrite: installation, examples, configuration.
   - Spec: `SP.01` - V3 Configuration Surface; `SP.14` - Announcement Kit
     And Listings (tagline).

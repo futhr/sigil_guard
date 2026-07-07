@@ -22,10 +22,6 @@ defmodule SigilGuard.Attestation do
   @trust_atom_key :_agent_trust
   @confirmation_key "_agent_confirmation"
   @confirmation_atom_key :_agent_confirmation
-  @legacy_trust_key "_sigil"
-  @legacy_trust_atom_key :_sigil
-  @legacy_confirmation_key "_sigil_confirmation"
-  @legacy_confirmation_atom_key :_sigil_confirmation
   @confirmation_token_key "confirmation_token"
   @confirmation_token_atom_key :confirmation_token
   @sha256_regex ~r/^[0-9a-f]{64}$/
@@ -35,10 +31,6 @@ defmodule SigilGuard.Attestation do
     @trust_atom_key,
     @confirmation_key,
     @confirmation_atom_key,
-    @legacy_trust_key,
-    @legacy_trust_atom_key,
-    @legacy_confirmation_key,
-    @legacy_confirmation_atom_key,
     @confirmation_token_key,
     @confirmation_token_atom_key
   ]
@@ -218,11 +210,7 @@ defmodule SigilGuard.Attestation do
   """
   @spec fetch(payload()) :: {:ok, envelope()} | :error
   def fetch(payload) when is_map(payload),
-    do:
-      fetch_map_metadata(payload, @trust_key, @trust_atom_key)
-      |> fallback_metadata(fn ->
-        fetch_map_metadata(payload, @legacy_trust_key, @legacy_trust_atom_key)
-      end)
+    do: fetch_map_metadata(payload, @trust_key, @trust_atom_key)
 
   def fetch(_), do: :error
 
@@ -253,19 +241,16 @@ defmodule SigilGuard.Attestation do
   @spec fetch_confirmation(payload()) :: {:ok, String.t()} | :error
   def fetch_confirmation(payload) when is_map(payload) do
     fetch_string_metadata(payload, @confirmation_key, @confirmation_atom_key)
-    |> fallback_metadata(fn ->
-      fetch_string_metadata(payload, @legacy_confirmation_key, @legacy_confirmation_atom_key)
-    end)
   end
 
   def fetch_confirmation(_), do: :error
 
   @doc """
-  Apply the SP.01 metadata strip rule plus the M3-M5 legacy transition aliases.
+  Apply the SP.01 metadata strip rule.
 
-  The reserved `_agent_*`, transition `_sigil*`, and `confirmation_token` keys
-  are removed at the payload root and inside the map under `params` in both
-  atom and string forms. Deeper nested occurrences are left untouched.
+  The reserved `_agent_trust`, `_agent_confirmation`, and `confirmation_token`
+  keys are removed at the payload root and inside the map under `params` in
+  both atom and string forms. Deeper nested occurrences are left untouched.
   """
   @spec strip_metadata(term()) :: term()
   def strip_metadata(payload) when is_map(payload) do
@@ -304,9 +289,6 @@ defmodule SigilGuard.Attestation do
       _ -> :error
     end
   end
-
-  defp fallback_metadata({:ok, _} = result, _), do: result
-  defp fallback_metadata(:error, fallback), do: fallback.()
 
   defp fetch_metadata(payload, string_key, atom_key) do
     case Map.fetch(payload, string_key) do

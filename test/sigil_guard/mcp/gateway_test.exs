@@ -359,7 +359,7 @@ defmodule SigilGuard.MCP.GatewayTest do
     test "accepts a valid request confirmation token and consumes it once" do
       request = confirmable_request()
       token = issue_request_token(request)
-      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], token)
+      confirmed_request = put_in(request, ["params", "_agent_confirmation"], token)
 
       assert %Decision{} =
                decision =
@@ -407,7 +407,7 @@ defmodule SigilGuard.MCP.GatewayTest do
     end
 
     test "blocks invalid confirmation token types" do
-      request = put_in(confirmable_request(), ["params", "_sigil_confirmation"], 123)
+      request = put_in(confirmable_request(), ["params", "_agent_confirmation"], 123)
 
       decision =
         Gateway.guard_confirmed_request(request, [trust_level: :medium],
@@ -424,8 +424,8 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       confirmed_request =
         request
-        |> Map.put("_sigil_confirmation", false)
-        |> put_in(["params", "_sigil_confirmation"], token)
+        |> Map.put("_agent_confirmation", false)
+        |> put_in(["params", "_agent_confirmation"], token)
 
       decision =
         Gateway.guard_confirmed_request(confirmed_request, [trust_level: :medium],
@@ -470,7 +470,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       decision =
         request
-        |> put_in(["params", "_sigil_confirmation"], token)
+        |> put_in(["params", "_agent_confirmation"], token)
         |> Gateway.guard_confirmed_request([trust_level: :medium], now: @now)
 
       assert decision.verdict == :blocked
@@ -481,7 +481,7 @@ defmodule SigilGuard.MCP.GatewayTest do
     test "can verify request confirmations without consuming tokens" do
       request = confirmable_request()
       token = issue_request_token(request)
-      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], token)
+      confirmed_request = put_in(request, ["params", "_agent_confirmation"], token)
 
       opts = [
         confirmation_key: @confirmation_key,
@@ -504,7 +504,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       assert {:ok, decision} =
                request
-               |> put_in(["params", "_sigil_confirmation"], token)
+               |> put_in(["params", "_agent_confirmation"], token)
                |> Gateway.guarded_confirmed_request([trust_level: :medium],
                  confirmation_key: @confirmation_key,
                  now: @now
@@ -517,7 +517,7 @@ defmodule SigilGuard.MCP.GatewayTest do
     test "returns JSON-RPC errors for invalid confirmation tokens without leaking request text" do
       request =
         confirmable_request()
-        |> put_in(["params", "_sigil_confirmation"], "not.a.valid.token")
+        |> put_in(["params", "_agent_confirmation"], "not.a.valid.token")
 
       assert {:error, response, decision} =
                Gateway.guarded_confirmed_request(request, [trust_level: :medium],
@@ -535,7 +535,7 @@ defmodule SigilGuard.MCP.GatewayTest do
   end
 
   describe "verify_request_envelope/2" do
-    test "rejects legacy _sigil metadata because envelope verification is removed" do
+    test "rejects envelope-shaped _agent_trust metadata because envelope verification is removed" do
       envelope = legacy_envelope("did:sigil:agent")
       request = signed_request(envelope)
 
@@ -543,7 +543,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                {:error, :legacy_envelope_removed}
     end
 
-    test "rejects missing _sigil metadata" do
+    test "rejects missing Agent Trust metadata" do
       assert {:error, :missing_envelope} =
                Gateway.verify_request_envelope(unsigned_request(), public_keys: public_keys())
     end
@@ -554,9 +554,19 @@ defmodule SigilGuard.MCP.GatewayTest do
       request =
         envelope
         |> signed_request()
-        |> Map.put("_sigil", false)
+        |> Map.put("_agent_trust", false)
 
       assert {:error, :invalid_envelope} =
+               Gateway.verify_request_envelope(request, public_keys: public_keys())
+    end
+
+    test "treats legacy _sigil metadata as inert user content" do
+      request =
+        update_in(unsigned_request(), ["params"], fn params ->
+          Map.put(params, "_sigil", legacy_envelope("did:sigil:agent"))
+        end)
+
+      assert {:error, :missing_envelope} =
                Gateway.verify_request_envelope(request, public_keys: public_keys())
     end
 
@@ -585,7 +595,7 @@ defmodule SigilGuard.MCP.GatewayTest do
   end
 
   describe "guard_signed_request/3" do
-    test "blocks legacy signed requests before tool execution" do
+    test "blocks envelope-shaped Agent Trust requests before tool execution" do
       request = signed_request(legacy_envelope("did:sigil:agent"))
 
       decision =
@@ -612,7 +622,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.audit_metadata.tool == "read_file"
     end
 
-    test "emits MCP telemetry for removed legacy signed requests" do
+    test "emits MCP telemetry for removed envelope-shaped Agent Trust requests" do
       ref = attach_mcp_telemetry()
 
       request = signed_request(legacy_envelope("did:sigil:agent"))
@@ -687,7 +697,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       decision =
         confirmable_request()
-        |> put_in(["params", "_sigil_confirmation"], token)
+        |> put_in(["params", "_agent_confirmation"], token)
         |> Gateway.guard_signed_confirmed_request([trust_level: :medium],
           public_keys: public_keys(),
           confirmation_key: @confirmation_key,
@@ -700,7 +710,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       refute Map.has_key?(decision.audit_metadata, :confirmation_status)
     end
 
-    test "blocks legacy signed requests without checking confirmation tokens" do
+    test "blocks envelope-shaped Agent Trust requests without checking confirmation tokens" do
       decision =
         Gateway.guard_signed_confirmed_request(
           signed_confirmable_request(),
@@ -716,10 +726,10 @@ defmodule SigilGuard.MCP.GatewayTest do
       refute Map.has_key?(decision.audit_metadata, :confirmation_status)
     end
 
-    test "rejects legacy signed confirmation tokens before confirmation verification" do
+    test "rejects signed confirmation tokens before confirmation verification" do
       request = signed_confirmable_request()
       token = issue_request_token(request)
-      confirmed_request = put_in(request, ["params", "_sigil_confirmation"], token)
+      confirmed_request = put_in(request, ["params", "_agent_confirmation"], token)
 
       decision =
         Gateway.guard_signed_confirmed_request(confirmed_request, [trust_level: :medium],
@@ -735,7 +745,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       refute inspect(decision.audit_metadata) =~ "tenant-a"
     end
 
-    test "caller-supplied actor is not overwritten by removed legacy envelope claims" do
+    test "caller-supplied actor is not overwritten by removed envelope claims" do
       decision =
         Gateway.guard_signed_confirmed_request(
           signed_confirmable_request(),
@@ -749,14 +759,14 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.audit_metadata.envelope_reason == :legacy_envelope_removed
     end
 
-    test "emits MCP telemetry for removed legacy signed confirmations" do
+    test "emits MCP telemetry for removed signed confirmations" do
       request = signed_confirmable_request()
       token = issue_request_token(request)
       ref = attach_mcp_telemetry()
 
       decision =
         request
-        |> put_in(["params", "_sigil_confirmation"], token)
+        |> put_in(["params", "_agent_confirmation"], token)
         |> Gateway.guard_signed_confirmed_request([trust_level: :medium],
           public_keys: public_keys(),
           confirmation_key: @confirmation_key,
@@ -776,13 +786,13 @@ defmodule SigilGuard.MCP.GatewayTest do
   end
 
   describe "guarded_signed_confirmed_request/3" do
-    test "returns JSON-RPC errors for legacy signed confirmed executable requests" do
+    test "returns JSON-RPC errors for signed confirmed executable requests" do
       request = signed_confirmable_request()
       token = issue_request_token(request)
 
       assert {:error, response, decision} =
                request
-               |> put_in(["params", "_sigil_confirmation"], token)
+               |> put_in(["params", "_agent_confirmation"], token)
                |> Gateway.guarded_signed_confirmed_request([trust_level: :medium],
                  public_keys: public_keys(),
                  confirmation_key: @confirmation_key,
@@ -795,10 +805,10 @@ defmodule SigilGuard.MCP.GatewayTest do
       refute Map.has_key?(decision.audit_metadata, :confirmation_status)
     end
 
-    test "returns JSON-RPC errors for removed legacy signed confirmations without raw leakage" do
+    test "returns JSON-RPC errors for removed signed confirmations without raw leakage" do
       request =
         signed_confirmable_request()
-        |> put_in(["params", "_sigil_confirmation"], "not.a.valid.token")
+        |> put_in(["params", "_agent_confirmation"], "not.a.valid.token")
 
       assert {:error, response, decision} =
                Gateway.guarded_signed_confirmed_request(request, [trust_level: :medium],
@@ -975,7 +985,7 @@ defmodule SigilGuard.MCP.GatewayTest do
     test "accepts a valid result confirmation token and consumes it once" do
       result = prompt_injection_result()
       token = issue_result_token(result)
-      confirmed_result = Map.put(result, "_sigil_confirmation", token)
+      confirmed_result = Map.put(result, "_agent_confirmation", token)
 
       decision =
         Gateway.guard_confirmed_result(confirmed_result, [trust_level: :high],
@@ -1010,7 +1020,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       confirmed_result =
         result
-        |> Map.put("_sigil_confirmation", false)
+        |> Map.put("_agent_confirmation", false)
         |> Map.put("confirmation_token", token)
 
       decision =
@@ -1052,7 +1062,7 @@ defmodule SigilGuard.MCP.GatewayTest do
     test "returns sanitized JSON-RPC results for confirmed quarantines" do
       result = Map.put(prompt_injection_result(), "id", "confirmed-result")
       token = issue_result_token(result)
-      confirmed_result = Map.put(result, "_sigil_confirmation", token)
+      confirmed_result = Map.put(result, "_agent_confirmation", token)
 
       assert {:ok, response, decision} =
                Gateway.guarded_confirmed_result(confirmed_result, [trust_level: :high],
@@ -1073,7 +1083,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       result =
         prompt_injection_result()
         |> Map.put("id", 12)
-        |> Map.put("_sigil_confirmation", "not.a.valid.token")
+        |> Map.put("_agent_confirmation", "not.a.valid.token")
 
       assert {:error, response, decision} =
                Gateway.guarded_confirmed_result(result, [trust_level: :high],
@@ -1548,7 +1558,7 @@ defmodule SigilGuard.MCP.GatewayTest do
   end
 
   defp signed_request(envelope, request \\ unsigned_request()) do
-    update_in(request, ["params"], &Map.put(&1, "_sigil", envelope))
+    update_in(request, ["params"], &Map.put(&1, "_agent_trust", envelope))
   end
 
   defp legacy_envelope(identity) do

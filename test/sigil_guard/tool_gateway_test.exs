@@ -338,7 +338,7 @@ defmodule SigilGuard.ToolGatewayTest do
       end
     end
 
-    test "accepts transition legacy confirmation metadata" do
+    test "treats legacy confirmation metadata as inert user content" do
       opts = [
         manifests: %{"repo_file_write" => suspicious_manifest()},
         require_manifest: true
@@ -369,8 +369,8 @@ defmodule SigilGuard.ToolGatewayTest do
           now: @now
         )
 
-      assert confirmed.verdict == :allowed
-      assert confirmed.audit_metadata.confirmation_status == :accepted
+      assert {:confirm, _} = confirmed.verdict
+      refute Map.has_key?(confirmed.audit_metadata, :confirmation_status)
     end
 
     test "returns typed errors when issuing confirmations fails" do
@@ -720,7 +720,8 @@ defmodule SigilGuard.ToolGatewayTest do
           attestation: :optional
         )
 
-      assert legacy.audit_metadata.deny_reason == :invalid_attestation
+      assert legacy.verdict == :allowed
+      refute legacy.audit_metadata[:deny_reason] == :invalid_attestation
     end
 
     test "accepts valid inbound attestations for optional and required modes" do

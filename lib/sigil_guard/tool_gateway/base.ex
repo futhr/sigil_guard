@@ -16,10 +16,10 @@ defmodule SigilGuard.ToolGateway.Base do
 
   @known_context_keys Map.keys(%Context{})
   @guard_metadata_keys [
-    :_sigil,
-    "_sigil",
-    :_sigil_confirmation,
-    "_sigil_confirmation",
+    :_agent_trust,
+    "_agent_trust",
+    :_agent_confirmation,
+    "_agent_confirmation",
     :confirmation_token,
     "confirmation_token"
   ]
@@ -68,7 +68,7 @@ defmodule SigilGuard.ToolGateway.Base do
 
   The token is bound to the same normalized request payload and boundary
   context used by `guard_request/3`, excluding SigilGuard transport metadata
-  such as `_sigil` and `_sigil_confirmation`.
+  such as `_agent_trust` and `_agent_confirmation`.
   """
   @spec issue_confirmation_token(
           term(),
@@ -89,10 +89,8 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Fail closed for legacy signed MCP requests.
-
-  The verdict-only `_sigil` verifier was removed in v3. Use Agent Trust
-  attestations for signed request evidence.
+  Fail closed for signed MCP requests that do not carry a valid Agent Trust
+  attestation.
   """
   @spec issue_signed_confirmation_token(
           term(),
@@ -145,7 +143,7 @@ defmodule SigilGuard.ToolGateway.Base do
 
   If the request does not require confirmation, this behaves like
   `guard_request/3`. If confirmation is required and a token is supplied via
-  `:confirmation_token`, `_sigil_confirmation`, or `confirmation_token`, the
+  `:confirmation_token`, `_agent_confirmation`, or `confirmation_token`, the
   token is verified against the request action digest. Gateway confirmation
   tokens are consumed by default; pass `consume_confirmation: false` to keep
   verification stateless.
@@ -174,7 +172,7 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Fail closed for legacy signed MCP tool requests and optional confirmation tokens.
+  Fail closed for signed MCP tool requests and optional confirmation tokens.
   """
   @spec guard_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
           Decision.t()
@@ -196,7 +194,7 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Fail closed for legacy signed, possibly confirmed MCP requests and return a JSON-RPC error.
+  Fail closed for signed, possibly confirmed MCP requests and return a JSON-RPC error.
   """
   @spec guarded_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
           {:ok, Decision.t()} | {:error, map(), Decision.t()}
@@ -213,9 +211,8 @@ defmodule SigilGuard.ToolGateway.Base do
   @doc """
   Guard a signed MCP tool request before execution.
 
-  The legacy `_sigil` envelope verifier was removed in v3. This helper now
-  fails closed for envelope-bearing requests; use Agent Trust attestations for
-  signed request evidence.
+  This helper accepts only Agent Trust attestation metadata and fails closed
+  for absent or invalid evidence.
   """
   @spec guard_signed_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_signed_request(request, context \\ %{}, opts \\ []) do
@@ -246,10 +243,10 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Verify legacy `_sigil` metadata on an MCP request.
+  Verify Agent Trust metadata on an MCP request.
 
-  The v3 runtime removed `SigilGuard.Envelope`, so envelope-bearing requests
-  fail closed with `:legacy_envelope_removed`.
+  The v3 runtime removed verdict-only envelopes, so envelope-shaped metadata
+  currently fails closed with `:legacy_envelope_removed`.
   """
   @spec verify_request_envelope(term(), keyword()) ::
           {:ok, %{identity: String.t(), envelope: map()}} | {:error, atom()}
@@ -803,16 +800,16 @@ defmodule SigilGuard.ToolGateway.Base do
 
   defp confirmation_token_paths do
     [
-      [:_sigil_confirmation],
-      ["_sigil_confirmation"],
+      [:_agent_confirmation],
+      ["_agent_confirmation"],
       [:confirmation_token],
       ["confirmation_token"],
-      [:params, :_sigil_confirmation],
-      [:params, "_sigil_confirmation"],
+      [:params, :_agent_confirmation],
+      [:params, "_agent_confirmation"],
       [:params, :confirmation_token],
       [:params, "confirmation_token"],
-      ["params", :_sigil_confirmation],
-      ["params", "_sigil_confirmation"],
+      ["params", :_agent_confirmation],
+      ["params", "_agent_confirmation"],
       ["params", :confirmation_token],
       ["params", "confirmation_token"]
     ]
@@ -854,12 +851,12 @@ defmodule SigilGuard.ToolGateway.Base do
 
   defp envelope_paths do
     [
-      [:_sigil],
-      ["_sigil"],
-      [:params, :_sigil],
-      [:params, "_sigil"],
-      ["params", :_sigil],
-      ["params", "_sigil"]
+      [:_agent_trust],
+      ["_agent_trust"],
+      [:params, :_agent_trust],
+      [:params, "_agent_trust"],
+      ["params", :_agent_trust],
+      ["params", "_agent_trust"]
     ]
   end
 
