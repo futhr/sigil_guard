@@ -48,6 +48,8 @@ defmodule SigilGuard.Scanner.PipelineTest do
 
   use ExUnit.Case, async: true
 
+  use ExUnitProperties
+
   alias SigilGuard.Patterns
   alias SigilGuard.Scanner
   alias SigilGuard.Scanner.Pipeline
@@ -271,6 +273,40 @@ defmodule SigilGuard.Scanner.PipelineTest do
 
       assert [%{match: "xxx", offset: 1, length: 3, pattern: ^pattern}] =
                Pipeline.regex_candidates(" xxx ", [pattern])
+    end
+  end
+
+  describe "confidence score bounds" do
+    # Fixtures that reliably produce an enriched hit under the built-in patterns.
+    @scored_secrets [
+      "key=AKIAIOSFODNN7EXAMPLE",
+      "api_key=R7v9K2mQ4xZ8pL6nT5y0",
+      "secret=R7v9K2mQ4xZ8pL6nT5y0"
+    ]
+
+    test "a strongly-signalled secret caps confidence at 0.99, never above 1.0" do
+      assert {:hit, [hit]} = Scanner.scan("key=AKIAIOSFODNN7EXAMPLE")
+      assert hit.confidence <= 0.99
+    end
+
+    property "every enriched hit carries a confidence that is a float in 0.0..1.0" do
+      check all(
+              secret <- member_of(@scored_secrets),
+              noise <- string(:alphanumeric, max_length: 10)
+            ) do
+        text = noise <> " " <> secret <> " " <> noise
+
+        case Scanner.scan(text) do
+          {:ok, _} ->
+            :ok
+
+          {:hit, hits} ->
+            Enum.each(hits, fn hit ->
+              assert is_float(hit.confidence)
+              assert hit.confidence >= 0.0 and hit.confidence <= 1.0
+            end)
+        end
+      end
     end
   end
 end
