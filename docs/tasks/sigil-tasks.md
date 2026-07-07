@@ -2310,6 +2310,13 @@ section is post-3.0.0 parking; neither is counted here.
     gates onto the criteria; the badge MUST be earned before any
     announcement fires.
   - Validation: badge status recorded; README badge added.
+  - Attempt 2026-07-07: added
+    `docs/security/openssf-best-practices.md` with a passing-criteria evidence
+    map and the project-specific README badge template. Public BadgeApp API
+    probes returned no project entry for `https://github.com/futhr/sigil_guard`,
+    so this remains open until a maintainer creates or claims the project at
+    bestpractices.dev, reaches passing, and supplies the project id for the
+    README badge.
 - [ ] M7.19 Announcement kit drafts, listings text, and Hex metadata
       review.
   - Spec: `SP.14` - Announcement Kit And Listings.
