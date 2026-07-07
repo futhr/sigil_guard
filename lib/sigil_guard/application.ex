@@ -7,15 +7,9 @@ defmodule SigilGuard.Application do
   cache so that they are owned by a process that lives as long as the
   application.
 
-  Starts the supervision tree that manages optional runtime services.
-  When legacy remote-bundle support is enabled
-  (`config :sigil_guard, registry_enabled: true`), this starts:
-
-    * `Finch` HTTP client pool (as `SigilGuard.Finch`)
-    * `SigilGuard.Registry.Cache` GenServer for TTL-cached compatibility bundles
-
-  When remote-bundle support is disabled (the default), no child processes are
-  started and SigilGuard operates as a purely functional library.
+  Starts the supervision tree that manages optional runtime services. The v3
+  core has no legacy registry children; trust-bundle state is owned by ETS
+  tables initialized during boot.
   """
 
   use Application
@@ -29,15 +23,7 @@ defmodule SigilGuard.Application do
     SigilGuard.TrustBundle.Quarantine.ensure_table()
     SigilGuard.TrustBundle.load_configured!(config)
 
-    children =
-      if SigilGuard.Config.registry_enabled?() do
-        [
-          {Finch, name: SigilGuard.Finch},
-          SigilGuard.Registry.Cache
-        ]
-      else
-        []
-      end
+    children = []
 
     opts = [strategy: :one_for_one, name: SigilGuard.Supervisor]
     Supervisor.start_link(children, opts)

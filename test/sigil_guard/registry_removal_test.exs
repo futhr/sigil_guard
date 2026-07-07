@@ -3,6 +3,7 @@ defmodule SigilGuard.RegistryRemovalTest do
 
   @registry_module SigilGuard.Registry
   @bundle_module SigilGuard.Registry.Bundle
+  @cache_module SigilGuard.Registry.Cache
   @registry_functions [
     {:fetch_bundle, []},
     {:resolve_did, ["did:example:alice"]},
@@ -14,6 +15,13 @@ defmodule SigilGuard.RegistryRemovalTest do
     {:digest, [%{}]},
     {:sign, [%{}, SigilGuard.TestSigner]},
     {:verify, [%{}]}
+  ]
+  @cache_functions [
+    {:status, []},
+    {:patterns, []},
+    {:rule_count, []},
+    {:source, []},
+    {:refresh, []}
   ]
 
   describe "v3 registry adapter removal" do
@@ -53,6 +61,31 @@ defmodule SigilGuard.RegistryRemovalTest do
       assert [%{"name" => "registry_pat", "regex" => "REG_[0-9]+"}] = fixture["patterns"]
       assert fixture["provenance"]["issuer"] == "did:sigil:registry"
       assert fixture["provenance"]["algorithm"] == "Ed25519"
+    end
+  end
+
+  describe "v3 registry cache removal" do
+    test "SigilGuard.Registry.Cache is deleted, not hidden" do
+      refute Code.ensure_loaded?(@cache_module)
+    end
+
+    test "removed cache calls raise UndefinedFunctionError cleanly" do
+      for {function, args} <- @cache_functions do
+        assert_raise UndefinedFunctionError, fn ->
+          apply(@cache_module, function, args)
+        end
+      end
+    end
+
+    test "application boot has no registry cache or Finch children" do
+      child_modules =
+        SigilGuard.Supervisor
+        |> Supervisor.which_children()
+        |> Enum.map(fn {id, _, _, modules} -> {id, modules} end)
+
+      refute Enum.any?(child_modules, fn {id, modules} ->
+               id in [SigilGuard.Finch, @cache_module] or @cache_module in List.wrap(modules)
+             end)
     end
   end
 end

@@ -61,8 +61,6 @@ defmodule SigilGuard do
   - `SigilGuard.Vault` — Secure secret storage
   - `SigilGuard.Identity` — Trust level hierarchy
   - `SigilGuard.Signer` — Cryptographic signing behaviour
-  - `SigilGuard.Registry.Cache` — Optional remote-bundle data caching
-
   """
 
   alias SigilGuard.Backend

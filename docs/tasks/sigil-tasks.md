@@ -1725,11 +1725,18 @@ section is post-3.0.0 parking; neither is counted here.
     `UndefinedFunctionError`, and preserved the old bundle shape in
     `test/fixtures/historical/legacy_registry_bundle.json` with a parser-only
     fixture assertion.
-- [ ] M6.03 Delete `SigilGuard.Registry.Cache`.
+- [x] M6.03 Delete `SigilGuard.Registry.Cache`.
   - Spec: `SP.12` - V3 Removal Map.
   - AC: deleted; `TrustBundle.Cache` is the only cache; no ETS table or
     supervision child remains for the registry path.
   - Tests: removal test, negative (boot has no registry children).
+  - Done: deleted `lib/sigil_guard/registry/cache.ex`, removed the old cache
+    test module, removed the `registry_enabled?` supervisor branch and
+    `SigilGuard.Finch`/`SigilGuard.Registry.Cache` child specs from application
+    boot, removed the cache module from public docs / ExDoc grouping, and
+    extended `registry_removal_test.exs` to prove the module is not loadable,
+    cache calls raise `UndefinedFunctionError`, and the running supervisor has
+    no registry cache or Finch children.
 - [ ] M6.04 Delete `SigilGuard.Profile`.
   - Spec: `docs/specs/SP.01-sigilguard-trust-profile.md` - Public Modules
     Removed In V3.

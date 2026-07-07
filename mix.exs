@@ -183,9 +183,6 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Vault.Entry,
           SigilGuard.Vault.InMemory
         ],
-        Registry: [
-          SigilGuard.Registry.Cache
-        ],
         Backend: [
           SigilGuard.Backend,
           SigilGuard.Backend.Elixir
