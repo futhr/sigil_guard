@@ -89,11 +89,10 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Issue an action-bound confirmation token for a signed MCP request.
+  Fail closed for legacy signed MCP requests.
 
-  `_sigil` is verified first, then the token is bound to the signed identity
-  as both actor and identity in the gateway context. This prevents a token
-  issued for an unsigned or spoofed context from approving a signed request.
+  The verdict-only `_sigil` verifier was removed in v3. Use Agent Trust
+  attestations for signed request evidence.
   """
   @spec issue_signed_confirmation_token(
           term(),
@@ -175,11 +174,7 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Guard a signed MCP tool request and honor an optional confirmation token.
-
-  Envelope verification runs before confirmation verification. A valid
-  confirmation token must be bound to the normalized request payload and to
-  the signed envelope identity.
+  Fail closed for legacy signed MCP tool requests and optional confirmation tokens.
   """
   @spec guard_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
           Decision.t()
@@ -201,7 +196,7 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   @doc """
-  Guard a signed, possibly confirmed MCP request and return either an allow decision or JSON-RPC error.
+  Fail closed for legacy signed, possibly confirmed MCP requests and return a JSON-RPC error.
   """
   @spec guarded_signed_confirmed_request(term(), Context.t() | map() | keyword(), keyword()) ::
           {:ok, Decision.t()} | {:error, map(), Decision.t()}

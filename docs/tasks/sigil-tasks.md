@@ -1778,11 +1778,17 @@ section is post-3.0.0 parking; neither is counted here.
     updated the SP.06 fixture-path reference, and extended
     `registry_removal_test.exs` with parse-only historical vector assertions
     plus a negative scan proving no `lib/` file reads `test/fixtures/historical`.
-- [ ] M6.07 Remove public examples centered on verdict-only envelopes.
+- [x] M6.07 Remove public examples centered on verdict-only envelopes.
   - Spec: `SP.01` - Public API Surface; `SP.06` - V3 Transition Rules.
   - AC: no README/ExDoc example signs or verifies a verdict-only envelope;
     replacements use `SigilGuard.Attestation` statements.
   - Validation: docs vocabulary scan clean; `mix docs` renders.
+  - Done: removed the public verdict-only envelope module from ExDoc in M6.05
+    and rewrote the remaining `SigilGuard.MCP.Gateway` /
+    `SigilGuard.ToolGateway.Base` signed-envelope public docs so they describe
+    v3 fail-closed behavior and point to Agent Trust attestations instead of
+    showing sign/verify examples. A README/lib/docs scan confirms no public
+    example calls `SigilGuard.Envelope`, `sign_envelope`, or `verify_envelope`.
 - [ ] M6.08 `SigilGuard.Config` strict closed-key validation.
   - Spec: `SP.01` - V3 Configuration Surface.
   - AC: `SigilGuard.Config.validate!/0` runs at `Application.start/2` and

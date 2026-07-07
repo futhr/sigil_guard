@@ -48,10 +48,10 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Issue an action-bound confirmation token for a signed MCP request.
+  Fail closed for legacy signed MCP requests.
 
-  This helper preserves the legacy MCP signed-envelope compatibility contract
-  while request enforcement migrates to the Agent Trust facade options.
+  The v3 runtime removed verdict-only `_sigil` envelopes. Use Agent Trust
+  attestations for signed request evidence.
   """
   @spec issue_signed_confirmation_token(term(), ctx(), Decision.t(), binary(), keyword()) ::
           {:ok, String.t()} | {:error, term()}
@@ -92,7 +92,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Guard a signed MCP tool request and honor an optional confirmation token.
+  Fail closed for legacy signed MCP requests and optional confirmation tokens.
   """
   @spec guard_signed_confirmed_request(term(), ctx(), keyword()) :: Decision.t()
   def guard_signed_confirmed_request(request, context \\ %{}, opts \\ []) do
@@ -100,7 +100,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Guard a signed, possibly confirmed MCP request and return either an allow decision or JSON-RPC error.
+  Fail closed for legacy signed, possibly confirmed MCP requests and return a JSON-RPC error.
   """
   @spec guarded_signed_confirmed_request(term(), ctx(), keyword()) ::
           {:ok, Decision.t()} | {:error, map(), Decision.t()}
@@ -109,7 +109,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Guard a signed MCP tool request before execution.
+  Fail closed for legacy signed MCP tool requests before execution.
   """
   @spec guard_signed_request(term(), ctx(), keyword()) :: Decision.t()
   def guard_signed_request(request, context \\ %{}, opts \\ []) do
@@ -117,7 +117,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Guard a signed MCP tool request and return either an allow decision or JSON-RPC error.
+  Fail closed for legacy signed MCP tool requests and return a JSON-RPC error.
   """
   @spec guarded_signed_request(term(), ctx(), keyword()) ::
           {:ok, Decision.t()} | {:error, map(), Decision.t()}
@@ -126,7 +126,7 @@ defmodule SigilGuard.MCP.Gateway do
   end
 
   @doc """
-  Verify signed MCP request metadata without running the runtime gate.
+  Reject legacy signed MCP request metadata without running the runtime gate.
   """
   @spec verify_request_envelope(term(), keyword()) ::
           {:ok, %{identity: String.t(), envelope: map()}} | {:error, atom()}
