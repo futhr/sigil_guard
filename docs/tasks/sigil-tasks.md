@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 133 / 228 tasks done (58%).** Milestones: 5 complete, 1 partial,
-4 not started. **95 tasks left.** Current milestone: **M4** (24/25, 96%).
+**Overall: 134 / 228 tasks done (59%).** Milestones: 6 complete, 0 partial,
+4 not started. **94 tasks left.** Current milestone: **M5** (0/26, next).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -73,18 +73,15 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 | Core groundwork | 19 | 19 | 100% | Complete |
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
-| M4 | Boundary scanner and policy kernel | 24 | 25 | 96% | In progress |
+| M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 0 | 26 | 0% | Not started |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **133** | **228** | **58%** | 5 done / 1 partial / 4 to go |
+| — | **Total** | **134** | **228** | **59%** | 6 done / 0 partial / 4 to go |
 
-### What's left (95 tasks)
+### What's left (94 tasks)
 
-- **M4 - 1 left:** M4.20 pattern-set split + bundle wiring (restructures
-  `Quarantine` into injection/poisoning sets through the SP.02 bundle contract;
-  needs the SP.04 pattern-set-entry schema pinned down first).
 - **M5 - 26:** audit, telemetry, provenance, and the threat-model test suite.
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
@@ -1075,15 +1072,27 @@ section is post-3.0.0 parking; neither is counted here.
   - AC: staged-pipeline validators and confidence scoring are expanded;
     scores land in the additive `confidence` hit field in `0.0..1.0`.
   - Tests: negative, property (score bounds).
-- [ ] M4.20 Pattern-set split with bundle-suppliable sets and pluggable
+- [x] M4.20 Pattern-set split with bundle-suppliable sets and pluggable
       quarantine indicators.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
-    Pattern Sets.
+    Pattern Sets, Bundle Pattern-Set Entry (Normative).
   - AC: secret, injection, and poisoning sets are distinct; bundle pattern
     entries gain a `set` field and each set can be supplied or overridden
     independently (SP.02 wiring); quarantine consumes the injection and
     poisoning sets with the current seven indicators as built-in defaults.
   - Tests: negative, malformed (bad `set` values), tamper.
+  - Done: added the `SigilGuard.PatternSets` resolver (`built_in/0`,
+    `resolve/1`) grouping bundle entries by `set`, replacing each set's default
+    independently, and compiling to the scanner pattern shape (`secret`) or the
+    quarantine indicator shape (`injection`/`poisoning`); tagged built-in
+    scanner patterns `set: :secret` and split the seven quarantine indicators
+    into `built_in_indicators(:injection)` (6) / `(:poisoning)` (1) with an
+    `:indicator_sets` override on `Quarantine.inspect`; wired
+    `TrustBundle.pattern_sets/1` to resolve a verified bundle's section
+    (fail-closed on a legacy entry without a `set`); pinned the SP.04 Bundle
+    Pattern-Set Entry schema (set-derived category, never entry-settable).
+    Malformed `set`/`name`/`regex`/`severity` and duplicate names fail
+    `:invalid_pattern_set`.
 - [x] M4.21 Hit-map additive extension (D17-safe).
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` - Hit
     Map (D17, Additive Only).

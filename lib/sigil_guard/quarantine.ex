@@ -69,15 +69,35 @@ defmodule SigilGuard.Quarantine do
 
   @prefilter_pattern ~r/(instruction|exfiltrate|send|upload|post|system|developer|reveal|dump|print|repeat|extract|ask|prompt|request|collect|when|before|after|<!--|display|visibility|<script)/i
 
+  # The built-in `poisoning` set (SP.04); everything else is the `injection` set.
+  @poisoning_indicator_ids [:tool_poisoning_directive]
+
+  @doc """
+  Return the built-in indicators for the `:injection` or `:poisoning` set (SP.04).
+
+  These are the defaults `SigilGuard.PatternSets` uses when a trust bundle
+  supplies neither set.
+  """
+  @spec built_in_indicators(:injection | :poisoning) :: [map()]
+  def built_in_indicators(:poisoning),
+    do: Enum.filter(@indicators, &(&1.id in @poisoning_indicator_ids))
+
+  def built_in_indicators(:injection),
+    do: Enum.reject(@indicators, &(&1.id in @poisoning_indicator_ids))
+
   @doc """
   Inspect text for deterministic quarantine indicators.
+
+  The `:indicator_sets` option (`%{injection: [...], poisoning: [...]}`, from
+  `SigilGuard.PatternSets`) overrides either set; an absent set keeps its
+  built-in default.
   """
   @spec inspect(String.t() | nil, Context.t() | map() | keyword(), keyword()) :: result()
   def inspect(text, context \\ %Context{}, opts \\ [])
 
   def inspect(text, context, opts) when is_binary(text) do
     context = Context.new(context)
-    active_indicators = indicators_for(text)
+    active_indicators = indicators_for(text, opts)
     indicators = find_indicators(text, active_indicators)
     verdict = verdict(indicators, context, opts)
 
@@ -104,7 +124,7 @@ defmodule SigilGuard.Quarantine do
   @spec sanitize(String.t()) :: String.t()
   def sanitize(text) when is_binary(text) do
     text
-    |> indicators_for()
+    |> indicators_for([])
     |> sanitize(text)
   end
 
@@ -128,17 +148,39 @@ defmodule SigilGuard.Quarantine do
   defp sanitized_text(text, _, []), do: text
   defp sanitized_text(text, active_indicators, _), do: sanitize(active_indicators, text)
 
-  defp indicators_for(text) do
-    if Regex.match?(@prefilter_pattern, text) do
-      lowercase = String.downcase(text)
+  defp indicators_for(text, opts) do
+    {active, custom?} = active_indicators(opts)
 
-      Enum.filter(@indicators, fn indicator ->
-        contains_any?(lowercase, indicator.prefilter)
-      end)
+    if custom? or Regex.match?(@prefilter_pattern, text) do
+      lowercase = String.downcase(text)
+      Enum.filter(active, &prefilter_active?(&1, lowercase))
     else
       []
     end
   end
+
+  # An absent `:indicator_sets` uses the built-ins with the fast-path prefilter;
+  # a supplied map overrides each set independently and is checked per indicator
+  # (the fast-path pattern covers only the built-in vocabulary).
+  defp active_indicators(opts) do
+    case Keyword.get(opts, :indicator_sets) do
+      %{} = sets ->
+        active =
+          Map.get(sets, :injection, built_in_indicators(:injection)) ++
+            Map.get(sets, :poisoning, built_in_indicators(:poisoning))
+
+        {active, true}
+
+      _ ->
+        {@indicators, false}
+    end
+  end
+
+  # A `[]` prefilter means "always scan" (SP.04); otherwise gate on the tokens.
+  defp prefilter_active?(%{prefilter: []}, _), do: true
+
+  defp prefilter_active?(%{prefilter: prefilter}, lowercase),
+    do: contains_any?(lowercase, prefilter)
 
   defp contains_any?(text, tokens) do
     Enum.any?(tokens, fn token ->

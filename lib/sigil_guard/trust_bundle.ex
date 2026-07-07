@@ -13,6 +13,7 @@ defmodule SigilGuard.TrustBundle do
   alias SigilGuard.Attestation.Envelope
   alias SigilGuard.Canonical.JCS
   alias SigilGuard.ConfigError
+  alias SigilGuard.PatternSets
   alias SigilGuard.Telemetry
   alias SigilGuard.TrustBundle.Cache
   alias SigilGuard.TrustBundle.Quarantine
@@ -248,6 +249,17 @@ defmodule SigilGuard.TrustBundle do
   @doc "Return verified scanner pattern sections, or an empty list when absent."
   @spec patterns(t()) :: [term()]
   def patterns(%__MODULE__{document: document}), do: list_section(document, "patterns")
+
+  @doc """
+  Resolve the verified `patterns` section into the three SP.04 pattern sets.
+
+  Routes the bundle's `patterns` entries through `SigilGuard.PatternSets.resolve/1`:
+  each `set` (`secret`, `injection`, `poisoning`) is independently overridable and
+  an absent set keeps its built-in default. A malformed entry fails closed with
+  `{:error, :invalid_pattern_set}`. An absent section resolves to all built-ins.
+  """
+  @spec pattern_sets(t()) :: {:ok, PatternSets.t()} | {:error, :invalid_pattern_set}
+  def pattern_sets(%__MODULE__{} = bundle), do: PatternSets.resolve(patterns(bundle))
 
   @doc "Return verified policy sections, or an empty list when absent."
   @spec policies(t()) :: [term()]

@@ -126,6 +126,16 @@ defmodule SigilGuard.ScannerTest do
       assert {:hit, [hit]} = Scanner.scan("found CUSTOM_1234 here", patterns: custom)
       assert hit.name == "custom"
     end
+
+    test "consumes a resolved bundle secret set (SP.04)" do
+      {:ok, %{secret: secret}} =
+        SigilGuard.PatternSets.resolve([
+          %{"set" => "secret", "name" => "custom_key", "regex" => "XK-[0-9]{6}"}
+        ])
+
+      assert {:hit, [hit]} = Scanner.scan("token XK-123456 here", patterns: secret)
+      assert hit.name == "custom_key"
+    end
   end
 
   describe "redact/3" do

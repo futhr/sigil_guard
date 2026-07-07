@@ -45,13 +45,17 @@ defmodule SigilGuard.Patterns do
           optional(:validated) => boolean()
         }
 
+  @typedoc "Pattern set (SP.04): `secret` feeds the scanner; `injection`/`poisoning` feed quarantine."
+  @type pattern_set :: :secret | :injection | :poisoning
+
   @type compiled_pattern :: %{
           name: String.t(),
           category: category(),
           severity: :low | :medium | :high,
           regex: Regex.t(),
           replacement_hint: String.t() | nil,
-          max_match_bytes: pos_integer()
+          max_match_bytes: pos_integer(),
+          set: pattern_set()
         }
 
   @default_max_match_bytes 256
@@ -118,7 +122,8 @@ defmodule SigilGuard.Patterns do
                                   severity: raw.severity,
                                   regex: Regex.compile!(raw.pattern),
                                   replacement_hint: raw.replacement_hint,
-                                  max_match_bytes: raw.max_match_bytes
+                                  max_match_bytes: raw.max_match_bytes,
+                                  set: :secret
                                 }
                               end)
 
@@ -215,7 +220,8 @@ defmodule SigilGuard.Patterns do
       severity: extract_severity(raw),
       regex: regex,
       replacement_hint: flex_get(raw, :replacement_hint),
-      max_match_bytes: extract_max_match_bytes(raw)
+      max_match_bytes: extract_max_match_bytes(raw),
+      set: :secret
     }
   end
 

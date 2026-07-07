@@ -616,6 +616,36 @@ built-in defaults when no bundle supplies those sets.
 | injection | `ignore_instructions`, `exfiltration_request`, `system_prompt_probe`, `model_extraction_request`, `credential_harvest_instruction`, `hidden_html_instruction` | `:injection` |
 | poisoning | `tool_poisoning_directive` | `:poisoning` |
 
+### Bundle Pattern-Set Entry (Normative)
+
+SP.02's `patterns` list holds pattern-set entries whose shape SP.04 owns. Each
+entry is a map (string or atom keys):
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `name` | string | yes | Stable id; the scanner hit `name` (secret) or the quarantine indicator `id` (injection/poisoning). Unique within its set. |
+| `set` | `"secret" \| "injection" \| "poisoning"` | yes | Closed set. Any other value fails `:invalid_pattern_set`. |
+| `regex` | string | yes | Pattern source, compiled with `Regex.compile/1`; a compile failure fails `:invalid_pattern_set`. |
+| `severity` | `"low" \| "medium" \| "high"` | no | Defaults `:medium`. |
+| `replacement_hint` | string | no | Secret-set redaction replacement. |
+| `max_match_bytes` | integer `1..4096` | no | Secret-set holdback bound (Holdback Invariant); defaults 256. |
+| `prefilter` | list of strings | no | Injection/poisoning fast-path substrings; `[]` means always scan. |
+
+**Independent override (Normative).** Entries are grouped by `set`. A set with
+at least one bundle entry **replaces** that set's built-in default entirely;
+each set is independent, so supplying `injection` leaves `secret` and
+`poisoning` at their built-ins. Within a set, duplicate `name` fails
+`:invalid_pattern_set`. Consumers: the secret scanner uses the `secret` set;
+quarantine consumes the `injection` and `poisoning` sets, whose seven built-ins
+(above) are the defaults when a bundle supplies neither. A secret entry's scanner
+hit `category` is the set's own category (`:secret`) and is never entry-settable,
+so a bundle cannot mis-tag a secret pattern to dodge secret-only checks such as
+`sensitive_sink`. Resolution is pure and never creates atoms from bundle input.
+`SigilGuard.TrustBundle.pattern_sets/1` resolves a verified bundle's section;
+a legacy `patterns` entry without a `set` fails closed (`:invalid_pattern_set`),
+while the raw `SigilGuard.TrustBundle.patterns/1` accessor stays for the v2
+compatibility-adapter path.
+
 ## Streaming Property-Test Specification
 
 ### Holdback Invariant (Normative)

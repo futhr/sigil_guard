@@ -52,6 +52,35 @@ defmodule SigilGuard.TrustBundleTest do
       assert TrustBundle.identity_issuers(bundle) == []
     end
 
+    test "pattern_sets/1 resolves the verified patterns section into SP.04 sets" do
+      bundle = %TrustBundle{
+        document: %{
+          "patterns" => [
+            %{"set" => "injection", "name" => "inj", "regex" => "danger"}
+          ]
+        }
+      }
+
+      assert {:ok, sets} = TrustBundle.pattern_sets(bundle)
+      assert Enum.map(sets.injection, & &1.id) == ["inj"]
+      # secret and poisoning stay at their built-in defaults.
+      assert length(sets.secret) == 6
+      assert Enum.map(sets.poisoning, & &1.id) == [:tool_poisoning_directive]
+    end
+
+    test "pattern_sets/1 on an absent section yields all built-in defaults" do
+      assert {:ok, sets} = TrustBundle.pattern_sets(%TrustBundle{document: %{}})
+      built_in = SigilGuard.PatternSets.built_in()
+      assert Enum.map(sets.secret, & &1.name) == Enum.map(built_in.secret, & &1.name)
+      assert Enum.map(sets.injection, & &1.id) == Enum.map(built_in.injection, & &1.id)
+      assert Enum.map(sets.poisoning, & &1.id) == Enum.map(built_in.poisoning, & &1.id)
+    end
+
+    test "pattern_sets/1 fails closed on a legacy entry without a set" do
+      bundle = %TrustBundle{document: %{"patterns" => [%{"name" => "x", "regex" => "a"}]}}
+      assert TrustBundle.pattern_sets(bundle) == {:error, :invalid_pattern_set}
+    end
+
     test "load source constructors route decoded envelopes to verification" do
       envelope = %{"payload" => "encoded"}
 
