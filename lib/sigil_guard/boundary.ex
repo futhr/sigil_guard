@@ -43,6 +43,7 @@ defmodule SigilGuard.Boundary do
           phase: Lifecycle.phase() | nil,
           source: atom() | String.t() | nil,
           sink: atom() | String.t() | nil,
+          origin: atom() | String.t() | nil,
           source_sensitivity: source_sensitivity(),
           actor: map() | nil,
           tool: map() | nil,
@@ -63,6 +64,7 @@ defmodule SigilGuard.Boundary do
   defstruct phase: nil,
             source: nil,
             sink: nil,
+            origin: nil,
             source_sensitivity: :internal,
             actor: nil,
             tool: nil,
@@ -80,7 +82,7 @@ defmodule SigilGuard.Boundary do
             sandbox: nil
 
   @known_keys ~w(
-    phase source sink source_sensitivity actor tool resource action_digest
+    phase source sink origin source_sensitivity actor tool resource action_digest
     payload_digest context_digest policy_file_digest hits indicators
     hook_results repo_changes trust_level trust_zone sandbox
   )

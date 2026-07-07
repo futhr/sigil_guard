@@ -22,6 +22,8 @@ defmodule SigilGuard.BoundaryPolicy do
   """
 
   alias SigilGuard.Boundary
+  alias SigilGuard.BoundaryPolicy.File, as: PolicyFile
+  alias SigilGuard.BoundaryPolicy.Match
   alias SigilGuard.Decision
   alias SigilGuard.Telemetry
   alias SigilGuard.Verdict
@@ -60,7 +62,7 @@ defmodule SigilGuard.BoundaryPolicy do
         untrusted_tool_request(boundary),
         sensitive_sink(boundary, opts),
         quarantine_indicators(boundary),
-        policy_default(opts)
+        policy_contribution(boundary, opts)
       ]
       |> Enum.reject(&is_nil/1)
 
@@ -75,7 +77,7 @@ defmodule SigilGuard.BoundaryPolicy do
 
   defp untrusted_tool_request(%Boundary{phase: :tool_request, trust_zone: zone})
        when zone in [:untrusted, "untrusted"] do
-    {:block, rule("boundary.untrusted.tool_request", "untrusted zone may not request tools")}
+    {:block, [rule("boundary.untrusted.tool_request", "untrusted zone may not request tools")]}
   end
 
   defp untrusted_tool_request(_), do: nil
@@ -83,7 +85,7 @@ defmodule SigilGuard.BoundaryPolicy do
   defp sensitive_sink(%Boundary{sink: sink, hits: hits}, opts) when sink in @external_sinks do
     if Enum.any?(hits, &secret_hit?/1) do
       verdict = if Keyword.get(opts, :on_sensitive, :block) == :redact, do: :redact, else: :block
-      {verdict, rule("boundary.secret.external_sink", "secret headed to an external sink")}
+      {verdict, [rule("boundary.secret.external_sink", "secret headed to an external sink")]}
     end
   end
 
@@ -91,31 +93,54 @@ defmodule SigilGuard.BoundaryPolicy do
 
   defp quarantine_indicators(%Boundary{indicators: indicators}) do
     if Enum.any?(indicators, &quarantine_indicator?/1) do
-      {:quarantine, rule("boundary.quarantine.indicator", "quarantine indicator present")}
+      {:quarantine, [rule("boundary.quarantine.indicator", "quarantine indicator present")]}
     end
   end
 
-  defp policy_default(opts) do
+  defp policy_contribution(boundary, opts) do
     case Keyword.get(opts, :policy) do
       nil -> nil
-      policy -> policy_default_contribution(policy)
+      %PolicyFile{} = policy -> apply_policy_file(boundary, policy)
+      policy when is_map(policy) -> default_contribution(policy)
+      _ -> nil
     end
   end
 
-  defp policy_default_contribution(policy) when is_map(policy) do
+  defp apply_policy_file(boundary, policy) do
+    case Match.matching_rules(policy.rules, boundary) do
+      [] -> default_contribution(policy)
+      rules -> strongest_rule_contribution(rules)
+    end
+  end
+
+  defp strongest_rule_contribution(rules) do
+    verdict =
+      rules
+      |> Enum.map(& &1.decision)
+      |> Verdict.strongest()
+
+    matched =
+      rules
+      |> Enum.filter(&(&1.decision == verdict))
+      |> Enum.map(&rule(&1.id, "matched policy rule #{&1.id}"))
+
+    {verdict, matched}
+  end
+
+  defp default_contribution(policy) do
     case Map.get(policy, :default) do
-      nil -> {:confirm, rule("policy.default.absent", "policy file has no default line")}
-      verdict when is_atom(verdict) -> {verdict, rule("policy.default", "policy file default")}
-      _ -> {:confirm, rule("policy.default.absent", "policy file has no default line")}
+      verdict when verdict in [:allow, :redact, :confirm, :quarantine, :block] ->
+        {verdict, [rule("policy.default", "policy file default")]}
+
+      _ ->
+        {:confirm, [rule("policy.default.absent", "policy file has no default line")]}
     end
   end
-
-  defp policy_default_contribution(_), do: nil
 
   defp matched_rules(contributions, verdict) do
     contributions
     |> Enum.filter(fn {contribution_verdict, _} -> contribution_verdict == verdict end)
-    |> Enum.map(&elem(&1, 1))
+    |> Enum.flat_map(&elem(&1, 1))
   end
 
   # -- Predicates -------------------------------------------------------------

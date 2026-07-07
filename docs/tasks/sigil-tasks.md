@@ -70,12 +70,12 @@ trailers (rule 10); the maintainer pushes manually.
 | M1 - Core groundwork | 19 | 19 | 0 | 0 |
 | M2 - Embedded trust bundles | 16 | 16 | 0 | 0 |
 | M3 - Manifests, gateway, and agent trust | 22 | 22 | 0 | 0 |
-| M4 - Boundary scanner and policy kernel | 25 | 6 | 0 | 19 |
+| M4 - Boundary scanner and policy kernel | 25 | 7 | 0 | 18 |
 | M5 - Audit, telemetry, provenance, threat suite | 26 | 0 | 0 | 26 |
 | M6 - Legacy removal, dep cut, migration gate | 31 | 0 | 0 | 31 |
 | M7 - Integrations and adoption | 20 | 0 | 0 | 20 |
 | M8 - Release | 17 | 0 | 0 | 17 |
-| **Total** | **228** | **115** | **0** | **113** |
+| **Total** | **228** | **116** | **0** | **112** |
 
 The table counts every milestone task (F through M8) exactly once. The
 Mandatory Gates section is a recurring per-commit checklist and the
@@ -930,7 +930,7 @@ Deferred section is post-3.0.0 parking; neither is counted here.
   - AC: candidate paths keep the safe-relative-path rules resolved inside
     the repo root.
   - Tests: negative (each legacy name), malformed.
-- [ ] M4.07 Precedence and matched-rule explanations.
+- [x] M4.07 Precedence and matched-rule explanations.
   - Spec: `docs/specs/SP.04-boundary-scanner-and-policy-kernel.md` -
     Precedence.
   - AC: `block > quarantine > confirm > redact > allow` across matching
