@@ -172,5 +172,8 @@ jobs:
       - name: Generate docs
         run: mix docs
 
+      - name: Check migration guide
+        run: mix sigil.migration_gate
+
       - name: Check doc coverage
         run: mix doctor

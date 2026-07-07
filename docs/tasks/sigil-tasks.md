@@ -1989,7 +1989,7 @@ section is post-3.0.0 parking; neither is counted here.
     untouched. The section enumerates registry, envelope, metadata, profile,
     config, policy filename, Finch dependency, error atom, and version-pinning
     breaks with anchors into `MIGRATING-3.0.md`.
-- [ ] M6.24 Migration completeness-gate script.
+- [x] M6.24 Migration completeness-gate script.
   - Spec: `SP.12` - Acceptance Criteria.
   - AC: a repo script cross-references the M6 deletion diff (removed
     modules, functions, config keys, filenames) against `MIGRATING-3.0.md`
@@ -1997,6 +1997,11 @@ section is post-3.0.0 parking; neither is counted here.
     doc; wired into CI for the M6 branch onward.
   - Tests: fixture-driven script test (unmapped removal fails; mapped
     passes).
+  - Done: added `mix sigil.migration_gate`, which statically checks required
+    M6 removed modules, functions, config keys, and policy filenames against
+    `MIGRATING-3.0.md`, validates local migration-doc links and anchors, and is
+    wired into the CI docs job. Added focused tests for a clean guide, missing
+    mapping failure, broken-anchor failure, and rejected task arguments.
 - [ ] M6.25 Remove legacy `_sigil*` reading; strip rule reduces to the six
       SP.01 keys.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Implementation

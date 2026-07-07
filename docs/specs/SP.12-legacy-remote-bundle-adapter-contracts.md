@@ -239,7 +239,7 @@ go/no-go gate.
 
 ## Acceptance Criteria
 
-- [ ] Every removed public function and configuration key in the removal
+- [x] Every removed public function and configuration key in the removal
       map has a 1:1 row in `MIGRATING-3.0.md`, checked by the M6
       completeness script against the deletion diff.
 - [ ] Booting with any `registry_*` key or `scanner_patterns: :registry`
