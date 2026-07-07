@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 150 / 228 tasks done (66%).** Milestones: 6 complete, 1 partial,
-3 not started. **78 tasks left.** Current milestone: **M5** (16/26, 62%).
+**Overall: 151 / 228 tasks done (66%).** Milestones: 6 complete, 1 partial,
+3 not started. **77 tasks left.** Current milestone: **M5** (17/26, 65%).
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -74,17 +74,16 @@ trailers (rule 10); the maintainer pushes manually.
 | M2 | Embedded trust bundles | 16 | 16 | 100% | Complete |
 | M3 | Manifests, gateway, and agent trust | 22 | 22 | 100% | Complete |
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
-| M5 | Audit, telemetry, provenance, threat suite | 16 | 26 | 62% | In progress |
+| M5 | Audit, telemetry, provenance, threat suite | 17 | 26 | 65% | In progress |
 | M6 | Legacy removal, dep cut, migration gate | 0 | 31 | 0% | Not started |
 | M7 | Integrations and adoption | 0 | 20 | 0% | Not started |
 | M8 | Release | 0 | 17 | 0% | Not started |
-| — | **Total** | **150** | **228** | **66%** | 6 done / 1 partial / 3 to go |
+| — | **Total** | **151** | **228** | **66%** | 6 done / 1 partial / 3 to go |
 
-### What's left (78 tasks)
+### What's left (77 tasks)
 
-- **M5 - 10 left:** the threat-model test suite TM.03-TM.12
-  (move-don't-duplicate). (M5.01-M5.16 done, incl. TM.01 injection and TM.02
-  tool poisoning.)
+- **M5 - 9 left:** the threat-model test suite TM.04-TM.12
+  (move-don't-duplicate). (M5.01-M5.17 done, incl. TM.01-TM.03.)
 - **M6 - 31:** legacy registry removal, dependency cut, and the migration gate.
 - **M7 - 20:** host integrations and adoption surfaces.
 - **M8 - 17:** release engineering and publication.
@@ -1469,12 +1468,20 @@ section is post-3.0.0 parking; neither is counted here.
     `:manifest_digest_mismatch` and a poisoned input schema is rejected;
     tamper (text swapped under a pinned digest) and malformed/unknown manifests
     fail closed.
-- [ ] M5.17 TM.03 threat family - line jumping.
+- [x] M5.17 TM.03 threat family - line jumping.
   - Spec: `R.06` - Control Mapping row 3; `SP.03` (verify-before-list).
   - AC: `.../tm03_line_jumping_test.exs` proves `tools/list` content is
     verified before any definition reaches model context and before any
     invocation (mitigates).
   - Tests: negative, tamper.
+  - Done: added the TM.03 module (R.06 row 3, ASI01/ASI02, mitigates) citing
+    the line-jumping attack (instructions smuggled into a tool definition that
+    reach the model during `tools/list`, before any invocation) and referencing
+    the base tests by name. Drives `verify_manifest/2` and
+    `verify_list_changed/2`: a clean entry verifies, a poisoned line-jump
+    description is rejected with `:manifest_digest_mismatch` before exposure, a
+    tool absent from the pinned set fails `:unknown_manifest`, and a refreshed
+    list with a poisoned entry (and malformed input) fails closed.
 - [ ] M5.18 TM.04 threat family - schema injection.
   - Spec: `R.06` - Control Mapping row 4; `SP.03` (Suspicious Required
     Parameters).
