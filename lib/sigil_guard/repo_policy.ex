@@ -121,7 +121,8 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   def compile(raw) when is_map(raw) do
-    with {:ok, default} <- normalize_decision(field_or_default(raw, "default", @default_decision)),
+    with {:ok, default} <-
+           normalize_decision(field_or_default(raw, "default", @default_decision)),
          {:ok, rules} <- compile_rules(field_or_default(raw, "rules", [])) do
       {:ok, %__MODULE__{default: default, rules: rules}}
     end

@@ -115,22 +115,18 @@ defmodule SigilGuard.Patterns do
     }
   ]
 
-  @compiled_built_in_patterns Enum.map(@built_in_patterns, fn raw ->
-                                %{
-                                  name: raw.name,
-                                  category: raw.category,
-                                  severity: raw.severity,
-                                  regex: Regex.compile!(raw.pattern),
-                                  replacement_hint: raw.replacement_hint,
-                                  max_match_bytes: raw.max_match_bytes,
-                                  set: :secret
-                                }
-                              end)
-
   @doc "Return compiled built-in patterns."
   @spec built_in() :: [compiled_pattern()]
   def built_in do
-    @compiled_built_in_patterns
+    case :persistent_term.get({__MODULE__, :built_in_patterns}, :undefined) do
+      :undefined ->
+        patterns = compile_built_in_patterns()
+        :persistent_term.put({__MODULE__, :built_in_patterns}, patterns)
+        patterns
+
+      patterns ->
+        patterns
+    end
   end
 
   @doc "The default `max_match_bytes` used when a pattern does not declare one."
@@ -206,6 +202,20 @@ defmodule SigilGuard.Patterns do
   end
 
   defp compile_pattern(_), do: nil
+
+  defp compile_built_in_patterns do
+    Enum.map(@built_in_patterns, fn raw ->
+      %{
+        name: raw.name,
+        category: raw.category,
+        severity: raw.severity,
+        regex: Regex.compile!(raw.pattern),
+        replacement_hint: raw.replacement_hint,
+        max_match_bytes: raw.max_match_bytes,
+        set: :secret
+      }
+    end)
+  end
 
   defp valid_raw_pattern?(raw) when is_map(raw) do
     is_binary(extract_regex_source(raw)) and validate_pattern_metadata(raw) == :ok
