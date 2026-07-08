@@ -47,8 +47,15 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Compile dependencies
+        run: |
+          mix deps.compile > /tmp/sigil_guard_deps_compile.log 2>&1 || {
+            cat /tmp/sigil_guard_deps_compile.log
+            exit 1
+          }
+
       - name: Compile
-        run: mix compile --warnings-as-errors
+        run: mix compile --no-deps-check --warnings-as-errors
 
       - name: Run tests
         run: mix test
@@ -91,13 +98,29 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Compile dependencies
+        run: |
+          mix deps.compile > /tmp/sigil_guard_deps_compile.log 2>&1 || {
+            cat /tmp/sigil_guard_deps_compile.log
+            exit 1
+          }
+
       - name: Install benchmark dependencies
         env:
           MIX_ENV: dev
         run: mix deps.get
 
+      - name: Compile benchmark dependencies
+        env:
+          MIX_ENV: dev
+        run: |
+          mix deps.compile > /tmp/sigil_guard_bench_deps_compile.log 2>&1 || {
+            cat /tmp/sigil_guard_bench_deps_compile.log
+            exit 1
+          }
+
       - name: Check formatting
-        run: mix format --check-formatted
+        run: mix format --no-compile --check-formatted
 
       - name: Run Credo
         run: mix credo --strict
@@ -153,8 +176,15 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      - name: Compile dependencies
+        run: |
+          mix deps.compile > /tmp/sigil_guard_deps_compile.log 2>&1 || {
+            cat /tmp/sigil_guard_deps_compile.log
+            exit 1
+          }
+
       - name: Compile
-        run: mix compile
+        run: mix compile --no-deps-check
 
       - name: Run Dialyzer
         run: mix dialyzer
@@ -182,6 +212,13 @@ jobs:
 
       - name: Install dependencies
         run: mix deps.get
+
+      - name: Compile dependencies
+        run: |
+          mix deps.compile > /tmp/sigil_guard_deps_compile.log 2>&1 || {
+            cat /tmp/sigil_guard_deps_compile.log
+            exit 1
+          }
 
       - name: Generate docs
         run: mix docs
