@@ -120,7 +120,7 @@ jobs:
           }
 
       - name: Check formatting
-        run: mix format --no-compile --check-formatted
+        run: mix format --check-formatted
 
       - name: Run Credo
         run: mix credo --strict

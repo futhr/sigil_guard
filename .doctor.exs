@@ -1,5 +1,5 @@
 %{
-  ignore_paths: [],
+  ignore_paths: [~r(^test/support/)],
   ignore_for_refs: [],
   exception_moduledoc: true,
   failed: true,
