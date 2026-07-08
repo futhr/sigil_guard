@@ -1,6 +1,6 @@
 [
-  parallel: true,
-  skipped: true,
+  parallel: false,
+  skipped: false,
   tools: [
     # Dependencies
     {:deps_get, command: "mix deps.get"},
