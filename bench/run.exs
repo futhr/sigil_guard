@@ -51,11 +51,12 @@ defmodule SigilGuard.Bench do
       scenarios,
       Keyword.merge(bench_config(smoke?),
         percentiles: [99],
+        print: [fast_warning: false],
         formatters: [
           Benchee.Formatters.Console,
           {Benchee.Formatters.Markdown,
            file: @markdown_file, description: markdown_description(smoke?)},
-          &write_machine_output/1
+          fn suite -> write_machine_output(suite, smoke?) end
         ]
       )
     ])
@@ -284,16 +285,17 @@ defmodule SigilGuard.Bench do
 
   defp expected_hits(size), do: div(size, 4096)
 
-  defp write_machine_output(suite) do
+  defp write_machine_output(suite, smoke?) do
     data = %{
       "schema" => @schema,
-      "environment" => environment(),
+      "mode" => mode(smoke?),
+      "environment" => environment(smoke?),
       "recorded_at" => Date.utc_today() |> Date.to_iso8601(),
       "scenarios" => scenario_stats(suite)
     }
 
     File.write!(@json_file, Jason.encode!(data, pretty: true))
-    prepend_environment_block!()
+    prepend_environment_block!(smoke?)
   end
 
   defp scenario_stats(%{scenarios: scenarios}) do
@@ -315,7 +317,7 @@ defmodule SigilGuard.Bench do
     "BM." <> number
   end
 
-  defp environment do
+  defp environment(smoke?) do
     %{
       "hardware" => cpu_info(),
       "cores" => System.schedulers_online(),
@@ -323,10 +325,27 @@ defmodule SigilGuard.Bench do
       "elixir" => System.version(),
       "otp" => System.otp_release(),
       "sigil_guard" => "#{Application.spec(:sigil_guard, :vsn)} (#{git_commit()})",
-      "benchee" => "warmup 2 s, time 5 s, memory_time 2 s",
+      "benchee" => benchee_label(smoke?),
       "date" => Date.utc_today() |> Date.to_iso8601()
     }
   end
+
+  defp mode(true), do: "smoke"
+  defp mode(false), do: "measured"
+
+  defp benchee_label(smoke?) do
+    config = bench_config(smoke?)
+
+    "warmup #{format_duration(config[:warmup])}, time #{format_duration(config[:time])}, " <>
+      "memory_time #{format_duration(config[:memory_time])}"
+  end
+
+  defp format_duration(0), do: "0 ns"
+
+  defp format_duration(seconds) when is_float(seconds) and seconds < 1,
+    do: "#{round(seconds * 1000)} ms"
+
+  defp format_duration(seconds), do: "#{seconds} s"
 
   defp markdown_description(smoke?) do
     mode = if smoke?, do: "smoke", else: "measured"
@@ -338,13 +357,13 @@ defmodule SigilGuard.Bench do
     """
   end
 
-  defp prepend_environment_block! do
+  defp prepend_environment_block!(smoke?) do
     body = File.read!(@markdown_file)
-    File.write!(@markdown_file, environment_markdown() <> "\n\n" <> body)
+    File.write!(@markdown_file, environment_markdown(smoke?) <> "\n\n" <> body)
   end
 
-  defp environment_markdown do
-    env = environment()
+  defp environment_markdown(smoke?) do
+    env = environment(smoke?)
 
     """
     ## Environment

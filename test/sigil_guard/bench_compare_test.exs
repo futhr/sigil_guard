@@ -50,6 +50,33 @@ defmodule SigilGuard.BenchCompareTest do
     assert message =~ "runner class differs"
   end
 
+  test "smoke run validates the benchmark matrix without median regression checks" do
+    baseline = document(median_ns: 100)
+    run = document(mode: "smoke", median_ns: 10_000)
+
+    assert {:ok, [{:pass, "smoke benchmark matrix matches baseline"}]} =
+             SigilGuard.BenchCompare.compare(baseline, run)
+  end
+
+  test "smoke run still fails when a baseline scenario is missing" do
+    baseline = document()
+
+    run =
+      document(mode: "smoke")
+      |> put_in(["scenarios"], %{"BM.99 new scenario" => stats(median_ns: 1)})
+
+    assert {:error, findings} = SigilGuard.BenchCompare.compare(baseline, run)
+    assert {:fail, "missing run scenario: " <> @scenario} in findings
+  end
+
+  test "invalid benchmark mode fails validation" do
+    assert {:error, message} =
+             document(mode: "partial")
+             |> SigilGuard.BenchCompare.validate_document("run")
+
+    assert message == "run mode must be measured or smoke"
+  end
+
   test "committed baseline and latest output satisfy the data model" do
     for path <- ["bench/baseline.json", "bench/output/benchmarks.json"] do
       document =
@@ -84,7 +111,10 @@ defmodule SigilGuard.BenchCompareTest do
   end
 
   defp document(overrides \\ []) do
-    %{
+    mode = Keyword.get(overrides, :mode)
+    stats_overrides = Keyword.drop(overrides, [:mode])
+
+    document = %{
       "schema" => "sigil_guard_bench_baseline/v1",
       "environment" => %{
         "hardware" => "runner",
@@ -97,8 +127,10 @@ defmodule SigilGuard.BenchCompareTest do
         "sigil_guard" => "1.0.0 (abc123)"
       },
       "recorded_at" => "2026-07-07",
-      "scenarios" => %{@scenario => stats(overrides)}
+      "scenarios" => %{@scenario => stats(stats_overrides)}
     }
+
+    if mode, do: Map.put(document, "mode", mode), else: document
   end
 
   defp stats(overrides) do

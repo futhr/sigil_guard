@@ -50,30 +50,30 @@ defmodule SigilGuard.BenchCompare do
          :ok <- require_schema(document, label),
          :ok <- require_environment(document["environment"], label),
          :ok <- require_recorded_at(document["recorded_at"], label),
+         :ok <- require_mode(document, label),
          :ok <- require_scenarios(document["scenarios"], label) do
       :ok
     end
   end
 
   defp compare_valid(baseline, run) do
-    if runner_class(baseline) == runner_class(run) do
-      binding_compare(baseline["scenarios"], run["scenarios"])
-    else
-      {:ok,
-       [
-         {:warn,
-          "runner class differs from baseline; comparison is informational and does not fail"}
-       ]}
+    cond do
+      smoke_run?(run) ->
+        smoke_compare(baseline["scenarios"], run["scenarios"])
+
+      runner_class(baseline) == runner_class(run) ->
+        binding_compare(baseline["scenarios"], run["scenarios"])
+
+      true ->
+        {:ok,
+         [
+           {:warn,
+            "runner class differs from baseline; comparison is informational and does not fail"}
+         ]}
     end
   end
 
   defp binding_compare(baseline_scenarios, run_scenarios) do
-    missing =
-      baseline_scenarios
-      |> Map.keys()
-      |> Enum.reject(&Map.has_key?(run_scenarios, &1))
-      |> Enum.map(&{:fail, "missing run scenario: #{&1}"})
-
     regressions =
       baseline_scenarios
       |> Enum.flat_map(fn {name, baseline_stats} ->
@@ -83,19 +83,39 @@ defmodule SigilGuard.BenchCompare do
         end
       end)
 
-    new_scenarios =
-      run_scenarios
-      |> Map.keys()
-      |> Enum.reject(&Map.has_key?(baseline_scenarios, &1))
-      |> Enum.map(&{:warn, "new scenario without baseline: #{&1}"})
-
-    findings = missing ++ regressions ++ new_scenarios
+    findings = scenario_presence_findings(baseline_scenarios, run_scenarios) ++ regressions
 
     if Enum.any?(findings, &match?({:fail, _}, &1)) do
       {:error, findings}
     else
       {:ok, pass_if_empty(findings)}
     end
+  end
+
+  defp smoke_compare(baseline_scenarios, run_scenarios) do
+    findings = scenario_presence_findings(baseline_scenarios, run_scenarios)
+
+    if Enum.any?(findings, &match?({:fail, _}, &1)) do
+      {:error, findings}
+    else
+      {:ok, pass_if_empty(findings, "smoke benchmark matrix matches baseline")}
+    end
+  end
+
+  defp scenario_presence_findings(baseline_scenarios, run_scenarios) do
+    missing =
+      baseline_scenarios
+      |> Map.keys()
+      |> Enum.reject(&Map.has_key?(run_scenarios, &1))
+      |> Enum.map(&{:fail, "missing run scenario: #{&1}"})
+
+    new_scenarios =
+      run_scenarios
+      |> Map.keys()
+      |> Enum.reject(&Map.has_key?(baseline_scenarios, &1))
+      |> Enum.map(&{:warn, "new scenario without baseline: #{&1}"})
+
+    missing ++ new_scenarios
   end
 
   defp regression_findings(name, baseline_stats, run_stats) do
@@ -113,8 +133,9 @@ defmodule SigilGuard.BenchCompare do
     end
   end
 
-  defp pass_if_empty([]), do: [{:pass, "no binding benchmark regressions"}]
-  defp pass_if_empty(findings), do: findings
+  defp pass_if_empty(findings, message \\ "no binding benchmark regressions")
+  defp pass_if_empty([], message), do: [{:pass, message}]
+  defp pass_if_empty(findings, _message), do: findings
 
   defp percent(run, baseline) when baseline > 0 do
     ((run - baseline) / baseline * 100)
@@ -152,6 +173,15 @@ defmodule SigilGuard.BenchCompare do
   end
 
   defp require_recorded_at(_, _label), do: {:error, "recorded_at must be a string"}
+
+  defp require_mode(%{"mode" => mode}, label) when mode not in ["measured", "smoke"] do
+    {:error, "#{label} mode must be measured or smoke"}
+  end
+
+  defp require_mode(_, _label), do: :ok
+
+  defp smoke_run?(%{"mode" => "smoke"}), do: true
+  defp smoke_run?(_), do: false
 
   defp require_scenarios(scenarios, label) when is_map(scenarios) and map_size(scenarios) > 0 do
     scenarios
