@@ -80,8 +80,10 @@ defmodule SigilGuard.AgentCard do
     version
   )
   @optional_fields ~w(description scopes)
-  @allowed_fields MapSet.new(@required_fields ++ @optional_fields)
-  @capability_keys MapSet.new(~w(description name))
+  # Plain lists, not MapSets: injecting a MapSet from a module attribute
+  # exposes its opaque internals to dialyzer on Elixir 1.18.
+  @allowed_fields @required_fields ++ @optional_fields
+  @capability_keys ~w(description name)
   @public_key_keys ~w(algorithm keyid public_key)
 
   @typedoc "A validated, normalized agent card as a string-keyed map."
@@ -328,7 +330,7 @@ defmodule SigilGuard.AgentCard do
   end
 
   defp closed_fields(card) do
-    if Enum.all?(Map.keys(card), &MapSet.member?(@allowed_fields, &1)) do
+    if Enum.all?(Map.keys(card), &(&1 in @allowed_fields)) do
       :ok
     else
       {:error, :invalid_agent_card}
@@ -386,9 +388,7 @@ defmodule SigilGuard.AgentCard do
   end
 
   defp valid_capability?(entry) when is_map(entry) do
-    keys = MapSet.new(Map.keys(entry))
-
-    MapSet.subset?(keys, @capability_keys) and
+    Enum.all?(Map.keys(entry), &(&1 in @capability_keys)) and
       non_empty_string?(Map.get(entry, "name")) and
       optional_non_empty_string?(entry, "description")
   end

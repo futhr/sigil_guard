@@ -45,15 +45,15 @@ defmodule SigilGuard.CapabilityManifest do
   )
   @schema_fields ~w(annotations input_schema output_schema)
   @preimage_string_fields @string_fields -- ["description"]
-  @allowed_fields MapSet.new(
-                    List.flatten([
-                      @string_fields,
-                      @digest_fields,
-                      @list_fields,
-                      @schema_fields,
-                      ["sandbox"]
-                    ])
-                  )
+  # A plain list, not a MapSet: injecting a MapSet from a module attribute
+  # exposes its opaque internals to dialyzer on Elixir 1.18.
+  @allowed_fields List.flatten([
+                    @string_fields,
+                    @digest_fields,
+                    @list_fields,
+                    @schema_fields,
+                    ["sandbox"]
+                  ])
   @preimage_fields List.flatten([["sandbox"], @preimage_string_fields, @list_fields])
   @required_fields ~w(
     description
@@ -241,7 +241,7 @@ defmodule SigilGuard.CapabilityManifest do
     valid? =
       manifest
       |> Map.keys()
-      |> Enum.all?(&MapSet.member?(@allowed_fields, &1))
+      |> Enum.all?(&(&1 in @allowed_fields))
 
     if valid? do
       :ok
