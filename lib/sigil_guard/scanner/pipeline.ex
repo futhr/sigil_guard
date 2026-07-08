@@ -341,8 +341,8 @@ defmodule SigilGuard.Scanner.Pipeline do
   defp secret_like?(value, min_length, min_entropy) do
     value = String.trim(value)
 
-    byte_size(value) >= min_length and character_diversity(value) >= 4 and
-      shannon_entropy(value) >= min_entropy and not weak_secret_value?(value)
+    byte_size(value) >= min_length and not weak_secret_value?(value) and
+      sufficient_entropy?(value, min_entropy)
   end
 
   defp weak_secret_value?(value) do
@@ -365,27 +365,32 @@ defmodule SigilGuard.Scanner.Pipeline do
     Regex.match?(~r/\A(.{1,4})\1{2,}\z/s, value)
   end
 
-  defp character_diversity(""), do: 0
+  defp sufficient_entropy?(value, min_entropy) do
+    {length, frequencies} = byte_frequencies(value)
 
-  defp character_diversity(value) do
-    value
-    |> :binary.bin_to_list()
-    |> MapSet.new()
-    |> MapSet.size()
+    map_size(frequencies) >= 4 and shannon_entropy(frequencies, length) >= min_entropy
   end
 
-  defp shannon_entropy(""), do: 0.0
+  defp shannon_entropy(value) when is_binary(value) do
+    {length, frequencies} = byte_frequencies(value)
 
-  defp shannon_entropy(value) do
-    bytes = :binary.bin_to_list(value)
-    length = length(bytes)
+    shannon_entropy(frequencies, length)
+  end
 
-    bytes
-    |> Enum.frequencies()
-    |> Enum.reduce(0.0, fn {_, count}, acc ->
+  defp shannon_entropy(_, 0), do: 0.0
+
+  defp shannon_entropy(frequencies, length) do
+    Enum.reduce(frequencies, 0.0, fn {_, count}, acc ->
       probability = count / length
       acc - probability * :math.log2(probability)
     end)
+  end
+
+  defp byte_frequencies(value) do
+    for <<byte <- value>>, reduce: {0, %{}} do
+      {length, frequencies} ->
+        {length + 1, Map.update(frequencies, byte, 1, &(&1 + 1))}
+    end
   end
 
   defp validation_enabled?(opts), do: Keyword.get(opts, :validate, true) != false
