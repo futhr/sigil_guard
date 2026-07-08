@@ -39,7 +39,7 @@ defmodule SigilGuard.AuditProofFixture do
   end
 
   @doc false
-  @spec signer() :: module()
+  @spec signer() :: SeedSigner
   def signer, do: SeedSigner
 
   @doc false
@@ -69,9 +69,10 @@ defmodule SigilGuard.AuditProofFixture do
   end
 
   @doc false
-  @spec consistency_proof(pos_integer()) :: map()
+  @spec consistency_proof(pos_integer()) :: Proof.consistency_proof()
   def consistency_proof(first_size) do
-    elem(Proof.consistency(signed_events(), first_size), 1)
+    {:ok, proof} = Proof.consistency(signed_events(), first_size)
+    proof
   end
 
   @doc false
@@ -82,14 +83,14 @@ defmodule SigilGuard.AuditProofFixture do
   end
 
   @doc false
-  @spec statement() :: map()
+  @spec statement() :: %{String.t() => term()}
   def statement do
     {:ok, statement} = Checkpoint.to_statement(checkpoint())
     statement
   end
 
   @doc false
-  @spec export() :: map()
+  @spec export() :: Export.t()
   def export do
     {:ok, export} =
       Export.create(signed_events(),

@@ -104,7 +104,11 @@ defmodule SigilGuard.AgentCardFixtureGenerator do
   @spec agent_public_key() :: binary()
   def agent_public_key, do: public_key(@agent_seed)
 
-  defp public_key(seed), do: elem(:crypto.generate_key(:eddsa, :ed25519, seed), 0)
+  defp public_key(seed) do
+    case :crypto.generate_key(:eddsa, :ed25519, seed) do
+      {public_key, _} when is_binary(public_key) -> public_key
+    end
+  end
 
   defp sha256_hex(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
 
