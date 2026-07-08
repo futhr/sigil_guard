@@ -149,10 +149,10 @@ defmodule SigilGuard.Bench do
             stream_window_bytes: 512
           )
 
-        {stream, _decision, _emitted} =
-          Enum.reduce(chunks, {stream, nil, ""}, fn chunk, {stream, _decision, acc} ->
-            {stream, decision, emitted} = SigilGuard.Runtime.Stream.push(stream, chunk)
-            {stream, decision, acc <> emitted}
+        {stream, _decision} =
+          Enum.reduce(chunks, {stream, nil}, fn chunk, {stream, _decision} ->
+            {stream, decision, _emitted} = SigilGuard.Runtime.Stream.push(stream, chunk)
+            {stream, decision}
           end)
 
         SigilGuard.Runtime.Stream.finish(stream)
