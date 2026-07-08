@@ -1523,6 +1523,27 @@ defmodule SigilGuard.ToolGatewayTest do
                ToolGateway.finish_guarded_result_stream(stream)
     end
 
+    test "shapes allowed guarded results without re-running the runtime gate" do
+      tool = "single_pass_guarded_result"
+      telemetry = attach_runtime_gate_telemetry(tool)
+
+      assert {:ok, response, %Decision{action: :allow}} =
+               ToolGateway.guarded_result(
+                 result(),
+                 [trust_level: :high, tool: tool],
+                 request_action_digest: @request_action_digest
+               )
+
+      assert response == %{
+               "jsonrpc" => "2.0",
+               "id" => 1,
+               "result" => result()["result"]
+             }
+
+      assert_receive {^telemetry, [:sigil_guard, :runtime, :gate], _, %{tool: ^tool}}
+      refute_receive {^telemetry, [:sigil_guard, :runtime, :gate], _, %{tool: ^tool}}, 100
+    end
+
     test "delegates decision responses with v2 JSON-RPC shape" do
       decision =
         ToolGateway.guard_request(request(), sandbox_context(),
@@ -1673,6 +1694,26 @@ defmodule SigilGuard.ToolGatewayTest do
     |> Path.join(@manifest_fixture)
     |> File.read!()
     |> Jason.decode!()
+  end
+
+  defp attach_runtime_gate_telemetry(tool) do
+    parent = self()
+    ref = make_ref()
+    handler = "tool-gateway-runtime-#{System.unique_integer()}"
+
+    :telemetry.attach(
+      handler,
+      [:sigil_guard, :runtime, :gate],
+      fn event, measurements, metadata, _ ->
+        if metadata.tool == tool do
+          send(parent, {ref, event, measurements, metadata})
+        end
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+    ref
   end
 
   defmodule TrustedSigner do

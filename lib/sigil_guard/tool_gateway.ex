@@ -280,7 +280,7 @@ defmodule SigilGuard.ToolGateway do
 
     case decision.action do
       :allow ->
-        {:ok, GatewayBase.guarded_result(result, context, opts) |> elem(1), decision}
+        {:ok, jsonrpc_result(result, request_id(result)), decision}
 
       :redact ->
         {:ok, GatewayBase.response_for_decision(decision, request_id(result), opts), decision}
@@ -526,16 +526,17 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp normalize_observed_carried_manifest(observed) do
-    observed
-    |> Map.new(fn
-      {:inputSchema, value} -> {"input_schema", value}
-      {"inputSchema", value} -> {"input_schema", value}
-      {:outputSchema, value} -> {"output_schema", value}
-      {"outputSchema", value} -> {"output_schema", value}
-      {key, value} when is_atom(key) -> {Atom.to_string(key), value}
-      pair -> pair
-    end)
-    |> then(&{:ok, &1})
+    normalized =
+      Map.new(observed, fn
+        {:inputSchema, value} -> {"input_schema", value}
+        {"inputSchema", value} -> {"input_schema", value}
+        {:outputSchema, value} -> {"output_schema", value}
+        {"outputSchema", value} -> {"output_schema", value}
+        {key, value} when is_atom(key) -> {Atom.to_string(key), value}
+        pair -> pair
+      end)
+
+    {:ok, normalized}
   end
 
   defp observed_list_manifest(observed, %CapabilityManifest{} = pinned) do
@@ -1300,6 +1301,18 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp request_id(_), do: nil
+
+  defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result}, _) do
+    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  end
+
+  defp jsonrpc_result(%{jsonrpc: _, id: id, result: result}, _) do
+    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  end
+
+  defp jsonrpc_result(result, id) do
+    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  end
 
   defp confirmation_token_paths do
     [
