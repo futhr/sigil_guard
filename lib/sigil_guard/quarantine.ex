@@ -19,54 +19,6 @@ defmodule SigilGuard.Quarantine do
           sanitized_text: String.t() | nil
         }
 
-  @indicators [
-    %{
-      id: :ignore_instructions,
-      severity: :high,
-      prefilter: ["instruction"],
-      pattern: ~r/ignore\s+(all\s+)?(previous|prior|above)\s+instructions?/i
-    },
-    %{
-      id: :exfiltration_request,
-      severity: :high,
-      prefilter: ["exfiltrate", "send", "upload", "post"],
-      pattern: ~r/(exfiltrate|send|upload|post).{0,40}(secret|token|key|credential|password)/i
-    },
-    %{
-      id: :system_prompt_probe,
-      severity: :medium,
-      prefilter: ["system", "developer"],
-      pattern: ~r/(system|developer)\s+(prompt|message|instructions?)/i
-    },
-    %{
-      id: :model_extraction_request,
-      severity: :high,
-      prefilter: ["reveal", "dump", "print", "repeat", "extract", "send"],
-      pattern:
-        ~r/(reveal|dump|print|repeat|extract|send).{0,60}(system prompt|developer message|hidden instructions?|training data|memorized data)/i
-    },
-    %{
-      id: :credential_harvest_instruction,
-      severity: :high,
-      prefilter: ["ask", "prompt", "request", "collect"],
-      pattern:
-        ~r/(ask|prompt|request|collect).{0,50}(password|api[_\s-]?key|token|credential|secret)/i
-    },
-    %{
-      id: :tool_poisoning_directive,
-      severity: :medium,
-      prefilter: ["when", "before", "after"],
-      pattern:
-        ~r/(when|before|after)\s+(using|calling|invoking).{0,50}(this\s+)?(tool|function|connector).{0,80}(ignore|override|prefer|follow|use)/i
-    },
-    %{
-      id: :hidden_html_instruction,
-      severity: :medium,
-      prefilter: ["<!--", "display", "visibility", "<script"],
-      pattern: ~r/(<!--|display\s*:\s*none|visibility\s*:\s*hidden|<script\b)/i
-    }
-  ]
-
   @prefilter_pattern ~r/(instruction|exfiltrate|send|upload|post|system|developer|reveal|dump|print|repeat|extract|ask|prompt|request|collect|when|before|after|<!--|display|visibility|<script)/i
 
   # The built-in `poisoning` set (SP.04); everything else is the `injection` set.
@@ -80,10 +32,10 @@ defmodule SigilGuard.Quarantine do
   """
   @spec built_in_indicators(:injection | :poisoning) :: [map()]
   def built_in_indicators(:poisoning),
-    do: Enum.filter(@indicators, &(&1.id in @poisoning_indicator_ids))
+    do: Enum.filter(indicators(), &(&1.id in @poisoning_indicator_ids))
 
   def built_in_indicators(:injection),
-    do: Enum.reject(@indicators, &(&1.id in @poisoning_indicator_ids))
+    do: Enum.reject(indicators(), &(&1.id in @poisoning_indicator_ids))
 
   @doc """
   Inspect text for deterministic quarantine indicators.
@@ -172,8 +124,74 @@ defmodule SigilGuard.Quarantine do
         {active, true}
 
       _ ->
-        {@indicators, false}
+        {indicators(), false}
     end
+  end
+
+  # Regexes nested inside collections cannot be injected from module
+  # attributes on Elixir 1.18 with OTP 28, so the indicator list is built at
+  # runtime and cached in `:persistent_term` (same approach as
+  # `SigilGuard.Patterns.built_in/0`).
+  defp indicators do
+    case :persistent_term.get({__MODULE__, :indicators}, :undefined) do
+      :undefined ->
+        indicators = built_in_indicator_list()
+        :persistent_term.put({__MODULE__, :indicators}, indicators)
+        indicators
+
+      indicators ->
+        indicators
+    end
+  end
+
+  defp built_in_indicator_list do
+    [
+      %{
+        id: :ignore_instructions,
+        severity: :high,
+        prefilter: ["instruction"],
+        pattern: ~r/ignore\s+(all\s+)?(previous|prior|above)\s+instructions?/i
+      },
+      %{
+        id: :exfiltration_request,
+        severity: :high,
+        prefilter: ["exfiltrate", "send", "upload", "post"],
+        pattern: ~r/(exfiltrate|send|upload|post).{0,40}(secret|token|key|credential|password)/i
+      },
+      %{
+        id: :system_prompt_probe,
+        severity: :medium,
+        prefilter: ["system", "developer"],
+        pattern: ~r/(system|developer)\s+(prompt|message|instructions?)/i
+      },
+      %{
+        id: :model_extraction_request,
+        severity: :high,
+        prefilter: ["reveal", "dump", "print", "repeat", "extract", "send"],
+        pattern:
+          ~r/(reveal|dump|print|repeat|extract|send).{0,60}(system prompt|developer message|hidden instructions?|training data|memorized data)/i
+      },
+      %{
+        id: :credential_harvest_instruction,
+        severity: :high,
+        prefilter: ["ask", "prompt", "request", "collect"],
+        pattern:
+          ~r/(ask|prompt|request|collect).{0,50}(password|api[_\s-]?key|token|credential|secret)/i
+      },
+      %{
+        id: :tool_poisoning_directive,
+        severity: :medium,
+        prefilter: ["when", "before", "after"],
+        pattern:
+          ~r/(when|before|after)\s+(using|calling|invoking).{0,50}(this\s+)?(tool|function|connector).{0,80}(ignore|override|prefer|follow|use)/i
+      },
+      %{
+        id: :hidden_html_instruction,
+        severity: :medium,
+        prefilter: ["<!--", "display", "visibility", "<script"],
+        pattern: ~r/(<!--|display\s*:\s*none|visibility\s*:\s*hidden|<script\b)/i
+      }
+    ]
   end
 
   # A `[]` prefilter means "always scan" (SP.04); otherwise gate on the tokens.
