@@ -153,7 +153,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
     Enum.reduce_while(legacy, :ok, fn {found_name, use_name}, :ok ->
       path = Path.expand(found_name, root)
 
-      if inside_root?(root, path) and File.regular?(path) do
+      if inside_root?(root, path) and safe_regular_candidate?(root, path) do
         {:halt, {:error, {:legacy_policy_filename, path, use_name}}}
       else
         {:cont, :ok}
@@ -164,7 +164,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
   defp first_existing(root, candidates) do
     Enum.find_value(candidates, fn relative ->
       path = Path.expand(relative, root)
-      if inside_root?(root, path) and File.regular?(path), do: path
+      if inside_root?(root, path) and safe_regular_candidate?(root, path), do: path
     end)
   end
 
@@ -187,6 +187,22 @@ defmodule SigilGuard.BoundaryPolicy.File do
 
   defp inside_root?(root, path) do
     path == root or String.starts_with?(path, root <> "/")
+  end
+
+  defp safe_regular_candidate?(root, path) do
+    path
+    |> Path.relative_to(root)
+    |> Path.split()
+    |> Enum.reduce_while(root, fn segment, current ->
+      candidate = Path.join(current, segment)
+
+      case File.lstat(candidate) do
+        {:ok, %{type: :symlink}} -> {:halt, false}
+        {:ok, _} -> {:cont, candidate}
+        {:error, _} -> {:halt, false}
+      end
+    end)
+    |> then(&(&1 == path and File.regular?(path)))
   end
 
   # -- Top-level line walk ----------------------------------------------------

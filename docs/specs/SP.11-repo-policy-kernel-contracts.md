@@ -117,6 +117,9 @@ Legacy filename handling is fail-closed:
 - The legacy check applies before an explicit `:candidates` override as well.
   Explicit candidates may add non-default v3 paths, but they do not authorize
   old `SIGIL` filenames as fallbacks.
+- Candidate files and their parent components MUST NOT be symbolic links.
+  Symlinked candidates are treated as absent so lexical root containment cannot
+  be bypassed by filesystem indirection.
 
 Migration table (reproduced 1:1 in `MIGRATING-1.0.md`):
 

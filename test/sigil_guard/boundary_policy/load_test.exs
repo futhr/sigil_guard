@@ -83,6 +83,25 @@ defmodule SigilGuard.BoundaryPolicy.LoadTest do
                {:error, :not_found}
     end
 
+    test "symlinked candidates and parent directories are ignored", %{root: root} do
+      outside =
+        Path.join(System.tmp_dir!(), "outside-policy-#{System.unique_integer([:positive])}")
+
+      File.write!(outside, @policy)
+      on_exit(fn -> File.rm(outside) end)
+
+      File.ln_s!(outside, Path.join(root, "SIGILGUARD_POLICY"))
+      assert PolicyFile.load(root) == {:error, :not_found}
+
+      File.rm!(Path.join(root, "SIGILGUARD_POLICY"))
+      outside_dir = Path.dirname(outside)
+      File.ln_s!(outside_dir, Path.join(root, ".sigilguard"))
+      relative = Path.relative_to(outside, outside_dir)
+
+      assert PolicyFile.load(root, candidates: [Path.join(".sigilguard", relative)]) ==
+               {:error, :not_found}
+    end
+
     test "oversized files fail :policy_too_large", %{root: root} do
       write(root, "SIGILGUARD_POLICY", "version 3\n" <> String.duplicate("x", 256 * 1024))
       assert PolicyFile.load(root) == {:error, :policy_too_large}

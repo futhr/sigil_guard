@@ -247,6 +247,24 @@ defmodule SigilGuard.RepoPolicyTest do
                RepoPolicy.find_file(dir, candidates: [Path.join(dir, ".sigilguard-policy")])
     end
 
+    test "ignores symlinked candidates and symlinked parent directories", %{dir: dir} do
+      outside = dir <> "-outside"
+      File.write!(outside, "default allow\n")
+      on_exit(fn -> File.rm(outside) end)
+
+      File.ln_s!(outside, Path.join(dir, "SIGILGUARD_POLICY"))
+      assert {:error, :not_found} = RepoPolicy.find_file(dir)
+
+      File.rm!(Path.join(dir, "SIGILGUARD_POLICY"))
+      outside_dir = dir <> "-outside-dir"
+      File.mkdir_p!(outside_dir)
+      File.write!(Path.join(outside_dir, "policy"), "default allow\n")
+      on_exit(fn -> File.rm_rf!(outside_dir) end)
+      File.ln_s!(outside_dir, Path.join(dir, ".sigilguard"))
+
+      assert {:error, :not_found} = RepoPolicy.find_file(dir)
+    end
+
     test "accepts a single candidate path and rejects invalid candidate sets", %{dir: dir} do
       File.write!(Path.join(dir, ".custom-policy"), "default allow\n")
 
