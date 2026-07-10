@@ -30,8 +30,10 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   raw anchor record or `%{"record" => record}` / `%{"anchor" => record}`.
   Fetched records are rejected when their canonical digest does not match the
   requested digest. When no explicit fetch URL is configured and the adapter
-  falls back to a receipt URI, private, loopback, link-local, and localhost
-  targets are rejected unless `allow_private_receipt_url: true` is passed.
+  falls back to a receipt URI, hostname targets require an exact
+  `:receipt_url_hosts` allowlist entry. Literal public IP addresses are accepted;
+  private, loopback, and link-local targets require
+  `allow_private_receipt_url: true`.
   """
 
   @behaviour SigilGuard.Audit.Anchor.Store
@@ -63,7 +65,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   @impl SigilGuard.Audit.Anchor.Store
   def put(record, opts) when is_map(record) and is_list(opts) do
-    with :ok <- validate_anchor(record),
+    with :ok <- validate_options(opts),
+         :ok <- validate_anchor(record),
          {:ok, url} <- put_url(opts),
          {:ok, metadata} <- metadata(opts),
          {:ok, headers} <- headers(opts),
@@ -81,7 +84,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   @impl SigilGuard.Audit.Anchor.Store
   def fetch(receipt_or_digest, opts) when is_list(opts) do
-    with :ok <- verify_fetch_receipt_reference(receipt_or_digest, opts),
+    with :ok <- validate_options(opts),
+         :ok <- verify_fetch_receipt_reference(receipt_or_digest, opts),
          {:ok, digest} <- digest_from_ref(receipt_or_digest),
          {:ok, url} <- fetch_url(receipt_or_digest, opts, digest),
          {:ok, headers} <- headers(opts),
@@ -95,6 +99,10 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
   end
 
   def fetch(_, _), do: {:error, :missing_url}
+
+  defp validate_options(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+  end
 
   defp validate_anchor(record) do
     case Anchor.validate(record) do
@@ -172,9 +180,33 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
       private_receipt_host?(host) ->
         {:error, :unsafe_receipt_url}
 
-      true ->
+      literal_ip?(host) ->
         :ok
+
+      allowlisted_receipt_host?(host, opts) ->
+        :ok
+
+      true ->
+        {:error, :unsafe_receipt_url}
     end
+  end
+
+  defp allowlisted_receipt_host?(host, opts) do
+    host = String.downcase(host)
+
+    opts
+    |> Keyword.get(:receipt_url_hosts, [])
+    |> List.wrap()
+    |> Enum.any?(fn
+      allowed when is_binary(allowed) -> String.downcase(allowed) == host
+      _ -> false
+    end)
+  end
+
+  defp literal_ip?(host) do
+    match?({:ok, _}, :inet.parse_address(String.to_charlist(host)))
+  rescue
+    ArgumentError -> false
   end
 
   defp private_receipt_host?(host) do

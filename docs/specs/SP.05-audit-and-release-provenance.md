@@ -650,12 +650,15 @@ Contract per CLAUDE.md rule 8:
 | Retries | None in the store. A host adapter MAY retry internally within the timeout budget; anchor puts are idempotent by `anchor_digest` and fetches are read-only, so host retries are safe. |
 | Failure | Adapter `{:error, reason}` surfaces as `{:error, {:http_client_error, reason}}`; adapter raises/exits are caught and surface as `{:error, {:http_client_error, :adapter_crash}}`. Non-2xx statuses keep the existing `{:error, {:http_error, status}}`. |
 | Body cap | Responses over `:max_body_bytes` (default `1_048_576`) fail with `{:error, :response_too_large}`. |
+| Receipt URL safety | Receipt-derived hostname URLs require an exact `:receipt_url_hosts` allowlist entry. Literal private, loopback, and link-local addresses fail unless `:allow_private_receipt_url` is explicitly true. Explicit host-configured fetch URLs remain host-owned. |
+| Local log bound | Local JSONL fetch streams fixed-size chunks and rejects a line over `:max_line_bytes` (default `1_048_576`) with `{:error, :log_line_too_large}`. |
+| Option validation | Anchor-store facades and adapters reject non-keyword option lists with `{:error, :invalid_options}` instead of raising. |
 
 `SigilGuard.Audit.Anchor.Store.HTTP` converts to call the resolved client:
 zero direct `Finch.` calls remain, the `SigilGuard.Finch` pool leaves the
 application supervision tree with the dependency in M6, and every other
 store behavior (endpoint contract, receipt normalization, WORM and
-receipt-signature options, private-host receipt-URL rejection) is
+receipt-signature options, allowlisted receipt-URL enforcement) is
 unchanged. A reference finch adapter ships as documentation only. In
 addition, an optional `req`-based default anchor client MAY ship as an
 optional dependency (guarded by `Code.ensure_loaded?/1`) for hosts that want

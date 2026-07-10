@@ -590,6 +590,10 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
       assert {:error, :invalid_anchor} = HTTP.put("bad", [])
       assert {:error, :missing_url} = HTTP.fetch(Anchor.digest(anchor), :bad)
       assert {:error, :missing_digest} = HTTP.fetch(:bad, [])
+      assert {:error, :invalid_options} = HTTP.put(anchor, [{:url}])
+
+      assert {:error, :invalid_options} =
+               HTTP.fetch(Anchor.digest(anchor), [{:url}])
     end
 
     test "rejects private receipt URLs by default" do
@@ -620,6 +624,24 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPTest do
                    "anchor_digest" => digest
                  })
       end)
+    end
+
+    test "requires explicit allowlisting for hostname receipt URLs" do
+      {_, anchor} = anchor_fixture()
+      digest = Anchor.digest(anchor)
+
+      receipt = %{
+        "uri" => "https://anchors.example.test/audit/anchors/#{digest}##{digest}",
+        "anchor_digest" => digest
+      }
+
+      assert {:error, :unsafe_receipt_url} = Store.fetch(HTTP, receipt)
+
+      assert {:error, {:http_client_error, _}} =
+               Store.fetch(HTTP, receipt, receipt_url_hosts: ["ANCHORS.EXAMPLE.TEST"])
+
+      assert {:error, :unsafe_receipt_url} =
+               Store.fetch(HTTP, receipt, receipt_url_hosts: ["example.test", 123])
     end
 
     test "returns HTTP and body errors", %{bypass: bypass, url: url} do

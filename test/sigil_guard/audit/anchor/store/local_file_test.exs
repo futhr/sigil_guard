@@ -197,6 +197,11 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
 
       assert {:error, :invalid_anchor} = LocalFile.put(:not_an_anchor, [])
       assert {:error, :missing_path} = LocalFile.fetch(%{}, :not_options)
+      assert {:error, :invalid_options} = LocalFile.put(anchor, [{:path}])
+
+      assert {:error, :invalid_options} =
+               LocalFile.fetch(Anchor.digest(anchor), [{:path}])
+
       assert {:error, :missing_path} = Store.put(LocalFile, anchor)
 
       assert {:error, :invalid_anchor} =
@@ -335,6 +340,51 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
 
       assert {:error, :not_found} =
                Store.fetch(LocalFile, String.duplicate("0", 64), path: path)
+    end
+
+    test "streams large logs and bounds individual line size" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+      digest = Anchor.digest(anchor)
+      unrelated = Jason.encode!(%{"anchor_digest" => String.duplicate("0", 64)})
+
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, List.duplicate([unrelated, ?\n], 10_000))
+      assert {:error, :not_found} = Store.fetch(LocalFile, digest, path: path)
+
+      File.write!(path, String.duplicate("x", 65))
+
+      assert {:error, :log_line_too_large} =
+               Store.fetch(LocalFile, digest, path: path, max_line_bytes: 64)
+
+      assert {:error, :invalid_max_line_bytes} =
+               Store.fetch(LocalFile, digest, path: path, max_line_bytes: 0)
+    end
+
+    test "accepts a final record without a newline and skips empty lines" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+
+      assert {:ok, receipt} = Store.put(LocalFile, anchor, path: path)
+
+      entry =
+        path
+        |> File.read!()
+        |> String.trim_trailing("\n")
+
+      File.write!(path, ["\n\n", entry])
+
+      assert {:ok, ^anchor} = Store.fetch(LocalFile, receipt, path: path)
+    end
+
+    test "rejects an oversized newline-terminated record" do
+      {_, anchor} = anchor_fixture()
+      path = tmp_path()
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, [String.duplicate("x", 65), ?\n])
+
+      assert {:error, :log_line_too_large} =
+               Store.fetch(LocalFile, Anchor.digest(anchor), path: path, max_line_bytes: 64)
     end
   end
 

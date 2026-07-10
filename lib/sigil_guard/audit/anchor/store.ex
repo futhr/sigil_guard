@@ -40,11 +40,11 @@ defmodule SigilGuard.Audit.Anchor.Store do
   def put(store, record, opts \\ [])
 
   def put(store, record, opts) when is_atom(store) and is_map(record) and is_list(opts) do
-    span(:put, store, fn ->
-      result = if store?(store), do: store.put(record, opts), else: {:error, :invalid_store}
-
-      enforce_required_worm(result, opts)
-    end)
+    if Keyword.keyword?(opts) do
+      put_with_valid_options(store, record, opts)
+    else
+      {:error, :invalid_options}
+    end
   end
 
   def put(_, _, _), do: {:error, :invalid_store}
@@ -57,14 +57,11 @@ defmodule SigilGuard.Audit.Anchor.Store do
   def fetch(store, receipt_or_digest, opts \\ [])
 
   def fetch(store, receipt_or_digest, opts) when is_atom(store) and is_list(opts) do
-    span(:fetch, store, fn ->
-      result =
-        if store?(store),
-          do: store.fetch(receipt_or_digest, opts),
-          else: {:error, :invalid_store}
-
-      enforce_anchor_result(result)
-    end)
+    if Keyword.keyword?(opts) do
+      fetch_with_valid_options(store, receipt_or_digest, opts)
+    else
+      {:error, :invalid_options}
+    end
   end
 
   def fetch(_, _, _), do: {:error, :invalid_store}
@@ -86,6 +83,24 @@ defmodule SigilGuard.Audit.Anchor.Store do
   end
 
   def verify(_, _, _, _), do: {:error, :invalid_anchor}
+
+  defp put_with_valid_options(store, record, opts) do
+    span(:put, store, fn ->
+      result = if store?(store), do: store.put(record, opts), else: {:error, :invalid_store}
+      enforce_required_worm(result, opts)
+    end)
+  end
+
+  defp fetch_with_valid_options(store, receipt_or_digest, opts) do
+    span(:fetch, store, fn ->
+      result =
+        if store?(store),
+          do: store.fetch(receipt_or_digest, opts),
+          else: {:error, :invalid_store}
+
+      enforce_anchor_result(result)
+    end)
+  end
 
   defp span(operation, store, fun) do
     metadata = %{anchor_store: inspect(store)}

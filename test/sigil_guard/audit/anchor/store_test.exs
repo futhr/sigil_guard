@@ -71,6 +71,8 @@ defmodule SigilGuard.Audit.Anchor.StoreTest do
     assert Store.verify(BadReceiptStore, %{}, :bad_checkpoint) == {:error, :invalid_anchor}
     assert Store.fetch(MemoryStore, %{}, :bad_opts) == {:error, :invalid_store}
     assert Store.put(MemoryStore, %{}, :bad_opts) == {:error, :invalid_store}
+    assert Store.fetch(MemoryStore, %{}, [{:path}]) == {:error, :invalid_options}
+    assert Store.put(MemoryStore, %{}, [{:path}]) == {:error, :invalid_options}
     assert Store.fetch("store", %{}) == {:error, :invalid_store}
   end
 

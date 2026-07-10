@@ -15,6 +15,8 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
 
   @kind "sigil_guard.audit.anchor.receipt"
   @version 1
+  @default_max_line_bytes 1_048_576
+  @read_chunk_bytes 65_536
   @hex_digest ~r/\A[0-9a-f]{64}\z/
   @atom_fields %{
     "anchor_digest" => :anchor_digest,
@@ -24,7 +26,8 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
 
   @impl SigilGuard.Audit.Anchor.Store
   def put(record, opts) when is_map(record) and is_list(opts) do
-    with :ok <- validate_anchor(record),
+    with :ok <- validate_options(opts),
+         :ok <- validate_anchor(record),
          :ok <- allow_local_receipt(opts),
          {:ok, path} <- path_from_opts(opts),
          {:ok, metadata} <- metadata(opts),
@@ -39,13 +42,19 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
 
   @impl SigilGuard.Audit.Anchor.Store
   def fetch(receipt_or_digest, opts) when is_list(opts) do
-    with {:ok, digest} <- digest_from_ref(receipt_or_digest),
-         {:ok, path} <- path_from_ref(receipt_or_digest, opts) do
-      find_record(path, digest)
+    with :ok <- validate_options(opts),
+         {:ok, digest} <- digest_from_ref(receipt_or_digest),
+         {:ok, path} <- path_from_ref(receipt_or_digest, opts),
+         {:ok, max_line_bytes} <- max_line_bytes(opts) do
+      find_record(path, digest, max_line_bytes)
     end
   end
 
   def fetch(_, _), do: {:error, :missing_path}
+
+  defp validate_options(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+  end
 
   defp validate_anchor(record) do
     case Anchor.validate(record) do
@@ -177,12 +186,14 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   # sobelow_skip ["Traversal.FileModule"]
-  defp find_record(path, digest) do
-    case File.read(path) do
-      {:ok, body} ->
-        body
-        |> String.split("\n", trim: true)
-        |> find_record_line(digest)
+  defp find_record(path, digest, max_line_bytes) do
+    case File.open(path, [:read, :binary]) do
+      {:ok, io} ->
+        try do
+          read_record_chunks(io, digest, max_line_bytes, "")
+        after
+          File.close(io)
+        end
 
       {:error, :enoent} ->
         {:error, :not_found}
@@ -192,12 +203,58 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
     end
   end
 
-  defp find_record_line(lines, digest) do
-    result = Enum.reduce_while(lines, :not_found, &find_record_entry(&1, &2, digest))
+  defp read_record_chunks(io, digest, max_line_bytes, buffer) do
+    case IO.binread(io, @read_chunk_bytes) do
+      :eof -> consume_final_line(buffer, digest, max_line_bytes)
+      {:error, reason} -> {:error, reason}
+      chunk -> consume_record_lines(io, digest, max_line_bytes, buffer <> chunk)
+    end
+  end
 
-    case result do
-      :not_found -> {:error, :not_found}
-      result -> result
+  defp consume_record_lines(io, digest, max_line_bytes, data) do
+    case :binary.match(data, "\n") do
+      {index, 1} when index > max_line_bytes ->
+        {:error, :log_line_too_large}
+
+      {index, 1} ->
+        <<line::binary-size(^index), ?\n, rest::binary>> = data
+
+        case consume_record_line(line, digest) do
+          :not_found -> consume_record_lines(io, digest, max_line_bytes, rest)
+          result -> result
+        end
+
+      :nomatch when byte_size(data) > max_line_bytes ->
+        {:error, :log_line_too_large}
+
+      :nomatch ->
+        read_record_chunks(io, digest, max_line_bytes, data)
+    end
+  end
+
+  defp consume_final_line("", _, _), do: {:error, :not_found}
+
+  defp consume_final_line(line, digest, max_line_bytes) when byte_size(line) <= max_line_bytes,
+    do: consume_record_line(line, digest) |> normalize_not_found()
+
+  defp consume_final_line(_, _, _), do: {:error, :log_line_too_large}
+
+  defp consume_record_line("", _), do: :not_found
+
+  defp consume_record_line(line, digest) do
+    case find_record_entry(line, :not_found, digest) do
+      {:cont, :not_found} -> :not_found
+      {:halt, result} -> result
+    end
+  end
+
+  defp normalize_not_found(:not_found), do: {:error, :not_found}
+  defp normalize_not_found(result), do: result
+
+  defp max_line_bytes(opts) do
+    case Keyword.get(opts, :max_line_bytes, @default_max_line_bytes) do
+      value when is_integer(value) and value > 0 -> {:ok, value}
+      _ -> {:error, :invalid_max_line_bytes}
     end
   end
 
