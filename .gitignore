@@ -9,6 +9,7 @@ sigil_guard-*.tar
 .elixir_ls/
 .cache/
 .vscode/
+.agents/
 priv/plts/
 native/*/target/
 priv/native/
