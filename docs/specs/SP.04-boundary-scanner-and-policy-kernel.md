@@ -315,7 +315,9 @@ exists under the repo root, loading MUST fail with
 its 1:1 positional replacement, even when a new-name file also exists. There
 is no silent fallback and no coexistence; hosts that load policy at boot MUST
 surface this as a typed startup error. Candidate paths keep the implemented
-safety rules: safe relative paths only, resolved inside the repo root.
+safety rules: safe relative paths only, resolved inside the repo root. A
+candidate or parent component that is a symbolic link is not eligible, so a
+lexically in-root path cannot redirect policy loading outside the trust root.
 
 ### Policy File Digest
 
@@ -777,6 +779,8 @@ SP.01's profile-wide taxonomy applies by reference (`:invalid_context`,
 | `:invalid_isolation_level` | context validation | use a closed-enum value | request blocked |
 | `:scanner_timeout` | decision | fail closed for outbound sinks | output blocked |
 | `:stream_holdback_overflow` | decision | redact or block | partial output withheld |
+| invalid scanner options | `ArgumentError` | pass a keyword list | direct scan rejected; runtime gate catches and blocks |
+| invalid policy options | blocked verdict | pass a keyword list | action blocked at highest risk |
 
 ## Security Considerations
 

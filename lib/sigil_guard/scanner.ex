@@ -44,6 +44,7 @@ defmodule SigilGuard.Scanner do
   """
   @spec scan(String.t(), keyword()) :: {:ok, String.t()} | {:hit, [Patterns.scan_hit()]}
   def scan(text, opts \\ []) do
+    validate_options!(opts)
     patterns = Keyword.get_lazy(opts, :patterns, &Patterns.built_in/0)
     telemetry_metadata = telemetry_metadata(patterns, opts)
 
@@ -86,6 +87,7 @@ defmodule SigilGuard.Scanner do
   """
   @spec redact(String.t(), [Patterns.scan_hit()], keyword()) :: String.t()
   def redact(text, hits, opts \\ []) do
+    validate_options!(opts)
     default = Keyword.get(opts, :default_replacement, "[REDACTED]")
 
     hits
@@ -104,10 +106,18 @@ defmodule SigilGuard.Scanner do
   """
   @spec scan_and_redact(String.t(), keyword()) :: String.t()
   def scan_and_redact(text, opts \\ []) do
+    validate_options!(opts)
+
     case scan(text, opts) do
       {:ok, clean_text} -> clean_text
       {:hit, hits} -> redact(text, hits, opts)
     end
+  end
+
+  defp validate_options!(opts) do
+    if Keyword.keyword?(opts),
+      do: :ok,
+      else: raise(ArgumentError, "options must be a keyword list")
   end
 
   defp do_scan(text, patterns, opts) do

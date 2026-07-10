@@ -18,9 +18,10 @@ research note.
 
 ## Orientation (Read First)
 
-Working knowledge for whoever builds this out. Read once, then start at M1.01.
+Historical implementation orientation retained for maintainers reviewing the v3
+rewrite. All milestones described below are complete.
 
-**v0.2.x versus v3.** The current `lib/` is the released 0.2.x runtime; v3 is
+**v0.2.x versus v3.** The former `lib/` was the released 0.2.x runtime; v3 was
 a deliberate breaking rewrite, not an incremental patch. The Rust/NIF backend
 is already gone and stays gone (`CLAUDE.md` rule 1) - ignore any NIF, rustler,
 precompiled-binary, or `SIGIL_GUARD_BUILD` references in history. Do not carry
@@ -30,8 +31,8 @@ mappings in `MIGRATING-1.0.md`. Legacy golden vectors move to
 `test/fixtures/historical/` as migration evidence, not v3 proofs.
 
 **The reference consumer contract.** One production agent runtime embeds
-SigilGuard (Elixir `~> 1.19`, OTP 27+), pinned `~> 0.1` today, moving to
-`~> 1.0` only after the 1.0 package is published and validated. It depends on
+SigilGuard (Elixir `~> 1.19`, OTP 27+). Its 1.0 migration remains
+maintainer-owned and is validated against the published package. It depends on
 the stable contracts in decision **D17**: `scan/1`, `scan_and_redact/1`,
 `policy_verdict/3`, the `Identity` / `Signer` / `Vault` behaviours,
 `Signer.Ed25519.{new/1, sign_with/2, verify/3}`, and the `%Audit{}` struct
@@ -83,6 +84,15 @@ trailers (rule 10); the maintainer pushes manually.
 ### What's left (0 tasks)
 
 No agent-owned tasks remain.
+
+Post-release maintenance includes ongoing dependency-audit remediation,
+per-module security coverage review, policy-loader symlink containment,
+receipt-URL allowlisting, and bounded local-anchor log reads. These are
+recurring hardening obligations rather than unfinished v3 milestones. Runtime
+and anchor-store public boundaries also maintain malformed option-container
+campaigns so improper input fails closed without exceptions. Direct scanner
+calls reject malformed options explicitly, policy evaluates them as blocked,
+and trust-bundle loading classifies them as invalid sources.
 
 Publish, push, tag, release-checklist execution, and production consumer bumps
 are maintainer-owned operations and are intentionally outside this checklist.

@@ -283,6 +283,7 @@ boundary labels) are normative in the V3 Decision Contract section.
 | Error | Type | Recovery | User Impact |
 |-------|------|----------|-------------|
 | malformed context | blocked decision | fix caller context | request blocked. |
+| malformed option container | blocked decision | pass a keyword list | request blocked. |
 | invalid payload | blocked decision | pass supported payload | request blocked. |
 | scanner failure | high-risk hit | inspect scanner config | fail closed. |
 | invalid risk options | blocked decision | fix policy options | request blocked. |

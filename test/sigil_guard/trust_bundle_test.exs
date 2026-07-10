@@ -284,6 +284,10 @@ defmodule SigilGuard.TrustBundleTest do
     envelope
   end
 
+  test "load rejects a non-keyword option list without raising" do
+    assert TrustBundle.load({:map, %{}}, [{:now}]) == {:error, :invalid_source}
+  end
+
   defp current_process_ports do
     owner = self()
 

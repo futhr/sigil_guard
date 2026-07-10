@@ -94,7 +94,8 @@ defmodule SigilGuard.Policy do
   """
   @spec evaluate(String.t(), Identity.trust_level(), keyword()) :: verdict()
   def evaluate(action, trust_level, opts \\ []) do
-    with {:ok, risk} <- effective_risk(action, opts),
+    with :ok <- validate_options(opts),
+         {:ok, risk} <- effective_risk(action, opts),
          {:ok, required_trust} <- required_trust(risk, opts),
          :ok <- validate_trust_level(trust_level) do
       emit_decision(action, risk, trust_level, required_trust)
@@ -134,13 +135,18 @@ defmodule SigilGuard.Policy do
   """
   @spec classify_risk(String.t(), keyword()) :: risk_level()
   def classify_risk(action, opts \\ []) do
-    mappings = Keyword.get(opts, :risk_mappings, %{})
+    mappings =
+      if Keyword.keyword?(opts), do: Keyword.get(opts, :risk_mappings, %{}), else: :invalid
 
     case mapped_risk(action, mappings) do
       {:ok, nil} -> classify_by_prefix(action)
       {:ok, level} -> normalize_risk_level(level)
       {:error, _} -> :high
     end
+  end
+
+  defp validate_options(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
   end
 
   @doc """
@@ -175,7 +181,8 @@ defmodule SigilGuard.Policy do
   """
   @spec rate_check(String.t(), keyword()) :: :ok | {:error, :rate_limited}
   def rate_check(identity, opts \\ []) do
-    with {:ok, max_requests} <- positive_integer_option(opts, :max_requests, 100),
+    with :ok <- validate_options(opts),
+         {:ok, max_requests} <- positive_integer_option(opts, :max_requests, 100),
          {:ok, window_ms} <- positive_integer_option(opts, :window_ms, 60_000),
          {:ok, table} <- rate_store_option(opts) do
       checked_rate(identity, table, max_requests, window_ms)

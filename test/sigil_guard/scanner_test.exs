@@ -220,4 +220,16 @@ defmodule SigilGuard.ScannerTest do
       refute String.contains?(result, "AKIAIOSFODNN7EXAMPLE")
     end
   end
+
+  describe "malformed options" do
+    test "rejects non-keyword option containers consistently" do
+      for fun <- [
+            fn -> Scanner.scan("safe", [{:patterns}]) end,
+            fn -> Scanner.redact("safe", [], [{:default_replacement}]) end,
+            fn -> Scanner.scan_and_redact("safe", [{:pipeline}]) end
+          ] do
+        assert_raise ArgumentError, "options must be a keyword list", fun
+      end
+    end
+  end
 end

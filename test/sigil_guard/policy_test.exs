@@ -248,6 +248,8 @@ defmodule SigilGuard.PolicyTest do
       for opts <- invalid_cases do
         assert {:error, :rate_limited} = Policy.rate_check("user-invalid", opts)
       end
+
+      assert {:error, :rate_limited} = Policy.rate_check("user-invalid", [{:max_requests}])
     end
 
     test "default rate table is owned by the application" do
@@ -307,6 +309,13 @@ defmodule SigilGuard.PolicyTest do
         |> Enum.map(fn {:ok, result} -> result end)
 
       assert Enum.all?(results, &(&1 == :ok))
+    end
+  end
+
+  describe "malformed option containers" do
+    test "evaluation blocks and classification chooses highest risk" do
+      assert Policy.evaluate("read_file", :high, [{:risk_level}]) == :blocked
+      assert Policy.classify_risk("read_file", [{:risk_mappings}]) == :high
     end
   end
 end

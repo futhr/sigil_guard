@@ -51,18 +51,45 @@ defmodule SigilGuard.Runtime.Gate do
   """
   @spec evaluate(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def evaluate(payload, context \\ %Context{}, opts \\ []) do
-    context = Context.new(context)
-
-    decision =
-      with :ok <- Context.validate(context),
-           {:ok, text, action} <- runtime_inputs(payload, context) do
-        evaluate_checked(payload, context, text, action, opts)
-      else
-        {:error, reason} -> malformed_input_decision(context, reason)
-      end
+    {_, decision} = evaluate_normalized(payload, context, opts)
 
     emit_decision(decision)
     decision
+  end
+
+  defp evaluate_normalized(payload, raw_context, opts) do
+    case normalize_runtime_context(raw_context) do
+      {:ok, context} ->
+        decision =
+          with :ok <- Context.validate(context),
+               :ok <- validate_runtime_options(opts),
+               {:ok, text, action} <- runtime_inputs(payload, context) do
+            evaluate_checked(payload, context, text, action, opts)
+          else
+            {:error, reason} -> malformed_input_decision(context, reason)
+          end
+
+        {context, decision}
+
+      {:error, reason} ->
+        context = %Context{}
+        {context, malformed_input_decision(context, reason)}
+    end
+  end
+
+  defp normalize_runtime_context(%Context{} = context), do: {:ok, context}
+  defp normalize_runtime_context(context) when is_map(context), do: {:ok, Context.new(context)}
+
+  defp normalize_runtime_context(context) when is_list(context) do
+    if Keyword.keyword?(context),
+      do: {:ok, Context.new(context)},
+      else: {:error, :invalid_context}
+  end
+
+  defp normalize_runtime_context(_), do: {:error, :invalid_context}
+
+  defp validate_runtime_options(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
   end
 
   defp runtime_inputs(payload, context) do

@@ -91,10 +91,14 @@ defmodule SigilGuard.TrustBundle do
   def load(source, opts \\ [])
 
   def load(source, opts) when is_list(opts) do
-    Telemetry.span([:sigil_guard, :trust_bundle, :load], load_metadata(source), fn ->
-      result = do_load(source, opts)
-      {result, load_metadata(result, source)}
-    end)
+    if Keyword.keyword?(opts) do
+      Telemetry.span([:sigil_guard, :trust_bundle, :load], load_metadata(source), fn ->
+        result = do_load(source, opts)
+        {result, load_metadata(result, source)}
+      end)
+    else
+      {:error, :invalid_source}
+    end
   end
 
   def load(_, _), do: {:error, :invalid_source}

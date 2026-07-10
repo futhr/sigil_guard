@@ -553,7 +553,7 @@ reused by reference, never redefined.
 
 | Error | Trigger | Recovery | User Impact |
 |-------|---------|----------|-------------|
-| `:invalid_source` | missing file/priv resource; non-JSON binary; `:none` or unrecognized constructor passed to `load` | fix the path or configuration | bundle not loaded |
+| `:invalid_source` | missing file/priv resource; non-JSON binary; `:none`, unrecognized constructor, or non-keyword options passed to `load` | fix the path or configuration | bundle not loaded |
 | `:invalid_bundle_format` | payload not strict JSON; required field missing/mistyped; unknown top-level field; sequence/floor/version regex violation; `rollback_floor > sequence`; threshold outside `1..n`; duplicate role keyids; role keyid absent from `keys`; keyid not the SHA-256 of its key; `alg` not `"ed25519"`; key not 32 bytes | fix and re-sign the document | bundle quarantined |
 | `:unsupported_profile_version` | profile stem matches, version segment is not `v1` | upgrade SigilGuard or re-issue at `v1` | bundle quarantined |
 | `:unknown_role` | no `"bundle"` delegate declared; rotation document without a root role | declare the required role and re-sign | bundle quarantined |
