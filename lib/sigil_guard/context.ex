@@ -91,6 +91,28 @@ defmodule SigilGuard.Context do
   end
 
   @doc """
+  Normalize context input into an override map without applying defaults.
+
+  Known string keys become their existing struct-field atoms. Unknown keys are
+  retained as strings and no atoms are created from external input.
+  """
+  @spec overrides(t() | map() | keyword() | term()) :: map()
+  def overrides(%__MODULE__{} = context), do: Map.from_struct(context)
+
+  def overrides(context) when is_list(context) do
+    if Keyword.keyword?(context) do
+      context
+      |> Map.new()
+      |> overrides()
+    else
+      %{}
+    end
+  end
+
+  def overrides(context) when is_map(context), do: atomize_known_keys(context)
+  def overrides(_), do: %{}
+
+  @doc """
   Validate normalized boundary context values.
 
   Runtime gates use this to fail closed on malformed boundary labels before

@@ -33,7 +33,6 @@ defmodule SigilGuard.ToolGateway do
   alias SigilGuard.ToolGateway.Base, as: GatewayBase
   alias SigilGuard.TrustBundle
 
-  @known_context_keys Map.keys(%Context{})
   @invalid_payload_field false
   @guard_metadata_keys [
     :_agent_trust,
@@ -1148,7 +1147,7 @@ defmodule SigilGuard.ToolGateway do
       action: action_field(action, tool),
       mcp_server: context_field(mcp_server(request))
     }
-    |> Map.merge(context_overrides(context))
+    |> Map.merge(Context.overrides(context))
     |> Context.new()
   end
 
@@ -1164,7 +1163,7 @@ defmodule SigilGuard.ToolGateway do
       action: action_field(action, tool),
       mcp_server: context_field(mcp_server(result))
     }
-    |> Map.merge(context_overrides(context))
+    |> Map.merge(Context.overrides(context))
     |> Context.new()
   end
 
@@ -1383,30 +1382,6 @@ defmodule SigilGuard.ToolGateway do
 
   defp executable?(%Decision{verdict: :allowed, action: action}), do: action in [:allow, :redact]
   defp executable?(%Decision{}), do: false
-
-  defp context_overrides(%Context{} = context), do: Map.from_struct(context)
-
-  defp context_overrides(context) when is_list(context) do
-    context
-    |> Map.new()
-    |> context_overrides()
-  end
-
-  defp context_overrides(context) when is_map(context) do
-    Map.new(context, fn {key, value} -> {known_context_key(key), value} end)
-  end
-
-  defp context_overrides(_), do: %{}
-
-  defp known_context_key(key) when is_atom(key), do: key
-
-  defp known_context_key(key) when is_binary(key) do
-    atom_key = String.to_existing_atom(key)
-
-    if atom_key in @known_context_keys, do: atom_key, else: key
-  rescue
-    ArgumentError -> key
-  end
 
   defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
   defp hash_text(text), do: Base.encode16(:crypto.hash(:sha256, text), case: :lower)

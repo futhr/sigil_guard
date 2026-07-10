@@ -75,6 +75,20 @@ defmodule SigilGuard.ContextTest do
     end
   end
 
+  describe "overrides/1" do
+    test "normalizes supported inputs without creating unknown atoms" do
+      assert Context.overrides(%{"phase" => :tool_result, "unknown-key" => 1}) == %{
+               "unknown-key" => 1,
+               phase: :tool_result
+             }
+
+      assert Context.overrides(phase: :tool_request) == %{phase: :tool_request}
+      assert Context.overrides(%Context{sink: :model}).sink == :model
+      assert Context.overrides([:not_a_keyword]) == %{}
+      assert Context.overrides(:invalid) == %{}
+    end
+  end
+
   describe "text/1" do
     test "extracts common payload text fields" do
       assert Context.text(%{"content" => "hello"}) == "hello"

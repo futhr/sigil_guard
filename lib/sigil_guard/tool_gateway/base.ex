@@ -14,7 +14,6 @@ defmodule SigilGuard.ToolGateway.Base do
   alias SigilGuard.Runtime
   alias SigilGuard.Telemetry
 
-  @known_context_keys Map.keys(%Context{})
   @guard_metadata_keys [
     :_agent_trust,
     "_agent_trust",
@@ -387,33 +386,9 @@ defmodule SigilGuard.ToolGateway.Base do
 
   defp merge_context(defaults, context) do
     context
-    |> context_overrides()
+    |> Context.overrides()
     |> then(&Map.merge(defaults, &1))
     |> Context.new()
-  end
-
-  defp context_overrides(%Context{} = context), do: Map.from_struct(context)
-
-  defp context_overrides(context) when is_list(context) do
-    context
-    |> Map.new()
-    |> context_overrides()
-  end
-
-  defp context_overrides(context) when is_map(context) do
-    Map.new(context, fn {key, value} -> {known_context_key(key), value} end)
-  end
-
-  defp context_overrides(_), do: %{}
-
-  defp known_context_key(key) when is_atom(key), do: key
-
-  defp known_context_key(key) when is_binary(key) do
-    atom_key = String.to_existing_atom(key)
-
-    if atom_key in @known_context_keys, do: atom_key, else: key
-  rescue
-    ArgumentError -> key
   end
 
   defp gate_payload(payload) do
