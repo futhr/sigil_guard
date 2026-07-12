@@ -537,8 +537,9 @@ section is post-1.0.0 parking; neither is counted here.
 - [x] M2.04 `TrustBundle.Cache` ETS snapshot with floor semantics.
   - Spec: `docs/specs/SP.02-embedded-trust-bundles.md` - Public API Sketch
     (Cache).
-  - AC: ETS table `:sigil_guard_trust_bundle` is created by
-    `SigilGuard.Application`; `put/1` accepts only sequence strictly above
+  - AC: ETS table `:sigil_guard_trust_bundle` is owned by
+    `SigilGuard.Runtime`, automatically by default or caller-supervised after
+    opt-out; `put/1` accepts only sequence strictly above
     the cached one and at or above the floor, treats a byte-identical
     re-put as a no-op, and advances the floor to
     `max(floor, rollback_floor, sequence)`; `floor/1` returns 0 for
@@ -1804,15 +1805,16 @@ section is post-1.0.0 parking; neither is counted here.
     example calls `SigilGuard.Envelope`, `sign_envelope`, or `verify_envelope`.
 - [x] M6.08 `SigilGuard.Config` strict closed-key validation.
   - Spec: `SP.01` - V3 Configuration Surface.
-  - AC: `SigilGuard.Config.validate!/0` runs at `Application.start/2` and
-    fails closed with `SigilGuard.ConfigError`: reason
+  - AC: `SigilGuard.Config.validate!/1` runs at `SigilGuard.Runtime` startup
+    (or `validate!/0` for the application-environment fallback) and fails
+    closed with `SigilGuard.ConfigError`: reason
     `:legacy_contract_removed` for removed keys, `:unknown_config_key`
     for unrecognized keys; every message names the offending key and
     `MIGRATING-1.0.md`; kept keys (`:trust_bundle`, `:scanner_patterns`,
     `:http_client`, `:attestation_ttl_ms`, `:max_skew_ms`,
     `:replay_ttl_ms`, `:vault_master_key`) validate per their table rows.
   - Tests: negative (per kept-key validation rule), malformed.
-  - Done: `validate!/0` already runs from `Application.start/2`; tightened
+  - Done: configuration validation runs from `SigilGuard.Runtime`; tightened
     the public config surface by deleting removed v2 accessors
     (`backend`, `protocol_profile`, and all `registry_*` readers), removing
     backend-selector examples from ExDoc, and keeping only v3 schema-backed
@@ -1829,7 +1831,7 @@ section is post-1.0.0 parking; neither is counted here.
   - Done: added a boot-time matrix in `ConfigTest` for `:backend`,
     `:protocol_profile`, all nine `registry_*` keys, and
     `scanner_patterns: :registry`. Each case clears v3 config, injects the
-    removed key/value, calls `SigilGuard.Application.start/2`, and asserts a
+    removed key/value, starts `SigilGuard.Runtime`, and asserts a
     `SigilGuard.ConfigError` with the offending key, reason
     `:legacy_contract_removed`, and `MIGRATING-1.0.md` in the message.
 - [x] M6.10 D13 policy filename rename verification.

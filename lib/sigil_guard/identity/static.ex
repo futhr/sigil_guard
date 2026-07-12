@@ -10,7 +10,7 @@ defmodule SigilGuard.Identity.Static do
 
   `:trust_mappings` is an ordered list of `{pattern, trust_level}` pairs
   evaluated first-match-wins. A pattern is an exact string or a single trailing
-  `*` (prefix match); the grammar is validated at boot by
+  `*` (prefix match); the grammar is validated at runtime startup by
   `SigilGuard.Config.validate!/0`. An actor matching no entry (or an empty
   table) is `:low`. Matching is pure string comparison and never creates atoms.
 

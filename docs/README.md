@@ -102,7 +102,7 @@ flowchart TD
     Host --> IdentityB[Identity]
     Host --> HTTPClient[HTTPClient]
 
-    API --> Infra[Config · Telemetry · ReplayStore]
+    API --> Infra[Caller-supervised Runtime · Config · Telemetry · ReplayStore]
 ```
 
 ## Boundary Flows

@@ -89,7 +89,7 @@ and floor comparison.
 |---------|------|---------------|
 | GenServer | no | No fetch loop exists; verification is pure functions. |
 | Behaviour | yes | `SigilGuard.Signer` signs dev bundles and fixtures. |
-| ETS | yes | `:sigil_guard_trust_bundle`, created at application boot. |
+| ETS | yes | `:sigil_guard_trust_bundle`, owned by `SigilGuard.Runtime` (automatic by default, caller-supervised on opt-out). |
 | Telemetry | yes | Load/verify spans and a quarantine event. |
 
 ## Role Model And Thresholds
@@ -363,10 +363,12 @@ constructor fails with `{:error, :invalid_source}` before verification.
 
 **Precedence.** Exactly one source per load call; sources never merge. A
 source passed to `load/1,2` always wins over configuration. The
-`:trust_bundle` env key (SP.01 configuration table) is read once by the
-application boot path: when not `:none`, boot loads and caches it, and any
-failure raises `SigilGuard.ConfigError` naming the error atom -
-configuration fails closed, per SP.01.
+`:trust_bundle` option (SP.01 configuration table) is read once by
+`SigilGuard.Runtime`: when not `:none`, runtime startup loads and caches it,
+and any failure raises `SigilGuard.ConfigError` naming the error atom -
+configuration fails closed, per SP.01. Configuration MAY be passed explicitly
+to a caller-supervised runtime or read from application environment by the
+automatic runtime.
 
 **No-network guarantee.** `load/1,2`, `verify/2`, and `dev_bundle/1` MUST
 perform zero network operations: no HTTP, no DNS, no socket opens, and no
@@ -450,7 +452,7 @@ defmodule SigilGuard.TrustBundle do
 end
 
 defmodule SigilGuard.TrustBundle.Cache do
-  # ETS :sigil_guard_trust_bundle, created by SigilGuard.Application,
+  # ETS :sigil_guard_trust_bundle, owned by SigilGuard.Runtime,
   # keyed by bundle_id. Per-boot state only.
 
   @spec get(bundle_id :: String.t()) ::
@@ -648,7 +650,7 @@ DSSE work is a prerequisite, and legacy removal lands in M6 per SP.12.
 - [x] M2: rotation chain walk from the pinned genesis root, fork rejection,
       floor bump semantics.
 - [x] M2: `Cache` (ETS at boot) and `Quarantine` records.
-- [x] M2: four load sources plus `:trust_bundle` boot wiring with
+- [x] M2: four load sources plus `:trust_bundle` runtime wiring with
       fail-closed `SigilGuard.ConfigError`.
 - [x] M2: `dev_bundle/1` with a doctest demonstrating library-mode
       bootstrap.

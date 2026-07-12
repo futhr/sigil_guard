@@ -222,9 +222,9 @@ confirmed =
 
 ## Configuration
 
-All configuration lives under the `:sigil_guard` application environment and is
-validated at boot. Unknown keys and removed legacy keys fail closed with
-`SigilGuard.ConfigError` and a pointer to `MIGRATING-1.0.md`.
+Stateful features are initialized automatically by `SigilGuard.Runtime`, which
+provides stable ownership for replay, rate-limit, and trust-bundle ETS state.
+The default setup uses application environment:
 
 ```elixir
 config :sigil_guard,
@@ -235,8 +235,35 @@ config :sigil_guard,
   replay_ttl_ms: 300_000
 ```
 
+Hosts that need control over failure placement or want to avoid global
+configuration can disable automatic startup and supervise the runtime directly:
+
+```elixir
+config :sigil_guard, runtime: false
+
+children = [
+  {SigilGuard.Runtime,
+   config: [
+     runtime: false,
+     trust_bundle: {:priv, :my_app, "sigil/trust_bundle.json"},
+     scanner_patterns: :bundle,
+     attestation_ttl_ms: 300_000,
+     max_skew_ms: 60_000,
+     replay_ttl_ms: 300_000
+   ]}
+]
+
+Supervisor.start_link(children, strategy: :one_for_one)
+```
+
+Unknown keys and removed legacy keys fail runtime startup with
+`SigilGuard.ConfigError` and a pointer to `MIGRATING-1.0.md`. Omitting the
+runtime child's `:config` option makes it read the `:sigil_guard` application
+environment.
+
 | Key | Default | Purpose |
 |-----|---------|---------|
+| `:runtime` | `true` | Start the singleton runtime automatically; set `false` for caller-owned supervision. |
 | `:trust_bundle` | `:none` | Local trust-bundle source: `:none`, `{:file, path}`, `{:priv, app, path}`, `{:map, map}`, or `{:binary, bytes}`. |
 | `:scanner_patterns` | `:built_in` | Pattern source, either `:built_in` or `:bundle`; `:bundle` requires `:trust_bundle`. |
 | `:http_client` | `nil` | Host-provided module implementing `SigilGuard.HTTPClient` for audit anchor HTTP stores. |
@@ -246,8 +273,8 @@ config :sigil_guard,
 | `:vault_master_key` | `nil` | Optional base64-encoded key for `SigilGuard.Vault.InMemory`. |
 | `:trust_mappings` | `[]` | Ordered `{pattern, trust_level}` actor mappings; patterns are exact strings or one trailing `*`. |
 
-Configured trust bundles are loaded and verified at application boot. Verified
-snapshots are cached for the current BEAM boot in the
+Configured trust bundles are loaded and verified when `SigilGuard.Runtime`
+starts. Verified snapshots are cached for the current BEAM boot in the
 `:sigil_guard_trust_bundle` ETS table, along with rollback floors, root pins,
 rotation digests, and revoked key ids. The signed bundle remains the durable
 source of truth across boots; remote distribution, if needed, belongs to the

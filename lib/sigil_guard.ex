@@ -15,7 +15,10 @@ defmodule SigilGuard do
 
   ## Runtime Configuration
 
-  SigilGuard validates a closed 1.0 configuration surface at application boot.
+  Stateless APIs can be used without starting a process. ETS-backed rate,
+  replay, and trust-bundle state is owned by `SigilGuard.Runtime`, which starts
+  automatically by default and validates the closed 1.0 configuration surface.
+  Hosts can disable automatic startup and supervise the runtime explicitly.
   The built-in backend is native Elixir and uses OTP `:crypto`, Regex, ETS,
   and ordinary OTP supervision; no backend selector is required.
 

@@ -229,6 +229,7 @@ defmodule SigilGuard.MixProject do
         ],
         Runtime: [
           SigilGuard.Application,
+          SigilGuard.Runtime,
           SigilGuard.Config,
           SigilGuard.ConfigError,
           SigilGuard.ReplayStore,

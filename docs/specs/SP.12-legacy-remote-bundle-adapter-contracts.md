@@ -188,7 +188,7 @@ go/no-go gate.
 
 | Module | Purpose |
 |--------|---------|
-| `lib/sigil_guard/trust_bundle.ex` | Local trust-bundle loading, verification, dev bundle, and boot wiring. |
+| `lib/sigil_guard/trust_bundle.ex` | Local trust-bundle loading, verification, dev bundle, and runtime wiring. |
 | `lib/sigil_guard/trust_bundle/schema.ex` | Bundle and rotation schema validation. |
 | `lib/sigil_guard/trust_bundle/verify.ex` | Roles, threshold, expiry, revocation, and rotation-chain verification. |
 | `lib/sigil_guard/trust_bundle/cache.ex` | ETS sequence/rollback protection. |

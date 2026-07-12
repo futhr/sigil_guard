@@ -689,9 +689,17 @@ carries the 1:1 mapping.
 
 ## V3 Configuration Surface
 
-All configuration lives under the `:sigil_guard` application env.
-`SigilGuard.Config.validate!/0` runs at `Application.start/2` and fails
-closed: any key outside the kept set below raises `SigilGuard.ConfigError`
+Exactly one `SigilGuard.Runtime` MUST own the default rate, replay, and
+trust-bundle ETS tables. The library application starts it automatically by
+default because unstable ownership would weaken replay and rollback protection.
+A host MAY set `runtime: false` and supervise `SigilGuard.Runtime` itself to
+control failure placement. The runtime accepts explicit configuration through
+its `:config` option; when omitted, it reads the `:sigil_guard` application
+environment.
+
+`SigilGuard.Config.validate!/1` (or `validate!/0` for the environment fallback)
+runs during runtime initialization and fails closed: any key outside the kept
+set below raises `SigilGuard.ConfigError`
 whose message names the offending key and points at `MIGRATING-1.0.md`,
 with reason `:legacy_contract_removed` for removed keys and
 `:unknown_config_key` for unrecognized keys.
@@ -700,6 +708,7 @@ with reason `:legacy_contract_removed` for removed keys and
 
 | Key | Type | Default | Validation |
 |-----|------|---------|------------|
+| `:runtime` | `boolean()` | `true` | `false` disables automatic startup so the host can supervise `SigilGuard.Runtime`. |
 | `:trust_bundle` | `SigilGuard.TrustBundle.source()` | `:none` | Closed constructor set owned by SP.02; invalid source raises `SigilGuard.ConfigError`. |
 | `:scanner_patterns` | `:built_in \| :bundle` | `:built_in` | `:bundle` requires `:trust_bundle` other than `:none`; `:registry` raises with reason `:legacy_contract_removed`. |
 | `:http_client` | `module() \| nil` | `nil` | When set, MUST implement `SigilGuard.HTTPClient` (SP.05). Sole consumer: the audit anchor HTTP store. `nil` disables it; local file anchors are unaffected. |

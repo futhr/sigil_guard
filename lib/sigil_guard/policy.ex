@@ -174,8 +174,8 @@ defmodule SigilGuard.Policy do
     * `:window_ms` — time window in milliseconds (default: 60_000)
     * `:rate_store` — ETS table name for rate tracking (default: `:sigil_guard_rates`)
 
-  The default table is created at application start and lives as long as
-  the application. A custom `:rate_store` table is created on first use
+  The default table is created and owned by `SigilGuard.Runtime`. A custom
+  `:rate_store` table is created on first use
   and owned by the first calling process — its rate state is lost if that
   process exits.
   """
@@ -194,9 +194,9 @@ defmodule SigilGuard.Policy do
   @doc """
   Ensure the ETS table used by `rate_check/2` exists.
 
-  The default table is created automatically at application start; call
-  this only to pre-create a custom `:rate_store` table from a process that
-  outlives the callers (the table is owned by the process that creates it).
+  `SigilGuard.Runtime` creates the default table; call this only to pre-create
+  a custom `:rate_store` table from a process that outlives the callers (the
+  table is owned by the process that creates it).
 
   Safe to call concurrently — creation races resolve to the existing table.
   """

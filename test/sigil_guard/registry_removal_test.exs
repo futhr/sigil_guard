@@ -132,7 +132,7 @@ defmodule SigilGuard.RegistryRemovalTest do
       end
     end
 
-    test "application boot has no registry cache or Finch children" do
+    test "application runtime has no registry cache or Finch children" do
       child_modules =
         SigilGuard.Supervisor
         |> Supervisor.which_children()

@@ -7,6 +7,7 @@ defmodule SigilGuard.ConfigTest do
   alias SigilGuard.ConfigError
 
   @env_keys [
+    :runtime,
     :scanner_patterns,
     :backend,
     :protocol_profile,
@@ -58,6 +59,7 @@ defmodule SigilGuard.ConfigTest do
     test "validates the v3 closed configuration surface through NimbleOptions" do
       validated = Config.validate!([])
 
+      assert Keyword.fetch!(validated, :runtime)
       assert Keyword.fetch!(validated, :trust_bundle) == :none
       assert Keyword.fetch!(validated, :scanner_patterns) == :built_in
       assert Keyword.fetch!(validated, :http_client) == nil
@@ -69,6 +71,7 @@ defmodule SigilGuard.ConfigTest do
 
     test "accepts configured v3 values" do
       opts = [
+        runtime: true,
         trust_bundle: {:file, "priv/sigil_guard/trust_bundle.json"},
         scanner_patterns: :bundle,
         http_client: SigilGuard.TestHTTPClient,
@@ -167,15 +170,12 @@ defmodule SigilGuard.ConfigTest do
   end
 
   describe "removed-key boot matrix" do
-    test "each removed key fails application boot with a migration pointer" do
+    test "each removed key fails runtime startup with a migration pointer" do
       for key <- @removed_keys do
         clear_v3_config()
         Application.put_env(:sigil_guard, key, removed_key_value(key))
 
-        error =
-          assert_raise ConfigError, fn ->
-            SigilGuard.Application.start(:normal, [])
-          end
+        error = runtime_config_error()
 
         assert error.key == key
         assert error.reason == :legacy_contract_removed
@@ -184,20 +184,40 @@ defmodule SigilGuard.ConfigTest do
       end
     end
 
-    test "legacy scanner_patterns registry value fails application boot" do
+    test "legacy scanner_patterns registry value fails runtime startup" do
       clear_v3_config()
       Application.put_env(:sigil_guard, :scanner_patterns, :registry)
 
-      error =
-        assert_raise ConfigError, fn ->
-          SigilGuard.Application.start(:normal, [])
-        end
+      error = runtime_config_error()
 
       assert error.key == :scanner_patterns
       assert error.reason == :legacy_contract_removed
       assert error.message =~ "scanner_patterns"
       assert error.message =~ "MIGRATING-1.0.md"
     end
+  end
+
+  defp runtime_config_error do
+    previous_trap_exit = Process.flag(:trap_exit, true)
+
+    try do
+      assert {:error, {%ConfigError{} = error, _}} =
+               SigilGuard.Runtime.start_link(name: unique_runtime_name())
+
+      error
+    after
+      receive do
+        {:EXIT, _, _} -> :ok
+      after
+        0 -> :ok
+      end
+
+      Process.flag(:trap_exit, previous_trap_exit)
+    end
+  end
+
+  defp unique_runtime_name do
+    {:global, {__MODULE__, make_ref()}}
   end
 
   describe "removed v2 accessors" do

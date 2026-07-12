@@ -252,12 +252,10 @@ defmodule SigilGuard.PolicyTest do
       assert {:error, :rate_limited} = Policy.rate_check("user-invalid", [{:max_requests}])
     end
 
-    test "default rate table is owned by the application" do
-      assert :ets.whereis(:sigil_guard_rates) != :undefined
-
+    test "default rate table is owned by the runtime" do
+      runtime = Process.whereis(SigilGuard.Runtime)
       owner = :ets.info(:sigil_guard_rates, :owner)
-      refute owner == self()
-      assert Process.alive?(owner)
+      assert owner == runtime
     end
 
     test "concurrent first use does not race on table creation" do

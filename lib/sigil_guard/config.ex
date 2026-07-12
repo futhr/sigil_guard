@@ -33,6 +33,11 @@ defmodule SigilGuard.Config do
   ]
 
   @schema [
+    runtime: [
+      type: :boolean,
+      default: true,
+      doc: "Automatically start SigilGuard.Runtime. Set false to place it in the host supervisor."
+    ],
     trust_bundle: [
       type: {:custom, __MODULE__, :validate_trust_bundle_source, []},
       default: :none,
