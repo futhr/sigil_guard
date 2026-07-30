@@ -327,10 +327,11 @@ defmodule SigilGuard.Audit do
   Return the events matching a closed set of filters, in chain order (SP.05).
 
   A pure read: no writes, no telemetry. The options `:from_index`, `:to_index`,
-  `:id`, `:type`, `:from_time`, and `:to_time` compose with AND. An unknown key
-  or an unparsable time fails `:invalid_query`; an index outside `0..length-1`
-  (or `:to_index` below `:from_index`) fails `:out_of_range`. An empty match is
-  `{:ok, []}`, never an error.
+  `:id`, `:type`, `:from_time`, and `:to_time` compose with AND. Options must be
+  a keyword list; a malformed list, unknown key, or unparsable time fails
+  `:invalid_query`. An index outside `0..length-1` (or `:to_index` below
+  `:from_index`) fails `:out_of_range`. An empty match is `{:ok, []}`, never an
+  error.
   """
   @spec query([t()], keyword()) :: {:ok, [t()]} | {:error, :out_of_range | :invalid_query}
   def query(events, opts \\ [])
@@ -387,7 +388,7 @@ defmodule SigilGuard.Audit do
   # -- Private --
 
   defp validate_query_keys(opts) do
-    if Enum.all?(Keyword.keys(opts), &(&1 in @query_keys)),
+    if Keyword.keyword?(opts) and Enum.all?(Keyword.keys(opts), &(&1 in @query_keys)),
       do: :ok,
       else: {:error, :invalid_query}
   end

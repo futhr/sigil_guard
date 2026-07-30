@@ -147,8 +147,10 @@ defmodule SigilGuard.ConfigTest do
     end
 
     test "raises typed errors for non-keyword config" do
-      assert_raise ConfigError, ~r/:sigil_guard.*invalid_config.*MIGRATING-1\.0\.md/, fn ->
-        Config.validate!(:bad)
+      for invalid <- [:bad, [:not_a_keyword], [{"runtime", true}]] do
+        assert_raise ConfigError, ~r/:sigil_guard.*invalid_config.*MIGRATING-1\.0\.md/, fn ->
+          Config.validate!(invalid)
+        end
       end
     end
 

@@ -698,8 +698,8 @@ its `:config` option; when omitted, it reads the `:sigil_guard` application
 environment.
 
 `SigilGuard.Config.validate!/1` (or `validate!/0` for the environment fallback)
-runs during runtime initialization and fails closed: any key outside the kept
-set below raises `SigilGuard.ConfigError`
+runs during runtime initialization and fails closed: malformed or non-keyword
+input and any key outside the kept set below raise `SigilGuard.ConfigError`
 whose message names the offending key and points at `MIGRATING-1.0.md`,
 with reason `:legacy_contract_removed` for removed keys and
 `:unknown_config_key` for unrecognized keys.

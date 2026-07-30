@@ -544,6 +544,8 @@ defmodule SigilGuard.AuditTest do
       assert Audit.query(events, from_time: 123) == {:error, :invalid_query}
       assert Audit.query(events, from_index: "0") == {:error, :invalid_query}
       assert Audit.query(events, to_index: "x") == {:error, :invalid_query}
+      assert Audit.query(events, [:not_a_keyword]) == {:error, :invalid_query}
+      assert Audit.query(events, [{"id", "id0"}]) == {:error, :invalid_query}
       assert Audit.query("not a list", []) == {:error, :invalid_query}
     end
 

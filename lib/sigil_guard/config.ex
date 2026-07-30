@@ -100,9 +100,21 @@ defmodule SigilGuard.Config do
 
   @doc """
   Validate explicit SigilGuard configuration options.
+
+  A malformed or non-keyword value raises `SigilGuard.ConfigError`.
   """
   @spec validate!(keyword()) :: keyword()
   def validate!(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      validate_options!(opts)
+    else
+      raise_invalid_config()
+    end
+  end
+
+  def validate!(_), do: raise_invalid_config()
+
+  defp validate_options!(opts) do
     with :ok <- reject_removed_keys(opts),
          :ok <- reject_unknown_keys(opts),
          :ok <- reject_legacy_values(opts),
@@ -120,7 +132,8 @@ defmodule SigilGuard.Config do
     end
   end
 
-  def validate!(_) do
+  @spec raise_invalid_config() :: no_return()
+  defp raise_invalid_config do
     raise SigilGuard.ConfigError.new(:sigil_guard, :invalid_config, "expected a keyword list")
   end
 

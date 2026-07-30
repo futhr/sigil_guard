@@ -458,7 +458,8 @@ event, and emit no telemetry. The `%SigilGuard.Audit{}` struct and
 `tip/1` returns the last event's coordinates without verifying the chain
 (verification stays in `verify_chain/3`); an empty list fails with
 `:empty_chain`, an unsigned last event with `:unsigned_event`. `query/2`
-options form a closed set; unknown keys fail with `:invalid_query`:
+options MUST be a keyword list and form a closed set; malformed lists and
+unknown keys fail with `:invalid_query`:
 
 | Option | Type | Semantics |
 |--------|------|-----------|
