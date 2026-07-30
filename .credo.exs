@@ -4,7 +4,7 @@
       name: "default",
       files: %{
         included: ["lib/", "test/"],
-        excluded: [~r"/_build/", ~r"/deps/", ~r"/native/"]
+        excluded: [~r"/_build/", ~r"/deps/"]
       },
       plugins: [],
       requires: [],
@@ -26,7 +26,7 @@
           # ── Design ───────────────────────────────────────
           {Credo.Check.Design.SkipTestWithoutComment, []},
           {Credo.Check.Design.TagFIXME, []},
-          {Credo.Check.Design.TagTODO, [exit_status: 0]},
+          {Credo.Check.Design.TagTODO, []},
 
           # ── Readability ──────────────────────────────────
           # AliasAs — Backend.Elixir can't alias without :as
@@ -74,6 +74,7 @@
           {Credo.Check.Refactor.FilterReject, []},
           {Credo.Check.Refactor.FunctionArity, [max_arity: 5]},
           {Credo.Check.Refactor.IoPuts, []},
+          {Credo.Check.Refactor.LongQuoteBlocks, []},
           # MapInto — incompatible with Elixir >= 1.8.0
           {Credo.Check.Refactor.MapInto, false},
           {Credo.Check.Refactor.MapJoin, []},
@@ -128,8 +129,6 @@
           {Credo.Check.Design.DuplicatedCode, false},
           # ExpensiveEmptyEnumCheck — length == 0 is clearer in tests
           {Credo.Check.Warning.ExpensiveEmptyEnumCheck, false},
-          # LongQuoteBlocks — NifCase has legitimate quote blocks
-          {Credo.Check.Refactor.LongQuoteBlocks, false},
           # MultiAlias — multi-alias grouping is fine
           {Credo.Check.Readability.MultiAlias, false},
           # NestedFunctionCalls — too noisy for Map.get/Keyword.get
