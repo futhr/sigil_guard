@@ -114,12 +114,14 @@ defmodule SigilGuard.Audit.Anchor.StoreTest do
     event = [:sigil_guard, :audit, :anchor_store, :put, :stop]
     handler = "anchor-store-test-#{System.unique_integer([:positive])}"
     parent = self()
+    expected_store = inspect(MemoryStore)
 
     :telemetry.attach(
       handler,
       event,
       fn ^event, _, metadata, _ ->
-        send(parent, {:anchor_store, metadata})
+        if metadata.anchor_store == expected_store,
+          do: send(parent, {:anchor_store, metadata})
       end,
       nil
     )
@@ -145,12 +147,14 @@ defmodule SigilGuard.Audit.Anchor.StoreTest do
     event = [:sigil_guard, :audit, :anchor_store, :put, :stop]
     handler = "anchor-store-unknown-test-#{System.unique_integer([:positive])}"
     parent = self()
+    expected_store = inspect(UnknownResultStore)
 
     :telemetry.attach(
       handler,
       event,
       fn ^event, _, metadata, _ ->
-        send(parent, {:anchor_store, metadata})
+        if metadata.anchor_store == expected_store,
+          do: send(parent, {:anchor_store, metadata})
       end,
       nil
     )
