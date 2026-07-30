@@ -1,6 +1,6 @@
 # SigilGuard Quick Start
 
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fquick-start.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fquick-start.livemd)
 
 This notebook runs SigilGuard from a local checkout and demonstrates the first
 scan, gate verdicts, and redaction. It is designed for offline validation from

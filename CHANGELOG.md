@@ -38,7 +38,7 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
 
 <!-- changelog -->
 
-## [v0.2.0](https://github.com/futhr/sigil_guard/compare/v0.1.1...v0.2.0) (2026-06-10)
+## [v0.2.0](https://github.com/refpath/sigil_guard/compare/v0.1.1...v0.2.0) (2026-06-10)
 
 
 
@@ -61,7 +61,7 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
 
 * use force-build for NIF compilation in CI by Tobias Bohwalli
 
-## [v0.1.1](https://github.com/futhr/sigil_guard/compare/v0.1.0...v0.1.1) (2026-04-06)
+## [v0.1.1](https://github.com/refpath/sigil_guard/compare/v0.1.0...v0.1.1) (2026-04-06)
 
 
 
@@ -70,7 +70,7 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
 
 * add NIF version features and musl/LTO config for precompiled builds by Tobias Bohwalli
 
-## [v0.1.0](https://github.com/futhr/sigil_guard/compare/v0.1.0...v0.1.0) (2026-04-03)
+## [v0.1.0](https://github.com/refpath/sigil_guard/compare/v0.1.0...v0.1.0) (2026-04-03)
 
 
 

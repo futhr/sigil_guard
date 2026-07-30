@@ -1,6 +1,6 @@
 # Audit Export And Proofs
 
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Faudit-export-and-proofs.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Faudit-export-and-proofs.livemd)
 
 This notebook builds a signed audit chain, creates portable checkpoint
 evidence, verifies inclusion and consistency proofs, and verifies a signed

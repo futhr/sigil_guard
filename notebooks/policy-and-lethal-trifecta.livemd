@@ -1,6 +1,6 @@
 # Policy And Lethal Trifecta
 
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fpolicy-and-lethal-trifecta.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fpolicy-and-lethal-trifecta.livemd)
 
 This notebook demonstrates the R.06 row-10 lethal-trifecta rule: private data,
 untrusted content, and an external sink must not cross without a deterministic

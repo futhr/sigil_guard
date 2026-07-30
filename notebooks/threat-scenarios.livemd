@@ -1,6 +1,6 @@
 # Threat Scenarios
 
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Ffuthr%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fthreat-scenarios.livemd)
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fthreat-scenarios.livemd)
 
 This notebook demonstrates selected SigilGuard threat-model controls end to
 end: tool poisoning, rug pulls, and schema injection. It runs against the local

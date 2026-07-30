@@ -4,9 +4,9 @@
 
 [![Hex.pm](https://img.shields.io/hexpm/v/sigil_guard.svg)](https://hex.pm/packages/sigil_guard)
 [![Docs](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/sigil_guard)
-[![CI](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/futhr/sigil_guard/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/futhr/sigil_guard/branch/main/graph/badge.svg)](https://codecov.io/gh/futhr/sigil_guard)
-[![License](https://img.shields.io/github/license/futhr/sigil_guard.svg)](LICENSE)
+[![CI](https://github.com/refpath/sigil_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/refpath/sigil_guard/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/refpath/sigil_guard/branch/main/graph/badge.svg)](https://codecov.io/gh/refpath/sigil_guard)
+[![License](https://img.shields.io/github/license/refpath/sigil_guard.svg)](LICENSE)
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
