@@ -50,8 +50,6 @@ defmodule SigilGuard.StreamingVectorFixture do
     per_pattern_vectors() ++ special_vectors() ++ confusable_vectors()
   end
 
-  # -- Per-pattern split vectors ----------------------------------------------
-
   defp per_pattern_vectors do
     Enum.flat_map(@pattern_texts, fn {name, text} ->
       {offset, length} = span(text, name)
@@ -63,8 +61,6 @@ defmodule SigilGuard.StreamingVectorFixture do
       ]
     end)
   end
-
-  # -- Special split vectors --------------------------------------------------
 
   defp special_vectors do
     mid_codepoint = "café AKIAIOSFODNN7EXAMPLE end"
@@ -80,8 +76,6 @@ defmodule SigilGuard.StreamingVectorFixture do
     ]
   end
 
-  # -- Unicode-confusable negatives (MUST NOT match or redact) -----------------
-
   defp confusable_vectors do
     cyrillic = "fake " <> @cyrillic_a <> "KIAIOSFODNN7EXAMPLE end"
     too_short = "near AKIAIOSFODNN7EXAMP end"
@@ -91,8 +85,6 @@ defmodule SigilGuard.StreamingVectorFixture do
       vector("confusable.too_short_key", split_at(too_short, 7))
     ]
   end
-
-  # -- Vector construction (golden values from the implementation) ------------
 
   defp vector(name, chunks) do
     text = IO.iodata_to_binary(chunks)

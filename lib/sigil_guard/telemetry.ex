@@ -141,12 +141,12 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :agent_trust, :quarantine]
   ]
 
-  # 1.0 attribute namespace (SP.05 D16): `sigilguard.*` throughout. The mapping is
+  # The 1.0 attribute namespace is `sigilguard.*` throughout. The mapping is
   # mechanical - leading `sigil.` becomes `sigilguard.` and the redundant
   # `.security.` segment is dropped - plus the exact-name exceptions (hashed
-  # actor/identity/confirmation.actor, `content_hash` to the SP.01 subject
-  # `payload.digest`, and the `<subject>.digest` family). The legacy
-  # `sigil.registry.*` and `sigil.envelope.*` attributes are removed (SP.12).
+  # actor/identity/confirmation.actor, `content_hash` to the attestation subject
+  # `payload.digest`, and the `<subject>.digest` family). Legacy
+  # `sigil.registry.*` and `sigil.envelope.*` attributes are removed.
   @attribute_map %{
     action: "sigilguard.action",
     action_digest: "sigilguard.action.digest",
@@ -207,9 +207,9 @@ defmodule SigilGuard.Telemetry do
     verdict: "sigilguard.verdict"
   }
 
-  # High-cardinality attributes (SP.05 D16): digests, hashes, opaque ids, and
-  # URIs. Dropped unless `include_high_cardinality: true` so metric pipelines
-  # stay bounded while span exporters can opt in.
+  # Drop digests, hashes, opaque ids, and URIs unless
+  # `include_high_cardinality: true`, keeping metric dimensions bounded while
+  # allowing span exporters to opt in.
   @high_cardinality_attributes [
     "sigilguard.action.digest",
     "sigilguard.actor.hash",
@@ -286,8 +286,8 @@ defmodule SigilGuard.Telemetry do
   Convert SigilGuard telemetry metadata to OpenTelemetry-style attributes.
 
   Official semantic-convention names are used only where they clearly fit
-  (`url.full`). Every other attribute uses the `sigilguard.*` namespace (SP.05
-  D16). High-cardinality attributes (digests, hashes, opaque ids, URIs) are
+  (`url.full`). Every other attribute uses the `sigilguard.*` namespace.
+  High-cardinality attributes (digests, hashes, opaque ids, URIs) are
   dropped unless `include_high_cardinality: true` is passed in `opts`, so metric
   pipelines stay bounded while span exporters can opt in.
   """

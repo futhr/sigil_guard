@@ -25,7 +25,7 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
     on_exit(fn -> Cache.clear() end)
   end
 
-  test "matrix produces every SP.02 trust-bundle error atom" do
+  test "matrix produces every trust-bundle error atom" do
     expected = MapSet.new(expected_error_atoms())
 
     produced =

@@ -127,7 +127,7 @@ defmodule SigilGuard.ScannerTest do
       assert hit.name == "custom"
     end
 
-    test "consumes a resolved bundle secret set (SP.04)" do
+    test "consumes a resolved bundle secret set" do
       {:ok, %{secret: secret}} =
         SigilGuard.PatternSets.resolve([
           %{"set" => "secret", "name" => "custom_key", "regex" => "XK-[0-9]{6}"}

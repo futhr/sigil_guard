@@ -9,13 +9,13 @@ defmodule SigilGuard.Audit.ProofTest do
   alias SigilGuard.Audit.Proof
   alias SigilGuard.AuditProofFixture, as: Fixture
 
-  # The anchor root from SP.05's five-event golden vector; pinned as a literal so
+  # The anchor root from audit's five-event golden vector; pinned as a literal so
   # a change to leaf/node hashing is caught even if the fixture regenerates.
   @root_5 "14ba3acb7050e49d3f2c3d633a8057ef39d936281298fb23fe215c774179aa0b"
 
   defp load(name), do: Jason.decode!(File.read!(Fixture.path(name)))
 
-  describe "golden vectors (SP.05 five-event tree)" do
+  describe "golden vectors (audit five-event tree)" do
     test "committed fixtures regenerate byte-identically" do
       assert File.read!(Fixture.path("events.json")) == Fixture.events_json()
       assert File.read!(Fixture.path("tree.json")) == Fixture.tree_json()
@@ -59,7 +59,7 @@ defmodule SigilGuard.Audit.ProofTest do
       assert tree["roots"]["5"] == @root_5
     end
 
-    test "the committed inclusion proofs match the SP.05 path table" do
+    test "the committed inclusion proofs match the audit path table" do
       %{"proofs" => proofs} = load("inclusion_5.json")
       tree = load("tree.json")
       [h0, h1, h2, h3, h4] = tree["leaves"]
@@ -241,7 +241,7 @@ defmodule SigilGuard.Audit.ProofTest do
   end
 
   describe "consistency/2 generation" do
-    test "the committed proofs match the SP.05 node table" do
+    test "the committed proofs match the audit node table" do
       tree = load("tree.json")
       [_, _, h2, h3, _] = tree["leaves"]
       h4 = tree["nodes"]["H4"]
@@ -405,7 +405,7 @@ defmodule SigilGuard.Audit.ProofTest do
     end
   end
 
-  describe "properties (SP.05 promotion/RFC equality; R.04)" do
+  describe "promotion-tree and RFC equality properties" do
     test "the promotion tree root equals the RFC 9162 root for every size 1..256" do
       events = build_chain(256)
       {:ok, leaves} = Checkpoint.leaf_hashes(events)

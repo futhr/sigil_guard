@@ -129,9 +129,8 @@ defmodule SigilGuard.Runtime.Stream do
 
   defp contained?(hit, emit_size), do: hit.offset + hit.length <= emit_size
 
-  # The effective holdback window is at least the largest active pattern's
-  # `max_match_bytes` (SP.04 Holdback Invariant): a configured window smaller
-  # than that maximum is raised so no match can straddle a chunk boundary.
+  # Raise a configured holdback below the largest active `max_match_bytes` so
+  # no match can straddle a chunk boundary.
   defp stream_window_bytes(opts) do
     max(configured_window(opts), active_max_match_bytes(opts))
   end

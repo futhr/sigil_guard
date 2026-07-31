@@ -191,8 +191,7 @@ defmodule SigilGuard.Config do
 
   defp valid_trust_mapping?(_), do: false
 
-  # A pattern is an exact string or a single trailing `*` (prefix match); a `*`
-  # in any other position, or more than one, is rejected (SP.10 closed grammar).
+  # A pattern is an exact string or a single trailing `*` prefix match.
   defp valid_mapping_pattern?(pattern) when is_binary(pattern) do
     case :binary.matches(pattern, "*") do
       [] -> true
@@ -203,7 +202,7 @@ defmodule SigilGuard.Config do
 
   defp valid_mapping_pattern?(_), do: false
 
-  @doc "Return the configured ordered actor-to-trust mappings (SP.10)."
+  @doc "Return the configured actor-to-trust mappings in evaluation order."
   @spec trust_mappings() :: [{String.t(), SigilGuard.Identity.trust_level()}]
   def trust_mappings do
     Application.get_env(:sigil_guard, :trust_mappings, [])

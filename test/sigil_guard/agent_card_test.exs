@@ -413,7 +413,7 @@ defmodule SigilGuard.AgentCardTest do
     end
   end
 
-  describe "JWS-to-DSSE parity (M3.22)" do
+  describe "JWS-to-DSSE parity" do
     test "one keypair signs the JWS and DSSE forms; each verifies under its own verifier" do
       {:ok, card} = AgentCard.new(valid_card())
       {:ok, card_json} = JCS.encode(card)

@@ -21,11 +21,11 @@ defmodule SigilGuard.Quarantine do
 
   @prefilter_pattern ~r/(instruction|exfiltrate|send|upload|post|system|developer|reveal|dump|print|repeat|extract|ask|prompt|request|collect|when|before|after|<!--|display|visibility|<script)/i
 
-  # The built-in `poisoning` set (SP.04); everything else is the `injection` set.
+  # The built-in `poisoning` set is explicit; all other indicators are injection.
   @poisoning_indicator_ids [:tool_poisoning_directive]
 
   @doc """
-  Return the built-in indicators for the `:injection` or `:poisoning` set (SP.04).
+  Return the built-in indicators for the `:injection` or `:poisoning` set.
 
   These are the defaults `SigilGuard.PatternSets` uses when a trust bundle
   supplies neither set.
@@ -194,7 +194,7 @@ defmodule SigilGuard.Quarantine do
     ]
   end
 
-  # A `[]` prefilter means "always scan" (SP.04); otherwise gate on the tokens.
+  # An empty prefilter means “always scan”; otherwise require a matching token.
   defp prefilter_active?(%{prefilter: []}, _), do: true
 
   defp prefilter_active?(%{prefilter: prefilter}, lowercase),

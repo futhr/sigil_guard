@@ -129,7 +129,7 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     :ok
   end
 
-  describe "D17 facade contracts" do
+  describe "export compatibility facade contracts" do
     test "scan/1 returns the stable clean and hit shapes" do
       assert {:ok, "safe text"} = SigilGuard.scan("safe text")
 

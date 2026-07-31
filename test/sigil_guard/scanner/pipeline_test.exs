@@ -270,7 +270,7 @@ defmodule SigilGuard.Scanner.PipelineTest do
     end
   end
 
-  describe "hit-map span (D17 additive)" do
+  describe "hit-map span (export compatibility additive)" do
     test "enriched hits carry a span equal to the flat offset/length" do
       assert {:hit, [hit]} = Scanner.scan("key=AKIAIOSFODNN7EXAMPLE")
       assert hit.span == {hit.offset, hit.length}

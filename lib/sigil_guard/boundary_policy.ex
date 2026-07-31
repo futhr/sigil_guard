@@ -8,28 +8,28 @@ defmodule SigilGuard.BoundaryPolicy do
   verdict is the strongest contribution under the total order
   `:allow < :redact < :confirm < :quarantine < :block`.
 
-  Combination order (SP.04, Decision Combination):
+  Combination order:
 
   1. Boundary validation failure blocks terminally.
   2. Kernel invariants (never overridable): `trust_zone: :untrusted` at
      `:tool_request` blocks; secret hits headed to an external sink block or
      redact per `:on_sensitive`; quarantine indicators quarantine.
-  3. Sandbox mismatch matrix (SP.04): at the tool phases, when the boundary
+  3. Sandbox mismatch matrix: at the tool phases, when the boundary
      declares a `tool` or a `sandbox`, the side-effect class and `isolation_level`
      select a cell; an absent/`:none` isolation defaults to `:quarantine` (reason
      `:sandbox_required`) unless a matching `[rules]` line carries an `isolation:`
      matcher - the only sanctioned weakening. A tool-phase boundary that declares
-     neither a tool nor a sandbox is out of the matrix's scope (SP.07).
-  4. Repo policy facts (SP.11): the `:repo_facts` map contributes `:block` on a
+     neither a tool nor a sandbox is out of the matrix's scope.
+  4. Repository policy facts: the `:repo_facts` map contributes `:block` on a
      repo `block` verdict and `:confirm` on `require_approval`; matched repo
      rules surface in the explanation.
   5. Policy-file `[rules]` verdict: the strongest matching rule, else the file
      `default`; a loaded policy with no `default` line contributes `:confirm`.
-  6. Host hooks (SP.04, `SigilGuard.Hooks`): the phase-matching callback on each
+  6. Host hooks: the phase-matching `SigilGuard.Hooks` callback on each
      `:hooks` module may contribute `:block`/`:confirm` and advisory signals
      (risk may only raise; indicators join with source `:hook`).
 
-  The advisory `:adaptive_detector` (SP.04, `SigilGuard.AdaptiveDetector`) is
+  The advisory `:adaptive_detector` (`SigilGuard.AdaptiveDetector`) is
   never a verdict source: it may only raise risk and add indicators (source
   `:adaptive`); a degraded run records `:adaptive_error` in the audit metadata.
 
@@ -37,7 +37,7 @@ defmodule SigilGuard.BoundaryPolicy do
 
   ## Examples
 
-  The canonical policy's first rules encode R.06's lethal trifecta - private
+  The canonical policy's first rules encode the lethal trifecta—private
   data, untrusted-content exposure, and an external sink. Low- and medium-trust
   actors are blocked outright; a high-trust actor is routed to `confirm`:
 
@@ -85,7 +85,7 @@ defmodule SigilGuard.BoundaryPolicy do
 
   @sandbox_phases [:tool_request, :tool_result]
 
-  # Side-effect mismatch matrix (SP.04): class -> isolation level -> verdict.
+  # Side-effect class and isolation level determine the mismatch verdict.
   # `:absent` is the nil / omitted level; it is not a member of the isolation
   # enum. `read`/`write`/`execute`/`network` are the matrix classes.
   @sandbox_matrix %{
@@ -119,10 +119,10 @@ defmodule SigilGuard.BoundaryPolicy do
     }
   }
 
-  # Manifest side-effect values (SP.03: none read write delete execute
-  # privileged) plus the matrix-native `network` class, mapped to the four
-  # matrix classes. Unmapped/`none` values contribute no class; the strictest
-  # remaining cell decides. Fail-closed: `delete` folds into `write`,
+  # Manifest side effects (`none`, `read`, `write`, `delete`, `execute`, and
+  # `privileged`) plus the matrix-native `network` value map to four classes.
+  # Unmapped and `none` values contribute no class; the strictest remaining
+  # cell decides. To fail closed, `delete` folds into `write` and
   # `privileged` into `execute`.
   @class_of %{
     "read" => :read,
@@ -141,7 +141,7 @@ defmodule SigilGuard.BoundaryPolicy do
   Evaluate a boundary and return a `SigilGuard.Decision`.
 
   Options: `:policy` (compiled policy, or nil), `:on_sensitive`
-  (`:block | :redact`, default `:block`), `:repo_facts` (the SP.11
+  (`:block | :redact`, default `:block`), `:repo_facts` (the repository
   `RepoPolicy.policy_facts/2` map, or nil), `:hooks` (a list of
   `SigilGuard.Hooks` modules in invocation order), `:hook_timeout_ms`
   (default `5_000`), `:adaptive_detector` (a `SigilGuard.AdaptiveDetector`
@@ -169,8 +169,6 @@ defmodule SigilGuard.BoundaryPolicy do
     emit(decision)
     decision
   end
-
-  # -- Combination ------------------------------------------------------------
 
   defp decide(boundary, opts) do
     matching = policy_matching_rules(boundary, opts)
@@ -239,10 +237,10 @@ defmodule SigilGuard.BoundaryPolicy do
     end
   end
 
-  # Repo policy facts (SP.11). The `:repo_facts` map is the exact
-  # `RepoPolicy.policy_facts/2` shape. `require_approval` maps to `:confirm`
-  # (SP.07); `block` to `:block`; `allow` contributes nothing. The matched repo
-  # rules surface in the decision explanation, namespaced `repo.<rule_id>`.
+  # The `:repo_facts` map is the exact `RepoPolicy.policy_facts/2` shape.
+  # `require_approval` maps to `:confirm`, `block` to `:block`, and `allow`
+  # contributes nothing. Matched rules appear in the decision explanation
+  # under `repo.<rule_id>`.
   defp repo_facts(opts) do
     case Keyword.get(opts, :repo_facts) do
       %{verdict: verdict} = facts -> repo_contribution(verdict, facts)
@@ -268,9 +266,9 @@ defmodule SigilGuard.BoundaryPolicy do
 
   defp repo_rule(_), do: rule("repo.rule", "repo policy rule")
 
-  # Side-effect mismatch matrix (SP.04). Applies only at the tool phases and
-  # only when no matching `[rules]` line carries an `isolation:` matcher - that
-  # explicit override is the sole sanctioned weakening of the matrix, and the
+  # Apply the side-effect mismatch matrix only at tool phases and
+  # only when no matching `[rules]` line carries an `isolation:` matcher. That
+  # explicit override weakens the matrix deliberately, and the
   # overriding rule's verdict flows through the normal policy contribution.
   defp sandbox_matrix(%Boundary{phase: phase} = boundary, matching)
        when phase in @sandbox_phases do
@@ -293,8 +291,8 @@ defmodule SigilGuard.BoundaryPolicy do
   # (whose side effects need isolation) or a `sandbox` (an isolation level to
   # check). A tool-phase boundary with neither is out of scope. Standalone this
   # keeps the fail-closed default for any declared tool (including an unverified
-  # manifest -> class `execute`); in the runtime gate it makes the matrix opt-in
-  # by tool/sandbox presence (SP.07 Gate <-> Kernel Delegation).
+  # manifest, which maps to `execute`); in the runtime gate it makes the matrix
+  # opt-in when a tool or sandbox is present.
   defp sandbox_scoped?(%Boundary{tool: tool, sandbox: sandbox}) do
     is_map(tool) or is_map(sandbox)
   end
@@ -324,7 +322,7 @@ defmodule SigilGuard.BoundaryPolicy do
 
   defp sandbox_level(_), do: :absent
 
-  # No verified manifest means class `execute` (SP.04); a verified manifest
+  # No verified manifest means class `execute`; a verified manifest
   # contributes its declared side-effect classes.
   defp sandbox_classes(%Boundary{tool: tool}) when is_map(tool) do
     if verified_manifest?(tool) do
@@ -402,8 +400,6 @@ defmodule SigilGuard.BoundaryPolicy do
     |> Enum.flat_map(&elem(&1, 1))
   end
 
-  # -- Predicates -------------------------------------------------------------
-
   defp secret_hit?(hit) when is_map(hit) do
     category(hit) in @secret_categories
   end
@@ -421,8 +417,6 @@ defmodule SigilGuard.BoundaryPolicy do
   defp quarantine_indicator?(_), do: false
 
   defp truthy?(value), do: value not in [nil, false]
-
-  # -- Decision assembly ------------------------------------------------------
 
   defp terminal_block(boundary, reason) do
     build_decision(boundary, :block, [rule("boundary.invalid", Atom.to_string(reason))],

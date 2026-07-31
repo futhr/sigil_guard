@@ -6,7 +6,7 @@ defmodule SigilGuard.RuntimeDependencySetTest do
   @expected_runtime_dependencies MapSet.new([:jason, :nimble_options, :telemetry])
   @expected_otp_extra_applications MapSet.new([:crypto, :logger])
 
-  test "runtime dependency closure is the D9 minimal set" do
+  test "runtime dependency closure contains only the approved minimal set" do
     assert runtime_dependency_closure(Mix.Project.config(), Mix.Dep.Lock.read()) ==
              @expected_runtime_dependencies
   end

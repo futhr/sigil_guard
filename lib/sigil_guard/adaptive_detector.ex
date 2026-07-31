@@ -95,8 +95,6 @@ defmodule SigilGuard.AdaptiveDetector do
 
   defp empty, do: %{indicators: [], risk_level: nil, error: nil}
 
-  # -- Per-element validation (all-or-nothing) --------------------------------
-
   defp validate_all(indicators) do
     if Enum.all?(indicators, &well_formed?/1), do: {:ok, indicators}, else: :error
   end
@@ -115,15 +113,11 @@ defmodule SigilGuard.AdaptiveDetector do
   defp valid_note?(nil), do: true
   defp valid_note?(note), do: is_binary(note)
 
-  # -- Risk ladder ------------------------------------------------------------
-
   defp strongest_risk([]), do: nil
 
   defp strongest_risk(severities) do
     Enum.max_by(severities, &Map.fetch!(@risk_rank, &1))
   end
-
-  # -- Bounded invocation -----------------------------------------------------
 
   defp run_bounded(fun, timeout) do
     parent = self()

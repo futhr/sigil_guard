@@ -121,8 +121,8 @@ defmodule SigilGuard.Audit.Checkpoint do
   @doc """
   Return the domain-separated leaf hash `LEAF(h) = SHA-256("sigil-audit-leaf-v1:" || h)`.
 
-  `h` is the event `hmac` exactly as stored (64 lowercase-hex ASCII bytes, never
-  the decoded 32 bytes). The result is the raw 32-byte hash (SP.05, SP.09).
+  `h` is the event `hmac` exactly as stored (64 lowercase-hex ASCII bytes,
+  never the decoded 32 bytes). The result is the raw 32-byte hash.
   """
   @spec leaf_hash(String.t()) :: binary()
   def leaf_hash(hmac) when is_binary(hmac), do: :crypto.hash(:sha256, [@leaf_prefix, hmac])
@@ -130,8 +130,8 @@ defmodule SigilGuard.Audit.Checkpoint do
   @doc """
   Return the domain-separated node hash `NODE(l, r) = SHA-256("sigil-audit-node-v1:" || l || r)`.
 
-  `l` and `r` are raw 32-byte child hashes; the result is the raw 32-byte parent
-  hash (SP.05, SP.09).
+  `l` and `r` are raw 32-byte child hashes; the result is the raw 32-byte
+  parent hash.
   """
   @spec node_hash(binary(), binary()) :: binary()
   def node_hash(left, right) when is_binary(left) and is_binary(right),
@@ -198,12 +198,12 @@ defmodule SigilGuard.Audit.Checkpoint do
   end
 
   @doc """
-  Build the DSSE checkpoint-state statement for `checkpoint` (SP.05, SP.09).
+  Build the DSSE checkpoint-state statement for `checkpoint`.
 
   Returns the in-toto Statement whose registered predicate type is
   `https://sigilguard.dev/audit-checkpoint-state/v1` and whose predicate binds
   the audit state `(merkle_root, tree_size, generated_at)` - `tree_size` is the
-  event count as a JSON string per the SP.01 growable-counter rule, and
+  event count as a JSON string to preserve growable-counter compatibility, and
   `chain_id` is included only when present. The single subject `checkpoint` is
   digested with `digest/1` over the unchanged local record, so signed and
   unsigned checkpoints yield the same subject digest. This wraps exports and

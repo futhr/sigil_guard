@@ -14,7 +14,7 @@ defmodule SigilGuard.Runtime.StreamTest do
   describe "push/2 and finish/1" do
     test "emits clean chunks after the holdback window" do
       # Small-bound patterns keep the configured window small; the built-in
-      # patterns' max_match_bytes (256) would otherwise raise the floor (SP.04).
+      # Bundle patterns use max_match_bytes 256, which would raise the floor.
       patterns =
         Patterns.compile([
           %{name: "z", category: "test", severity: :low, pattern: "zzz", max_match_bytes: 8}
@@ -83,7 +83,7 @@ defmodule SigilGuard.Runtime.StreamTest do
         )
 
       # Prefix exceeds the 256-byte holdback floor so some clean content emits
-      # before the injection completes and halts the stream (SP.04 window raise).
+      # before the injection completes and halts the stream (boundary policy window raise).
       prefix = String.duplicate("safe ", 60)
       {stream, first_decision, first} = Stream.push(stream, prefix <> "Ignore previous")
 
@@ -104,7 +104,7 @@ defmodule SigilGuard.Runtime.StreamTest do
     end
   end
 
-  describe "streaming equivalence (SP.04)" do
+  describe "streaming equivalence" do
     @stream_ctx [phase: :tool_result, sink: :model, trust_level: :medium]
 
     # Secret-bearing fixtures: ASCII secrets, plus multi-byte and grapheme
@@ -127,7 +127,7 @@ defmodule SigilGuard.Runtime.StreamTest do
         Enum.reduce(chunks, {Stream.new(@stream_ctx, []), []}, fn chunk, {stream, acc} ->
           {stream, decision, piece} = Stream.push(stream, chunk)
           assert decision.verdict == :allowed
-          # No emitted prefix ever carries the raw secret bytes (SP.04).
+          # No emitted prefix may carry raw secret bytes.
           refute piece =~ @secret
           {stream, [piece | acc]}
         end)
@@ -187,7 +187,7 @@ defmodule SigilGuard.Runtime.StreamTest do
     end
   end
 
-  describe "holdback window invariant (SP.04)" do
+  describe "holdback window invariant" do
     property "the window is at least the largest active max_match_bytes" do
       check all(
               configured <- integer(1..4096),

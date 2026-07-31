@@ -23,7 +23,7 @@ defmodule SigilGuard.BenchTest do
     end
   end
 
-  test "committed hit corpora satisfy the SP.15 precondition" do
+  test "committed hit corpora satisfy the benchmark precondition" do
     SigilGuard.Bench.assert_corpus!()
 
     for {name, expected_hits} <- [

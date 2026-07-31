@@ -1,6 +1,6 @@
 defmodule SigilGuard.Audit.Witness do
   @moduledoc """
-  Witness cosigning and threshold verification for audit checkpoints (SP.05).
+  Witness cosigning and threshold verification for audit checkpoints.
 
   Cosigning lets independent witnesses co-attest a checkpoint so verification no
   longer rests on the operator's key alone. It is optional, offline-compatible,
@@ -18,9 +18,10 @@ defmodule SigilGuard.Audit.Witness do
   own trust material is the witness's responsibility around this call.
 
   `verify_threshold/3` counts the distinct witness keyids from a named key set
-  whose signatures verify; a bad or unresolved witness signature is simply not
-  counted (tolerated per SP.01), and fewer than `threshold` fails
-  `:witness_threshold_not_met`. Thresholds are opt-in: an unwitnessed
+  whose signatures verify; a bad or unresolved witness signature is not
+  counted, duplicate signatures are tolerated but ignored, and fewer than
+  `threshold` valid signatures produces `:witness_threshold_not_met`.
+  Thresholds are opt-in: an unwitnessed
   single-signature checkpoint stays valid where no threshold policy applies.
   """
 
@@ -71,11 +72,11 @@ defmodule SigilGuard.Audit.Witness do
   @doc """
   Verify that at least `threshold` distinct witness keyids cosigned `envelope`.
 
-  `witness_keys` maps witness key ids to their public keys. Counts only the keyids
-  whose signatures verify over the envelope's PAE; unresolved or invalid witness
-  signatures are tolerated (not counted). Fewer than `threshold` verified keyids
-  fails `:witness_threshold_not_met`; a structurally invalid envelope surfaces the
-  DSSE error. Returns the sorted verified keyids on success.
+  `witness_keys` maps witness key ids to their public keys. Only key ids whose
+  signatures verify over the envelope's PAE are counted; unresolved or invalid
+  witness signatures are ignored. Fewer than `threshold` verified key ids
+  produces `:witness_threshold_not_met`; a structurally invalid envelope
+  surfaces the DSSE error. Returns the sorted verified key ids on success.
   """
   @spec verify_threshold(map(), %{optional(String.t()) => binary()}, pos_integer()) ::
           {:ok, %{verified_keyids: [String.t()]}}
@@ -101,8 +102,6 @@ defmodule SigilGuard.Audit.Witness do
         {:error, reason}
     end
   end
-
-  # -- Consistency gate -------------------------------------------------------
 
   defp verify_previous(_, nil), do: :ok
 
@@ -131,8 +130,6 @@ defmodule SigilGuard.Audit.Witness do
       _ -> {:error, :invalid_envelope}
     end
   end
-
-  # -- Threshold counting -----------------------------------------------------
 
   # A signature-verification outcome means the envelope is well-formed enough to
   # count per keyid; a structural DSSE error is surfaced as-is.

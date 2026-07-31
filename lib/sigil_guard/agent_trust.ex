@@ -17,7 +17,7 @@ defmodule SigilGuard.AgentTrust do
   A verified `agent_response` envelope authenticates its producer; it does not
   make the response content safe. `verify_agent_response/3` returns the
   statement without touching the payload. Hosts MUST route the response payload
-  through the SP.04 result pipeline (`SigilGuard.Runtime.Gate.evaluate/3` with a
+  through the result boundary (`SigilGuard.Runtime.Gate.evaluate/3` with a
   `:tool_result` phase) before it reaches model context, exactly like a tool
   result:
 
@@ -151,8 +151,8 @@ defmodule SigilGuard.AgentTrust do
   Options: `:request_action_digest` (required; absent fails `:invalid_payload`),
   `:peer_card` (card DSSE envelope resolving the agent's own keys), `:payload`
   (response content for digest binding), `:max_skew_ms`, `:now`, `:replay`,
-  `:replay_ttl_ms`. Verification never exempts the payload from the SP.04 result
-  pipeline (see the module doc).
+  `:replay_ttl_ms`. Verification never exempts the payload from the result
+  boundary described in the module documentation.
   """
   @spec verify_agent_response(map(), AgentCard.trust_material(), keyword()) ::
           {:ok, map()} | {:error, verify_response_error()}
@@ -240,8 +240,6 @@ defmodule SigilGuard.AgentTrust do
     match?({:ok, chain} when is_list(chain), fetch_field(map, "delegation_chain"))
   end
 
-  # -- Shared attestation build ----------------------------------------------
-
   defp build_attestation(statement_type, params) do
     case params.peer do
       {:verified, card, card_digest} ->
@@ -317,8 +315,6 @@ defmodule SigilGuard.AgentTrust do
   defp quarantine_unknown(%Decision{verdict: :blocked} = decision), do: decision
   defp quarantine_unknown(%Decision{} = decision), do: %{decision | action: :quarantine}
 
-  # -- Peer card resolution ---------------------------------------------------
-
   defp resolve_peer(opts) do
     case Keyword.get(opts, :peer_card) do
       nil -> {:ok, :unknown}
@@ -374,8 +370,6 @@ defmodule SigilGuard.AgentTrust do
       (Map.has_key?(map, "signatures") or Map.has_key?(map, :signatures))
   end
 
-  # -- Verified-card binding checks ------------------------------------------
-
   defp match_agent_id(card, peer_agent_id) do
     if Map.get(card, "agent_id") == peer_agent_id do
       :ok
@@ -392,8 +386,6 @@ defmodule SigilGuard.AgentTrust do
 
     if capability in names, do: :ok, else: {:error, :unknown_capability}
   end
-
-  # -- Trust derivation -------------------------------------------------------
 
   defp derive_peer_trust(card, payload, opts) do
     resolver = build_resolver(opts)
@@ -447,8 +439,6 @@ defmodule SigilGuard.AgentTrust do
   defp min_level(level, acc) do
     if Identity.compare_trust(level, acc) == :gt, do: acc, else: level
   end
-
-  # -- Response verification helpers -----------------------------------------
 
   defp response_key_material(trust_material, card) do
     base =
@@ -572,8 +562,6 @@ defmodule SigilGuard.AgentTrust do
     end
   end
 
-  # -- Delegation depth -------------------------------------------------------
-
   defp check_delegation_depth(payload, opts) do
     with {:ok, max} <- max_delegation_depth(opts) do
       enforce_delegation_depth(payload, max)
@@ -593,8 +581,6 @@ defmodule SigilGuard.AgentTrust do
       _ -> {:error, :invalid_payload}
     end
   end
-
-  # -- Context / option helpers ----------------------------------------------
 
   defp attest_context(context), do: context
 

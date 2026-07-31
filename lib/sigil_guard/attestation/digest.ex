@@ -46,7 +46,7 @@ defmodule SigilGuard.Attestation.Digest do
   def normalize(value), do: normalize_value(value)
 
   @doc """
-  Compute the payload digest for any SP.01 payload class.
+  Compute the payload digest for any attestation payload class.
   """
   @spec payload_digest(term()) :: {:ok, String.t()} | {:error, error_reason()}
   def payload_digest(payload) when is_binary(payload) do
@@ -72,7 +72,7 @@ defmodule SigilGuard.Attestation.Digest do
   def payload_digest(_), do: {:error, :invalid_payload}
 
   @doc """
-  Compute the shared SP.01 context digest for a statement type.
+  Compute the shared attestation context digest for a statement type.
   """
   @spec context_digest(statement_type(), Context.t() | map() | keyword()) ::
           {:ok, String.t()} | {:error, error_reason()}
@@ -83,7 +83,7 @@ defmodule SigilGuard.Attestation.Digest do
   end
 
   @doc """
-  Return the shared SP.01 context digest preimage for a statement type.
+  Return the shared attestation context digest preimage for a statement type.
   """
   @spec context_preimage(statement_type(), Context.t() | map() | keyword()) ::
           {:ok, map()} | {:error, error_reason()}
@@ -113,7 +113,7 @@ defmodule SigilGuard.Attestation.Digest do
   def context_preimage(_, _), do: {:error, :unknown_statement_type}
 
   @doc """
-  Compute the SP.01 action digest for a statement type.
+  Compute the attestation action digest for a statement type.
   """
   @spec action_digest(statement_type(), term(), Context.t() | map() | keyword(), keyword()) ::
           {:ok, String.t()} | {:error, error_reason()}
@@ -124,7 +124,7 @@ defmodule SigilGuard.Attestation.Digest do
   end
 
   @doc """
-  Return the SP.01 action digest preimage for a statement type.
+  Return the attestation action digest preimage for a statement type.
   """
   @spec action_preimage(statement_type(), term(), Context.t() | map() | keyword(), keyword()) ::
           {:ok, map()} | {:error, error_reason()}

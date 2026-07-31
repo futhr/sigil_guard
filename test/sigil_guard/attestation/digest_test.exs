@@ -61,7 +61,7 @@ defmodule SigilGuard.Attestation.DigestTest do
       assert Digest.payload_digest(list_payload) == {:ok, sha256(canonical_list)}
     end
 
-    test "keeps digest-neutral behavior only for SP.01 metadata namespaces" do
+    test "keeps digest-neutral behavior only for attestation metadata namespaces" do
       payload = %{
         "name" => "repo_file_write",
         "params" => %{"arguments" => %{"path" => "README.md"}}

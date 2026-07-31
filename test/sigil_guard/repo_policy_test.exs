@@ -693,7 +693,7 @@ defmodule SigilGuard.RepoPolicyTest do
   end
 
   describe "policy_facts/2" do
-    test "builds the SP.11 facts shape using rule messages" do
+    test "builds the repository policy facts shape using rule messages" do
       policy =
         compile!(
           rules: [

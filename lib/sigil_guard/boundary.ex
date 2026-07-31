@@ -4,12 +4,12 @@ defmodule SigilGuard.Boundary do
 
   A `%SigilGuard.Boundary{}` gathers everything `SigilGuard.BoundaryPolicy`
   needs to reach a deterministic verdict: the lifecycle phase, the source and
-  sink boundaries, scanner hits and indicators, the SP.01 digests, actor and
+  sink boundaries, scanner hits and indicators, attestation digests, actor and
   tool facts, and the sandbox identity. `new/1` normalizes a struct, map, or
   keyword list; `validate/1` rejects out-of-enum values with typed errors.
 
   `source_sensitivity` is an evaluation fact only - it is never part of the
-  SP.01 context digest. `sandbox_id` and `isolation_level` (from `sandbox`) are
+  context digest. `sandbox_id` and `isolation_level` (from `sandbox`) are
   digest-bound through `SigilGuard.Context`.
   """
 

@@ -329,7 +329,7 @@ defmodule SigilGuard.Audit.ExportTest do
     end
   end
 
-  describe "signed audit event (SP.05)" do
+  describe "signed audit event" do
     test "canonical bytes use exactly the ordered event-hash field list" do
       event = %Audit{
         id: "00000000000000000000000000000001",
@@ -348,7 +348,7 @@ defmodule SigilGuard.Audit.ExportTest do
     end
   end
 
-  describe "create/2 evidence (SP.05)" do
+  describe "create/2 evidence" do
     test "a package without evidence keys stays byte-identical to a 0.2.x export" do
       {:ok, export} = Export.create(build_signed_chain(3), generated_at: @generated_at)
 
@@ -398,7 +398,7 @@ defmodule SigilGuard.Audit.ExportTest do
     end
   end
 
-  describe "verify/3 evidence (SP.05)" do
+  describe "verify/3 evidence" do
     test "verifies a full evidence package" do
       events = build_signed_chain(3)
       {:ok, export} = evidence_export(events)

@@ -49,7 +49,7 @@ defmodule SigilGuard.AttestationErrorTaxonomyTest do
     on_exit(&ReplayStore.clear/0)
   end
 
-  test "every SP.01 error taxonomy atom is produced by a public API scenario" do
+  test "every attestation error taxonomy atom is produced by a public API scenario" do
     produced =
       scenarios()
       |> Enum.map(fn {label, fun} -> {label, fun.()} end)

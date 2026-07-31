@@ -12,8 +12,8 @@ defmodule SigilGuard.AgentCard do
   the card in a DSSE envelope, and `verify/2,3` resolves the issuer against
   bundle-declared card signers, enforces JCS byte-equality, and checks freshness.
 
-  Trust flows from the bundle: bundle-declared issuers (the `"agent_card"`
-  delegate role, SP.02) sign cards, cards list the agent's own keys, and those
+  Trust flows from the bundle: issuers declared in its `"agent_card"` delegate
+  role sign cards, cards list the agent's own keys, and those
   agent keys sign the agent's attestations. Agent keys never appear in the
   bundle. Card trust comes from the bundle, never from the transport that
   delivered the card.
@@ -134,7 +134,7 @@ defmodule SigilGuard.AgentCard do
   def new(_), do: {:error, :invalid_agent_card}
 
   @doc """
-  Compute the SP.13 card digest.
+  Compute the Agent Trust card digest.
 
   Lowercase-hex SHA-256 over the compact JCS bytes of the normalized card.
   """
@@ -199,8 +199,6 @@ defmodule SigilGuard.AgentCard do
 
   defp verify_metadata({:ok, _}), do: %{result: :ok, error: nil}
   defp verify_metadata({:error, reason}), do: %{result: :error, error: reason}
-
-  # -- Issuer resolution ------------------------------------------------------
 
   defp resolve_issuers(%TrustBundle{document: document}) when is_map(document) do
     bundle_keys = bundle_keys(document)
@@ -274,8 +272,6 @@ defmodule SigilGuard.AgentCard do
     Map.reject(map, fn {_, value} -> is_nil(value) end)
   end
 
-  # -- Payload parsing and canonicalization -----------------------------------
-
   defp parse_and_validate(payload) do
     case Jason.decode(payload) do
       {:ok, decoded} -> new(decoded)
@@ -318,8 +314,6 @@ defmodule SigilGuard.AgentCard do
       _ -> {:error, :invalid_agent_card}
     end
   end
-
-  # -- Schema validation ------------------------------------------------------
 
   defp normalize_card(card) do
     case Digest.normalize(card) do
@@ -464,8 +458,6 @@ defmodule SigilGuard.AgentCard do
       _ -> {:error, :invalid_agent_card}
     end
   end
-
-  # -- Leaf helpers -----------------------------------------------------------
 
   defp encode_card(card) do
     case JCS.encode(card) do

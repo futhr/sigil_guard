@@ -755,7 +755,7 @@ defmodule SigilGuard.Runtime.GateTest do
     |> Base.encode16(case: :lower)
   end
 
-  describe "V3 decision contract (SP.07)" do
+  describe "V3 decision contract" do
     @unified [:allow, :redact, :confirm, :quarantine, :block]
 
     property "action is the closed unified verdict and is consistent with the v2 verdict" do
@@ -879,7 +879,7 @@ defmodule SigilGuard.Runtime.GateTest do
     defp consistent_verdict?(:allowed, action), do: action in [:allow, :redact]
     defp consistent_verdict?(:blocked, action), do: action == :block
     # A confirming verdict's unified action is always :confirm; the executable
-    # action moves to `effect` (SP.07 verdict/effect split).
+    # action moves to `effect` (runtime verdict/effect split).
     defp consistent_verdict?({:confirm, _}, action), do: action == :confirm
   end
 end

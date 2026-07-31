@@ -41,8 +41,6 @@ defmodule SigilGuard.BoundaryPolicy.Match do
 
   defp matcher_matches?(_, _, _), do: false
 
-  # -- Value comparisons ------------------------------------------------------
-
   defp present_in?(nil, _), do: false
   defp present_in?(value, values), do: str(value) in values
 
@@ -61,8 +59,6 @@ defmodule SigilGuard.BoundaryPolicy.Match do
   defp category_value_matches?("none", present), do: present == []
   defp category_value_matches?("any", present), do: present != []
   defp category_value_matches?(value, present), do: value in present
-
-  # -- Field extraction -------------------------------------------------------
 
   defp isolation(%Boundary{sandbox: sandbox}) when is_map(sandbox) do
     fetch(sandbox, "isolation_level")

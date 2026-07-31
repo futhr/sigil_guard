@@ -21,7 +21,7 @@ defmodule SigilGuard.TrustBundleTest do
   end
 
   describe "public API shell" do
-    test "exposes the SP.02 struct fields and section accessors" do
+    test "exposes the trust-bundle struct fields and section accessors" do
       bundle = %TrustBundle{
         bundle_id: "example-org-trust",
         sequence: 1,
@@ -54,7 +54,7 @@ defmodule SigilGuard.TrustBundleTest do
       assert TrustBundle.identity_issuers(bundle) == []
     end
 
-    test "pattern_sets/1 resolves the verified patterns section into SP.04 sets" do
+    test "pattern_sets/1 resolves the verified patterns section into boundary policy sets" do
       bundle = %TrustBundle{
         document: %{
           "patterns" => [
@@ -177,7 +177,7 @@ defmodule SigilGuard.TrustBundleTest do
                {:error, :invalid_source}
     end
 
-    test "verify routes malformed envelopes through SP.01 errors" do
+    test "verify routes malformed envelopes through attestation errors" do
       assert TrustBundle.verify(%{"payload" => "encoded"}) == {:error, :invalid_envelope}
       assert TrustBundle.verify("bad") == {:error, :invalid_envelope}
       assert TrustBundle.verify(%{}, :bad_opts) == {:error, :invalid_bundle_format}

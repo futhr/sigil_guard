@@ -319,7 +319,7 @@ defmodule SigilGuard.Attestation.AgentPredicateTest do
   end
 
   describe "action_digest/3" do
-    test "uses the SP.01 agent_request action preimage row" do
+    test "uses the attestation agent_request action preimage row" do
       assert AgentPredicate.action_preimage(:agent_request, request_payload(), []) ==
                {:ok,
                 %{
@@ -345,7 +345,7 @@ defmodule SigilGuard.Attestation.AgentPredicateTest do
                 }}
     end
 
-    test "uses the SP.01 agent_response action preimage row" do
+    test "uses the attestation agent_response action preimage row" do
       assert AgentPredicate.action_preimage(:agent_response, response_payload(),
                request_action_digest: @request_action_digest
              ) ==

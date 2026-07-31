@@ -26,18 +26,18 @@ defmodule SigilGuard.Audit.Proof do
   @inclusion_kind "sigil_guard.audit.inclusion_proof"
   @consistency_kind "sigil_guard.audit.consistency_proof"
   @version 1
-  # Sizes at or above 2^53 are rejected (JSON-safe integer bound, SP.05).
+  # Reject sizes at or above 2^53 so proofs remain exact JSON integers.
   @max_size 9_007_199_254_740_992
   @inclusion_keys ~w(kind version leaf_index tree_size audit_path)
   @consistency_keys ~w(kind version first_size second_size proof_nodes)
   @hex_64 ~r/\A[0-9a-f]{64}\z/
 
-  @typedoc "An inclusion proof object (closed shape; serializes as JSON, SP.05)."
+  @typedoc "A closed, JSON-serializable inclusion proof."
   @type inclusion_proof :: %{
           required(String.t()) => String.t() | non_neg_integer() | [String.t()]
         }
 
-  @typedoc "A consistency proof object (closed shape; serializes as JSON, SP.05)."
+  @typedoc "A closed, JSON-serializable consistency proof."
   @type consistency_proof :: %{
           required(String.t()) => String.t() | non_neg_integer() | [String.t()]
         }
@@ -150,8 +150,6 @@ defmodule SigilGuard.Audit.Proof do
 
   def verify_consistency(_, _, _), do: {:error, :invalid_proof}
 
-  # -- Generation -------------------------------------------------------------
-
   # Walk every level except the root, collecting the sibling of the current
   # index; an unpaired last (promoted) node contributes nothing at that level.
   defp audit_path(levels, leaf_index) do
@@ -181,7 +179,7 @@ defmodule SigilGuard.Audit.Proof do
   end
 
   # RFC 9162 2.1.4.1 SUBPROOF over the promotion tree (root-equal to the RFC
-  # split construction for sizes 1..256, R.04). `m` is the older size, `leaves`
+  # split construction for sizes 1..256). `m` is the older size, `leaves`
   # the newer leaf hashes, `b` the "on the boundary" flag.
   defp subproof(m, leaves, b) do
     n = length(leaves)
@@ -217,8 +215,6 @@ defmodule SigilGuard.Audit.Proof do
 
   defp pow2_below(p, n) when p * 2 < n, do: pow2_below(p * 2, n)
   defp pow2_below(p, _), do: p
-
-  # -- Verification -----------------------------------------------------------
 
   defp verify_path(hmac, leaf_index, tree_size, path, merkle_root) do
     seed = {:ok, {Checkpoint.leaf_hash(hmac), leaf_index, tree_size - 1}}
@@ -259,8 +255,6 @@ defmodule SigilGuard.Audit.Proof do
     do: shift_until_odd(div(fn_, 2), div(sn, 2))
 
   defp shift_until_odd(fn_, sn), do: {fn_, sn}
-
-  # -- Consistency verification (RFC 9162 2.1.4.2) ----------------------------
 
   defp consistency_in_range(first_size, second_size)
        when first_size >= 1 and first_size <= second_size,
@@ -344,8 +338,6 @@ defmodule SigilGuard.Audit.Proof do
   defp power_of_two?(1), do: true
   defp power_of_two?(n) when n > 1 and rem(n, 2) == 0, do: power_of_two?(div(n, 2))
   defp power_of_two?(_), do: false
-
-  # -- Proof object validation (closed shape) ---------------------------------
 
   defp decode_inclusion_proof(proof) when is_map(proof) do
     with true <- closed_keys?(proof, @inclusion_keys),

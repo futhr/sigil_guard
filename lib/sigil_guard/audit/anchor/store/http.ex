@@ -296,7 +296,6 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
 
   defp valid_header?(_), do: false
 
-  # `transport` bundles the resolved `%{url, headers, timeout, opts}`.
   defp post_anchor(record, metadata, transport) do
     body =
       Jason.encode!(%{
@@ -316,8 +315,8 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTP do
     end
   end
 
-  # Route every request through the resolved host `SigilGuard.HTTPClient` (D9):
-  # per-call, then app env, then fail closed - never a direct network call here.
+  # Keep network ownership with the host: resolve a `SigilGuard.HTTPClient`
+  # per call or from application configuration, then fail closed.
   defp do_request(method, body, transport, decode_opts) do
     with {:ok, client} <- resolve_http_client(transport.opts),
          {:ok, response} <- invoke_http_client(client, method, body, transport) do

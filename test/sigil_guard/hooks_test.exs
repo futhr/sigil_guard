@@ -6,8 +6,6 @@ defmodule SigilGuard.HooksTest do
   alias SigilGuard.Boundary
   alias SigilGuard.Hooks
 
-  # -- Fixture hook modules (blockable: tool_request; notify: session_start) ---
-
   defmodule BlockHook do
     @spec on_tool_request(term(), term()) :: term()
     def on_tool_request(_, _), do: {:block, "denied"}

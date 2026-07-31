@@ -89,7 +89,7 @@ defmodule SigilGuard.QuarantineTest do
     end
   end
 
-  describe "built_in_indicators/1 pattern-set split (SP.04)" do
+  describe "built_in_indicators/1 pattern-set split" do
     test "poisoning is the tool-poisoning directive; injection is everything else" do
       poisoning = Quarantine.built_in_indicators(:poisoning)
       injection = Quarantine.built_in_indicators(:injection)

@@ -56,7 +56,7 @@ defmodule SigilGuard.Audit.Export do
       `SigilGuard.Audit.Proof.consistency/2` proof.
 
   The three evidence keys are optional and additive: a package created without
-  them is byte-identical to a 0.2.x export (D17).
+  them is byte-identical to a 0.2.x export.
   """
   @spec create([Audit.t()], keyword()) :: {:ok, t()} | {:error, atom()}
   def create(events, opts \\ [])
@@ -190,8 +190,8 @@ defmodule SigilGuard.Audit.Export do
     end
   end
 
-  # Only present evidence keys are added, so an export without them stays
-  # byte-identical to a 0.2.x package (D17).
+  # Adding only present evidence keys keeps packages without references
+  # byte-identical to 0.2.x exports.
   defp put_evidence(base, statement, inclusion, consistency) do
     base
     |> maybe_put("checkpoint_statement", statement)

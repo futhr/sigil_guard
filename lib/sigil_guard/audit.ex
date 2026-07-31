@@ -90,7 +90,7 @@ defmodule SigilGuard.Audit do
   @redacted_placeholder "redacted-v1"
 
   @doc """
-  Return the privacy-hashed form of a field value (SP.05).
+  Return the privacy-hashed form of a field value.
 
   `hash_field(value, field_hash_key)` returns
   `"fh1:" <> lowercase-hex HMAC-SHA256(field_hash_key, value)`. The field-hash
@@ -101,10 +101,10 @@ defmodule SigilGuard.Audit do
   ## Examples
 
       SigilGuard.Audit.hash_field("did:web:alice", field_hash_key)
-      #=> "fh1:9a0b..."
+      # => "fh1:9a0b..."
 
       SigilGuard.Audit.hash_field("did:web:alice", nil)
-      #=> "redacted-v1"
+      # => "redacted-v1"
 
   """
   @spec hash_field(String.t(), binary() | nil) :: String.t()
@@ -119,7 +119,7 @@ defmodule SigilGuard.Audit do
   def hash_field(_, _), do: @redacted_placeholder
 
   @doc """
-  Apply the SP.05 per-field privacy classification to an event's signed fields.
+  Apply per-field privacy classification to an event's signed fields.
 
   The `hashed`-class `actor` field is replaced by its `hash_field/2` form; the
   `clear`-class fields (`id`, `type`, `action`, `result`, `timestamp`) are left
@@ -303,7 +303,7 @@ defmodule SigilGuard.Audit do
   @query_keys [:from_index, :to_index, :id, :type, :from_time, :to_time]
 
   @doc """
-  Return the last event's coordinates without verifying the chain (SP.05).
+  Return the last event's coordinates without verifying the chain.
 
   A pure read: it never writes and emits no telemetry (verification stays in
   `verify_chain/3`). An empty list fails `:empty_chain`; an unsigned last event
@@ -324,7 +324,7 @@ defmodule SigilGuard.Audit do
   end
 
   @doc """
-  Return the events matching a closed set of filters, in chain order (SP.05).
+  Return the events matching a closed set of filters, in chain order.
 
   A pure read: no writes, no telemetry. The options `:from_index`, `:to_index`,
   `:id`, `:type`, `:from_time`, and `:to_time` compose with AND. Options must be
@@ -355,7 +355,7 @@ defmodule SigilGuard.Audit do
   def query(_, _), do: {:error, :invalid_query}
 
   @doc """
-  Locate each checkpoint's event span within `events` (SP.05).
+  Locate each checkpoint's event span within `events`.
 
   A pure read: no writes, no telemetry. For each checkpoint it finds the
   `first_event_id`/`last_event_id` in `events` and checks the span length
@@ -384,8 +384,6 @@ defmodule SigilGuard.Audit do
   end
 
   def checkpoint_boundaries(_, _), do: {:error, :invalid_query}
-
-  # -- Private --
 
   defp validate_query_keys(opts) do
     if Keyword.keyword?(opts) and Enum.all?(Keyword.keys(opts), &(&1 in @query_keys)),

@@ -67,8 +67,6 @@ defmodule SigilGuard do
   alias SigilGuard.Policy
   alias SigilGuard.Runtime
 
-  # -- Scanning --
-
   @doc """
   Scan text for sensitive content.
 
@@ -116,8 +114,6 @@ defmodule SigilGuard do
   @spec scan_and_redact(String.t(), keyword()) :: String.t()
   def scan_and_redact(text, opts \\ []), do: Backend.impl().scan_and_redact(text, opts)
 
-  # -- Runtime Gate --
-
   @doc """
   Evaluate a boundary-aware runtime decision.
 
@@ -143,8 +139,6 @@ defmodule SigilGuard do
   def guard(payload, context \\ %SigilGuard.Context{}, opts \\ []) do
     Runtime.Gate.evaluate(payload, context, opts)
   end
-
-  # -- Policy --
 
   @doc """
   Evaluate an action against a trust level and return a verdict.

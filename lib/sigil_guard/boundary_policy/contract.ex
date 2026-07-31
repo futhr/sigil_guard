@@ -30,7 +30,7 @@ defmodule SigilGuard.BoundaryPolicy.Contract do
   @typedoc "A credential-violation transform."
   @type transform :: :mask | :hash
 
-  @typedoc "An allowed outbound content class from the SP.01 payload class."
+  @typedoc "An allowed outbound content class derived from the payload class."
   @type content_class :: :text | :structured
 
   @typedoc "Outbound content: UTF-8 `text` binary or a `structured` map/list."
@@ -75,7 +75,7 @@ defmodule SigilGuard.BoundaryPolicy.Contract do
   @doc """
   Apply the `sink` contract to outbound `content` in the normative order.
 
-  Evaluation order (SP.04): content class check, then `credential_transform`
+  Evaluation order: content class check, then `credential_transform`
   replacements, then `digest_only_pii` replacements, then `max_size`
   truncation. A disallowed content class is not transformable and escalates:
   `enforce/4` returns `{:block, "contract.<sink>.class"}`. A `:verdict` of

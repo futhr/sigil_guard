@@ -131,7 +131,7 @@ defmodule SigilGuard.TelemetryTest do
       assert attributes["sigilguard.scanner.error"] == "scanner_failed"
       assert attributes["sigilguard.payload.digest"] == "abc123"
 
-      # The legacy registry/envelope attributes are never emitted (SP.12).
+      # The legacy registry/envelope attributes are never emitted (telemetry compatibility).
       refute Map.has_key?(attributes, "sigil.envelope.status")
       refute Map.has_key?(attributes, "sigil.envelope.reason")
       refute Enum.any?(Map.keys(attributes), &String.contains?(&1, "envelope"))
@@ -187,7 +187,7 @@ defmodule SigilGuard.TelemetryTest do
 
       assert attributes["url.full"] == "https://registry.example.test/patterns/bundle"
       assert attributes["sigilguard.measurement.duration"] == 10
-      # The legacy sigil.registry.* attributes are removed (SP.12).
+      # The legacy sigil.registry.* attributes are removed (telemetry compatibility).
       refute Enum.any?(Map.keys(attributes), &String.contains?(&1, "registry"))
       refute Enum.member?(Map.values(attributes), "patterns/bundle")
     end

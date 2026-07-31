@@ -4,7 +4,7 @@ defmodule SigilGuard.PatternSets do
 
   The three pattern sets - `secret`, `injection`, `poisoning` - are distinct and
   each is independently overridable by a trust bundle. `resolve/1` compiles the
-  SP.02 `patterns` list (whose entry shape SP.04 owns) into consumer-ready sets:
+  trust-bundle `patterns` list into consumer-ready sets:
   the `secret` set feeds `SigilGuard.Scanner` (compiled pattern maps), while
   `injection` and `poisoning` feed `SigilGuard.Quarantine` (indicator maps). A
   set with at least one bundle entry replaces that set's built-in default
@@ -72,8 +72,6 @@ defmodule SigilGuard.PatternSets do
   end
 
   def resolve(_), do: {:error, :invalid_pattern_set}
-
-  # -- Validation -------------------------------------------------------------
 
   defp validate_entries(entries) do
     Enum.reduce_while(entries, {:ok, []}, fn entry, {:ok, acc} ->
@@ -157,8 +155,6 @@ defmodule SigilGuard.PatternSets do
     names = Enum.map(entries, & &1.name)
     length(names) == length(Enum.uniq(names))
   end
-
-  # -- Building consumer shapes -----------------------------------------------
 
   defp build_sets(grouped) do
     defaults = built_in()

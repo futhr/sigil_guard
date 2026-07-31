@@ -1,6 +1,6 @@
 defmodule SigilGuard.Audit.CloudEvents do
   @moduledoc """
-  Project a signed audit event into a CloudEvents 1.0 envelope (SP.05).
+  Project a signed audit event into a CloudEvents 1.0 envelope.
 
   `project/2` maps a `SigilGuard.Audit` event to a CloudEvents structured JSON
   envelope: `type` is the registered `io.sigilguard.decision.v1`, `source` is
@@ -11,7 +11,7 @@ defmodule SigilGuard.Audit.CloudEvents do
   The `data` payload is the privacy-filtered event: the scalar fields verbatim
   (`actor` is whatever the event already carries, so classify it with
   `SigilGuard.Audit.classify/2` first) plus a metadata allowlist of the reserved
-  SP.05 keys only - unknown host keys and raw content are omitted, and
+  signed audit keys only—unknown host keys and raw content are omitted—and
   `trace_id`/`span_id` move to `traceparent` rather than appearing in `data`.
   """
 
@@ -22,7 +22,7 @@ defmodule SigilGuard.Audit.CloudEvents do
   @datacontenttype "application/json"
   @default_source "urn:sigilguard"
 
-  # Reserved SP.05 metadata keys that project into `data.metadata` (clear class).
+  # These signed clear-class keys project into `data.metadata`.
   # `trace_id`/`span_id` are deliberately excluded - they become `traceparent`.
   @reserved_metadata_keys ~w(
     evidence decision_id decision scanner_summary

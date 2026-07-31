@@ -24,7 +24,7 @@ defmodule SigilGuard.Patterns do
   """
 
   @typedoc """
-  Pattern-set category (SP.04). The built-in pipeline emits the closed atom set
+  Pattern-set category. The built-in pipeline emits the closed atom set
   `:secret | :injection | :poisoning`; custom/compatibility-bundle patterns may
   carry a free-form string category.
   """
@@ -45,7 +45,7 @@ defmodule SigilGuard.Patterns do
           optional(:validated) => boolean()
         }
 
-  @typedoc "Pattern set (SP.04): `secret` feeds the scanner; `injection`/`poisoning` feed quarantine."
+  @typedoc "`secret` feeds the scanner; `injection` and `poisoning` feed quarantine."
   @type pattern_set :: :secret | :injection | :poisoning
 
   @type compiled_pattern :: %{
@@ -61,9 +61,9 @@ defmodule SigilGuard.Patterns do
   @default_max_match_bytes 256
   @max_match_bytes_limit 4096
 
-  # `max_match_bytes` bounds the longest span each pattern can match, clamping
-  # unbounded quantifiers (SP.04 Holdback Invariant). It sizes the streaming
-  # holdback window so no secret can straddle a chunk boundary undetected.
+  # `max_match_bytes` is a conservative width for lookarounds, alternation, and
+  # bounded or unbounded quantifiers. It sizes the streaming holdback so no
+  # secret can straddle a chunk boundary undetected.
   @built_in_patterns [
     %{
       name: "aws_access_key",
@@ -136,7 +136,7 @@ defmodule SigilGuard.Patterns do
   @doc """
   Return the largest `max_match_bytes` among `patterns`.
 
-  Sizes the streaming holdback window (SP.04): the effective window MUST be at
+  Sizes the streaming holdback window: the effective window MUST be at
   least this value so no pattern match can straddle a chunk boundary undetected.
   Falls back to the default when the list is empty or a pattern omits the field.
   """
@@ -235,7 +235,7 @@ defmodule SigilGuard.Patterns do
     }
   end
 
-  # Bundle patterns MAY declare `max_match_bytes` in 1..4096 (SP.04); an absent,
+  # Bundle patterns may declare `max_match_bytes` in 1..4096; an absent,
   # out-of-range, or non-integer value defaults to 256.
   defp extract_max_match_bytes(raw) do
     case flex_fetch(raw, :max_match_bytes) do
@@ -293,7 +293,6 @@ defmodule SigilGuard.Patterns do
     end
   end
 
-  # Get a value from a map with atom or string keys.
   defp flex_get(raw, key, default \\ nil) do
     case flex_fetch(raw, key) do
       {:ok, value} -> value

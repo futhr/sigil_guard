@@ -118,7 +118,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
   end
 
   @doc """
-  Load and parse the boundary policy from a repo root (D13, SP.11).
+  Load and parse the repository's boundary-policy file.
 
   Candidate paths are checked in order: `SIGILGUARD_POLICY`,
   `.sigilguard-policy`, `.sigilguard/policy`, `.github/sigilguard-policy`. A
@@ -205,8 +205,6 @@ defmodule SigilGuard.BoundaryPolicy.File do
     |> then(&(&1 == path and File.regular?(path)))
   end
 
-  # -- Top-level line walk ----------------------------------------------------
-
   defp parse_lines(numbered) do
     with {:ok, rest} <- expect_version(numbered),
          {:ok, acc} <- walk_sections(rest, new_acc()) do
@@ -243,8 +241,6 @@ defmodule SigilGuard.BoundaryPolicy.File do
     end
   end
 
-  # -- [repo] : verbatim body, no folding -------------------------------------
-
   defp take_repo(_, %{repo: repo}) when repo != nil, do: {:error, :invalid_policy_file}
 
   defp take_repo(numbered, acc) do
@@ -258,8 +254,6 @@ defmodule SigilGuard.BoundaryPolicy.File do
       {:error, _} -> {:error, :invalid_policy_file}
     end
   end
-
-  # -- [rules] / [contracts] : whitespace folding -----------------------------
 
   defp take_folded_section(header, numbered, acc) do
     if section_seen?(acc, header) do
@@ -291,8 +285,6 @@ defmodule SigilGuard.BoundaryPolicy.File do
       {:error, reason} -> {:error, reason}
     end
   end
-
-  # -- [rules] lines ----------------------------------------------------------
 
   defp rules_line("default " <> rest, _, acc) do
     cond do
@@ -363,8 +355,6 @@ defmodule SigilGuard.BoundaryPolicy.File do
     end
   end
 
-  # -- Line helpers -----------------------------------------------------------
-
   defp fold(numbered) do
     numbered
     |> Enum.reduce([], fn {raw, n}, acc ->
@@ -394,8 +384,6 @@ defmodule SigilGuard.BoundaryPolicy.File do
   defp strip(line), do: String.trim(line)
 
   defp section_header?(line), do: Regex.match?(@section_regex, line)
-
-  # -- Accumulator ------------------------------------------------------------
 
   defp new_acc, do: %{rules: [], default: nil, contracts: %{}, repo: nil, seen: MapSet.new()}
 

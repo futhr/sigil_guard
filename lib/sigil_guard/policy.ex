@@ -272,8 +272,6 @@ defmodule SigilGuard.Policy do
     end
   end
 
-  # -- Private --
-
   @prefix_risk_mappings [
     {"delete_", :high},
     {"drop_", :high},

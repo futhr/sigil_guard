@@ -4,7 +4,7 @@ defmodule SigilGuard.Attestation do
 
   The `_agent_trust` and `_agent_confirmation` keys carry SigilGuard trust
   evidence on guarded payloads. These helpers attach and fetch that metadata
-  while `strip_metadata/1` applies the SP.01 digest strip rule before payload
+  while `strip_metadata/1` applies the attestation digest strip rule before payload
   digest computation.
 
   ## Examples
@@ -257,7 +257,7 @@ defmodule SigilGuard.Attestation do
   def fetch_confirmation(_), do: :error
 
   @doc """
-  Apply the SP.01 metadata strip rule.
+  Apply the attestation metadata strip rule.
 
   The reserved `_agent_trust`, `_agent_confirmation`, and `confirmation_token`
   keys are removed at the payload root and inside the map under `params` in

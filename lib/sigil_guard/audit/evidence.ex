@@ -1,8 +1,8 @@
 defmodule SigilGuard.Audit.Evidence do
   @moduledoc """
-  Audit evidence references binding attestations to audit artifacts (SP.01, SP.05).
+  Audit evidence references bind attestations to audit artifacts.
 
-  An evidence ref is the SP.01 shape `%{"kind" => "checkpoint" | "export" |
+  An evidence ref has the shape `%{"kind" => "checkpoint" | "export" |
   "anchor", "ref" => digest}`, where `ref` is the artifact's `digest/1`. Refs are
   carried in an attestation predicate's `evidence` list and in a signed audit
   event's `metadata["evidence"]`, so a decision, its attestation, and its audit
@@ -24,7 +24,7 @@ defmodule SigilGuard.Audit.Evidence do
   @typedoc "An audit artifact kind referenced by evidence."
   @type kind :: :checkpoint | :export | :anchor
 
-  @typedoc "An SP.01 evidence reference: a `kind` and the artifact's `ref` digest."
+  @typedoc "An evidence `kind` and the referenced artifact digest."
   @type ref :: %{required(String.t()) => String.t()}
 
   @doc """

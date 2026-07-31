@@ -12,7 +12,7 @@ defmodule SigilGuard.TrustBundle do
 
       {:ok, bundle} = SigilGuard.TrustBundle.dev_bundle(cache: false)
       bundle.dev?
-      #=> true
+      # => true
 
       source = {:map, bundle.envelope}
       {:ok, loaded} = SigilGuard.TrustBundle.load(source, cache: false)
@@ -36,7 +36,7 @@ defmodule SigilGuard.TrustBundle do
           | {:map, map()}
           | {:binary, binary()}
 
-  @typedoc "SP.01 envelope errors reused by trust-bundle verification."
+  @typedoc "Attestation-envelope errors reused by trust-bundle verification."
   @type shared_envelope_error ::
           :invalid_envelope
           | :invalid_payload_type
@@ -210,7 +210,7 @@ defmodule SigilGuard.TrustBundle do
   Verify a decoded DSSE trust-bundle envelope.
 
   This verifies the envelope, schema, bundle role, signature threshold,
-  revocations, and freshness checks implemented in SP.02.
+  revocations, and freshness checks for the complete trust bundle.
 
   ## Options
 
@@ -219,7 +219,7 @@ defmodule SigilGuard.TrustBundle do
     * `:max_skew_ms` - accepted future clock skew for bundle and role expiry.
       Defaults to `60_000`.
     * `:enforce_declared_threshold` - when `true`, enforce the bundle role's
-      declared threshold. The 1.0 release line defaults to the D3 effective
+      declared threshold. For compatibility, the 1.0 release line defaults to an effective
       threshold of `1`; bundle documents still carry their declared threshold,
       and root rotation documents always enforce full declared old-root and
       new-root thresholds.
@@ -276,7 +276,7 @@ defmodule SigilGuard.TrustBundle do
   def patterns(%__MODULE__{document: document}), do: list_section(document, "patterns")
 
   @doc """
-  Resolve the verified `patterns` section into the three SP.04 pattern sets.
+  Resolve the verified `patterns` section into the three runtime pattern sets.
 
   Routes the bundle's `patterns` entries through `SigilGuard.PatternSets.resolve/1`:
   each `set` (`secret`, `injection`, `poisoning`) is independently overridable and

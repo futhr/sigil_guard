@@ -17,16 +17,14 @@ defmodule SigilGuard.Backend.Elixir do
   ## Example
 
       SigilGuard.Backend.Elixir.scan("API_KEY=sk_live_abc123", [])
-      #=> {:hit, [%{type: :api_key, match: "sk_live_abc123", ...}]}
+      # => {:hit, [%{type: :api_key, match: "sk_live_abc123", ...}]}
 
       SigilGuard.Backend.Elixir.classify_risk("read_file", [])
-      #=> :low
+      # => :low
 
   """
 
   @behaviour SigilGuard.Backend
-
-  # -- Scanning --
 
   @impl SigilGuard.Backend
   def scan(text, opts), do: SigilGuard.Scanner.scan(text, opts)
@@ -37,8 +35,6 @@ defmodule SigilGuard.Backend.Elixir do
   @impl SigilGuard.Backend
   def scan_and_redact(text, opts), do: SigilGuard.Scanner.scan_and_redact(text, opts)
 
-  # -- Policy --
-
   @impl SigilGuard.Backend
   def evaluate_policy(action, trust_level, opts) do
     SigilGuard.Policy.evaluate(action, trust_level, opts)
@@ -46,8 +42,6 @@ defmodule SigilGuard.Backend.Elixir do
 
   @impl SigilGuard.Backend
   def classify_risk(action, opts), do: SigilGuard.Policy.classify_risk(action, opts)
-
-  # -- Audit --
 
   @impl SigilGuard.Backend
   def audit_sign_event(event, key, prev_hmac) do

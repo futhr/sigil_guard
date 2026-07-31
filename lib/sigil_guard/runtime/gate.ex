@@ -417,8 +417,8 @@ defmodule SigilGuard.Runtime.Gate do
     }
   end
 
-  # SP.07 Gate <-> Kernel Delegation: evaluate the boundary policy kernel over a
-  # normalized `Boundary` and fold its verdict into the gate's combination. The
+  # Evaluate the boundary policy kernel over a normalized `Boundary` and fold
+  # its verdict into the gate's combination. The
   # kernel contributes policy-file `[rules]`, the sandbox matrix, hooks, adaptive
   # signals, and the shared invariants (untrusted-tool-request, secret->external);
   # the gate keeps scanner-failure, quarantine gradations, risk x trust, and the
@@ -477,9 +477,8 @@ defmodule SigilGuard.Runtime.Gate do
     ]
   end
 
-  # Only supply a sandbox when the host declared an isolation level, keeping the
-  # sandbox matrix opt-in in the gate (SP.07); the gate carries no tool
-  # side-effect facts, so it never sets `tool`.
+  # Supply a sandbox only when the host declared an isolation level. The gate
+  # carries no tool side-effect facts, so it never sets `tool`.
   defp boundary_sandbox(%Context{isolation_level: nil}), do: nil
 
   defp boundary_sandbox(%Context{isolation_level: level, sandbox_id: id}) do
@@ -514,7 +513,7 @@ defmodule SigilGuard.Runtime.Gate do
   end
 
   # Map a legacy verdict/action pair to its unified-enum strength so gate and
-  # kernel contributions combine by the SP.07 total order.
+  # Kernel contributions combine by the documented total order.
   defp unified_strength(:blocked, :quarantine), do: :quarantine
   defp unified_strength(:blocked, _), do: :block
   defp unified_strength({:confirm, _}, :quarantine), do: :quarantine
@@ -522,13 +521,13 @@ defmodule SigilGuard.Runtime.Gate do
   defp unified_strength(:allowed, :redact), do: :redact
   defp unified_strength(:allowed, _), do: :allow
 
-  # SP.07 unified verdict enum: a confirming verdict's `action` is `:confirm`; the
+  # A confirming verdict's `action` is `:confirm`; the
   # executable action to run once confirmation is accepted moves to `effect`. Every
   # other verdict's action is already in the closed set.
   defp unified_action({:confirm, _}, _), do: :confirm
   defp unified_action(_, action), do: action
 
-  # `effect` is the post-confirmation executable action (SP.07). For a `:confirm`
+  # `effect` is the post-confirmation executable action. For a `:confirm`
   # decision it is the underlying `:allow`/`:redact`/`:quarantine` the caller runs
   # after acceptance (`:require_approval`/`:confirm`-shaped source actions proceed
   # as `:allow`); for a crossing decision it mirrors the action; a block has none.
@@ -539,7 +538,7 @@ defmodule SigilGuard.Runtime.Gate do
   defp normalize_effect(action) when action in [:allow, :redact, :quarantine], do: action
   defp normalize_effect(_), do: :allow
 
-  # Surface the deciding reason as a typed matched rule (SP.07). The full
+  # Surface the deciding reason as a typed matched rule. The full
   # per-rule delegation flows once the gate routes verdicts through
   # BoundaryPolicy; today the gate's assembled reason is the contributing rule.
   defp matched_rules(nil), do: []

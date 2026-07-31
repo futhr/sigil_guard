@@ -2,20 +2,21 @@ defmodule SigilGuard.Decision do
   @moduledoc """
   Runtime gate decision returned by boundary-aware SigilGuard checks.
 
-  `:action` carries the unified verdict vocabulary: `:allow | :redact | :confirm | :quarantine | :block`, totally
-  ordered `:allow < :redact < :confirm < :quarantine < :block`. `:verdict`
-  keeps the legacy dual vocabulary (`:allowed | :blocked | {:confirm, reason}`)
-  populated alongside for compatibility.
+  `:action` carries the unified verdict vocabulary:
+  `:allow | :redact | :confirm | :quarantine | :block`, ordered from least to
+  most restrictive. `:verdict` keeps the legacy dual vocabulary
+  (`:allowed | :blocked | {:confirm, reason}`) populated alongside it for
+  compatibility.
 
   On a `:confirm` decision, `:action` is the unified verdict `:confirm` while
   `:effect` records the executable action (`:allow | :redact | :quarantine`) to
-  run once confirmation is accepted; the confirmation dispatch keys off `:effect`,
-  and the confirmation token binding is unchanged (SP.07).
+  run once confirmation is accepted. Confirmation dispatch uses `:effect`; the
+  token binding remains unchanged.
 
-  The 1.0 contract adds `matched_rules` and `evidence_refs` so verdicts are explainable and
-  evidence-linked without raw payloads, and surfaces the boundary labels
-  (`source`, `sink`, `trust_zone`, `actor`, `resource`, `phase`) on the
-  decision.
+  The 1.0 contract adds `matched_rules` and `evidence_refs` so verdicts are
+  explainable and evidence-linked without raw payloads. It also surfaces the
+  boundary labels (`source`, `sink`, `trust_zone`, `actor`, `resource`,
+  `phase`) on the decision.
   """
 
   @type action :: :allow | :redact | :quarantine | :block | :confirm

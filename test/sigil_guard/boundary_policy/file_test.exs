@@ -78,7 +78,7 @@ defmodule SigilGuard.BoundaryPolicy.FileTest do
   end
 
   describe "parse/1 grammar errors" do
-    # SP.04: invalid/ holds one minimal file per parse-error atom. Fixtures
+    # boundary policy: invalid/ holds one minimal file per parse-error atom. Fixtures
     # named after a contract atom fail with that atom; the rest are grammar
     # violations that all fail :invalid_policy_file.
     @atom_by_basename %{

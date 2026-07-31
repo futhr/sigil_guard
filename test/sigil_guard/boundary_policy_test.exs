@@ -41,7 +41,7 @@ defmodule SigilGuard.BoundaryPolicyTest do
     def analyze(_, _, opts), do: Keyword.fetch!(opts, :return)
   end
 
-  # A fully-attested sandbox keeps the SP.04 mismatch matrix a no-op so these
+  # A fully-attested sandbox keeps the boundary policy mismatch matrix a no-op so these
   # cases isolate the kernel invariants, policy default, and combination engine;
   # the matrix itself is exercised in the sandbox-matrix describe block below.
   defp base(overrides \\ %{}) do
@@ -151,7 +151,7 @@ defmodule SigilGuard.BoundaryPolicyTest do
   describe "sandbox mismatch matrix" do
     @manifest String.duplicate("b", 64)
 
-    # SP.04 Side-Effect Mismatch Matrix. Columns: absent | :none | :container |
+    # boundary policy Side-Effect Mismatch Matrix. Columns: absent | :none | :container |
     # :vm | :remote_attested. `absent` is the omitted level (no sandbox).
     @matrix %{
       read: [:quarantine, :quarantine, :allow, :allow, :allow],
@@ -220,7 +220,7 @@ defmodule SigilGuard.BoundaryPolicyTest do
     end
 
     test "a tool-phase boundary declaring neither tool nor sandbox is out of scope" do
-      # SP.07 opt-in-by-presence: with no tool and no sandbox there is nothing to
+      # runtime opt-in-by-presence: with no tool and no sandbox there is nothing to
       # evaluate, so the matrix does not fire (the runtime gate stays opt-in).
       for phase <- [:tool_request, :tool_result] do
         boundary = base(%{phase: phase}) |> Map.drop([:sandbox, :tool])

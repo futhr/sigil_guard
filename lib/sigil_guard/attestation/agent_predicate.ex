@@ -3,7 +3,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   Predicate extension validation for agent-to-agent trust statements.
 
   This module covers the `agent_request` and `agent_response` fields owned by
-  SP.13 and the SP.01 action-digest preimage rows for those statement types.
+  Agent Trust and the attestation action-digest preimage rows for those statement types.
   It deliberately stays below full attestation orchestration; card resolution,
   signing, and digest recomputation are handled by later integration layers.
   """
@@ -18,7 +18,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   @type error_reason :: :invalid_payload | :unsupported_number_range
 
   @doc """
-  Build the SP.13 extension fields for an `agent_request` predicate.
+  Build the Agent Trust extension fields for an `agent_request` predicate.
   """
   @spec build_request(map(), keyword()) :: {:ok, map()} | {:error, :invalid_payload}
   def build_request(payload, opts \\ [])
@@ -45,7 +45,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   def build_request(_, _), do: {:error, :invalid_payload}
 
   @doc """
-  Build the SP.13 extension fields for an `agent_response` predicate.
+  Build the Agent Trust extension fields for an `agent_response` predicate.
   """
   @spec build_response(map(), keyword()) :: {:ok, map()} | {:error, :invalid_payload}
   def build_response(payload, opts \\ [])
@@ -74,7 +74,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   def build_response(_, _), do: {:error, :invalid_payload}
 
   @doc """
-  Validate SP.13 extension fields on a decoded predicate.
+  Validate Agent Trust extension fields on a decoded predicate.
   """
   @spec validate(statement_type(), map()) :: :ok | {:error, :invalid_payload}
   def validate(:agent_request, predicate) when is_map(predicate) do
@@ -107,7 +107,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   def validate(_, _), do: {:error, :invalid_payload}
 
   @doc """
-  Return the SP.01 action-digest preimage for an A2A statement payload.
+  Return the attestation action-digest preimage for an A2A statement payload.
   """
   @spec action_preimage(statement_type(), map(), keyword()) ::
           {:ok, map()} | {:error, :invalid_payload}
@@ -145,7 +145,7 @@ defmodule SigilGuard.Attestation.AgentPredicate do
   def action_preimage(_, _, _), do: {:error, :invalid_payload}
 
   @doc """
-  Compute the SP.01 action digest for an A2A statement payload.
+  Compute the attestation action digest for an A2A statement payload.
   """
   @spec action_digest(statement_type(), map(), keyword()) ::
           {:ok, String.t()} | {:error, error_reason()}

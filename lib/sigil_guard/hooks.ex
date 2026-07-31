@@ -146,8 +146,6 @@ defmodule SigilGuard.Hooks do
     {:halt, %{acc | contributions: [{:block, [rule]} | acc.contributions]}}
   end
 
-  # -- Result interpretation --------------------------------------------------
-
   defp interpret({:ok, value}, module, phase, blockable?) do
     interpret_value(value, module, phase, blockable?)
   end
@@ -197,8 +195,6 @@ defmodule SigilGuard.Hooks do
   defp fail_closed(reason, module, phase, true), do: {:block, rule(module, phase, reason)}
   defp fail_closed(_, _, _, false), do: :continue
 
-  # -- Signal normalization ---------------------------------------------------
-
   defp normalize_signal(signal) do
     with {:ok, risk} <- signal_risk(signal),
          {:ok, indicators} <- signal_indicators(signal) do
@@ -244,8 +240,6 @@ defmodule SigilGuard.Hooks do
     if Map.fetch!(@risk_rank, other) > Map.fetch!(@risk_rank, current), do: other, else: current
   end
 
-  # -- Bounded invocation -----------------------------------------------------
-
   defp invoke(module, callback, boundary, opts, timeout) do
     run_bounded(fn -> apply(module, callback, [boundary, opts]) end, timeout)
   end
@@ -279,8 +273,6 @@ defmodule SigilGuard.Hooks do
   catch
     _, _ -> {:error, :hook_crash}
   end
-
-  # -- Helpers ----------------------------------------------------------------
 
   defp exports?(module, callback), do: function_exported?(module, callback, 2)
 

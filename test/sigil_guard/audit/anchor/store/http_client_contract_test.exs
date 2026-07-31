@@ -61,7 +61,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPClientContractTest do
     %{anchor: anchor()}
   end
 
-  describe "client resolution (D9)" do
+  describe "client resolution" do
     test "no configured client fails :http_client_not_configured", ctx do
       assert Store.put(HTTP, ctx.anchor, url: "http://x/") ==
                {:error, :http_client_not_configured}

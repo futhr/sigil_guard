@@ -21,7 +21,7 @@ defmodule SigilGuard.TrustBundle.Verify do
   @doc """
   Verify a decoded trust-bundle DSSE envelope.
 
-  By default this enforces the D3/1.0 effective bundle-role threshold of `1`,
+  By default this enforces the 1.0 effective bundle-role threshold of `1`,
   even when the role declaration carries a larger threshold. Pass
   `enforce_declared_threshold: true` to require the role's declared threshold.
   Root rotation documents always require the full declared old-root and
@@ -35,7 +35,7 @@ defmodule SigilGuard.TrustBundle.Verify do
     * `:genesis_root` - previously pinned root descriptor used to verify a
       rotation chain.
     * `:enforce_declared_threshold` - opt in to declared bundle-role threshold
-      enforcement. Defaults to `false` for D3 compatibility.
+      enforcement. Defaults to `false` for 1.0 compatibility.
   """
   @spec verify(map(), keyword()) :: {:ok, TrustBundle.t()} | {:error, verify_error()}
   def verify(envelope, opts \\ [])

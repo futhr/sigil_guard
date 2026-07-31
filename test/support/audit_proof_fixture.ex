@@ -1,9 +1,9 @@
 defmodule SigilGuard.AuditProofFixture do
   @moduledoc false
 
-  # Deterministic golden vectors for audit inclusion proofs (SP.05). All inputs
+  # Deterministic golden vectors for audit inclusion proofs. All inputs
   # are fixed, so `write!/0` regenerates byte-identical fixtures and a test can
-  # assert stability. See SP.05 "Golden Vector: Five-Event Tree".
+  # assert stability. See audit "Golden Vector: Five-Event Tree".
 
   alias SigilGuard.Audit
   alias SigilGuard.Audit.Checkpoint
@@ -106,8 +106,6 @@ defmodule SigilGuard.AuditProofFixture do
     export
   end
 
-  # -- Fixture files ----------------------------------------------------------
-
   @doc false
   @spec write!() :: :ok
   def write! do
@@ -167,8 +165,6 @@ defmodule SigilGuard.AuditProofFixture do
   @doc false
   @spec export_json() :: binary()
   def export_json, do: encode(export())
-
-  # -- Helpers ----------------------------------------------------------------
 
   defp event(index) do
     %Audit{

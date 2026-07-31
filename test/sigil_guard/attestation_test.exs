@@ -87,7 +87,7 @@ defmodule SigilGuard.AttestationTest do
   end
 
   describe "strip_metadata/1" do
-    test "removes only SP.01 metadata keys at root and params level" do
+    test "removes only attestation metadata keys at root and params level" do
       payload = %{
         "_agent_trust" => @envelope,
         :_agent_trust => %{"atom" => true},

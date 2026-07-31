@@ -256,7 +256,7 @@ defmodule SigilGuard.ConfigTest do
     end
   end
 
-  describe "trust_mappings validation (SP.10)" do
+  describe "trust_mappings validation" do
     test "accepts exact patterns, a single trailing wildcard, and an empty table" do
       for mappings <- [[], [{"user:42", :high}], [{"spiffe://prod/*", :medium}, {"*", :low}]] do
         assert Config.validate!(trust_mappings: mappings)[:trust_mappings] == mappings

@@ -200,7 +200,7 @@ defmodule SigilGuard.AuditTest do
     test "verifies historical events whose type uses the retired name (names are data)" do
       # v3 renamed the scanner interception event; a chain signed under the old
       # "SigilInterception" type string still verifies, because the HMAC covers
-      # the type value, not a known-name enum (SP.09 V3 Extensions).
+      # the type value, not a known-name enum (audit integrity V3 Extensions).
       legacy =
         [Audit.new_event("SigilInterception", "alice", "scan", "blocked")]
         |> Audit.build_chain(@secret_key)
@@ -366,7 +366,7 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
-  describe "hash_field/2 (SP.05 privacy)" do
+  describe "hash_field/2 (audit privacy)" do
     test "returns the fh1: HMAC form for a value and key" do
       hashed = Audit.hash_field("did:web:alice", @field_hash_key)
 
@@ -385,7 +385,7 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
-  describe "classify/2 (SP.05 privacy)" do
+  describe "classify/2 (audit privacy)" do
     setup do
       event = %Audit{
         id: "00000000000000000000000000000001",
@@ -482,7 +482,7 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
-  describe "tip/1 (SP.05)" do
+  describe "tip/1" do
     test "returns the last event's coordinates" do
       events = query_events()
       last = List.last(events)
@@ -500,7 +500,7 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
-  describe "query/2 (SP.05)" do
+  describe "query/2" do
     test "filters by type, id, and index range, preserving chain order" do
       events = query_events()
 
@@ -564,7 +564,7 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
-  describe "checkpoint_boundaries/2 (SP.05)" do
+  describe "checkpoint_boundaries/2" do
     test "locates each checkpoint's event span" do
       events = query_events()
 
@@ -607,7 +607,7 @@ defmodule SigilGuard.AuditTest do
     end
   end
 
-  describe "read purity (SP.05)" do
+  describe "read purity" do
     test "tip/query/checkpoint_boundaries emit no telemetry" do
       # A unique actor so the handler ignores audit events from concurrent tests;
       # the events are signed before the handler attaches, so only a read that

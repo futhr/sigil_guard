@@ -53,8 +53,6 @@ defmodule SigilGuard.Vault.InMemory do
     ]
   ]
 
-  # -- Client API --
-
   @doc "Start the in-memory vault GenServer."
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -99,8 +97,6 @@ defmodule SigilGuard.Vault.InMemory do
   def delete(vault_id) do
     GenServer.call(__MODULE__, {:delete, vault_id})
   end
-
-  # -- Server Callbacks --
 
   @impl GenServer
   def init(opts) do
@@ -203,8 +199,6 @@ defmodule SigilGuard.Vault.InMemory do
   def format_status(status) do
     %{status | state: %{status.state | master_key: :REDACTED}}
   end
-
-  # -- Private --
 
   defp generate_vault_id do
     "vault_" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)

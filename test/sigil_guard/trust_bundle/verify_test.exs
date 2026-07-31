@@ -94,20 +94,24 @@ defmodule SigilGuard.TrustBundle.VerifyTest do
                Verify.verify(two_signatures, now: @now, enforce_declared_threshold: true)
     end
 
-    test "documents D3 threshold defaults and opt-in declared enforcement" do
+    test "documents 1.0 compatibility threshold defaults and opt-in declared enforcement" do
       public_docs = Code.fetch_docs(TrustBundle)
       verify_docs = Code.fetch_docs(Verify)
 
       public_verify_doc = doc_text(public_docs, :verify, 2)
 
-      assert public_verify_doc =~ "The 1.0 release line defaults to the D3 effective"
+      assert public_verify_doc =~
+               "For compatibility, the 1.0 release line defaults to an effective"
+
       assert public_verify_doc =~ "threshold of `1`"
 
       assert public_verify_doc =~ ":enforce_declared_threshold"
-      assert doc_text(verify_docs, :verify, 2) =~ "Defaults to `false` for D3 compatibility"
+
+      assert doc_text(verify_docs, :verify, 2) =~
+               "Defaults to `false` for 1.0 compatibility"
 
       assert File.read!("README.md") =~
-               "follows the D3 effective threshold of `1` unless verification is called"
+               "the 1.0 release line uses an effective threshold of `1` unless verification is"
     end
 
     test "rejects unknown, invalid, duplicate, and revoked signatures" do

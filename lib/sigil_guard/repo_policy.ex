@@ -264,7 +264,7 @@ defmodule SigilGuard.RepoPolicy do
   end
 
   @doc """
-  Build the SP.11 policy-facts map from a compiled policy and a decision.
+  Build repository policy facts from a compiled policy and a decision.
 
   This is the exact shape the repo kernel contributes to
   `SigilGuard.BoundaryPolicy` and to `repo_change` audit evidence: the repo

@@ -29,8 +29,6 @@ defmodule SigilGuard.Backend do
   @typedoc "Backend configuration atoms"
   @type backend_type :: :elixir
 
-  # -- Scanning --
-
   @doc "Scan text for sensitive content."
   @callback scan(text :: String.t(), opts :: keyword()) ::
               {:ok, String.t()} | {:hit, [Patterns.scan_hit()]}
@@ -42,8 +40,6 @@ defmodule SigilGuard.Backend do
   @doc "Scan and redact in a single pass."
   @callback scan_and_redact(text :: String.t(), opts :: keyword()) :: String.t()
 
-  # -- Policy --
-
   @doc "Evaluate an action against a trust level."
   @callback evaluate_policy(
               action :: String.t(),
@@ -53,8 +49,6 @@ defmodule SigilGuard.Backend do
 
   @doc "Classify the risk level of an action."
   @callback classify_risk(action :: String.t(), opts :: keyword()) :: Policy.risk_level()
-
-  # -- Audit --
 
   @doc "Sign an audit event, linking it to the previous event in the chain."
   @callback audit_sign_event(event :: Audit.t(), key :: binary(), prev_hmac :: String.t() | nil) ::

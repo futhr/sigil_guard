@@ -796,7 +796,7 @@ defmodule SigilGuard.Audit.Anchor.Store.HTTPNoClientTest do
 
   test "fails closed with :http_client_not_configured when no client is configured" do
     # No per-call :http_client and no app-env client: the store must not silently
-    # no-op, and it makes no direct network call of its own (D9).
+    # no-op, and it makes no direct network call of its own.
     assert Application.get_env(:sigil_guard, :http_client) == nil
 
     assert {:error, :http_client_not_configured} =

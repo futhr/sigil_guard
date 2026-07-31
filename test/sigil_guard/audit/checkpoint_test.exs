@@ -390,7 +390,7 @@ defmodule SigilGuard.Audit.CheckpointTest do
       assert predicate["merkle_root"] == checkpoint["merkle_root"]
       assert predicate["generated_at"] == @generated_at
       assert predicate["profile"] == "sigil_guard_agent_trust/v1"
-      # tree_size is the event count as a JSON string (SP.01 growable counter).
+      # tree_size is the event count as a JSON string (attestation growable counter).
       assert predicate["tree_size"] == "3"
       assert predicate["chain_id"] == "chain-a"
 

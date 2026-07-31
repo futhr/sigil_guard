@@ -96,8 +96,8 @@ defmodule SigilGuard.Attestation.Envelope do
   @doc """
   Append a signature to an existing envelope over its identical PAE bytes.
 
-  DSSE cosigning (SP.05): the `payload` and existing signatures are unchanged and
-  the appended signature covers the same PAE bytes. A key id already present in
+  DSSE cosigning leaves `payload` and existing signatures unchanged, and the
+  appended signature covers the same PAE bytes. A key id already present in
   the envelope (or produced by `signer`) fails `:duplicate_keyid`; a signer that
   cannot produce an Ed25519 signature fails `:invalid_signer`.
   """
