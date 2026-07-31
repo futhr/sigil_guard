@@ -74,7 +74,7 @@ sequenceDiagram
         Host->>TG: guard_result(result, context, opts)
         TG-->>Host: safe result or typed denial
     else denied
-        TG-->>Host: JSON-RPC error (-32050..-32056)
+        TG-->>Host: JSON-RPC error (-31990..-31984)
     end
     Note over TG: every decision and denial emits audit evidence refs
 ```
@@ -108,10 +108,11 @@ fields, never emit `null`). All digests are lowercase-hex SHA-256.
 | `audience` | list | no | RFC 8707-style audience/resource identifiers the tool's upstream credentials are minted for; sorted ascending; omitted when the tool uses no upstream credentials. |
 | `description_sha256` | string | yes | SHA-256 of the raw UTF-8 description bytes (SP.01 binary payload class; no JCS). |
 | `expires_at` | string | yes | ISO 8601 UTC with millisecond precision, per SP.01. |
+| `icons_sha256` | string | no | SHA-256 of the JCS bytes of the MCP icon list; omitted when no icons are declared. |
 | `input_schema_sha256` | string | yes | SHA-256 of the JCS bytes of the JSON Schema document. |
 | `input_sensitivity` | string | yes | Closed: `public`, `internal`, `private`. |
 | `issuer_keyid` | string | yes | `"sha256:" <> hex` per SP.01's keyid rule; MUST name a bundle-declared issuer (SP.02). |
-| `manifest_format` | string | yes | Constant `sigil_guard_capability_manifest/v1`; the digest domain separator. |
+| `manifest_format` | string | yes | Constant `sigil_guard_capability_manifest/v2`; the digest domain separator. |
 | `name` | string | yes | Tool name; MUST be byte-equal to the `tools/list` name. |
 | `network_access` | string | yes | Closed: `none`, `outbound`, `bidirectional`. |
 | `output_schema_sha256` | string | no | SHA-256 of the JCS bytes of the output schema; omitted when none is declared. |
@@ -122,6 +123,8 @@ fields, never emit `null`). All digests are lowercase-hex SHA-256.
 | `server` | string | yes | Canonical MCP server URI for network transports; host-assigned local runner id for stdio and in-process tools. |
 | `side_effects` | list | yes | Closed: `none`, `read`, `write`, `delete`, `execute`, `privileged`; sorted ascending; non-empty; `none` MUST be the sole element when present. |
 | `suspicious_params` | list | yes | Recomputable disclosure list (next subsection); MAY be empty; deduplicated, sorted ascending. |
+| `title_sha256` | string | no | SHA-256 of raw UTF-8 MCP title bytes; omitted when no title is declared. |
+| `ui_sha256` | string | no | SHA-256 of normalized MCP Apps UI metadata (`resource_uri`, sorted `visibility`); omitted for non-App tools. |
 | `version` | string | yes | Tool implementation version being pinned. |
 
 `manifest_digest` is the lowercase-hex SHA-256 over the compact JCS bytes
@@ -134,12 +137,19 @@ SP.01 context digest. When `sandbox.required` is `true`, a request whose
 context lacks `sandbox_id` or sits below `min_isolation` MUST be denied
 with `:sandbox_required`.
 
-Carried form: the distributed document carries `description`,
-`annotations`, `input_schema`, and `output_schema` in full; normalization
-substitutes the `*_sha256` preimage fields. Carried `*_sha256` fields MUST
-match recomputation, else `{:error, :invalid_manifest}`. Manifests are
-trusted only through a verified trust bundle's `tools` entries (SP.02);
-standalone manifest signing is not a v3 surface.
+Carried form: the distributed document carries `description`, `title`,
+`icons`, `annotations`, `input_schema`, `output_schema`, and normalized `ui`
+in full; normalization substitutes the `*_sha256` preimage fields. Carried
+`*_sha256` fields MUST match recomputation, else
+`{:error, :invalid_manifest}`. Manifests are trusted only through a verified
+trust bundle's `tools` entries (SP.02); standalone manifest signing is not a
+v3 surface.
+
+Manifest v2 validates every `x-mcp-header` annotation found in
+`input_schema`: the header name is a valid HTTP field-name token, the property
+type is `boolean`, `integer`, or `string`, and names are unique
+case-insensitively. Suspicious credential parameter names are rejected even
+when optional. Header transport and value serialization remain host-owned.
 
 ### Suspicious Required Parameters
 
@@ -185,7 +195,7 @@ bytes). `audience` and `output_schema` are absent, therefore omitted:
   },
   "input_sensitivity": "internal",
   "issuer_keyid": "sha256:<computed: issuer public key digest>",
-  "manifest_format": "sigil_guard_capability_manifest/v1",
+  "manifest_format": "sigil_guard_capability_manifest/v2",
   "name": "repo_file_write",
   "network_access": "none",
   "output_sensitivity": "internal",
@@ -327,13 +337,13 @@ family that MUST be green before 1.0.0.
 | Tool poisoning via descriptions/metadata (2) | Manifest digest pinning over description, annotations, and schema digests; drift denies. | TM.02 |
 | Line jumping (3) | `verify_manifest/2` at `tools/list` time, BEFORE any definition enters model context and before any invocation. | TM.03 |
 | Schema injection (4) | Schema digests inside the manifest digest + `suspicious_params` disclosure bound into the signed digest and recomputed at verify. | TM.04 |
-| Rug pull / TOFU drift (5) | Drift rejection; `tools/list_changed` forces full re-verification, and re-listed manifests invalidate cached approvals because tokens bind `manifest_digest`. | TM.05 |
+| Rug pull / TOFU drift (5) | Drift rejection; `notifications/tools/list_changed` forces full re-verification, and re-listed manifests invalidate cached approvals because tokens bind `manifest_digest`. | TM.05 |
 | Confused deputy incl. consent replay (6) | Audience/resource binding into attestations and manifests; nonce + expiry on tokens and statements. OAuth consent itself is host-owned. | TM.06 |
 | Token passthrough (7) | Explicit deny: a credential whose audience is the host itself is never forwarded upstream (`:token_passthrough_denied`). | TM.07 |
-| Session hijacking via resumable streams + `list_changed` (8) | Host-owned transport; SigilGuard assists with per-action nonce/replay scope and `list_changed` re-verification. | TM.07 |
+| Stale authorization across stateless requests/list changes (8) | Host-owned subscription transport; SigilGuard independently gates each action and assists with nonce/replay scope plus relisted-manifest re-verification. | TM.07 |
 
 Host-owned exclusions (R.06): OAuth flows, token issuance, and consent
-storage; TLS, session, and stream-resumption security; sandbox creation
+storage; TLS, subscription delivery, and request routing; sandbox creation
 and escape-hardening; model behavior. SigilGuard binds the results
 (audience, resource, sandbox identity) and records evidence; it never
 runs these systems.
@@ -473,28 +483,29 @@ identical return shape:
 
 ## JSON-RPC Error Registry
 
-Codes sit in the implementation-defined server-error range. `data` is a
+Codes sit in an application-defined range outside JSON-RPC's reserved
+server-error band. `data` is a
 string-keyed map; `nil`-valued fields are omitted. Common `data` fields for
 every code: `status`, `action`, `reason`, `phase`, `risk_level`,
 `trust_level`, `hit_count`, `indicator_ids`, `content_hash`,
 `action_digest`, and `evidence` (list of `{"kind", "ref"}` maps, SP.01
 evidence shape).
 
-SigilGuard uses -32050..-32056 (a clean sub-range of JSON-RPC's
-implementation-defined -32000..-32099 band). It deliberately avoids
--3200x, which MCP SDKs use for transport-level errors, and -32042
-(`URL_ELICITATION_REQUIRED`, MCP 2025-11-25). This is a v3 change from
-v0.2's -32001..-32003 (Decision D19).
+MCP `2026-07-28` treats `-32000..-32019` as a legacy allocation and reserves
+`-32020..-32099`. SigilGuard therefore uses `-31990..-31984`, outside the
+complete `-32768..-32000` reserved server-error band. This is
+a v3 change from v0.2's `-32001..-32003` and supersedes the pre-release D19
+allocation (Decision D20, SP.16).
 
 | Code | `data.status` | Trigger | Additional `data` fields |
 |------|---------------|---------|--------------------------|
-| `-32050` | `"blocked"` | Any block verdict, including `:audience_mismatch`, `:resource_mismatch`, `:token_passthrough_denied` (named in `reason`). | `scanner_error`, `confirmation_status`, `confirmation_reason`. |
-| `-32051` | `"confirmation_required"` | `{:confirm, _}` without a valid token. | `confirmation_status`, `confirmation_reason`. |
-| `-32052` | `"quarantined"` | Quarantine action on request or result. | `sanitized_text` only when `include_sanitized: true`. |
-| `-32053` | `"manifest_drift"` | `:manifest_digest_mismatch`, `:schema_digest_mismatch`, `:suspicious_required_param`. | `tool`, `server`, `expected_manifest_digest`, `received_manifest_digest`, `drifted_fields` (preimage keys that differ). |
-| `-32054` | `"unknown_manifest"` | `:unknown_manifest`, `:manifest_expired`. | `tool`, `server`, `manifest_status` (`"unknown"` \| `"expired"`), `expires_at` when expired. |
-| `-32055` | `"invalid_attestation"` | `attestation: :required` with a missing envelope, or any SP.01 `verify_error`. | `attestation_error` (SP.01 atom as string). |
-| `-32056` | `"sandbox_required"` | `:sandbox_required`. | `tool`, `required_isolation`, `received_isolation`, `sandbox_id_present` (boolean). |
+| `-31990` | `"blocked"` | Any block verdict, including `:audience_mismatch`, `:resource_mismatch`, `:token_passthrough_denied` (named in `reason`). | `scanner_error`, `confirmation_status`, `confirmation_reason`. |
+| `-31989` | `"confirmation_required"` | `{:confirm, _}` without a valid token. | `confirmation_status`, `confirmation_reason`. |
+| `-31988` | `"quarantined"` | Quarantine action on request or result. | `sanitized_text` only when `include_sanitized: true`. |
+| `-31987` | `"manifest_drift"` | `:manifest_digest_mismatch`, `:schema_digest_mismatch`, `:suspicious_required_param`. | `tool`, `server`, `expected_manifest_digest`, `received_manifest_digest`, `drifted_fields` (preimage keys that differ). |
+| `-31986` | `"unknown_manifest"` | `:unknown_manifest`, `:manifest_expired`. | `tool`, `server`, `manifest_status` (`"unknown"` \| `"expired"`), `expires_at` when expired. |
+| `-31985` | `"invalid_attestation"` | `attestation: :required` with a missing envelope, or any SP.01 `verify_error`. | `attestation_error` (SP.01 atom as string). |
+| `-31984` | `"sandbox_required"` | `:sandbox_required`. | `tool`, `required_isolation`, `received_isolation`, `sandbox_id_present` (boolean). |
 
 ## Agent-To-Agent Pointer
 
@@ -511,6 +522,9 @@ statements.
 | `lib/sigil_guard/tool_gateway.ex` | Transport-neutral guard, manifest verification, attest helpers. |
 | `lib/sigil_guard/capability_manifest.ex` | Canonical form, inner digests, `manifest_digest`, verify. |
 | `lib/sigil_guard/mcp/gateway.ex` | Permanent MCP facade (D14) and JSON-RPC shaping. |
+| `lib/sigil_guard/mcp/protocol.ex` | MCP revision and successful-result discrimination. |
+| `lib/sigil_guard/mcp/security_payload.ex` | Structured request/result security projection. |
+| `lib/sigil_guard/mcp/app_resource.ex` | Offline MCP Apps resource verification. |
 | `lib/sigil_guard/confirmation.ex` | v2 claims, four-digest binding, single-use default. |
 | `test/sigil_guard/tool_gateway_test.exs` | Guard, drift, audience, sandbox, ordering tests. |
 | `test/sigil_guard/capability_manifest_test.exs` | Canonical form, digest, suspicious-param tests. |
@@ -564,8 +578,9 @@ Spec-local atoms. Shared atoms (`:digest_mismatch`, `:expired_attestation`,
   digest-verified before entering model context, policy inputs only, and
   trusted solely through verified bundles (SP.02); unknown or unverifiable
   definitions MUST be withheld from model context.
-- `tools/list_changed` MUST trigger full re-verification; cached approvals
-  die structurally because tokens bind `manifest_digest`.
+- A changed tool listing delivered by the host subscription path MUST trigger
+  full re-verification; cached approvals die structurally because tokens bind
+  `manifest_digest`.
 - Token passthrough is forbidden by the MCP specification; the gateway
   enforces the deny deterministically rather than trusting servers.
 - Confirmation tokens cannot approve changed arguments, sinks, actors,
@@ -610,7 +625,7 @@ malformed-input cases per repository rule 9.
       named atoms and documented JSON-RPC codes.
 - [x] Confirmation tokens: `300_000` ms default TTL, single-use by
       default, four-digest binding, re-issue required on any change.
-- [x] Codes `-32050..-32056` emit exactly the documented `data` shapes
+- [x] Codes `-31990..-31984` emit exactly the documented `data` shapes
       with `nil` fields omitted.
 - [x] Every `MCP.Gateway` helper delegates per the facade table with an
       identical return shape (parity tests).
@@ -634,7 +649,7 @@ removal lands in M6.
 - [x] M3: `attest_request/3` and `attest_result/3` over SP.01 Attestation.
 - [x] M3: confirmation v2 claims, single-use default; transition
       dual-strips `_sigil*` alongside `_agent_*`.
-- [x] M3: JSON-RPC codes `-32050..-32056` and `data` shapes.
+- [x] M3: JSON-RPC codes `-31990..-31984` and `data` shapes.
 - [x] M3: `MCP.Gateway` rewired as the permanent facade per the table.
 - [x] M5: threat-model modules for the TM rows owned here.
 - [x] M6: remove `_sigil*` reading; the strip rule reduces to SP.01's six
@@ -656,7 +671,7 @@ removal lands in M6.
 - [R.02 - Attestation Envelope And Canonical Encoding](../research/R.02-attestation-envelope-and-canonical-encoding.md)
 - [R.05 - Actor Identity, Delegation, And A2A](../research/R.05-actor-identity-delegation-and-a2a.md)
 - [R.06 - Agentic Threat Model And Control Mapping](../research/R.06-agentic-threat-model-and-control-mapping.md)
-- [MCP Authorization (2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+- [MCP 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
 - [MCP Security Best Practices](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices)
 - [RFC 8707 - Resource Indicators for OAuth 2.0](https://www.rfc-editor.org/info/rfc8707)
 - [RFC 9728 - OAuth 2.0 Protected Resource Metadata](https://datatracker.ietf.org/doc/html/rfc9728)

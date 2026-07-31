@@ -145,9 +145,10 @@ metadata verification precedes content scanning in SigilGuard:
   credentials is tricked into replaying a stored consent to a new audience.
 - **Token passthrough.** A server forwards a client token to an upstream API it
   was not issued for; the MCP spec explicitly forbids this.
-- **Session hijacking via resumable streams + tools/list_changed.** An attacker
-  resumes a stream or forces a `tools/list_changed` refresh to smuggle new,
-  unapproved tools mid-session.
+- **Stale authorization across request/list changes.** Earlier MCP revisions
+  exposed resumable-session attacks. MCP `2026-07-28` removes protocol
+  sessions and delivers list changes through subscriptions, but a host can
+  still reuse stale authorization or approvals after a changed listing.
 - **Memory poisoning (MemoryGraft).** Grafted "successful experiences" persist
   in long-term memory and re-surface via lexical+embedding retrieval (up to
   ~48% poisoned recall), inducing behavioral drift until the store is rebuilt.
@@ -263,10 +264,10 @@ before 1.0.0.
 | 2 | Tool poisoning via descriptions/metadata (MCPTox) | ASI02, ASI04 | Capability-manifest digest pinning over description+schema+annotation digests; drift rejection (SP.03) | mitigates | TM.02 |
 | 3 | Line jumping (pre-invocation, via `tools/list`) | ASI01, ASI02 | Manifest-time verification: `tools/list` output is verified against pinned manifest digests before any content enters model context (SP.03) | mitigates | TM.03 |
 | 4 | Schema injection (adversarial required params, e.g. `AWS_ACCESS_KEY_ID`) | ASI02, ASI03 | Input-schema digest binding + schema validation; adversarial-required-param indicators bound into the manifest digest (SP.03) | mitigates + detects | TM.04 |
-| 5 | Rug pull / TOFU drift | ASI04 | Digest-pinned manifest with drift rejection; `tools/list_changed` drops cached approvals and forces re-verification (SP.03) | mitigates | TM.05 |
+| 5 | Rug pull / TOFU drift | ASI04 | Digest-pinned manifest with drift rejection; `notifications/tools/list_changed` drops cached approvals and forces re-verification (SP.03) | mitigates | TM.05 |
 | 6 | Confused deputy incl. consent-cookie replay | ASI03 | Attestation binds audience + resource + actor; nonce/replay scope on ReplayStore; DSSE expiry (SP.01, SP.03) | mitigates (partial) | TM.06 |
 | 7 | Token passthrough (spec-forbidden) | ASI03 | Gateway deny rule: audience/resource mismatch is an explicit block; attestation records the intended audience (SP.03) | mitigates | TM.07 |
-| 8 | Session hijacking via resumable streams + `tools/list_changed` | ASI03, ASI02 | `tools/list_changed` invalidates cached approvals; per-action nonce + replay scope; audit records session boundary (SP.03, SP.05) | detects (partial) | TM.07 |
+| 8 | Stale authorization across stateless requests and list-change delivery | ASI03, ASI02 | Each request is independently gated; changed listings invalidate cached approvals; per-action nonce and replay scope avoid connection authority (SP.03, SP.16) | detects (partial) | TM.07 |
 | 9 | Memory & context poisoning (MemoryGraft) | ASI06 | Model-ingress gating: retrieved memory/context crosses `tool_result`->`outbound_model` through the scanner + trust-zone policy before reaching the model; digest provenance on ingested records (SP.04) | mitigates + detects | TM.08 |
 | 10 | Lethal trifecta dataflow (private data + untrusted content + external comms) | ASI01, ASI02, ASI05 | Boundary policy kernel dataflow rule (source sensitivity x untrusted origin x external sink => block/confirm); sink-aware output contracts (SP.04) | mitigates | TM.09 |
 | 11 | Unexpected code execution via tool/agent output | ASI05 | Sink-aware output contract denies untrusted-origin content into exec/command sinks; confirmation bound to action digest incl. `sandbox_id` (SP.04, SP.03) | mitigates (dataflow); out-of-scope (the runtime that executes) | TM.09 |
@@ -340,9 +341,10 @@ responsibility, and no control row may claim to secure them:
 - **OAuth flows and token issuance.** SigilGuard consumes an already-issued
   identity/audience and binds it into attestations; it does not run the
   authorization server, mint tokens, or manage consent cookies.
-- **Session and transport security.** TLS, stream resumption, WebSocket auth,
-  and session lifecycle belong to the host transport. SigilGuard adds
-  per-action nonce/replay and `list_changed` invalidation as assists only.
+- **Transport and subscription security.** TLS, subscription delivery, and
+  request routing belong to the host transport. MCP `2026-07-28` removes
+  protocol sessions; SigilGuard adds per-action nonce/replay and manifest-list
+  invalidation as assists only.
 - **Sandbox execution itself.** SigilGuard requires `sandbox_id` and isolation
   level as attested inputs and defaults untrusted/absent sandboxes to
   quarantine, but it does not create, run, or escape-harden the sandbox.
@@ -367,7 +369,7 @@ input cases per repository rule 9, and MUST cite the sourced attack it defends.
 | TM.04 | Schema injection | 4 |
 | TM.05 | Rug pull / TOFU drift | 5, 18 |
 | TM.06 | Confused deputy + consent replay | 6, 21 |
-| TM.07 | Token passthrough + session hijacking | 7, 8 |
+| TM.07 | Token passthrough + stale stateless authorization | 7, 8 |
 | TM.08 | Memory poisoning (model-ingress gating) | 9 |
 | TM.09 | Lethal-trifecta dataflow | 10, 11 |
 | TM.10 | A2A impersonation / delegation abuse | 12, 13, 20 |

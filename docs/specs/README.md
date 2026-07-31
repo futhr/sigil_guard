@@ -32,6 +32,7 @@ flowchart TD
 
     SP14[SP.14 Ecosystem Integrations And Adoption]
     SP15[SP.15 Benchmark Methodology]
+    SP16[SP.16 MCP v2 And Apps]
 
     R01 --> SP01
     SP01 --> SP02
@@ -66,6 +67,7 @@ flowchart TD
 
     V3 --> SP14
     V3 --> SP15
+    V3 --> SP16
 ```
 
 ## V3 Agent Trust Profile Specs
@@ -84,6 +86,7 @@ compatibility shims.
 | [`SP.13`](SP.13-agent-to-agent-trust-statements.md) | implemented | Agent cards, `agent_request`/`agent_response` predicates, delegation-chain validation, peer trust. | Card tamper, unknown-agent quarantine, chain reorder/depth, trust-min derivation. |
 | [`SP.14`](SP.14-ecosystem-integrations-and-adoption.md) | implemented | Integration contracts (hermes_mcp, Jido, LangChain, Tidewave), cheatsheets, livebooks, SECURITY.md, and maintainer-owned adoption handoff. | Livebook execution, guide compile checks, docs coverage. |
 | [`SP.15`](SP.15-benchmark-methodology-and-baselines.md) | implemented | Benchmark scenario matrix, environment disclosure, CI regression thresholds, llm-guard comparison rules, SLO ratification. | Bench harness smoke test, baseline regression gates. |
+| [`SP.16`](SP.16-mcp-2026-07-28-and-apps-contracts.md) | implemented | MCP v2 structured action binding, MRTR/result discrimination, application-defined JSON-RPC codes, manifest v2, and MCP Apps boundary helpers. | Structured tamper, exact-version response, manifest header/icon/UI drift, app visibility, and UI-resource tests. |
 
 ## Foundation And Transition Specs
 
@@ -113,6 +116,7 @@ These specs capture current behavior that v3 should reuse, rewire, or remove.
   validation belong in `SP.13`.
 - Ecosystem integration contracts and adoption artifacts belong in `SP.14`.
 - Benchmark methodology, baselines, and SLO ratification belong in `SP.15`.
+- MCP protocol-revision compatibility and MCP Apps security belong in `SP.16`.
 - Old SIGIL wire fields, registry-named modules, old profile names, and Rust
   vectors belong only in migration docs or historical fixtures.
 

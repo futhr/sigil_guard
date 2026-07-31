@@ -40,14 +40,15 @@ its exact digest strip list, and the gateway facade function mapping (D14).
 ### Overview
 
 `SigilGuard.MCP.Gateway` is an adapter-neutral helper module. It understands
-common JSON-RPC tool-call and result shapes, strips trust metadata from action
-digests, labels the boundary context, delegates to `SigilGuard.Runtime.Gate`,
-and currently can verify old envelope metadata.
+common JSON-RPC tool-call and result shapes, builds the SP.16 structured
+security projection, strips only fixed trust metadata from action digests,
+labels the boundary context, delegates to `SigilGuard.Runtime.Gate`, and
+verifies Agent Trust attestations.
 
 `SigilGuard.Confirmation` issues HMAC-SHA256 tokens with canonical claims. A
 token binds to payload, normalized context, actor, action, decision reason,
-expiry, and nonce. Consumers can opt into single-use semantics through
-`SigilGuard.ReplayStore`.
+expiry, and nonce. Verification consumes nonces by default through
+`SigilGuard.ReplayStore`; callers explicitly opt out with `consume: false`.
 
 ### Data Flow
 
@@ -187,10 +188,11 @@ Confirmation Lifecycle sections).
 | `issue_signed_confirmation_token/5` | Verifies `_agent_trust` first and binds the token actor to the attestation actor id. |
 | `issue_result_confirmation_token/5` | Result-side issuance under the claims delta. |
 
-V3 renumbers the gateway rejection codes to `-32050..-32056`, owned by
-SP.03's JSON-RPC error registry; this spec never mints codes and points to
-that registry for every code. This is a breaking change from v0.2's
-`-32001..-32003`, documented in `MIGRATING-1.0.md`.
+V3 renumbers the gateway rejection codes to `-31990..-31984`, owned by
+SP.03's JSON-RPC error registry and selected under MCP `2026-07-28` by SP.16;
+this spec never mints codes and points to that registry for every code. This
+is a breaking change from v0.2's `-32001..-32003`, documented in
+`MIGRATING-1.0.md`.
 
 ## Module Map
 
@@ -220,8 +222,9 @@ that registry for every code. This is a breaking change from v0.2's
 ## Security Considerations
 
 - Confirmation tokens intentionally ignore transport metadata fields when
-  computing the payload digest so tokens bind to the actual tool action, not
-  wrapper fields.
+  computing the payload digest so tokens bind to the actual structured tool
+  action, not correlation fields. Parameter names, nested values, numbers,
+  booleans, nulls, and MRTR state/responses remain bound.
 - Signed confirmation flow binds the token actor/identity to the verified
   envelope identity.
 - HMAC keys must be at least 16 bytes.
@@ -262,7 +265,7 @@ that registry for every code. This is a breaking change from v0.2's
       handling anywhere under `lib/`.
 - [x] Every helper in the Gateway Function Mapping keeps its v2 name and
       arity on the `MCP.Gateway` facade and delegates to `ToolGateway`.
-- [x] Gateway rejection codes are `-32050..-32056` per SP.03's registry, and
+- [x] Gateway rejection codes are `-31990..-31984` per SP.03's registry, and
       no code outside that registry is emitted.
 
 ## Implementation Roadmap

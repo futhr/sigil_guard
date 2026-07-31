@@ -2,15 +2,15 @@
 
 This is the canonical execution checklist for SigilGuard v3, the embedded
 Agent Trust Profile runtime. V3 is a deliberate, spec-governed breaking
-release: every architectural decision (D1-D19) is closed, research-backed,
+release: every architectural decision (D1-D20) is closed, research-backed,
 and recorded below with rationale (see Closed Decisions); no open choices
-remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M8. A
+remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M9. A
 task is done only when its AC bullets hold and its named test families
 exist. Migration lives in `MIGRATING-1.0.md`, `CHANGELOG.md`, and release
 notes - never in permanent legacy runtime shims.
 
-This file, the research notes (`../research/R.01`-`R.07`), and the specs
-(`../specs/SP.01`-`SP.15`) are the complete, self-contained plan of record.
+This file, the research notes (`../research/R.01`-`R.08`), and the specs
+(`../specs/SP.01`-`SP.16`) are the complete, self-contained plan of record.
 An implementer needs nothing outside `docs/` and the codebase. The decisions
 were derived from primary-source research and adversarially verified against
 those sources; do not reopen a closed decision without a superseding
@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 230 / 230 tasks done (100%).** Milestones: 11 complete.
-**No agent-owned tasks left.** Current milestone: **complete**.
+**Overall: 242 / 242 tasks done (100%).** Milestones: 12 complete.
+**Current milestone: complete - maintainer-owned release handoff remains.**
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -79,11 +79,13 @@ trailers (rule 10); the maintainer pushes manually.
 | M7 | Integrations and adoption | 17 | 17 | 100% | Complete |
 | M7A | Pre-release audit hardening | 14 | 14 | 100% | Complete |
 | M8 | Release | 8 | 8 | 100% | Complete |
-| — | **Total** | **230** | **230** | **100%** | 11 done |
+| M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
+| — | **Total** | **242** | **242** | **100%** | 12 done |
 
-### What's left (0 tasks)
+### Release Handoff
 
-No agent-owned tasks remain.
+M9 aligned the unreleased 1.0 gateway, confirmation, manifest, Apps, docs, and
+release artifacts with MCP `2026-07-28`.
 
 Post-release maintenance includes ongoing dependency-audit remediation,
 per-module security coverage review, policy-loader symlink containment,
@@ -99,7 +101,7 @@ are maintainer-owned operations and are intentionally outside this checklist.
 After the owner-managed package flow, validate the reference consumer against
 the actual 1.0.0 package artifact as release handoff evidence.
 
-The table counts every milestone task (F through M8, including M7A) exactly
+The table counts every milestone task (F through M9, including M7A) exactly
 once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
 section is post-1.0.0 parking; neither is counted here.
@@ -668,7 +670,7 @@ section is post-1.0.0 parking; neither is counted here.
     enums `input_sensitivity`/`output_sensitivity`/`network_access`/
     `reversibility`/`side_effects`, sorted lists, `sandbox` map shape) and
     fails `:invalid_manifest` otherwise; `manifest_format` is
-    `sigil_guard_capability_manifest/v1`.
+    `sigil_guard_capability_manifest/v2`.
   - Tests: negative, malformed.
 - [x] M1.02 Manifest digest, inner digests, and the `repo_file_write`
       golden fixture.
@@ -728,7 +730,7 @@ section is post-1.0.0 parking; neither is counted here.
     is required; unknown tools fail `:unknown_manifest`, expired manifests
     `:manifest_expired`.
   - Tests: negative, tamper, expiration, malformed.
-- [x] M1.07 `tools/list_changed` re-verification and approval invalidation.
+- [x] M1.07 `notifications/tools/list_changed` re-verification and approval invalidation.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Threat Coverage
     And Host-Owned Exclusions (TM.05, TM.07).
   - AC: a `list_changed` notification forces full re-verification; cached
@@ -796,14 +798,14 @@ section is post-1.0.0 parking; neither is counted here.
     (confirmation/attestation opt combinations) with identical return
     shapes; parity tests cover every row.
   - Tests: parity suite (facade vs `ToolGateway`), negative.
-- [x] M3.14 JSON-RPC error registry `-32050..-32056` (D19).
+- [x] M3.14 JSON-RPC error registry, finalized as `-31990..-31984` by D20.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - JSON-RPC Error
     Registry.
   - AC: v3 renumbers gateway rejection codes from v0.2's `-32001..-32003`
-    to `-32050` (`blocked`), `-32051` (`confirmation_required`), `-32052`
-    (`quarantined`), `-32053` (`manifest_drift` with `drifted_fields`),
-    `-32054` (`unknown_manifest`/`manifest_expired`), `-32055`
-    (`invalid_attestation` with the SP.01 atom as string), `-32056`
+    to `-31990` (`blocked`), `-31989` (`confirmation_required`), `-31988`
+    (`quarantined`), `-31987` (`manifest_drift` with `drifted_fields`),
+    `-31986` (`unknown_manifest`/`manifest_expired`), `-31985`
+    (`invalid_attestation` with the SP.01 atom as string), `-31984`
     (`sandbox_required` with isolation fields); each emits exactly the
     documented `data` shape with nil fields omitted; the v0.2 → v3 code
     change is recorded in `MIGRATING-1.0.md`.
@@ -820,15 +822,15 @@ section is post-1.0.0 parking; neither is counted here.
   - Tests: negative, tamper.
 - [x] M3.16 Sandbox-required denial for privileged tools.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - CapabilityManifest
-    Canonical Form (sandbox binding); JSON-RPC Error Registry (-32056).
+    Canonical Form (sandbox binding); JSON-RPC Error Registry (-31984).
   - AC: `sandbox.required: true` with a context missing `sandbox_id` or
     below `min_isolation` denies with `:sandbox_required` and emits
-    `-32056` with `required_isolation`, `received_isolation`, and
+    `-31984` with `required_isolation`, `received_isolation`, and
     `sandbox_id_present`.
   - Tests: negative (per isolation level), malformed.
 - [x] M3.17 Poisoned and quarantined tool-result handling tests.
   - Spec: `docs/specs/SP.03-mcp-attestation-gateway.md` - Threat Coverage
-    And Host-Owned Exclusions (TM.02); `-32052` registry row.
+    And Host-Owned Exclusions (TM.02); `-31988` registry row.
   - AC: poisoned/quarantined results produce quarantine decisions with
     sanitized text only (`sanitized_text` in `data` only when
     `include_sanitized: true`); raw output never crosses.
@@ -1519,7 +1521,7 @@ section is post-1.0.0 parking; neither is counted here.
 - [x] M5.19 TM.05 threat family - rug pull / TOFU drift.
   - Spec: `R.06` - Control Mapping rows 5 and 18; `SP.03` (list_changed).
   - AC: `.../tm05_rug_pull_test.exs` proves drift rejection and that
-    `tools/list_changed` drops cached approvals and forces re-verification,
+    `notifications/tools/list_changed` drops cached approvals and forces re-verification,
     covering the config-swap analog (mitigates).
   - Tests: negative, tamper, replay.
   - Done: added the TM.05 module (R.06 rows 5 and 18, ASI04/ASI05, claim
@@ -1527,7 +1529,7 @@ section is post-1.0.0 parking; neither is counted here.
     config-swap pattern) citing the rug-pull / Cursor "MCPoison"
     (CVE-2025-54136) attack and referencing the base tests by exact name.
     Drives re-verification and token binding with rug-pull fixtures: a swapped
-    description or input schema on a `tools/list_changed` refresh is rejected by
+    description or input schema on a `notifications/tools/list_changed` refresh is rejected by
     `verify_list_changed/2` (`:manifest_digest_mismatch` / `:schema_digest_mismatch`)
     while an unchanged tool re-lists cleanly; a confirmation token bound to the
     benign manifest digest stops applying once the tool rug-pulls or its config
@@ -2700,6 +2702,51 @@ section is post-1.0.0 parking; neither is counted here.
   - Done: recorded the runtime dependency posture in `CHANGELOG.md`; verified
     `mix deps.audit` reports no vulnerabilities for the 1.0.0 release line.
 
+## M9 - MCP `2026-07-28` Alignment
+
+> Specs: `SP.16`, `SP.03`, `SP.08`; research: `R.08`. Depends on: M8
+> agent-owned release readiness. Publishing, pushing, tagging, and package
+> release remain maintainer-owned.
+
+- [x] M9.01 Canonical structured MCP security payload.
+  - AC: request/result binding retains keys and every JSON value; correlation
+    ids and fixed guard metadata do not affect approval digests.
+- [x] M9.02 Legal JSON-RPC rejection registry.
+  - AC: statuses map exactly to `-31990..-31984`; no SigilGuard error uses the
+    MCP-reserved `-32020..-32099` range.
+- [x] M9.03 Protocol version and result discrimination.
+  - AC: MCP `2026-07-28` responses insert/preserve `resultType`; legacy
+    responses retain legacy shape.
+- [x] M9.04 MRTR request/result binding.
+  - AC: `inputResponses` and `requestState` changes invalidate approvals;
+    input-required results retain their discriminator and are scanned.
+- [x] M9.05 Capability-manifest v2 display and UI binding.
+  - AC: title, icons, normalized UI URI/visibility, schemas, annotations, and
+    security properties participate in the manifest digest.
+- [x] M9.06 `x-mcp-header` validation.
+  - AC: invalid, duplicate, non-primitive, or sensitive header annotations
+    fail closed with typed errors.
+- [x] M9.07 MCP Apps caller boundary.
+  - AC: app origin normalizes from strings; model/app visibility and same-server
+    requirements are enforced before execution.
+- [x] M9.08 MCP App resource verification.
+  - AC: UI URI, MIME, content digest, CSP domains, permissions, and malformed
+    resource shapes fail closed without network or rendering.
+- [x] M9.09 Threat-model and integration alignment.
+  - AC: session/resumability language is replaced with stateless,
+    subscription/list-refresh, explicit-handle, MRTR, and Apps threats; adapter
+    guides disclose their protocol era.
+- [x] M9.10 Migration, README, changelog, and GitOps release readiness.
+  - AC: all intentional 1.0 changes and host responsibilities are documented;
+    the changelog marker/config remain compatible with automated git_ops.
+- [x] M9.11 Golden vectors and complete regression suite.
+  - AC: confirmation/attestation/manifest vectors are regenerated; focused
+    tamper, malformed, replay, expiry, quarantine, modern/legacy, and Apps tests
+    are green.
+- [x] M9.12 Full release quality gate.
+  - AC: every `CLAUDE.md` and `done` skill gate passes; coverage remains at
+    least 95%; no publish, push, or tag is performed.
+
 ## Closed Decisions
 
 All architectural decisions are final and research-backed; each lives in
@@ -2709,7 +2756,8 @@ choices) - the owning docs carry the long-form argument, comparisons, and
 sources. Do not reopen a decision without a superseding research note.
 D1-D18 were set during the first research round; D9 was revised and D19
 added during an adversarial hardening round (both verified against primary
-sources, 2026-07-02).
+sources, 2026-07-02). D20 supersedes D19 for final MCP `2026-07-28`
+compatibility before the unreleased 1.0 publication.
 
 | # | Decision and rationale | Owning doc(s) |
 |---|------------------------|---------------|
@@ -2731,7 +2779,8 @@ sources, 2026-07-02).
 | D16 | **Single OTel attribute namespace `sigilguard.*`** (resolves the v0.2 `sigil.*` vs draft `sigil_guard.*` split; rename is mechanical). | `SP.05` |
 | D17 | **Consumer-facing contracts kept byte-identical in v3**: `scan/1` `{:ok,_}|{:hit,[%{name: _}]}`, `scan_and_redact/1`, `policy_verdict/3` `:allowed|:blocked|{:confirm, reason}`, the Identity/Signer/Vault behaviours, `Signer.Ed25519.new/1|sign_with/2|verify/3`, and `%Audit{}` fields. Hit maps extend additively only. Deliberate breaks get 1:1 MIGRATING mappings. | `SP.07` |
 | D18 | **Shell-command AST risk analysis is an explicit v1.0 non-goal** (hosts keep their own analyzers); parked in Deferred, revisit post-GA. | `SP.04` |
-| D19 | **Gateway JSON-RPC rejection codes renumbered to `-32050..-32056`** (blocked/confirmation_required/quarantined/manifest_drift/unknown_manifest/invalid_attestation/sandbox_required). Legal but ambiguous at v0.2's `-32001..-32003` (a client can conflate `-32001` with an SDK transport timeout; MCP's `-32042` shows the low band filling); the v3 break moves to a clean sub-range with buffer. | `SP.03`, `SP.08` |
+| D19 | **Superseded by D20.** The pre-release gateway selected `-32050..-32056` before MCP reserved that range. It never ships as the 1.0 contract. | `SP.03`, `SP.08` |
+| D20 | **MCP `2026-07-28` alignment without a framework/transport dependency.** SigilGuard uses `-31990..-31984`, canonical structured MCP action binding, required modern result discrimination, manifest v2 display/UI/header coverage, and app-origin/UI-resource verification. Transport sessions, discovery, authorization, subscriptions, tasks, HTTP headers, and rendering remain host-owned. | `R.08`, `SP.16`, `SP.03`, `SP.08` |
 
 ## Deferred (Post-1.0.0)
 

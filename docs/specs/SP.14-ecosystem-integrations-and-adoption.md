@@ -213,6 +213,13 @@ Each row is additional to the pinned-version validation procedure.
 | LangChain/ReqLLM | Request and result sides both gated; the ReqLLM pipeline-step variant appears in the same guide. |
 | Tidewave | Shipped policy blocks eval-class tools, requires approval for repo writes, allows schema/doc reads; guide states Tidewave is dev-only and the guard is defense in depth, not a production-exposure fix. |
 
+For MCP-facing targets, the guide MUST disclose the adapter version that was
+compiled and MUST NOT imply that dependency supports MCP `2026-07-28`.
+Modern adapters pass the selected protocol version to SigilGuard, retain MRTR
+state/input responses in the guarded message, and keep discovery,
+subscriptions, header serialization, transport authorization, and MCP Apps
+rendering host-owned (SP.16).
+
 ### Tier 2 Watchlist
 
 Tracked without guides until the promotion criteria hold; promotion adds a
@@ -341,6 +348,7 @@ runtime errors. N/A rows are intentional.
 | anubis variant | pinned-version procedure | the hermes guide compiles against `anubis_mcp` (test-only). |
 | docs render | `mix docs` | cheatsheet, guides, and threat-model guide render without warnings. |
 | doc coverage | `mix doctor` | 100% documentation coverage. |
+| MCP revision contract | guide review + gateway tests | adapter protocol era is explicit; modern result/MRTR and Apps responsibilities follow SP.16. |
 
 ## Acceptance Criteria
 

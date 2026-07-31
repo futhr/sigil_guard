@@ -35,6 +35,8 @@ flowchart TD
     R06 --> SP13
     R07 --> SP14[SP.14]
     R07 --> SP15[SP.15]
+    R08[R.08 MCP v2 And Apps]
+    R08 --> SP16[SP.16]
 ```
 
 ## Current Research Notes
@@ -48,6 +50,7 @@ flowchart TD
 | [`R.05`](R.05-actor-identity-delegation-and-a2a.md) | complete | adopted | [`SP.01`](../specs/SP.01-sigilguard-trust-profile.md), [`SP.03`](../specs/SP.03-mcp-attestation-gateway.md), [`SP.10`](../specs/SP.10-vault-and-identity-contracts.md), [`SP.13`](../specs/SP.13-agent-to-agent-trust-statements.md) | Actor and issuer identities are SPIFFE-shaped strings carried opaquely, with optional did:key acceptance, RFC 8693 act-claim delegation chains, and host-owned OAuth at the MCP layer. |
 | [`R.06`](R.06-agentic-threat-model-and-control-mapping.md) | complete | adopted | [`SP.03`](../specs/SP.03-mcp-attestation-gateway.md), [`SP.04`](../specs/SP.04-boundary-scanner-and-policy-kernel.md), [`SP.13`](../specs/SP.13-agent-to-agent-trust-statements.md), [`SP.14`](../specs/SP.14-ecosystem-integrations-and-adoption.md) | The normative threat model maps OWASP Agentic Top 10 2026 classes and named MCP attacks to SigilGuard controls with mitigates/detects/out-of-scope claims and TM.01-TM.12 test families. |
 | [`R.07`](R.07-ecosystem-positioning-dependencies-and-adoption.md) | complete | adopted | [`SP.05`](../specs/SP.05-audit-and-release-provenance.md), [`SP.12`](../specs/SP.12-legacy-remote-bundle-adapter-contracts.md), [`SP.14`](../specs/SP.14-ecosystem-integrations-and-adoption.md), [`SP.15`](../specs/SP.15-benchmark-methodology-and-baselines.md) | V3 keeps a minimal, individually justified runtime dependency set (telemetry, nimble_options, jason — not zero), adaptive detection stays a behaviour with an optional post-GA package, no compatibility namespace ships, and the release sequence and adoption playbook are fixed. |
+| [`R.08`](R.08-mcp-2026-07-28-and-apps-security.md) | complete | adopted | [`SP.03`](../specs/SP.03-mcp-attestation-gateway.md), [`SP.08`](../specs/SP.08-mcp-gateway-and-confirmation-contracts.md), [`SP.16`](../specs/SP.16-mcp-2026-07-28-and-apps-contracts.md) | MCP v2 (`2026-07-28`) requires structured MRTR-aware action binding, application-defined error codes outside reserved ranges, result discriminators, expanded manifest coverage, and optional MCP Apps boundary controls while transport and rendering remain host-owned. |
 
 ## Evidence Map
 
@@ -61,6 +64,7 @@ flowchart TD
 | Workload and agent identity standards | Actor, issuer, and delegation claims need portable shapes without network resolution. | `R.05`, `SP.10`, `SP.13` |
 | Elixir ecosystem integration surfaces | Adoption depends on MCP SDK interceptors, agent frameworks, and observability norms. | `R.07`, `SP.14`, `SP.15` |
 | Existing SigilGuard implementation | Compatibility contracts must be preserved while terminology moves forward. | `SP.06` through `SP.12` |
+| MCP v2 (`2026-07-28`) and MCP Apps | Stateless requests, MRTR, result discrimination, error allocation, and embedded UI introduce new security boundaries. | `R.08`, `SP.16` |
 
 ## Resolved Backlog
 
