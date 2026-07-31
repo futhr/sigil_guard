@@ -45,7 +45,13 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
 - Runtime dependencies are intentionally limited to `:telemetry`,
   `:nimble_options`, and `:jason`; integrations, notebooks, and adaptive
   detector examples add no runtime dependency, and `mix deps.audit` is clean
-  for the 1.0.0 release line.
+  for the 1.0.0 release line. The test-only Bypass/Cowboy tree currently
+  resolves Cowlib 2.19.0, for which Hex reports CVE-2026-43966 and
+  CVE-2026-43969; Cowlib is absent from the production dependency tree, the
+  two advisories are explicitly acknowledged in the Hex project configuration,
+  affected encoders are not called by SigilGuard, and no patched Hex release
+  is available as of 2026-07-31. Recheck this owner-side immediately before
+  release.
 - Changed selected trust-bundle error atoms and config boot errors; see
   [Error Changes](MIGRATING-1.0.md#error-changes).
 - Version adoption is explicit: `~> 0.2` remains on the 0.2.x line and

@@ -16,6 +16,12 @@ defmodule SigilGuard.MixProject do
       package: package(),
       source_url: @source_url,
       homepage_url: @source_url,
+      hex: [
+        ignore_advisories: [
+          "CVE-2026-43966",
+          "CVE-2026-43969"
+        ]
+      ],
       docs: docs(),
       dialyzer: dialyzer(),
       test_coverage: [tool: ExCoveralls],
