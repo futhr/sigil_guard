@@ -323,7 +323,7 @@ defmodule SigilGuard.AgentTrustFixtureGenerator do
       },
       "input_sensitivity" => "internal",
       "issuer_keyid" => Envelope.keyid(__MODULE__.SeedSigner.public_key()),
-      "manifest_format" => "sigil_guard_capability_manifest/v1",
+      "manifest_format" => "sigil_guard_capability_manifest/v2",
       "name" => "repo_file_write",
       "network_access" => "none",
       "output_sensitivity" => "internal",

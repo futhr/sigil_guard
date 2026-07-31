@@ -25,7 +25,7 @@ defmodule SigilGuard.ToolGateway.BaseTest do
              Base.guarded_request(confirmable_request(), trust_level: :medium)
 
     assert {:confirm, _} = decision.verdict
-    assert response["error"]["code"] == -32_051
+    assert response["error"]["code"] == -31_989
     assert response["error"]["data"]["status"] == "confirmation_required"
   end
 
@@ -127,7 +127,7 @@ defmodule SigilGuard.ToolGateway.BaseTest do
     assert {:error, confirm_error, %Decision{verdict: {:confirm, _}}} =
              Base.guarded_confirmed_result(result, trust_level: :high)
 
-    assert confirm_error["error"]["code"] == -32_052
+    assert confirm_error["error"]["code"] == -31_988
 
     assert %Decision{verdict: :allowed, action: :allow} =
              Base.guard_confirmed_result(
@@ -166,7 +166,7 @@ defmodule SigilGuard.ToolGateway.BaseTest do
                action: "send_webhook"
              )
 
-    assert error["error"]["code"] == -32_050
+    assert error["error"]["code"] == -31_990
   end
 
   test "stream responses emit held chunks and final nil chunks" do
@@ -196,19 +196,19 @@ defmodule SigilGuard.ToolGateway.BaseTest do
       )
 
     assert response = Base.response_for_decision(drift, "drift")
-    assert response["error"]["code"] == -32_053
+    assert response["error"]["code"] == -31_987
     assert response["error"]["data"]["drifted_fields"] == ["schema"]
 
     invalid_attestation =
       decision(:blocked, deny_reason: :invalid_attestation, verify_error: :digest_mismatch)
 
-    assert Base.response_for_decision(invalid_attestation)["error"]["code"] == -32_055
+    assert Base.response_for_decision(invalid_attestation)["error"]["code"] == -31_985
 
     sandbox = decision(:blocked, deny_reason: :sandbox_required, required_isolation: "container")
-    assert Base.response_for_decision(sandbox)["error"]["code"] == -32_056
+    assert Base.response_for_decision(sandbox)["error"]["code"] == -31_984
 
     quarantine = %Decision{decision(:blocked) | action: :quarantine}
-    assert Base.response_for_decision(quarantine)["error"]["code"] == -32_052
+    assert Base.response_for_decision(quarantine)["error"]["code"] == -31_988
 
     evidence = decision(:blocked, evidence: [%{kind: :audit, ref: "audit:1"}])
 
@@ -269,7 +269,7 @@ defmodule SigilGuard.ToolGateway.BaseTest do
            ]) == "redacted"
 
     effect_quarantine = %Decision{decision({:confirm, :dangerous}) | effect: :quarantine}
-    assert Base.response_for_decision(effect_quarantine)["error"]["code"] == -32_052
+    assert Base.response_for_decision(effect_quarantine)["error"]["code"] == -31_988
 
     suspicious = decision(:blocked, deny_reason: :suspicious_required_param)
 

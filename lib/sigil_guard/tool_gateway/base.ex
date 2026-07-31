@@ -1,34 +1,61 @@
 defmodule SigilGuard.ToolGateway.Base do
   @moduledoc """
-  Transport-agnostic MCP guard helpers.
+  Provides the transport-neutral mechanics behind the tool gateways.
 
-  The module accepts MCP-shaped maps, normalizes common request/result fields,
-  labels the relevant trust boundary, and delegates enforcement to
-  `SigilGuard.Runtime.Gate`. It does not depend on a particular MCP server
-  or client package.
+  This module accepts decoded MCP-shaped maps, derives the request or result
+  boundary, builds a structured `SigilGuard.MCP.SecurityPayload`, and delegates
+  enforcement to `SigilGuard.Runtime.Gate`. It also shapes safe JSON-RPC
+  responses and drives the chunk-aware result sanitizer.
+
+  Most applications should call `SigilGuard.MCP.Gateway` or
+  `SigilGuard.ToolGateway`. This lower-level module exists for their shared
+  mechanics and for adapters that intentionally do not use capability
+  manifests.
+
+  Confirmation tokens bind the structured payload, protocol revision, and
+  normalized boundary context. SigilGuard metadata and non-authorizing
+  operational metadata are excluded; client capabilities and extension
+  metadata that can alter behavior remain bound. A confirmed quarantine only
+  releases the sanitized value recorded by the original decision.
+
+  The module does not negotiate MCP, validate a full JSON Schema, execute
+  tools, or send transport messages. Hosts must perform those steps before and
+  after the guard call as appropriate.
+
+  ## Example
+
+      request = %{
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "read_file",
+          "arguments" => %{"path" => "README.md"},
+          "_meta" => %{
+            "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities" => %{}
+          }
+        }
+      }
+
+      context = [origin: :model, sink: :tool, phase: :tool_request]
+      %SigilGuard.Decision{} = SigilGuard.ToolGateway.Base.guard_request(request, context)
   """
+  @moduledoc since: "1.0.0"
 
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
+  alias SigilGuard.MCP.Protocol
+  alias SigilGuard.MCP.SecurityPayload
   alias SigilGuard.Runtime
   alias SigilGuard.Telemetry
 
-  @guard_metadata_keys [
-    :_agent_trust,
-    "_agent_trust",
-    :_agent_confirmation,
-    "_agent_confirmation",
-    :confirmation_token,
-    "confirmation_token"
-  ]
-  @blocked_code -32_050
-  @confirm_code -32_051
-  @quarantine_code -32_052
-  @manifest_drift_code -32_053
-  @unknown_manifest_code -32_054
-  @invalid_attestation_code -32_055
-  @sandbox_required_code -32_056
+  @blocked_code -31_990
+  @confirm_code -31_989
+  @quarantine_code -31_988
+  @manifest_drift_code -31_987
+  @unknown_manifest_code -31_986
+  @invalid_attestation_code -31_985
+  @sandbox_required_code -31_984
   @invalid_payload_field false
 
   @doc """
@@ -40,7 +67,7 @@ defmodule SigilGuard.ToolGateway.Base do
   @spec guard_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_request(request, context \\ %{}, opts \\ []) do
     request
-    |> gate_payload()
+    |> SecurityPayload.for_gate(:request, opts)
     |> Runtime.Gate.evaluate(request_context(request, context), opts)
   end
 
@@ -79,7 +106,7 @@ defmodule SigilGuard.ToolGateway.Base do
           {:ok, String.t()} | {:error, term()}
   def issue_confirmation_token(request, context, %Decision{} = decision, key, opts \\ []) do
     Confirmation.issue(
-      gate_payload(request),
+      SecurityPayload.for_gate(request, :request, opts),
       request_context(request, context),
       decision,
       key,
@@ -121,7 +148,7 @@ defmodule SigilGuard.ToolGateway.Base do
           {:ok, String.t()} | {:error, term()}
   def issue_result_confirmation_token(result, context, %Decision{} = decision, key, opts \\ []) do
     Confirmation.issue(
-      gate_payload(result),
+      SecurityPayload.for_gate(result, :result, opts),
       result_context(result, context),
       decision,
       key,
@@ -230,7 +257,7 @@ defmodule SigilGuard.ToolGateway.Base do
   @spec guard_result(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_result(result, context \\ %{}, opts \\ []) do
     result
-    |> gate_payload()
+    |> SecurityPayload.for_gate(:result, opts)
     |> Runtime.Gate.evaluate(result_context(result, context), opts)
   end
 
@@ -263,10 +290,10 @@ defmodule SigilGuard.ToolGateway.Base do
 
     case decision.action do
       :allow ->
-        {:ok, jsonrpc_result(result, request_id(result)), decision}
+        {:ok, jsonrpc_result(result, request_id(result), opts), decision}
 
       :redact ->
-        {:ok, sanitized_result(result, decision, request_id(result)), decision}
+        {:ok, sanitized_result(result, decision, request_id(result), opts), decision}
 
       _ ->
         {:error, response_for_decision(decision, request_id(result), opts), decision}
@@ -283,10 +310,10 @@ defmodule SigilGuard.ToolGateway.Base do
 
     case decision.action do
       :allow ->
-        {:ok, jsonrpc_result(result, request_id(result)), decision}
+        {:ok, jsonrpc_result(result, request_id(result), opts), decision}
 
       :redact ->
-        {:ok, sanitized_result(result, decision, request_id(result)), decision}
+        {:ok, sanitized_result(result, decision, request_id(result), opts), decision}
 
       _ ->
         {:error, response_for_decision(decision, request_id(result), opts), decision}
@@ -346,7 +373,7 @@ defmodule SigilGuard.ToolGateway.Base do
   @spec response_for_decision(Decision.t(), term(), keyword()) :: map()
   def response_for_decision(%Decision{} = decision, id \\ nil, opts \\ []) do
     if decision.verdict == :allowed and decision.action in [:allow, :redact] do
-      sanitized_result(%{}, decision, id)
+      sanitized_result(%{}, decision, id, opts)
     else
       jsonrpc_error(id, error_code(decision), error_message(decision), error_data(decision, opts))
     end
@@ -391,91 +418,12 @@ defmodule SigilGuard.ToolGateway.Base do
     |> Context.new()
   end
 
-  defp gate_payload(payload) do
-    payload = strip_guard_metadata(payload)
-    tool = tool_name(payload)
-    action = action_name(payload)
-
-    %{
-      tool: context_field(tool),
-      action: action_field(action, tool),
-      text: text_payload(payload)
-    }
-  end
-
-  defp strip_guard_metadata(value) when is_map(value) do
-    value
-    |> Map.drop(@guard_metadata_keys)
-    |> strip_params_metadata(:params)
-    |> strip_params_metadata("params")
-  end
-
-  defp strip_guard_metadata(value), do: value
-
-  defp strip_params_metadata(payload, params_key) do
-    case Map.get(payload, params_key) do
-      params when is_map(params) ->
-        Map.put(payload, params_key, Map.drop(params, @guard_metadata_keys))
-
-      _ ->
-        payload
-    end
-  end
-
-  defp text_payload(payload) when is_map(payload), do: joined_strings(payload)
-  defp text_payload(payload), do: Context.text(payload) || joined_strings(payload)
-
-  defp joined_strings(payload) do
-    payload
-    |> collect_strings()
-    |> Enum.reverse()
-    |> Enum.join("\n")
-  end
-
-  defp collect_strings(value), do: collect_strings(value, [])
-
-  defp collect_strings(value, acc) when is_binary(value), do: [value | acc]
-
-  defp collect_strings(value, acc) when is_list(value) do
-    Enum.reduce(value, acc, &collect_strings/2)
-  end
-
-  defp collect_strings(value, acc) when is_map(value) do
-    value
-    |> Map.values()
-    |> Enum.reduce(acc, &collect_strings/2)
-  end
-
-  defp collect_strings(_, acc), do: acc
-
   defp tool_name(payload) do
-    first_payload_value(payload, [
-      [:tool],
-      ["tool"],
-      [:name],
-      ["name"],
-      [:params, :name],
-      [:params, "name"],
-      ["params", :name],
-      ["params", "name"]
-    ])
+    SecurityPayload.tool_name(payload)
   end
 
   defp action_name(payload) do
-    first_payload_value(payload, [
-      [:action],
-      ["action"],
-      [:tool],
-      ["tool"],
-      [:name],
-      ["name"],
-      [:params, :name],
-      [:params, "name"],
-      ["params", :name],
-      ["params", "name"],
-      [:method],
-      ["method"]
-    ])
+    SecurityPayload.action_name(payload)
   end
 
   defp mcp_server(payload) do
@@ -569,11 +517,13 @@ defmodule SigilGuard.ToolGateway.Base do
   defp maybe_apply_result_confirmation(%Decision{} = decision, _, _, _), do: decision
 
   defp verify_confirmation_token(decision, request, context, token, opts) do
+    direction = if context.phase == :tool_result, do: :result, else: :request
+
     with {:ok, key} <- confirmation_key(opts),
          {:ok, claims} <-
            Confirmation.verify(
              token,
-             gate_payload(request),
+             SecurityPayload.for_gate(request, direction, opts),
              context,
              key,
              confirmation_opts(opts)
@@ -620,9 +570,8 @@ defmodule SigilGuard.ToolGateway.Base do
     }
   end
 
-  # The unified verdict `action` for a confirm decision is `:confirm`; the action
-  # to run after acceptance is the decision's `effect` (SP.07). Default to `:allow`
-  # when no effect is recorded (e.g. a bare confirm).
+  # A confirm decision uses `action: :confirm`; its `effect` is the action to run
+  # after acceptance. Default to `:allow` when a bare confirm records no effect.
   defp confirmed_action(%Decision{effect: effect}) when effect in [:allow, :redact, :quarantine],
     do: effect
 
@@ -656,7 +605,7 @@ defmodule SigilGuard.ToolGateway.Base do
 
     result =
       if executable?(decision) do
-        {:ok, stream_chunk_response(emitted, id), decision}
+        {:ok, stream_chunk_response(emitted, id, opts), decision}
       else
         {:error, response_for_decision(decision, id, opts), decision}
       end
@@ -664,17 +613,17 @@ defmodule SigilGuard.ToolGateway.Base do
     {stream, result}
   end
 
-  defp stream_chunk_response("", _), do: nil
+  defp stream_chunk_response("", _, _), do: nil
 
-  defp stream_chunk_response(text, id) do
+  defp stream_chunk_response(text, id, opts) do
+    result =
+      %{"content" => [%{"type" => "text", "text" => text}]}
+      |> Protocol.ensure_result_type(%{}, opts)
+
     %{
       "jsonrpc" => "2.0",
       "id" => id,
-      "result" => %{
-        "content" => [
-          %{"type" => "text", "text" => text}
-        ]
-      }
+      "result" => result
     }
   end
 
@@ -812,7 +761,7 @@ defmodule SigilGuard.ToolGateway.Base do
 
   defp envelope_decision(request, context, reason) do
     context = request_context(request, context)
-    content_hash = hash_text(text_payload(request))
+    content_hash = hash_text(SecurityPayload.for_gate(request, :request).text)
 
     decision = %Decision{
       verdict: :blocked,
@@ -893,22 +842,40 @@ defmodule SigilGuard.ToolGateway.Base do
     Telemetry.emit([:sigil_guard, :mcp, :request], %{system_time: System.system_time()}, metadata)
   end
 
-  defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result}, _) do
-    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result} = source, _, opts) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => Protocol.ensure_result_type(result, source, opts)
+    }
   end
 
-  defp jsonrpc_result(%{jsonrpc: _, id: id, result: result}, _) do
-    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  defp jsonrpc_result(%{jsonrpc: _, id: id, result: result} = source, _, opts) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => Protocol.ensure_result_type(result, source, opts)
+    }
   end
 
-  defp jsonrpc_result(result, id) do
-    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  defp jsonrpc_result(result, id, opts) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => Protocol.ensure_result_type(result, result, opts)
+    }
   end
 
-  defp sanitized_result(result, %Decision{} = decision, id) do
+  defp sanitized_result(result, %Decision{} = decision, id, opts) do
+    payload =
+      decision
+      |> sanitized_payload()
+      |> preserve_result_type(result)
+      |> Protocol.ensure_result_type(result, opts)
+
     result
-    |> jsonrpc_result(id)
-    |> put_in(["result"], sanitized_payload(decision))
+    |> jsonrpc_result(id, opts)
+    |> put_in(["result"], payload)
   end
 
   defp sanitized_payload(%Decision{sanitized_text: text}) when is_binary(text) do
@@ -920,6 +887,13 @@ defmodule SigilGuard.ToolGateway.Base do
   end
 
   defp sanitized_payload(%Decision{}), do: %{"content" => []}
+
+  defp preserve_result_type(payload, result) do
+    case Protocol.result_type(result) do
+      value when is_binary(value) -> Map.put(payload, "resultType", value)
+      _ -> payload
+    end
+  end
 
   defp jsonrpc_error(id, code, message, data) do
     %{
@@ -993,6 +967,8 @@ defmodule SigilGuard.ToolGateway.Base do
       when reason in [
              :manifest_digest_mismatch,
              :schema_digest_mismatch,
+             :invalid_header_annotation,
+             :sensitive_header_param,
              :suspicious_required_param
            ] ->
         :manifest_drift
@@ -1067,6 +1043,8 @@ defmodule SigilGuard.ToolGateway.Base do
     do: Enum.map(fields, &error_value/1)
 
   defp drifted_fields(%{deny_reason: :schema_digest_mismatch}), do: ["schema"]
+  defp drifted_fields(%{deny_reason: :invalid_header_annotation}), do: ["input_schema"]
+  defp drifted_fields(%{deny_reason: :sensitive_header_param}), do: ["input_schema"]
   defp drifted_fields(%{deny_reason: :suspicious_required_param}), do: ["suspicious_params"]
   defp drifted_fields(%{deny_reason: :manifest_digest_mismatch}), do: ["manifest"]
   defp drifted_fields(_), do: nil

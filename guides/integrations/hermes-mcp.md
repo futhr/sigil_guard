@@ -215,16 +215,52 @@ Always return SigilGuard denials through the SP.03 JSON-RPC error registry via
 
 | Decision action | JSON-RPC status | Code |
 |-----------------|-----------------|------|
-| `:block` | `blocked` | `-32050` |
-| `:confirm` | `confirmation_required` | `-32051` |
-| `:quarantine` | `quarantined` | `-32052` |
-| manifest drift | `manifest_drift` | `-32053` |
-| unknown manifest | `unknown_manifest` | `-32054` |
-| invalid attestation | `invalid_attestation` | `-32055` |
-| sandbox required | `sandbox_required` | `-32056` |
+| `:block` | `blocked` | `-31990` |
+| `:confirm` | `confirmation_required` | `-31989` |
+| `:quarantine` | `quarantined` | `-31988` |
+| manifest drift | `manifest_drift` | `-31987` |
+| unknown manifest | `unknown_manifest` | `-31986` |
+| invalid attestation | `invalid_attestation` | `-31985` |
+| sandbox required | `sandbox_required` | `-31984` |
 
 Hermes owns transport shape. SigilGuard owns deterministic decision and error
 payload content.
+
+## MCP v2 (`2026-07-28`) Adapter Contract
+
+The validation record above is for the named Hermes/Anubis versions; do not
+infer MCP v2 support from SigilGuard. The adapter remains responsible
+for protocol negotiation, `server/discover`, subscription delivery, and
+constructing and validating the standard request `_meta`, including
+`protocolVersion` and `clientCapabilities`.
+
+When the adapter has negotiated the modern revision, pass it explicitly while
+guarding successful results:
+
+```elixir
+SigilGuard.ToolGateway.guarded_result(result, context,
+  protocol_version: "2026-07-28",
+  request_action_digest: request_action_digest
+)
+```
+
+This inserts `resultType: "complete"` only when absent and preserves every
+existing discriminator for host-side validation. Unknown future protocol dates
+are not treated as v2. Forward the full JSON-RPC request/result map to the
+gateway whenever issuing confirmation or Agent Trust evidence. The shared
+structured projection intentionally binds nested keys, non-string values,
+client capabilities, behavior-changing extension metadata, `inputResponses`,
+and `requestState`; passing only a concatenated text view loses the security
+contract.
+
+For MCP Apps, set `origin: :app` and the trusted `mcp_server` in the boundary
+context. The pinned manifest must expose the tool to `"app"` and name that same
+server. Verify direct `resources/read` content with
+`SigilGuard.MCP.AppResource.verify/2` before the host renderer sees it. Resource
+verification is limited to 1 MiB by default, and dedicated app domains require
+an exact host allowlist match. Hermes or the host still owns HTML5 validation,
+iframe sandboxing, CSP and Permissions Policy enforcement, and browser
+permissions.
 
 ## Anubis Variant
 

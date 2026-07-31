@@ -42,6 +42,14 @@ defmodule SigilGuard.ContextTest do
       assert context.intended_audience == :model
     end
 
+    test "normalizes MCP Apps as a distinct caller origin" do
+      context = Context.new(%{"origin" => "app", "mcp_server" => "repo-mcp"})
+
+      assert context.origin == :app
+      assert context.mcp_server == "repo-mcp"
+      assert Context.validate(context) == :ok
+    end
+
     test "ignores unknown string keys without atomizing them" do
       context = Context.new(%{"unknown-key" => "value", "phase" => :tool_result})
 

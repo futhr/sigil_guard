@@ -25,7 +25,7 @@ defmodule SigilGuard.CapabilityManifestTest do
       assert {:ok, capability} = CapabilityManifest.new(manifest)
 
       assert capability.name == "repo_file_write"
-      assert capability.manifest_format == "sigil_guard_capability_manifest/v1"
+      assert capability.manifest_format == "sigil_guard_capability_manifest/v2"
       assert capability.side_effects == ["write"]
       assert capability.sandbox == %{"min_isolation" => "container", "required" => true}
       assert capability.preimage == read_json(@preimage_fixture)
@@ -56,7 +56,7 @@ defmodule SigilGuard.CapabilityManifestTest do
         {"unknown field", Map.put(manifest(), "extra", true)},
         {"missing required field", Map.delete(manifest(), "server")},
         {"bad format",
-         Map.put(manifest(), "manifest_format", "sigil_guard_capability_manifest/v2")},
+         Map.put(manifest(), "manifest_format", "sigil_guard_capability_manifest/v1")},
         {"bad enum", Map.put(manifest(), "network_access", "ambient")},
         {"unsorted list", Map.put(manifest(), "scopes", ["repo:write", "admin"])},
         {"duplicate list", Map.put(manifest(), "allowed_source_zones", ["trusted", "trusted"])},
@@ -146,10 +146,152 @@ defmodule SigilGuard.CapabilityManifestTest do
 
       assert CapabilityManifest.new(unsafe) == {:error, :unsupported_number_range}
     end
+
+    test "binds MCP title, icons, and Apps UI metadata into manifest v2" do
+      enriched =
+        manifest()
+        |> Map.put("title", "Repository writer")
+        |> Map.put("icons", [
+          %{
+            "src" => "https://cdn.example.test/repo-write.svg",
+            "mimeType" => "image/svg+xml",
+            "sizes" => ["any"],
+            "theme" => "light"
+          }
+        ])
+        |> Map.put("ui", %{
+          "resource_uri" => "ui://repo/review",
+          "visibility" => ["app", "model"]
+        })
+
+      assert {:ok, capability} = CapabilityManifest.new(enriched)
+      assert capability.title == "Repository writer"
+      assert capability.title_sha256 =~ ~r/^[0-9a-f]{64}$/
+      assert capability.icons_sha256 =~ ~r/^[0-9a-f]{64}$/
+      assert capability.ui_sha256 =~ ~r/^[0-9a-f]{64}$/
+      assert capability.preimage["title_sha256"] == capability.title_sha256
+      assert capability.preimage["icons_sha256"] == capability.icons_sha256
+      assert capability.preimage["ui_sha256"] == capability.ui_sha256
+
+      changed = put_in(enriched, ["ui", "visibility"], ["app"])
+
+      assert CapabilityManifest.verify(capability, changed) ==
+               {:error, :manifest_digest_mismatch}
+
+      data_icon =
+        enriched
+        |> Map.put("icons", [
+          %{
+            "src" => "data:image/png;base64,#{Base.encode64(<<137, 80, 78, 71>>)}",
+            "mimeType" => "image/png",
+            "sizes" => ["48x48"],
+            "theme" => "dark"
+          }
+        ])
+
+      assert {:ok, %CapabilityManifest{}} = CapabilityManifest.new(data_icon)
+    end
+
+    test "validates x-mcp-header annotations and rejects unsafe variants" do
+      valid =
+        manifest()
+        |> put_in(
+          ["input_schema", "properties", "tenant"],
+          %{"type" => "string", "x-mcp-header" => "X-Tenant"}
+        )
+
+      assert {:ok, %CapabilityManifest{}} = CapabilityManifest.new(valid)
+
+      malformed =
+        put_in(
+          valid,
+          ["input_schema", "properties", "tenant", "x-mcp-header"],
+          "X-Tenant\r\nInjected: yes"
+        )
+
+      duplicate =
+        valid
+        |> put_in(
+          ["input_schema", "properties", "region"],
+          %{"type" => "string", "x-mcp-header" => "x-tenant"}
+        )
+
+      non_primitive =
+        put_in(valid, ["input_schema", "properties", "tenant", "type"], "object")
+
+      sensitive =
+        manifest()
+        |> put_in(
+          ["input_schema", "properties", "authorization_token"],
+          %{"type" => "string", "x-mcp-header" => "Authorization"}
+        )
+
+      assert CapabilityManifest.new(malformed) == {:error, :invalid_header_annotation}
+      assert CapabilityManifest.new(duplicate) == {:error, :invalid_header_annotation}
+      assert CapabilityManifest.new(non_primitive) == {:error, :invalid_header_annotation}
+      assert CapabilityManifest.new(sensitive) == {:error, :sensitive_header_param}
+
+      unreachable =
+        put_in(
+          manifest(),
+          ["input_schema", "allOf"],
+          [
+            %{
+              "properties" => %{
+                "tenant" => %{"type" => "string", "x-mcp-header" => "X-Tenant"}
+              }
+            }
+          ]
+        )
+
+      assert CapabilityManifest.new(unreachable) == {:error, :invalid_header_annotation}
+    end
+
+    test "rejects malformed display and UI metadata" do
+      assert CapabilityManifest.new(Map.put(manifest(), "title", "")) ==
+               {:error, :invalid_manifest}
+
+      assert CapabilityManifest.new(Map.put(manifest(), "icons", [%{"src" => ""}])) ==
+               {:error, :invalid_manifest}
+
+      for icon <- [
+            %{"src" => "javascript:alert(1)"},
+            %{"src" => "https://example.test/icon.png", "theme" => "sepia"},
+            %{"src" => "https://example.test/icon.png", "sizes" => ["0x48"]},
+            %{"src" => "https://example.test/icon.png", "sizes" => ["48x48", "48x48"]},
+            %{"src" => "https://example.test/icon.png", "unknown" => true},
+            %{"src" => "data:image/png;base64,not base64"}
+          ] do
+        assert CapabilityManifest.new(Map.put(manifest(), "icons", [icon])) ==
+                 {:error, :invalid_manifest}
+      end
+
+      unsorted_ui =
+        Map.put(manifest(), "ui", %{
+          "resource_uri" => "ui://repo/review",
+          "visibility" => ["model", "app"]
+        })
+
+      assert CapabilityManifest.new(unsorted_ui) == {:error, :invalid_manifest}
+
+      empty_ui_uri =
+        Map.put(manifest(), "ui", %{
+          "resource_uri" => "ui://",
+          "visibility" => ["app", "model"]
+        })
+
+      assert CapabilityManifest.new(empty_ui_uri) == {:error, :invalid_manifest}
+
+      app_only_without_resource =
+        Map.put(manifest(), "ui", %{"visibility" => ["app"]})
+
+      assert {:ok, %CapabilityManifest{ui: %{"visibility" => ["app"]}}} =
+               CapabilityManifest.new(app_only_without_resource)
+    end
   end
 
   describe "digest/1" do
-    test "reproduces committed golden vectors and the SP.01 tool_request digest" do
+    test "reproduces committed golden vectors and the attestation tool_request digest" do
       manifest_json = read_fixture_bytes(@manifest_fixture)
       preimage_json = read_fixture_bytes(@preimage_fixture)
       expected = read_json(@expected_fixture)

@@ -38,6 +38,16 @@ when moving production code to the 1.0 release line.
 - Update expected error atoms and boot-error handling.
 - Re-check socket, channel, or session-auth code that previously carried
   `_sigil`; it must now carry or verify `_agent_trust`.
+- Reissue all confirmation tokens and attestations; MCP action binding now
+  covers the complete structured payload instead of extracted string values.
+- Regenerate pinned capability manifests as
+  `sigil_guard_capability_manifest/v2`.
+- Move MCP denial handling to `-31990..-31984` and continue branching on
+  `error.data.status`.
+- Pass `protocol_version: "2026-07-28"` from adapters that want modern
+  `resultType` behavior.
+- Treat MCP Apps rendering, CSP enforcement, and browser sandboxing as
+  host-owned after `SigilGuard.MCP.AppResource` verification.
 - Leave host-owned sigil-prefixed boot keys untouched unless they configure
   SigilGuard itself.
 
@@ -492,22 +502,116 @@ semver rules and remains separate from the `0.2.x` line.
 
 ## MCP JSON-RPC Rejection Codes
 
-SigilGuard 1.0 moves MCP gateway rejection codes from the v0.2 `-32001..-32003`
-range to the dedicated `-32050..-32056` range:
+SigilGuard 1.0 moves MCP gateway rejection codes from the v0.2
+`-32001..-32003` range to the application-defined `-31990..-31984` range,
+outside JSON-RPC's reserved server-error band. An earlier 1.0 development draft
+used `-32050..-32056`; those values are reserved by MCP `2026-07-28` and never
+ship as the 1.0 contract. MCP v2 also treats `-32000..-32019` as a legacy range
+where new codes should not be allocated.
 
 | 0.2.x code | 1.0 code | Status |
 |-----------|---------|--------|
-| `-32001` | `-32050` | `blocked` |
-| `-32002` | `-32051` | `confirmation_required` |
-| `-32003` | `-32052` | `quarantined` |
-| n/a | `-32053` | `manifest_drift` |
-| n/a | `-32054` | `unknown_manifest` |
-| n/a | `-32055` | `invalid_attestation` |
-| n/a | `-32056` | `sandbox_required` |
+| `-32001` | `-31990` | `blocked` |
+| `-32002` | `-31989` | `confirmation_required` |
+| `-32003` | `-31988` | `quarantined` |
+| n/a | `-31987` | `manifest_drift` |
+| n/a | `-31986` | `unknown_manifest` |
+| n/a | `-31985` | `invalid_attestation` |
+| n/a | `-31984` | `sandbox_required` |
 
 Clients should key retry, approval, quarantine, manifest refresh, attestation,
 and sandbox handling off `error.data.status` rather than the older three-code
 bucket.
+
+## MCP v2 (`2026-07-28`)
+
+### Structured Action Binding
+
+`ToolGateway`, its MCP facade, confirmation tokens, and gateway attestations
+now bind a canonical structured projection. The projection retains method,
+parameter names, nested maps/lists, numbers, booleans, nulls, MRTR
+`inputResponses`, and `requestState`. It excludes JSON-RPC correlation fields
+(`id`, `request_id`, and `jsonrpc`), fixed SigilGuard metadata, and operational
+progress, logging, subscription, and trace metadata. Client capabilities and
+unknown extension metadata remain bound because they may alter behavior. The
+protocol revision is extracted and bound separately.
+
+This deliberately invalidates tokens, action digests, and attestation vectors
+created by the earlier string-flattening draft. Pass the original raw MCP
+request or result to `ToolGateway.issue_confirmation/5`,
+`attest_request/3`, and `attest_result/3`; the helpers apply the shared
+projection. Do not pre-flatten payloads into `tool`/`action`/`text` maps.
+
+### Protocol Version And Results
+
+SigilGuard remains transport-neutral and does not negotiate MCP. Adapters may
+pass `protocol_version: "2026-07-28"` to guarded response helpers, or leave the
+standard version value in request `_meta`. MCP v2 requests also require
+client-capabilities metadata, which the host must supply and validate.
+Malformed or missing required metadata uses JSON-RPC `-32602`; the host uses
+MCP `-32021` for a required capability the client did not declare and `-32022`
+for an unsupported protocol revision. These are protocol errors, not SigilGuard
+policy denials.
+Successful v2 responses add `resultType: "complete"` when absent and preserve
+any existing discriminator—including malformed or extension values—for the
+host validator to reject or interpret. Earlier responses retain their prior
+shape, and unknown future revisions are not silently treated as v2.
+
+Every MRTR retry is a new guarded action. Forward the retry's new request,
+`inputResponses`, and opaque `requestState` through the gateway; never treat
+state from the server as authorization.
+
+### Capability Manifest v2
+
+Regenerate every pinned manifest with
+`manifest_format: "sigil_guard_capability_manifest/v2"`. The new digest
+preimage additionally binds:
+
+- optional `title` and canonical `icons`;
+- normalized UI metadata with a `ui://` `resource_uri` and sorted
+  `visibility`;
+- the complete `input_schema`, including validated `x-mcp-header`
+  annotations.
+
+Icon entries are closed maps. Sources must use HTTPS or a valid image data URL;
+optional MIME types must be `image/*`, sizes are `any` or positive `WxH`
+tokens, and themes are `light` or `dark`. The host still owns image fetching,
+same-origin and redirect enforcement, credential omission, content sniffing,
+decoding, byte and dimension limits, and renderer safety.
+
+An `x-mcp-header` annotation is valid only on a primitive `boolean`, `integer`,
+or `string` field that is statically reachable through a chain consisting
+solely of JSON Schema `properties`. Header names must use HTTP token
+characters and be unique case-insensitively; sensitive parameter names are
+rejected. SigilGuard does not emit MCP `HeaderMismatch` (`-32020`): header
+construction and mismatch handling remain the host transport adapter's
+responsibility.
+
+Manifest v1 documents fail closed. Tool listings must supply display/UI fields
+when the pinned v2 manifest contains them; changing those fields is manifest
+drift and invalidates approvals.
+
+### MCP Apps
+
+Use `origin: :app` with a trusted `mcp_server` for calls originating in an MCP
+App. App calls are accepted only for app-visible tools on that same server;
+model callers are denied access to app-only tools.
+
+Call `SigilGuard.MCP.AppResource.verify/2` on the direct `resources/read`
+content before handing bytes to a renderer. Pin `expected_sha256` and allow
+only reviewed CSP origins, dedicated app domains, and browser permissions.
+Both MCP Apps `text` and Base64 `blob` resources are supported. Content is
+limited to 1 MiB by default; use `:max_bytes` only for a reviewed renderer
+limit. Options are closed and duplicate keys fail. Dedicated app domains use a
+host-defined format and therefore require an exact `:allowed_app_domains`
+match.
+
+The stable Apps extension predates MCP v2 examples. The host maps the
+negotiated UI extension capability into v2 per-request metadata and discovery;
+SigilGuard consumes only the resulting app origin, server, visibility, and
+resource metadata. The host still owns resource fetching, HTML5 validation,
+iframe origins and sandboxing, CSP and Permissions Policy enforcement,
+authorization, and rendering.
 
 ## Decision Struct And The Unified Verdict (SP.07)
 

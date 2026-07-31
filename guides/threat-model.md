@@ -11,13 +11,13 @@ or ecosystem tooling.
 | # | Attack | ASI class | SigilGuard control | Claim | Test |
 |---|--------|-----------|--------------------|-------|------|
 | 1 | Prompt injection via tool results, including pull-request title hijack | ASI01 | Result-phase scanner pipeline, streaming holdback, sink-aware output contracts, and boundary policy tainting for `tool_result` origin. | mitigates | TM.01 |
-| 2 | Tool poisoning via descriptions or metadata | ASI02, ASI04 | Capability-manifest digest pinning over description, schema, and annotation digests; drift rejection. | mitigates | TM.02 |
+| 2 | Tool poisoning via descriptions or metadata | ASI02, ASI04 | Capability-manifest v2 digest pinning over descriptions, schemas, annotations, titles, icons, and UI visibility; drift rejection. | mitigates | TM.02 |
 | 3 | Line jumping before invocation through `tools/list` | ASI01, ASI02 | `tools/list` output is verified against pinned manifest digests before content enters model context. | mitigates | TM.03 |
-| 4 | Schema injection through adversarial required params | ASI02, ASI03 | Input-schema digest binding, schema validation, and adversarial-required-param indicators bound into the manifest digest. | mitigates + detects | TM.04 |
-| 5 | Rug pull or TOFU drift | ASI04 | Digest-pinned manifests with drift rejection; `tools/list_changed` drops cached approvals and forces reverification. | mitigates | TM.05 |
+| 4 | Schema injection through adversarial required params | ASI02, ASI03 | Input-schema digest binding, required-param indicators, and fail-closed `x-mcp-header` validation for syntax, type, duplicates, and credential exposure. | mitigates + detects | TM.04 |
+| 5 | Rug pull or TOFU drift | ASI04 | Digest-pinned manifests with drift rejection; `notifications/tools/list_changed` drops cached approvals and forces reverification. | mitigates | TM.05 |
 | 6 | Confused deputy, including consent-cookie replay | ASI03 | Attestations bind audience, resource, and actor; ReplayStore scopes nonce replay; DSSE expiry bounds reuse. | mitigates (partial) | TM.06 |
 | 7 | Token passthrough | ASI03 | Gateway audience/resource mismatch is an explicit block; attestation records intended audience. | mitigates | TM.07 |
-| 8 | Session hijacking through resumable streams and `tools/list_changed` | ASI03, ASI02 | `tools/list_changed` invalidates cached approvals; per-action nonce/replay scope and audit records session boundaries. | detects (partial) | TM.07 |
+| 8 | Stale authorization across stateless requests and list-change delivery | ASI03, ASI02 | Every request is gated independently; list changes invalidate cached approvals; per-action nonce/replay scope avoids treating a connection as authority. | detects (partial) | TM.07 |
 | 9 | Memory and context poisoning | ASI06 | Model-ingress gating sends retrieved memory/context through scanner and trust-zone policy before model exposure; ingested records carry digest provenance. | mitigates + detects | TM.08 |
 | 10 | Lethal-trifecta dataflow | ASI01, ASI02, ASI05 | Boundary policy rule over private data, untrusted origin, and external sink; sink-aware output contracts. | mitigates | TM.09 |
 | 11 | Unexpected code execution via tool or agent output | ASI05 | Sink-aware output contracts deny untrusted-origin content into execution sinks; confirmation binds action digest including `sandbox_id`. | mitigates (dataflow); out-of-scope (the runtime that executes) | TM.09 |
@@ -66,8 +66,13 @@ responsibility:
   identity or audience and binds it into attestations. It does not run the
   authorization server, mint tokens, or manage consent cookies.
 - **Session and transport security** — TLS, stream resumption, WebSocket auth,
-  and session lifecycle belong to the host transport. SigilGuard adds
-  per-action nonce/replay and `tools/list_changed` invalidation as assists.
+  subscription delivery, and request routing belong to the host transport.
+  MCP v2 (`2026-07-28`) removes protocol sessions; SigilGuard adds per-action
+  nonce/replay and manifest-list invalidation as assists.
+- **MCP Apps rendering** — iframe origin isolation, sandbox attributes, CSP
+  headers, and browser permission enforcement are host-owned. SigilGuard
+  verifies pinned resource bytes and declared domain/permission subsets and
+  enforces model/app visibility plus same-server app calls before execution.
 - **Sandbox execution** — SigilGuard requires sandbox identity and isolation
   level as attested inputs and can fail closed on unsafe boundaries. It does
   not create, run, or harden the sandbox itself.
@@ -91,7 +96,7 @@ responsibility:
 | TM.04 | Schema injection | 4 |
 | TM.05 | Rug pull, TOFU drift, and analogous config swap | 5, 18 |
 | TM.06 | Confused deputy and consent replay | 6, 21 |
-| TM.07 | Token passthrough and session hijacking | 7, 8 |
+| TM.07 | Token passthrough and stale stateless authorization | 7, 8 |
 | TM.08 | Memory poisoning at model ingress | 9 |
 | TM.09 | Lethal-trifecta dataflow and execution-sink boundaries | 10, 11 |
 | TM.10 | A2A impersonation and delegation abuse | 12, 13, 20 |
@@ -101,3 +106,10 @@ responsibility:
 Every mitigation or detection row maps to a threat-model test module under
 `test/sigil_guard/threat_model/`. Evidence-only and out-of-scope rows are tested
 only for the signals SigilGuard actually owns.
+
+MCP v2 regression coverage also lives in
+`MCP.SecurityPayloadTest`, `MCP.ProtocolTest`, `MCP.AppResourceTest`,
+`CapabilityManifestTest`, and `ToolGatewayTest`. These cases cover structural
+argument tampering, MRTR state and input responses, modern result
+discrimination, header injection, UI metadata drift, app cross-server calls,
+and undeclared browser capabilities.

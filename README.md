@@ -18,12 +18,13 @@
 
 ---
 
-SigilGuard is an embedded security runtime for MCP and agent-tool boundaries,
-in native Elixir. It sits between a language model and the tools it can reach,
-decides whether a tool call, a tool result, or a model output is allowed to
-cross a given boundary, and produces signed, tamper-evident evidence of every
-decision. It runs in-process on the BEAM: no sidecar, no proxy hop, no network
-call on the decision path.
+SigilGuard is an embedded security runtime for MCP v2 and agent-tool
+boundaries, in native Elixir. MCP specifications are date-versioned; throughout
+this project, “MCP v2” means the final `2026-07-28` revision. SigilGuard sits
+between a language model and the tools it can reach, decides whether a tool
+call, a tool result, or a model output may cross a boundary, and produces
+signed, tamper-evident evidence of every decision. It runs in-process on the
+BEAM: no sidecar, no proxy hop, no network call on the decision path.
 
 The problem it addresses is the one every agent deployment eventually hits: a
 model with access to private data, exposure to untrusted content, and the
@@ -54,7 +55,7 @@ in-process library is a better fit.
 |------------|--------------|
 | **Sensitivity scanner** | Staged detection and redaction of secrets and credentials, with confidence scoring and boundary-aware enrichment. |
 | **Boundary policy kernel** | Deterministic source-to-sink decisions over phase, origin, sink, actor, trust zone, and sandbox identity. |
-| **MCP / tool gateway** | Transport-agnostic guards for tool requests and results, with capability manifests pinned by digest. |
+| **MCP v2 / tool gateway** | Transport-agnostic guards for MCP `2026-07-28` structured requests, MRTR results, and manifests pinned by digest. |
 | **Signed attestations** | Canonical, DSSE-enveloped statements binding an actor, tool, action, payload, and context to a verdict. |
 | **Trust bundles** | Signed, local trust material — roots, keys, policies, patterns, tool manifests, and revocations — verified offline. |
 | **Confirmation tokens** | Short-lived human-approval grants bound to the exact action, payload, and context, never a fuzzy intent. |
@@ -127,9 +128,10 @@ this same decision. The [architecture](docs/README.md) covers the full surface.
 
 ## Agent Trust Profile
 
-The 1.0 release line has one wire profile: `sigil_guard_agent_trust/v1`. Agent Trust evidence is
-a DSSE envelope over a JCS-canonical in-toto-style statement, with payload and
-context digests bound to the boundary decision. The public metadata keys are:
+The 1.0 release line has one wire profile: `sigil_guard_agent_trust/v1`.
+Agent Trust evidence is a DSSE envelope over a JCS-canonical in-toto-style
+statement, with payload and context digests bound to the boundary decision.
+The public metadata keys are:
 
 | Key | Purpose |
 |-----|---------|
@@ -159,7 +161,11 @@ request = %{
   "method" => "tools/call",
   "params" => %{
     "name" => "repo_file_write",
-    "arguments" => %{"path" => "README.md", "content" => "updated"}
+    "arguments" => %{"path" => "README.md", "content" => "updated"},
+    "_meta" => %{
+      "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities" => %{}
+    }
   }
 }
 
@@ -167,7 +173,7 @@ context = [
   actor: "spiffe://agents/editor",
   trust_level: :medium,
   sandbox_id: "sandbox-123",
-  isolation_level: :filesystem
+  isolation_level: :container
 ]
 
 decision =
@@ -182,6 +188,7 @@ Attach and require Agent Trust evidence with the `_agent_trust` metadata key:
 ```elixir
 {:ok, envelope} =
   SigilGuard.ToolGateway.attest_request(decision, context,
+    payload: request,
     signer: MyApp.AgentSigner,
     keyid: "agent-ed25519-1",
     nonce: "unique-request-nonce",
@@ -219,6 +226,56 @@ confirmed =
     confirmation_key: confirmation_key
   )
 ```
+
+### MCP v2 (`2026-07-28`) and MCP Apps
+
+SigilGuard does not negotiate MCP or own a transport. A host adapter selects
+MCP v2 response behavior with `protocol_version: "2026-07-28"` or supplies the
+standard per-request protocol-version `_meta` value. The adapter must also
+supply and validate the required client-capabilities metadata. Missing
+per-request fields use `-32602`; missing declared capabilities and unsupported
+revisions use MCP's `-32021` and `-32022` errors. Successful v2 results receive
+`resultType: "complete"` when absent and preserve every existing discriminator
+for host-side validation. Unknown future revisions are not treated as v2.
+`input_required`, `inputRequests`, `inputResponses`, and `requestState` remain
+part of the exact structured confirmation and attestation binding.
+
+Capability manifests use `sigil_guard_capability_manifest/v2`. The v2 digest
+also binds optional tool `title`, `icons`, normalized MCP Apps UI metadata, and
+validated `x-mcp-header` annotations. Header annotations must be on
+`properties`-reachable `boolean`, `integer`, or `string` fields; header names
+are HTTP tokens, case-insensitively unique, and may not expose sensitive
+parameters. Icon sources must be HTTPS or valid image data URLs. The host
+adapter owns same-origin credential-free icon fetching, redirect and size
+limits, content sniffing and safe rendering, complete JSON Schema 2020-12
+validation, JavaScript-safe integer checks at runtime, header construction, and
+MCP `HeaderMismatch` handling.
+App-origin tool calls use `origin: :app` and must name the same trusted
+`mcp_server` as an app-visible manifest.
+
+Before a renderer receives an MCP Apps resource, verify its pinned bytes and
+requested browser capabilities:
+
+```elixir
+{:ok, verified_resource} =
+  SigilGuard.MCP.AppResource.verify(resource,
+    expected_uri: "ui://repo/review",
+    expected_sha256: pinned_ui_sha256,
+    max_bytes: 1_048_576,
+    allowed_connect_domains: ["https://api.example.com"],
+    allowed_permissions: [:clipboardWrite]
+  )
+```
+
+Resource verification is capped at 1 MiB by default. Dedicated app domains use
+the host-defined format and must match `:allowed_app_domains` exactly. The host
+remains responsible for `server/discover`, `subscriptions/listen`, OAuth,
+transport headers, HTML5 validation, iframe creation, sandbox attributes, and
+CSP enforcement. The stable MCP Apps extension predates MCP v2, so the host
+maps its negotiated UI capability into v2 per-request metadata and discovery;
+SigilGuard only enforces the resulting boundary metadata.
+
+See [Migrating to MCP v2](MIGRATING-1.0.md#mcp-v2-2026-07-28).
 
 ## Configuration
 
@@ -279,10 +336,10 @@ starts. Verified snapshots are cached for the current BEAM boot in the
 rotation digests, and revoked key ids. The signed bundle remains the durable
 source of truth across boots; remote distribution, if needed, belongs to the
 host application before bytes are passed to `SigilGuard.TrustBundle.load/2`.
-Trust-bundle roles always carry their declared threshold, but the 1.0 release
-line follows the D3 effective threshold of `1` unless verification is called
-with `enforce_declared_threshold: true`; root rotation documents always enforce
-the full declared old-root and new-root thresholds.
+Trust-bundle roles always carry their declared threshold. For compatibility,
+the 1.0 release line uses an effective threshold of `1` unless verification is
+called with `enforce_declared_threshold: true`; root rotation documents always
+enforce the full declared old-root and new-root thresholds.
 
 ## Extension Points
 
@@ -328,7 +385,8 @@ module topology, and the runtime, MCP, and audit-evidence flows, with diagrams.
 
 ## References
 
-- [Model Context Protocol — Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+- [Model Context Protocol v2 — 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
+- [MCP Apps extension](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
 - [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)
 - [Historical upstream SIGIL repository](https://github.com/sigil-eu/sigil)
 

@@ -1,12 +1,34 @@
 defmodule SigilGuard.Context do
   @moduledoc """
-  Boundary metadata for SigilGuard runtime decisions.
+  Describes the trust boundary crossed by a SigilGuard decision.
 
-  A context labels where content came from, where it is going, who is
-  acting, and which trust boundary is being crossed. Regex scanner hits
-  are only one signal; phase-2 runtime gates use this metadata to decide
-  whether a hit should be allowed, redacted, quarantined, confirmed, or
-  blocked.
+  A context records where content came from, where it is going, who is acting,
+  which tool or resource is involved, and what isolation surrounds the action.
+  `SigilGuard.Runtime.Gate` combines these labels with scanner, manifest,
+  repository, and host-policy signals to allow, redact, quarantine, confirm,
+  or block the boundary crossing.
+
+  Values may be supplied as a struct, map, or keyword list. Known string keys
+  are normalized without creating atoms from untrusted input. Invalid enum
+  values fail closed through `validate/1`.
+
+  MCP Apps calls should use `origin: :app`, identify the trusted
+  `mcp_server`, and name the `resource_uri` where relevant. Ordinary
+  model-initiated tool calls use `origin: :model`.
+
+  ## Example
+
+      iex> context =
+      ...>   SigilGuard.Context.new(
+      ...>     phase: :tool_request,
+      ...>     origin: :app,
+      ...>     sink: :tool,
+      ...>     mcp_server: "https://mcp.example.com",
+      ...>     resource_uri: "ui://repo/review"
+      ...>   )
+      ...>
+      ...> SigilGuard.Context.validate(context)
+      :ok
   """
 
   @type phase ::
@@ -18,7 +40,8 @@ defmodule SigilGuard.Context do
 
   @type trust_zone :: :trusted | :semi_trusted | :untrusted
   @type sink :: :internal | :model | :user | :tool | :external | :network | :log | :repo
-  @type origin :: :unknown | :user | :model | :tool | :resource | :repo | :registry | atom()
+  @type origin ::
+          :unknown | :user | :model | :tool | :app | :resource | :repo | :registry | atom()
   @type isolation_level :: :none | :container | :vm | :remote_attested
   @type network_posture :: :none | :outbound | :bidirectional
 
@@ -65,7 +88,7 @@ defmodule SigilGuard.Context do
 
   @phases ~w(inbound_user tool_request tool_result outbound_model repo_change)a
   @sinks ~w(internal model user tool external network log repo)a
-  @origins ~w(unknown user model tool resource repo registry)a
+  @origins ~w(unknown user model tool app resource repo registry)a
   @trust_levels ~w(low medium high)a
   @trust_zones ~w(trusted semi_trusted untrusted)a
   @audiences ~w(internal model user tool external network log repo)a

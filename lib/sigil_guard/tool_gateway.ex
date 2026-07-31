@@ -1,22 +1,46 @@
 defmodule SigilGuard.ToolGateway do
   @moduledoc """
-  Manifest-aware tool gateway entry points.
+  Enforces manifests, attestations, and confirmations around tool boundaries.
 
-  This is the enforcement core for MCP-shaped tool calls and results. It
-  combines capability-manifest checks, Agent Trust attestation verification,
-  confirmation tokens, and `SigilGuard.Runtime.Gate` boundary decisions.
+  `SigilGuard.ToolGateway` is the enforcement core for MCP-shaped tool calls
+  and results. It combines pinned `SigilGuard.CapabilityManifest` values,
+  Agent Trust attestation verification, action-bound confirmation tokens, and
+  `SigilGuard.Runtime.Gate` boundary decisions.
   `SigilGuard.MCP.Gateway` is the stable transport-facing facade that delegates
   here with MCP compatibility defaults.
 
-  Use this module when the host owns request/result maps and wants the full
-  policy surface. Use `SigilGuard.MCP.Gateway` when wiring an MCP adapter that
-  wants JSON-RPC-compatible helper names and tuple shapes.
+  The gateway remains transport-neutral. The host owns protocol negotiation,
+  `server/discover`, subscriptions, authorization, transport headers, schema
+  validation, and execution. For MCP v2 (`2026-07-28`), pass the selected
+  revision in the request `_meta` or through `:protocol_version`. SigilGuard
+  binds the revision and behavior-changing metadata to the guarded action, but
+  it does not claim that a decoded map is wire-valid.
+
+  Manifest checks run before the runtime gate. Confirmation and attestation
+  digests use a structured security projection, preserving map keys, arrays,
+  numbers, booleans, nulls, multi-round-trip input, request state, client
+  capabilities, and extension metadata that can affect behavior. JSON-RPC
+  correlation fields and operational tracing metadata are excluded.
+
+  ## Choosing an entry point
+
+  Use `guard_request/3` before executing a tool and `guard_result/3` before
+  returning output to a model. The `guarded_request/3` and `guarded_result/3`
+  variants additionally shape adapter-friendly JSON-RPC responses. Use
+  `verify_manifest/2` whenever a discovered tool definition is refreshed.
 
   ## Examples
 
       request = %{
         "method" => "tools/call",
-        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+        "params" => %{
+          "name" => "read_file",
+          "arguments" => %{"path" => "README.md"},
+          "_meta" => %{
+            "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities" => %{}
+          }
+        }
       }
 
       context = [phase: :tool_request, origin: :model, sink: :tool, trust_level: :medium]
@@ -24,44 +48,46 @@ defmodule SigilGuard.ToolGateway do
       decision = SigilGuard.ToolGateway.guard_request(request, context)
       decision.action in [:allow, :redact, :confirm, :quarantine, :block]
   """
+  @moduledoc since: "1.0.0"
 
   alias SigilGuard.Attestation
   alias SigilGuard.CapabilityManifest
   alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
+  alias SigilGuard.MCP.Protocol
+  alias SigilGuard.MCP.SecurityPayload
   alias SigilGuard.ToolGateway.Base, as: GatewayBase
   alias SigilGuard.TrustBundle
 
   @invalid_payload_field false
-  @guard_metadata_keys [
-    :_agent_trust,
-    "_agent_trust",
-    :_agent_confirmation,
-    "_agent_confirmation",
-    :confirmation_token,
-    "confirmation_token"
-  ]
 
+  @typedoc "A closed reason for rejecting a manifest, request, or result."
   @type deny_reason ::
           :unknown_manifest
           | :invalid_manifest
           | :manifest_digest_mismatch
           | :manifest_expired
           | :schema_digest_mismatch
+          | :invalid_header_annotation
+          | :sensitive_header_param
           | :suspicious_required_param
           | :resource_mismatch
           | :audience_mismatch
           | :token_passthrough_denied
           | :sandbox_required
+          | :app_visibility_denied
+          | :app_server_mismatch
           | :invalid_attestation
           | :invalid_payload
           | :invalid_confirmation_token
           | :missing_confirmation_key
           | :confirmation_failed
 
+  @typedoc "An attestation construction or signing failure."
   @type attest_error :: Attestation.from_decision_error() | Attestation.sign_error()
 
+  @typedoc "A confirmation-token issue failure."
   @type confirmation_issue_error ::
           :invalid_key
           | :not_confirmable
@@ -89,16 +115,18 @@ defmodule SigilGuard.ToolGateway do
   """
   @spec guard_request(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_request(request, context \\ %{}, opts \\ []) do
-    payload = request_payload(request)
+    payload = request_payload(request, opts)
     request_context = request_context(request, context)
 
     with {:ok, capability} <- resolve_manifest(payload.tool, opts),
          :ok <- manifest_freshness(capability, opts),
          :ok <- passthrough_resource_audience(capability, opts),
+         :ok <- verify_caller_visibility(capability, request_context),
          :ok <- require_sandbox(capability, request_context),
          :ok <- verify_inbound_attestation(request, payload, request_context, capability, opts) do
       request
       |> GatewayBase.guard_request(context, opts)
+      |> put_protocol_metadata(request, opts)
       |> put_manifest_metadata(capability)
       |> maybe_force_suspicious_confirmation(payload, request_context, capability, opts)
       |> maybe_apply_confirmation(payload, request_context, request, opts)
@@ -118,6 +146,8 @@ defmodule SigilGuard.ToolGateway do
              | :manifest_expired
              | :manifest_digest_mismatch
              | :schema_digest_mismatch
+             | :invalid_header_annotation
+             | :sensitive_header_param
              | :suspicious_required_param}
   def verify_manifest(observed, opts) when is_map(observed) do
     opts = Keyword.put(opts, :require_manifest, true)
@@ -151,7 +181,12 @@ defmodule SigilGuard.ToolGateway do
   def verify_manifest(_, _), do: {:error, :unknown_manifest}
 
   @doc """
-  Verify a refreshed `tools/list` result after a `tools/list_changed` notice.
+  Verify a refreshed `tools/list` result after the host receives a list-change
+  notification through `subscriptions/listen`.
+
+  Every observed entry is revalidated against its pinned manifest. The
+  function stops at the first mismatch and never returns a partially verified
+  list.
   """
   @spec verify_list_changed([map()], keyword()) ::
           {:ok, [CapabilityManifest.t()]} | {:error, deny_reason()}
@@ -181,7 +216,7 @@ defmodule SigilGuard.ToolGateway do
 
   def attest_request(%Decision{} = decision, context, opts) when is_list(opts) do
     with {:ok, signer} <- required_attestation_signer(opts),
-         opts <- attestation_opts(opts, :tool_request),
+         {:ok, opts} <- attestation_opts(opts, :tool_request),
          {:ok, statement} <- Attestation.from_decision(decision, context, opts) do
       Attestation.sign(statement, signer, opts)
     end
@@ -198,7 +233,7 @@ defmodule SigilGuard.ToolGateway do
 
   def attest_result(%Decision{} = decision, context, opts) when is_list(opts) do
     with {:ok, signer} <- required_attestation_signer(opts),
-         opts <- attestation_opts(opts, :tool_result),
+         {:ok, opts} <- attestation_opts(opts, :tool_result),
          {:ok, statement} <- Attestation.from_decision(decision, context, opts) do
       Attestation.sign(statement, signer, opts)
     end
@@ -224,7 +259,7 @@ defmodule SigilGuard.ToolGateway do
   def issue_confirmation(payload, context, %Decision{} = decision, key, opts \\ []) do
     with {:ok, direction} <- confirmation_direction(opts) do
       payload
-      |> confirmation_payload(direction)
+      |> confirmation_payload(direction, opts)
       |> Confirmation.issue(
         confirmation_context(payload, context, direction),
         decision,
@@ -239,13 +274,14 @@ defmodule SigilGuard.ToolGateway do
   """
   @spec guard_result(term(), Context.t() | map() | keyword(), keyword()) :: Decision.t()
   def guard_result(result, context \\ %{}, opts \\ []) do
-    payload = result_payload(result)
+    payload = result_payload(result, opts)
     result_context = result_context(result, context)
 
     case request_action_digest(opts) do
       :ok ->
         result
         |> GatewayBase.guard_result(context, opts)
+        |> put_protocol_metadata(result, opts)
         |> put_result_binding_metadata(opts)
         |> maybe_apply_result_confirmation(payload, result_context, result, opts)
 
@@ -279,7 +315,7 @@ defmodule SigilGuard.ToolGateway do
 
     case decision.action do
       :allow ->
-        {:ok, jsonrpc_result(result, request_id(result)), decision}
+        {:ok, jsonrpc_result(result, request_id(result), opts), decision}
 
       :redact ->
         {:ok, GatewayBase.response_for_decision(decision, request_id(result), opts), decision}
@@ -289,24 +325,43 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  @doc "Return the JSON-RPC-compatible decision response."
+  @doc """
+  Return the audit-safe JSON-RPC response for a boundary decision.
+
+  The response contains status and sanitized decision data, never the raw
+  rejected payload.
+  """
   @spec response_for_decision(Decision.t(), term(), keyword()) :: map()
   def response_for_decision(%Decision{} = decision, id \\ nil, opts \\ []) do
     GatewayBase.response_for_decision(decision, id, opts)
   end
 
-  @doc "Start the result stream sanitizer."
+  @doc """
+  Start a chunk-safe sanitizer for a streaming tool result.
+
+  The stream retains enough data to detect a sensitive value split across
+  chunk boundaries.
+  """
   @spec stream_result(Context.t() | map() | keyword(), keyword()) :: SigilGuard.Runtime.Stream.t()
   def stream_result(context \\ %{}, opts \\ []), do: GatewayBase.stream_result(context, opts)
 
-  @doc "Guard one result stream chunk using the JSON-RPC-compatible tuple shape."
+  @doc """
+  Push one result chunk through the sanitizer.
+
+  A successful `nil` response means the sanitizer is retaining a safe
+  holdback; callers must not emit the original chunk.
+  """
   @spec guarded_result_chunk(SigilGuard.Runtime.Stream.t(), String.t(), keyword()) ::
           {SigilGuard.Runtime.Stream.t(),
            {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
   def guarded_result_chunk(stream, chunk, opts \\ []),
     do: GatewayBase.guarded_result_chunk(stream, chunk, opts)
 
-  @doc "Flush a guarded result stream using the JSON-RPC-compatible tuple shape."
+  @doc """
+  Finish a guarded result stream and return any remaining safe output.
+
+  Call this exactly once after the final input chunk.
+  """
   @spec finish_guarded_result_stream(SigilGuard.Runtime.Stream.t(), keyword()) ::
           {SigilGuard.Runtime.Stream.t(),
            {:ok, map() | nil, Decision.t()} | {:error, map(), Decision.t()}}
@@ -348,8 +403,8 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  defp confirmation_payload(payload, :request), do: request_payload(payload)
-  defp confirmation_payload(payload, :result), do: result_payload(payload)
+  defp confirmation_payload(payload, :request, opts), do: request_payload(payload, opts)
+  defp confirmation_payload(payload, :result, opts), do: result_payload(payload, opts)
 
   defp confirmation_context(payload, context, :request), do: request_context(payload, context)
   defp confirmation_context(payload, context, :result), do: result_context(payload, context)
@@ -541,19 +596,28 @@ defmodule SigilGuard.ToolGateway do
   defp observed_list_manifest(observed, %CapabilityManifest{} = pinned) do
     with {:ok, name} <- required_observed_string(observed, "name", :name),
          {:ok, description} <- required_observed_string(observed, "description", :description),
+         {:ok, title} <- optional_observed_string(observed, "title", :title),
+         {:ok, icons} <- optional_observed_list(observed, "icons", :icons),
          {:ok, input_schema} <- required_observed_map(observed, "inputSchema", :input_schema),
          {:ok, output_schema} <- optional_observed_map(observed, "outputSchema", :output_schema),
          {:ok, annotations} <- optional_observed_map(observed, "annotations", :annotations),
+         {:ok, ui} <- optional_observed_ui(observed),
+         :ok <- required_when_pinned("title", title, pinned.title),
+         :ok <- required_when_pinned("icons", icons, pinned.icons),
          :ok <- required_when_pinned("outputSchema", output_schema, pinned.output_schema),
-         :ok <- required_when_pinned("annotations", annotations, pinned.annotations) do
+         :ok <- required_when_pinned("annotations", annotations, pinned.annotations),
+         :ok <- required_when_pinned("ui", ui, pinned.ui) do
       manifest =
         pinned
         |> pinned_manifest_map()
         |> Map.put("name", name)
         |> Map.put("description", description)
         |> Map.put("input_schema", input_schema)
+        |> maybe_put_observed("title", title)
+        |> maybe_put_observed("icons", icons)
         |> maybe_put_observed("output_schema", output_schema)
         |> maybe_put_observed("annotations", annotations)
+        |> maybe_put_observed("ui", ui)
 
       {:ok, manifest}
     end
@@ -566,8 +630,11 @@ defmodule SigilGuard.ToolGateway do
       :annotations_sha256,
       :description_sha256,
       :digest,
+      :icons_sha256,
       :input_schema_sha256,
       :output_schema_sha256,
+      :title_sha256,
+      :ui_sha256,
       :preimage
     ])
     |> Enum.reduce(%{}, fn
@@ -609,10 +676,50 @@ defmodule SigilGuard.ToolGateway do
     end
   end
 
-  defp required_when_pinned(_, value, pinned) when is_map(value) and is_map(pinned), do: :ok
-  defp required_when_pinned(_, nil, nil), do: :ok
-  defp required_when_pinned(_, value, nil) when is_map(value), do: :ok
-  defp required_when_pinned(_, nil, pinned) when is_map(pinned), do: {:error, :invalid_manifest}
+  defp optional_observed_string(map, string_key, atom_key) do
+    case observed_field(map, string_key, atom_key) do
+      nil -> {:ok, nil}
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp optional_observed_list(map, string_key, atom_key) do
+    case observed_field(map, string_key, atom_key) do
+      nil -> {:ok, nil}
+      value when is_list(value) -> {:ok, value}
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp optional_observed_ui(observed) do
+    case observed_field(observed, "_meta", :_meta) do
+      nil -> {:ok, nil}
+      meta when is_map(meta) -> normalize_observed_ui(Map.get(meta, "ui", Map.get(meta, :ui)))
+      _ -> {:error, :invalid_manifest}
+    end
+  end
+
+  defp normalize_observed_ui(nil), do: {:ok, nil}
+
+  defp normalize_observed_ui(ui) when is_map(ui) do
+    uri = Map.get(ui, "resourceUri", Map.get(ui, :resourceUri))
+    visibility = Map.get(ui, "visibility", Map.get(ui, :visibility, ["model", "app"]))
+
+    if (is_nil(uri) or is_binary(uri)) and is_list(visibility) do
+      normalized = %{"visibility" => Enum.sort(visibility)}
+      {:ok, if(is_nil(uri), do: normalized, else: Map.put(normalized, "resource_uri", uri))}
+    else
+      {:error, :invalid_manifest}
+    end
+  end
+
+  defp normalize_observed_ui(_), do: {:error, :invalid_manifest}
+
+  defp required_when_pinned(_, _, nil), do: :ok
+  defp required_when_pinned(_, nil, _), do: {:error, :invalid_manifest}
+
+  defp required_when_pinned(_, _, _), do: :ok
 
   defp maybe_put_observed(manifest, _, nil), do: manifest
   defp maybe_put_observed(manifest, key, value), do: Map.put(manifest, key, value)
@@ -700,6 +807,35 @@ defmodule SigilGuard.ToolGateway do
 
   defp audience_contains?(audience, value), do: value in List.wrap(audience)
   defp present?(value), do: value not in [nil, ""]
+
+  defp verify_caller_visibility(nil, %Context{origin: :app}),
+    do: {:error, :app_visibility_denied}
+
+  defp verify_caller_visibility(nil, _), do: :ok
+
+  defp verify_caller_visibility(
+         %CapabilityManifest{server: server, ui: ui},
+         %Context{origin: :app, mcp_server: server}
+       ) do
+    if visible_to?(ui, "app"), do: :ok, else: {:error, :app_visibility_denied}
+  end
+
+  defp verify_caller_visibility(%CapabilityManifest{}, %Context{origin: :app}),
+    do: {:error, :app_server_mismatch}
+
+  defp verify_caller_visibility(%CapabilityManifest{ui: ui}, %Context{origin: :model}) do
+    if visible_to?(ui, "model"), do: :ok, else: {:error, :app_visibility_denied}
+  end
+
+  defp verify_caller_visibility(_, _), do: :ok
+
+  defp visible_to?(nil, "model"), do: true
+  defp visible_to?(nil, "app"), do: false
+
+  defp visible_to?(%{"visibility" => visibility}, caller) when is_list(visibility),
+    do: caller in visibility
+
+  defp visible_to?(_, _), do: false
 
   defp require_sandbox(nil, _), do: :ok
   defp require_sandbox(%CapabilityManifest{sandbox: %{"required" => false}}, _), do: :ok
@@ -804,9 +940,21 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp attestation_opts(opts, statement_type) do
-    opts
-    |> Keyword.put(:statement_type, statement_type)
-    |> normalize_attestation_manifest()
+    direction = if statement_type == :tool_result, do: :result, else: :request
+
+    case Keyword.fetch(opts, :payload) do
+      {:ok, payload} when is_map(payload) ->
+        normalized =
+          opts
+          |> Keyword.put(:payload, SecurityPayload.for_gate(payload, direction, opts))
+          |> Keyword.put(:statement_type, statement_type)
+          |> normalize_attestation_manifest()
+
+        {:ok, normalized}
+
+      _ ->
+        {:error, :invalid_payload}
+    end
   end
 
   defp normalize_attestation_manifest(opts) do
@@ -1054,7 +1202,7 @@ defmodule SigilGuard.ToolGateway do
 
   defp deny(denial, payload, context) do
     {reason, denial_metadata} = denial_metadata(denial)
-    content_hash = hash_text(payload.text || "")
+    content_hash = hash_text(payload.text)
 
     %Decision{
       verdict: :blocked,
@@ -1096,6 +1244,25 @@ defmodule SigilGuard.ToolGateway do
   end
 
   defp denial_metadata(reason) when is_atom(reason), do: {reason, %{deny_reason: reason}}
+
+  defp put_protocol_metadata(%Decision{} = decision, message, opts) do
+    metadata =
+      decision.audit_metadata
+      |> maybe_put_protocol_version(Protocol.version(message, opts))
+      |> maybe_put_result_type(Protocol.result_type(message))
+
+    %{decision | audit_metadata: metadata}
+  end
+
+  defp maybe_put_protocol_version(metadata, version) when is_binary(version),
+    do: Map.put(metadata, :protocol_version, version)
+
+  defp maybe_put_protocol_version(metadata, _), do: metadata
+
+  defp maybe_put_result_type(metadata, result_type) when is_binary(result_type),
+    do: Map.put(metadata, :mcp_result_type, result_type)
+
+  defp maybe_put_result_type(metadata, _), do: metadata
 
   defp put_manifest_metadata(%Decision{} = decision, nil), do: decision
 
@@ -1167,101 +1334,15 @@ defmodule SigilGuard.ToolGateway do
     |> Context.new()
   end
 
-  defp request_payload(request) do
-    payload = strip_guard_metadata(request)
-    tool = tool_name(payload)
-    action = action_name(payload)
-
-    %{
-      tool: context_field(tool),
-      action: action_field(action, tool),
-      text: text_payload(payload)
-    }
-  end
-
-  defp result_payload(result) do
-    payload = strip_guard_metadata(result)
-    tool = tool_name(payload)
-    action = action_name(payload)
-
-    %{
-      tool: context_field(tool),
-      action: action_field(action, tool),
-      text: text_payload(payload)
-    }
-  end
-
-  defp strip_guard_metadata(value) when is_map(value) do
-    value
-    |> Map.drop(@guard_metadata_keys)
-    |> strip_params_metadata(:params)
-    |> strip_params_metadata("params")
-  end
-
-  defp strip_guard_metadata(value), do: value
-
-  defp strip_params_metadata(payload, params_key) do
-    case Map.get(payload, params_key) do
-      params when is_map(params) ->
-        Map.put(payload, params_key, Map.drop(params, @guard_metadata_keys))
-
-      _ ->
-        payload
-    end
-  end
-
-  defp text_payload(payload) when is_map(payload), do: joined_strings(payload)
-  defp text_payload(payload), do: Context.text(payload) || joined_strings(payload)
-
-  defp joined_strings(payload) do
-    payload
-    |> collect_strings()
-    |> Enum.reverse()
-    |> Enum.join("\n")
-  end
-
-  defp collect_strings(value), do: collect_strings(value, [])
-  defp collect_strings(value, acc) when is_binary(value), do: [value | acc]
-
-  defp collect_strings(value, acc) when is_list(value),
-    do: Enum.reduce(value, acc, &collect_strings/2)
-
-  defp collect_strings(value, acc) when is_map(value) do
-    value
-    |> Map.values()
-    |> Enum.reduce(acc, &collect_strings/2)
-  end
-
-  defp collect_strings(_, acc), do: acc
+  defp request_payload(request, opts), do: SecurityPayload.for_gate(request, :request, opts)
+  defp result_payload(result, opts), do: SecurityPayload.for_gate(result, :result, opts)
 
   defp tool_name(payload) do
-    first_payload_value(payload, [
-      [:tool],
-      ["tool"],
-      [:name],
-      ["name"],
-      [:params, :name],
-      [:params, "name"],
-      ["params", :name],
-      ["params", "name"]
-    ])
+    SecurityPayload.tool_name(payload)
   end
 
   defp action_name(payload) do
-    first_payload_value(payload, [
-      [:action],
-      ["action"],
-      [:tool],
-      ["tool"],
-      [:name],
-      ["name"],
-      [:params, :name],
-      [:params, "name"],
-      ["params", :name],
-      ["params", "name"],
-      [:method],
-      ["method"]
-    ])
+    SecurityPayload.action_name(payload)
   end
 
   defp mcp_server(payload) do
@@ -1301,16 +1382,28 @@ defmodule SigilGuard.ToolGateway do
 
   defp request_id(_), do: nil
 
-  defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result}, _) do
-    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result} = source, _, opts) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => Protocol.ensure_result_type(result, source, opts)
+    }
   end
 
-  defp jsonrpc_result(%{jsonrpc: _, id: id, result: result}, _) do
-    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  defp jsonrpc_result(%{jsonrpc: _, id: id, result: result} = source, _, opts) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => Protocol.ensure_result_type(result, source, opts)
+    }
   end
 
-  defp jsonrpc_result(result, id) do
-    %{"jsonrpc" => "2.0", "id" => id, "result" => result}
+  defp jsonrpc_result(result, id, opts) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => Protocol.ensure_result_type(result, result, opts)
+    }
   end
 
   defp confirmation_token_paths do

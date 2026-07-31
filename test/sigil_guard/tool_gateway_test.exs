@@ -6,7 +6,6 @@ defmodule SigilGuard.ToolGatewayTest do
   alias __MODULE__.TrustedSigner
   alias SigilGuard.Attestation
   alias SigilGuard.CapabilityManifest
-  alias SigilGuard.Confirmation
   alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.ReplayStore
@@ -90,6 +89,58 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert decision.verdict == :blocked
       assert decision.audit_metadata.deny_reason == :unknown_manifest
+    end
+
+    test "confines MCP App callers to same-server app-visible tools" do
+      app_manifest =
+        Map.put(manifest(), "ui", %{
+          "resource_uri" => "ui://repo/review",
+          "visibility" => ["app"]
+        })
+
+      app_context =
+        high_context("container") ++
+          [origin: :app, mcp_server: "repo-mcp", tool: "repo_file_write"]
+
+      allowed =
+        ToolGateway.guard_request(request(), app_context,
+          manifests: %{"repo_file_write" => app_manifest}
+        )
+
+      wrong_server =
+        ToolGateway.guard_request(request(), Keyword.put(app_context, :mcp_server, "other-mcp"),
+          manifests: %{"repo_file_write" => app_manifest}
+        )
+
+      hidden =
+        ToolGateway.guard_request(request(), app_context,
+          manifests: %{
+            "repo_file_write" => put_in(app_manifest, ["ui", "visibility"], ["model"])
+          }
+        )
+
+      unpinned = ToolGateway.guard_request(request(), app_context)
+
+      assert allowed.verdict == :allowed
+      assert wrong_server.audit_metadata.deny_reason == :app_server_mismatch
+      assert hidden.audit_metadata.deny_reason == :app_visibility_denied
+      assert unpinned.audit_metadata.deny_reason == :app_visibility_denied
+    end
+
+    test "denies model callers when an App tool is not model-visible" do
+      app_only =
+        Map.put(manifest(), "ui", %{
+          "resource_uri" => "ui://repo/review",
+          "visibility" => ["app"]
+        })
+
+      decision =
+        ToolGateway.guard_request(request(), sandbox_context(),
+          manifests: %{"repo_file_write" => app_only}
+        )
+
+      assert decision.verdict == :blocked
+      assert decision.audit_metadata.deny_reason == :app_visibility_denied
     end
 
     test "fails closed when the manifest registry is malformed" do
@@ -546,7 +597,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert decision.verdict == :blocked
       assert decision.audit_metadata.deny_reason == :sandbox_required
-      assert response["error"]["code"] == -32_056
+      assert response["error"]["code"] == -31_984
       assert response["error"]["data"]["tool"] == "repo_file_write"
       assert response["error"]["data"]["required_isolation"] == "container"
       assert response["error"]["data"]["sandbox_id_present"] == false
@@ -581,7 +632,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       response = ToolGateway.response_for_decision(decision, "weak-sandbox")
 
-      assert response["error"]["code"] == -32_056
+      assert response["error"]["code"] == -31_984
       assert response["error"]["data"]["required_isolation"] == "remote_attested"
       assert response["error"]["data"]["received_isolation"] == "container"
       assert response["error"]["data"]["sandbox_id_present"] == true
@@ -615,19 +666,19 @@ defmodule SigilGuard.ToolGatewayTest do
       resource_response = ToolGateway.response_for_decision(resource, "resource")
       audience_response = ToolGateway.response_for_decision(audience, "audience")
 
-      assert passthrough_response["error"]["code"] == -32_050
+      assert passthrough_response["error"]["code"] == -31_990
       assert passthrough_response["error"]["data"]["status"] == "blocked"
       assert passthrough_response["error"]["data"]["reason"] =~ "token_passthrough_denied"
       assert token_passthrough.audit_metadata.audience == "host-app"
       assert token_passthrough.audit_metadata.self_resource == "host-app"
 
-      assert resource_response["error"]["code"] == -32_050
+      assert resource_response["error"]["code"] == -31_990
       assert resource_response["error"]["data"]["status"] == "blocked"
       assert resource_response["error"]["data"]["reason"] =~ "resource_mismatch"
       assert resource.audit_metadata.server == "repo-mcp"
       assert resource.audit_metadata.resource == "other-server"
 
-      assert audience_response["error"]["code"] == -32_050
+      assert audience_response["error"]["code"] == -31_990
       assert audience_response["error"]["data"]["status"] == "blocked"
       assert audience_response["error"]["data"]["reason"] =~ "audience_mismatch"
       assert audience.audit_metadata.audience == "other-server"
@@ -738,7 +789,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert {:ok, envelope} =
                ToolGateway.attest_request(decision, context,
-                 payload: request_payload(),
+                 payload: request(),
                  signer: TrustedSigner,
                  keyid: "trusted",
                  now: @now,
@@ -1103,8 +1154,8 @@ defmodule SigilGuard.ToolGatewayTest do
       assert {:confirm, _} = old_decision.verdict
 
       assert {:ok, token} =
-               Confirmation.issue(
-                 request_payload(),
+               ToolGateway.issue_confirmation(
+                 request(),
                  request_context(),
                  old_decision,
                  @confirmation_key,
@@ -1182,7 +1233,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert {:ok, statement} =
                Attestation.verify(envelope, trust_material,
-                 payload: request(),
+                 payload: SigilGuard.MCP.SecurityPayload.for_gate(request(), :request),
                  context: context,
                  manifest_digest: capability.digest,
                  now: @now
@@ -1226,7 +1277,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert {:ok, statement} =
                Attestation.verify(envelope, trust_material,
-                 payload: result(),
+                 payload: SigilGuard.MCP.SecurityPayload.for_gate(result(), :result),
                  context: context,
                  manifest_digest: capability.digest,
                  request_action_digest: @request_action_digest,
@@ -1320,7 +1371,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert {:ok, statement} =
                Attestation.verify(envelope, %{"trusted" => TrustedSigner.public_key()},
-                 payload: result(),
+                 payload: SigilGuard.MCP.SecurityPayload.for_gate(result(), :result),
                  context: attestation_result_context(),
                  request_action_digest: @request_action_digest,
                  now: @now
@@ -1472,7 +1523,7 @@ defmodule SigilGuard.ToolGatewayTest do
       assert {:confirm, _} = decision.verdict
       assert decision.action == :confirm
       assert decision.effect == :quarantine
-      assert response["error"]["code"] == -32_052
+      assert response["error"]["code"] == -31_988
       assert response["error"]["data"]["status"] == "quarantined"
       refute Map.has_key?(response["error"]["data"], "sanitized_text")
       refute inspect(response) =~ "Ignore previous instructions"
@@ -1544,6 +1595,34 @@ defmodule SigilGuard.ToolGatewayTest do
       refute_receive {^telemetry, [:sigil_guard, :runtime, :gate], _, %{tool: ^tool}}, 100
     end
 
+    test "shapes modern complete and input-required results" do
+      assert {:ok, complete, %Decision{action: :allow}} =
+               ToolGateway.guarded_result(
+                 result(),
+                 [trust_level: :high],
+                 protocol_version: "2026-07-28",
+                 request_action_digest: @request_action_digest
+               )
+
+      interim =
+        result()
+        |> put_in(["result", "resultType"], "input_required")
+        |> put_in(["result", "inputRequests"], %{
+          "approval" => %{"method" => "elicitation/create", "params" => %{}}
+        })
+
+      assert {:ok, input_required, %Decision{action: :allow}} =
+               ToolGateway.guarded_result(
+                 interim,
+                 [trust_level: :high],
+                 protocol_version: "2026-07-28",
+                 request_action_digest: @request_action_digest
+               )
+
+      assert complete["result"]["resultType"] == "complete"
+      assert input_required["result"]["resultType"] == "input_required"
+    end
+
     test "delegates decision responses with v2 JSON-RPC shape" do
       decision =
         ToolGateway.guard_request(request(), sandbox_context(),
@@ -1555,7 +1634,7 @@ defmodule SigilGuard.ToolGatewayTest do
 
       assert {:confirm, _} = decision.verdict
       assert response["id"] == "confirm-1"
-      assert response["error"]["code"] == -32_051
+      assert response["error"]["code"] == -31_989
       assert response["error"]["data"]["action_digest"] == decision.audit_metadata.action_digest
     end
   end
@@ -1619,14 +1698,6 @@ defmodule SigilGuard.ToolGatewayTest do
 
   defp request_with_secret do
     put_in(request(), ["params", "arguments", "content"], "AWS_KEY=AKIAIOSFODNN7EXAMPLE")
-  end
-
-  defp request_payload do
-    %{
-      tool: "repo_file_write",
-      action: "repo_file_write",
-      text: "tools/call\nhello\nREADME.md\nrepo_file_write"
-    }
   end
 
   defp request_context do

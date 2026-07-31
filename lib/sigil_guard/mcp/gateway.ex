@@ -1,22 +1,45 @@
 defmodule SigilGuard.MCP.Gateway do
   @moduledoc """
-  Transport-facing MCP facade.
+  Guards MCP requests and results at a host-owned transport boundary.
 
-  This module is the permanent MCP adapter facade. It keeps JSON-RPC-compatible
-  helper names and tuple shapes for host MCP servers while delegating
-  enforcement to `SigilGuard.ToolGateway`.
+  This module is the stable adapter facade for MCP clients, servers, and
+  gateways. It accepts decoded MCP-shaped values and returns decisions or
+  JSON-RPC-compatible tuple shapes while delegating policy enforcement to
+  `SigilGuard.ToolGateway`.
 
-  Use `SigilGuard.ToolGateway` directly for the full manifest, attestation, and
-  confirmation policy surface. Use this facade when integrating an MCP transport
-  and you want stable request/result helper names with MCP compatibility
-  defaults.
+  SigilGuard does not negotiate the protocol, perform discovery, own
+  authorization, or send transport messages. The host supplies the negotiated
+  protocol revision through the request's standard `_meta` or the
+  `:protocol_version` option. For MCP v2 (`2026-07-28`), the host is also
+  responsible for validating the complete wire request, including required
+  client capabilities.
+
+  Calls without “confirmed” in their name deliberately disable confirmation
+  handling. Confirmed variants honor an action-bound token. Use
+  `SigilGuard.ToolGateway` directly when the host also needs manifest
+  verification, attestation creation, or the complete policy option surface.
+
+  ## Return values
+
+  Decision-only functions return a `SigilGuard.Decision` struct. Guarded
+  request functions return `{:ok, decision}` when execution may continue or
+  `{:error, response, decision}` when the adapter must reject the call.
+  Guarded result functions also return the safe MCP result that may cross back
+  to the model.
 
   ## Examples
 
       request = %{
         "id" => "call-1",
         "method" => "tools/call",
-        "params" => %{"name" => "read_file", "arguments" => %{"path" => "README.md"}}
+        "params" => %{
+          "name" => "read_file",
+          "arguments" => %{"path" => "README.md"},
+          "_meta" => %{
+            "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities" => %{}
+          }
+        }
       }
 
       context = [phase: :tool_request, origin: :model, sink: :tool]
@@ -26,12 +49,14 @@ defmodule SigilGuard.MCP.Gateway do
         {:error, response, decision} -> {:reject, response, decision}
       end
   """
+  @moduledoc since: "1.0.0"
 
   alias SigilGuard.Context
   alias SigilGuard.Decision
   alias SigilGuard.ToolGateway
   alias SigilGuard.ToolGateway.Base
 
+  @typedoc "Boundary context accepted by all gateway helpers."
   @type ctx :: Context.t() | map() | keyword()
 
   @doc """

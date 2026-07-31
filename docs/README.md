@@ -68,6 +68,9 @@ flowchart TD
     ToolGateway --> ToolGatewayBase[ToolGateway.Base]
     Gateway --> Manifest[CapabilityManifest]
     Gateway --> MCP[MCP.Gateway facade]
+    MCP --> Protocol[MCP.Protocol]
+    MCP --> SecurityPayload[MCP.SecurityPayload]
+    MCP --> AppResource[MCP.AppResource]
     Gateway --> Confirmation[Confirmation]
 
     API --> Runtime[Boundary Runtime]
@@ -134,7 +137,9 @@ sequenceDiagram
 ### MCP And Tool Gateway
 
 Tool requests and results are bound to a pinned capability manifest and a
-signed attestation. Confirmation is bound to the exact action digest.
+signed attestation. Confirmation is bound to the exact structured action
+digest, including MRTR input responses and state. MCP Apps add a distinct
+same-server app caller and an offline-verifiable UI resource boundary.
 
 ```mermaid
 sequenceDiagram
@@ -145,16 +150,16 @@ sequenceDiagram
     participant Confirm as Confirmation
     participant Tool
 
-    Adapter->>Gateway: tools/call request
+    Adapter->>Gateway: tools/call request + protocol version
     Gateway->>Manifest: verify pinned manifest digest
-    Gateway->>Gate: normalized request boundary
+    Gateway->>Gate: structured request binding
     Gate-->>Gateway: Decision
     alt allowed
         Gateway->>Tool: execute
         Tool-->>Gateway: tool result
         Gateway->>Gate: tool-result-to-model boundary
         Gate-->>Gateway: result decision
-        Gateway-->>Adapter: result or sanitized result
+        Gateway-->>Adapter: resultType result or sanitized result
     else confirm required
         Gateway-->>Adapter: JSON-RPC confirmation error
         Adapter->>Confirm: issue action-bound token
@@ -190,7 +195,8 @@ flowchart LR
 |-----------|----------------|
 | Trust Profile | Profile constants, canonical encoding (DSSE over JCS), and signed attestations over action, payload, context, and manifest digests. |
 | Trust Bundles | Offline load, verification, caching, and quarantine of signed trust material with TUF-style roles, thresholds, expiry, and revocation. |
-| Tool Gateway | Transport-neutral request and result guards, capability-manifest digest pinning, and action-bound confirmation tokens. |
+| Tool Gateway | Transport-neutral request/result guards, MCP v2 (`2026-07-28`) structured binding, manifest v2 pinning, MRTR/result shaping, and action-bound confirmation. |
+| MCP Apps Boundary | App/model visibility, same-server app callers, and offline UI byte/CSP/permission verification; rendering remains host-owned. |
 | Boundary Runtime | The deterministic gate, boundary normalization, source-to-sink policy, staged scanner, quarantine, lifecycle hooks, and streaming sanitizer. |
 | Audit | HMAC-linked event chains, Merkle checkpoints with proofs, external anchor stores, and portable signed exports. |
 | Agent-to-Agent Trust | Signed agent cards and delegation-chain validation for inter-agent calls. |

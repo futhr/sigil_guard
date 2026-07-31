@@ -24,6 +24,22 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
   [SIGILGUARD policy filenames](MIGRATING-1.0.md#policy-filenames).
 - Renamed confirmation metadata from `_sigil_confirmation` to
   [`_agent_confirmation`](MIGRATING-1.0.md#mcp-confirmation-metadata).
+- Aligned the embedded gateway with MCP v2 (`2026-07-28`): structured action
+  binding now covers nested keys and non-string values, modern successful
+  responses carry `resultType`, and MRTR inputs/state remain bound across
+  retries. See [MCP v2](MIGRATING-1.0.md#mcp-v2-2026-07-28).
+- Moved gateway denial codes outside JSON-RPC's reserved server-error band to
+  the application-defined
+  [`-31990..-31984` range](MIGRATING-1.0.md#mcp-json-rpc-rejection-codes);
+  the pre-release `-32050..-32056` draft allocation never ships.
+- Upgraded capability manifests to
+  `sigil_guard_capability_manifest/v2`, binding tool titles, icons, MCP Apps
+  UI visibility, and validated `x-mcp-header` annotations.
+- Added offline MCP Apps boundaries: same-server app/model visibility checks
+  and `SigilGuard.MCP.AppResource` verification for pinned UI bytes, declared
+  CSP domains, dedicated app domains, and browser permissions. Verification is
+  strictly optioned and bounded to 1 MiB by default; rendering remains
+  host-owned.
 - Removed Finch from the runtime dependency set; HTTP anchor stores use the
   host-provided `SigilGuard.HTTPClient` behaviour.
 - Runtime dependencies are intentionally limited to `:telemetry`,

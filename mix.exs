@@ -192,7 +192,10 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Runtime.Stream
         ],
         "MCP Gateway": [
+          SigilGuard.MCP.AppResource,
           SigilGuard.MCP.Gateway,
+          SigilGuard.MCP.Protocol,
+          SigilGuard.MCP.SecurityPayload,
           SigilGuard.ToolGateway,
           SigilGuard.ToolGateway.Base,
           SigilGuard.TransportExamples

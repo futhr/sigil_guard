@@ -187,7 +187,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.action == :block
       assert response["jsonrpc"] == "2.0"
       assert response["id"] == 7
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["status"] == "blocked"
       assert response["error"]["data"]["hit_count"] == 1
       assert response["error"]["data"]["content_hash"]
@@ -208,7 +208,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.verdict == :blocked
       assert decision.audit_metadata.runtime_input_error == :invalid_trust_level
       assert response["id"] == "bad-context"
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["reason"] =~ "invalid_trust_level"
       assert response["error"]["data"]["trust_level"] == "admin"
     end
@@ -324,7 +324,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       assert claims["action_digest"] == decision.audit_metadata.action_digest
       # The token records the unified verdict action; the executable effect
-      # (:quarantine) is recovered on acceptance (SP.07 verdict/effect split).
+      # (:quarantine) is recovered on acceptance (runtime verdict/effect split).
       assert claims["action"] == "confirm"
       refute inspect(claims) =~ "Ignore previous instructions"
       refute token =~ "Ignore previous instructions"
@@ -526,7 +526,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                )
 
       assert decision.verdict == :blocked
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["confirmation_status"] == "invalid"
       assert response["error"]["data"]["confirmation_reason"] == "invalid_token"
       refute inspect(response) =~ "tenant-a"
@@ -684,7 +684,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       assert decision.action == :block
       assert response["id"] == 11
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["status"] == "blocked"
       assert response["error"]["data"]["reason"] =~ "missing_envelope"
       refute inspect(response) =~ "AKIAIOSFODNN7EXAMPLE"
@@ -800,7 +800,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                )
 
       assert decision.verdict == :blocked
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["reason"] =~ "legacy_envelope_removed"
       refute Map.has_key?(decision.audit_metadata, :confirmation_status)
     end
@@ -818,7 +818,7 @@ defmodule SigilGuard.MCP.GatewayTest do
                )
 
       assert decision.verdict == :blocked
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["reason"] =~ "legacy_envelope_removed"
       refute Map.has_key?(response["error"]["data"], "confirmation_status")
       refute inspect(response) =~ "tenant-a"
@@ -931,7 +931,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.action == :confirm
       assert decision.effect == :quarantine
       assert response["id"] == 8
-      assert response["error"]["code"] == -32_052
+      assert response["error"]["code"] == -31_988
       assert response["error"]["data"]["status"] == "quarantined"
       assert "ignore_instructions" in response["error"]["data"]["indicator_ids"]
       refute inspect(response) =~ "Ignore previous instructions"
@@ -1093,7 +1093,7 @@ defmodule SigilGuard.MCP.GatewayTest do
 
       assert decision.verdict == :blocked
       assert response["id"] == 12
-      assert response["error"]["code"] == -32_050
+      assert response["error"]["code"] == -31_990
       assert response["error"]["data"]["confirmation_status"] == "invalid"
       assert response["error"]["data"]["confirmation_reason"] == "invalid_token"
       refute inspect(response) =~ "Ignore previous instructions"
@@ -1116,7 +1116,7 @@ defmodule SigilGuard.MCP.GatewayTest do
   describe "guarded_result_chunk/3 and finish_guarded_result_stream/2" do
     test "returns nil while chunks are held back and emits MCP-shaped safe chunks" do
       # Small-bound patterns keep the window at 8; built-in bounds (256) would
-      # otherwise raise the holdback floor (SP.04 Holdback Invariant).
+      # otherwise raise the holdback floor (boundary policy Holdback Invariant).
       patterns =
         Patterns.compile([
           %{name: "z", category: "test", severity: :low, pattern: "zzz", max_match_bytes: 8}
@@ -1198,7 +1198,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       assert decision.action == :confirm
       assert decision.effect == :quarantine
       assert response["id"] == 14
-      assert response["error"]["code"] == -32_052
+      assert response["error"]["code"] == -31_988
       assert response["error"]["data"]["status"] == "quarantined"
       refute inspect(response) =~ "Ignore previous instructions"
 
@@ -1230,7 +1230,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       response = Gateway.response_for_decision(decision, 10)
 
       assert {:confirm, _} = decision.verdict
-      assert response["error"]["code"] == -32_051
+      assert response["error"]["code"] == -31_989
       assert response["error"]["data"]["status"] == "confirmation_required"
       assert response["error"]["data"]["action_digest"] == decision.audit_metadata.action_digest
       refute inspect(response) =~ "tenant-a"
@@ -1288,7 +1288,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       response = Gateway.response_for_decision(decision, "manifest-drift")
       data = response["error"]["data"]
 
-      assert response["error"]["code"] == -32_053
+      assert response["error"]["code"] == -31_987
       assert data["status"] == "manifest_drift"
       assert data["tool"] == "repo_file_write"
       assert data["server"] == "repo-mcp"
@@ -1306,12 +1306,12 @@ defmodule SigilGuard.MCP.GatewayTest do
           "expired"
         )
 
-      assert unknown["error"]["code"] == -32_054
+      assert unknown["error"]["code"] == -31_986
       assert unknown["error"]["data"]["status"] == "unknown_manifest"
       assert unknown["error"]["data"]["manifest_status"] == "unknown"
       refute Map.has_key?(unknown["error"]["data"], "expires_at")
 
-      assert expired["error"]["code"] == -32_054
+      assert expired["error"]["code"] == -31_986
       assert expired["error"]["data"]["manifest_status"] == "expired"
       assert expired["error"]["data"]["expires_at"] == "2026-06-30T12:00:00Z"
     end
@@ -1320,7 +1320,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       decision = registry_decision(:invalid_attestation, attestation_error: :digest_mismatch)
       response = Gateway.response_for_decision(decision, "attestation")
 
-      assert response["error"]["code"] == -32_055
+      assert response["error"]["code"] == -31_985
       assert response["error"]["data"]["status"] == "invalid_attestation"
       assert response["error"]["data"]["attestation_error"] == "digest_mismatch"
     end
@@ -1337,7 +1337,7 @@ defmodule SigilGuard.MCP.GatewayTest do
       response = Gateway.response_for_decision(decision, "sandbox")
       data = response["error"]["data"]
 
-      assert response["error"]["code"] == -32_056
+      assert response["error"]["code"] == -31_984
       assert data["status"] == "sandbox_required"
       assert data["tool"] == "repo_file_write"
       assert data["required_isolation"] == "vm"
