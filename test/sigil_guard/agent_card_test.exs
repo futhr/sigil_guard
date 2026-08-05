@@ -52,6 +52,20 @@ defmodule SigilGuard.AgentCardTest do
     }
   end
 
+  defp currently_valid_card do
+    now = DateTime.utc_now()
+
+    valid_card()
+    |> Map.put("issued_at", timestamp(DateTime.add(now, -1, :hour)))
+    |> Map.put("expires_at", timestamp(DateTime.add(now, 1, :hour)))
+  end
+
+  defp timestamp(datetime) do
+    datetime
+    |> DateTime.truncate(:millisecond)
+    |> DateTime.to_iso8601()
+  end
+
   describe "new/1" do
     test "normalizes and accepts a valid card" do
       assert {:ok, card} = AgentCard.new(valid_card())
@@ -169,7 +183,11 @@ defmodule SigilGuard.AgentCardTest do
     end
 
     test "verify uses the current time when :now is omitted" do
-      {:ok, envelope} = AgentCard.sign(valid_card(), IssuerSigner)
+      # The shared fixture pins its validity window to absolute timestamps, which
+      # the freshness/skew tests depend on. This test is the only one that reads
+      # the wall clock, so it derives its window from the current time instead —
+      # a pinned window would silently start failing once it elapsed.
+      {:ok, envelope} = AgentCard.sign(currently_valid_card(), IssuerSigner)
       assert {:ok, _} = AgentCard.verify(envelope, issuer_material())
     end
   end
