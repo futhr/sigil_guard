@@ -1,7 +1,8 @@
 ---
 name: sigil-implement
 description: Implement a SigilGuard task from docs/tasks/sigil-tasks.md or docs/specs. Use for code changes in trust profile, bundles, MCP gateway, scanner, policy, audit, or docs-backed feature work.
-allowed-tools: Bash(mix *), Bash(rg *), Bash(git *)
+disable-model-invocation: true
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash(mix *), Bash(rg *), Bash(git *)
 ---
 
 # Sigil Implement
@@ -16,6 +17,8 @@ Before editing:
 During implementation:
 
 - Keep changes scoped to the spec.
+- Do not add coverage skips, broad excludes, generated-by markers, or comments
+  that restate code.
 - Add tests with the behavior change.
 - Include tamper, malformed, expiry, replay, or quarantine tests for security
   surfaces.

@@ -1,13 +1,17 @@
 ---
 name: sigil-spec
 description: Create or update SigilGuard implementation specs under docs/specs. Use before implementing trust-profile, MCP gateway, scanner, policy, audit, bundle, or compatibility changes.
-allowed-tools: Bash(rg *), Bash(sed *)
+disable-model-invocation: true
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash(rg *), Bash(sed *)
 ---
 
 # Sigil Spec
 
 Specs live under `docs/specs/` and use
 `docs/templates/spec-base.md`.
+
+Write only under `docs/specs/` and `docs/tasks/sigil-tasks.md`. Do not modify
+source, tests, config, or quality-ignore files from this skill.
 
 ## Required Sections
 
