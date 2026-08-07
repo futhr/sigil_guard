@@ -444,7 +444,7 @@ research notes:
   [R.04](R.04-audit-proofs-witnessing-and-privacy.md) — optional post-GA
   adapter, never core.
 - Adaptive anomaly detection: resolved by
-  [R.07](R.07-ecosystem-positioning-dependencies-and-adoption.md) — behaviour
+  [R.07](R.07-runtime-dependencies-and-interoperability.md) — behaviour
   in core with a deterministic nil-path; reference implementation in an
   optional post-GA package.
 
@@ -558,11 +558,11 @@ All questions this note originally left open are now closed:
   [R.03](R.03-trust-bundle-role-model.md) — v1 bundles carry issuer/key
   references; VC-style credentials remain optional opaque references.
 - Compatibility namespace: closed by
-  [R.07](R.07-ecosystem-positioning-dependencies-and-adoption.md) — no
+  [R.07](R.07-runtime-dependencies-and-interoperability.md) — no
   `SigilGuard.Compatibility` namespace; `MIGRATING-1.0.md` and the changelog
   carry the migration.
 - Adaptive scanning: closed by
-  [R.07](R.07-ecosystem-positioning-dependencies-and-adoption.md) — behaviour
+  [R.07](R.07-runtime-dependencies-and-interoperability.md) — behaviour
   in core with a deterministic nil-path; the reference detector ships as an
   optional post-GA package.
 

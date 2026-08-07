@@ -11,17 +11,15 @@ sigil_guard:
   depends_on: ["R.06", "R.07"]
 ---
 
-# SP.14 - Ecosystem Integrations And Adoption
+# SP.14 - Ecosystem Integrations And Interoperability
 
 ## Executive Summary
 
-Security layers win by being where the tools are, and the Elixir MCP/agent
-security niche is effectively empty: the only neighbor, `llm_guard`, has
-roughly 749 all-time downloads and no gate, bundle, or audit architecture
-(R.07). SigilGuard's adoption problem is placement, not competition. This
-spec fixes the Tier 1 integration contracts (hermes_mcp, Jido, LangChain
-plus ReqLLM, Tidewave), the Tier 2 watchlist, and the adoption artifacts,
-each with acceptance criteria.
+An embedded gate is only reachable where a host framework exposes an
+insertion point, so the interoperability surface determines whether the
+runtime can be applied at all (R.07). This spec fixes the Tier 1 integration
+contracts (hermes_mcp, Jido, LangChain plus ReqLLM, Tidewave), the Tier 2
+watchlist, and the documentation artifacts, each with acceptance criteria.
 
 ## Business Value
 
@@ -275,14 +273,12 @@ and real wiring lives in the ExDoc guide.
 - **Signer compromise:** pointer to SP.02's emergency rotation ceremony as
   the canonical runbook.
 
-### Maintainer-Owned Adoption Handoff
+### Maintainer-Owned Release Handoff
 
-The OpenSSF Best Practices badge, announcement copy, listing submissions,
-and any CFP material are maintainer-owned release actions. They are not
-source-tree acceptance items and must not be fired by agents. When the
-maintainer performs them, published claims must stay within R.06 levels and
-the recorded tagline remains: "In-process. OTP-supervised. Deterministic. No
-sidecar. Signed evidence."
+The OpenSSF Best Practices badge and any external publication material are
+maintainer-owned release actions. They are not source-tree acceptance items
+and must not be fired by agents. Any published claim must stay within the
+evidence levels defined in R.06.
 
 ## Data Model
 
@@ -374,8 +370,7 @@ items are maintainer-owned release handoff.
 - [x] M7: four Tier 1 guides plus `examples/` with pinned validation records.
 - [x] M7: five livebooks plus the offline execution validation script.
 - [x] M7: SECURITY.md and documentation gates completed.
-- [x] M8/GA: leave announcement kit, listings, date-gated CFP, tags, pushes,
-      and publication to the maintainer.
+- [x] M8/GA: leave tags, pushes, and publication to the maintainer.
 
 ## Success Metrics
 
@@ -401,4 +396,3 @@ items are maintainer-owned release handoff.
 - [MCP Interceptors Working Group charter](https://modelcontextprotocol.io/community/working-groups/interceptors)
 - [OpenSSF Best Practices badge](https://www.bestpractices.dev/)
 - [Livebook](https://livebook.dev/)
-- [awesome-elixir](https://github.com/h4cc/awesome-elixir)

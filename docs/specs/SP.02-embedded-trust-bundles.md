@@ -674,7 +674,7 @@ DSSE work is a prerequisite, and legacy removal lands in M6 per SP.12.
 - [R.01 - Embedded Agent Trust Profile](../research/R.01-embedded-mcp-trust-profile.md)
 - [R.02 - Attestation Envelope And Canonical Encoding](../research/R.02-attestation-envelope-and-canonical-encoding.md)
 - [R.03 - Trust Bundle Role Model](../research/R.03-trust-bundle-role-model.md)
-- [R.07 - Ecosystem Positioning, Dependencies, And Adoption](../research/R.07-ecosystem-positioning-dependencies-and-adoption.md)
+- [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)
 - [The Update Framework Specification](https://theupdateframework.github.io/specification/latest/)
 - [TAP 8 - Key rotation and explicit self-revocation](https://github.com/theupdateframework/taps/blob/master/tap8.md)
 - [Sigstore root-signing ceremonies](https://github.com/sigstore/root-signing)

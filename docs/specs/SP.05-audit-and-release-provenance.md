@@ -813,7 +813,7 @@ cut lands in M6 per SP.12.
 - [R.01 - Embedded Agent Trust Profile](../research/R.01-embedded-mcp-trust-profile.md)
 - [R.02 - Attestation Envelope And Canonical Encoding](../research/R.02-attestation-envelope-and-canonical-encoding.md)
 - [R.04 - Audit Proofs, Witnessing, And Privacy](../research/R.04-audit-proofs-witnessing-and-privacy.md)
-- [R.07 - Ecosystem Positioning, Dependencies, And Adoption](../research/R.07-ecosystem-positioning-dependencies-and-adoption.md)
+- [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)
 - [SP.01 - Agent Trust Profile](./SP.01-sigilguard-trust-profile.md)
 - [RFC 9162 - Certificate Transparency Version 2.0](https://datatracker.ietf.org/doc/html/rfc9162)
 - [RFC 9943 - SCITT Architecture](https://datatracker.ietf.org/doc/rfc9943/)

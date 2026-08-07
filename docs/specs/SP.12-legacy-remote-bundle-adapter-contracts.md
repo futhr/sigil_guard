@@ -285,7 +285,7 @@ go/no-go gate.
 
 ## Sources
 
-- [R.07 - Ecosystem Positioning, Dependencies, And Adoption](../research/R.07-ecosystem-positioning-dependencies-and-adoption.md)
+- [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)
 - [SP.01 - Agent Trust Profile](SP.01-sigilguard-trust-profile.md)
 - [SP.02 - Embedded Trust Bundles](SP.02-embedded-trust-bundles.md)
 - [SP.05 - Audit And Release Provenance](SP.05-audit-and-release-provenance.md)

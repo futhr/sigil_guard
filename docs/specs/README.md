@@ -30,7 +30,7 @@ flowchart TD
     SP11[SP.11 Repo Policy Kernel]
     SP12[SP.12 Legacy Remote Removal]
 
-    SP14[SP.14 Ecosystem Integrations And Adoption]
+    SP14[SP.14 Ecosystem Integrations And Interoperability]
     SP15[SP.15 Benchmark Methodology]
     SP16[SP.16 MCP v2 And Apps]
 
@@ -84,7 +84,7 @@ compatibility shims.
 | [`SP.04`](SP.04-boundary-scanner-and-policy-kernel.md) | implemented | Boundary policy input, lifecycle hooks, trust zones, sandbox identity, deterministic explanations. | Split secrets, validation confidence, hook phases, sandbox mismatch, path policy. |
 | [`SP.05`](SP.05-audit-and-release-provenance.md) | implemented | Signed audit events, OTel attributes, Merkle proofs, witness cosigning, privacy classes, anchors, SBOM/release provenance, `HTTPClient` behaviour. | Signed exports, inclusion/consistency proofs, anchor verification, telemetry privacy, provenance docs. |
 | [`SP.13`](SP.13-agent-to-agent-trust-statements.md) | implemented | Agent cards, `agent_request`/`agent_response` predicates, delegation-chain validation, peer trust. | Card tamper, unknown-agent quarantine, chain reorder/depth, trust-min derivation. |
-| [`SP.14`](SP.14-ecosystem-integrations-and-adoption.md) | implemented | Integration contracts (hermes_mcp, Jido, LangChain, Tidewave), cheatsheets, livebooks, SECURITY.md, and maintainer-owned adoption handoff. | Livebook execution, guide compile checks, docs coverage. |
+| [`SP.14`](SP.14-ecosystem-integrations-and-interoperability.md) | implemented | Integration contracts (hermes_mcp, Jido, LangChain, Tidewave), cheatsheets, livebooks, SECURITY.md, and maintainer-owned adoption handoff. | Livebook execution, guide compile checks, docs coverage. |
 | [`SP.15`](SP.15-benchmark-methodology-and-baselines.md) | implemented | Benchmark scenario matrix, environment disclosure, CI regression thresholds, llm-guard comparison rules, SLO ratification. | Bench harness smoke test, baseline regression gates. |
 | [`SP.16`](SP.16-mcp-2026-07-28-and-apps-contracts.md) | implemented | MCP v2 structured action binding, MRTR/result discrimination, application-defined JSON-RPC codes, manifest v2, and MCP Apps boundary helpers. | Structured tamper, exact-version response, manifest header/icon/UI drift, app visibility, and UI-resource tests. |
 

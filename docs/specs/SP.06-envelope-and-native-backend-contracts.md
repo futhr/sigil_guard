@@ -226,4 +226,4 @@ evidence. Current attestation error semantics are owned by SP.01.
 ## Sources
 
 - [SP.01 - SigilGuard Trust Profile](SP.01-sigilguard-trust-profile.md)
-- [R.07 - Ecosystem Positioning, Dependencies, And Adoption](../research/R.07-ecosystem-positioning-dependencies-and-adoption.md)
+- [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)

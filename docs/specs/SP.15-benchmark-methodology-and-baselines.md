@@ -299,7 +299,7 @@ Aligned with task milestones M7 and M8 (the task list owns task IDs).
 
 ## Sources
 
-- [R.07 - Ecosystem Positioning, Dependencies, And Adoption](../research/R.07-ecosystem-positioning-dependencies-and-adoption.md)
+- [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)
 - [Benchee documentation](https://hexdocs.pm/benchee/Benchee.html)
 - [benchee_markdown formatter](https://hexdocs.pm/benchee_markdown/)
 - [llm-guard (protectai) repository](https://github.com/protectai/llm-guard)

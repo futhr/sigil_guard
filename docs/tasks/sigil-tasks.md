@@ -220,7 +220,7 @@ section is post-1.0.0 parking; neither is counted here.
   - File: `docs/research/R.06-agentic-threat-model-and-control-mapping.md`.
 - [x] M0.06 Research note R.07 - ecosystem positioning, dependencies,
       adoption (D5, D6, D9, D11).
-  - File: `docs/research/R.07-ecosystem-positioning-dependencies-and-adoption.md`.
+  - File: `docs/research/R.07-runtime-dependencies-and-interoperability.md`.
 - [x] M0.07 SP.01 full upgrade: DSSE + JCS normative encoding, statement
       registry, digest computation, golden vectors, v3 config surface,
       shared error taxonomy.
@@ -254,7 +254,7 @@ section is post-1.0.0 parking; neither is counted here.
 - [x] M0.14 Create SP.13 - agent-to-agent trust statements.
   - File: `docs/specs/SP.13-agent-to-agent-trust-statements.md`.
 - [x] M0.15 Create SP.14 - ecosystem integrations and adoption.
-  - File: `docs/specs/SP.14-ecosystem-integrations-and-adoption.md`.
+  - File: `docs/specs/SP.14-ecosystem-integrations-and-interoperability.md`.
 - [x] M0.16 Create SP.15 - benchmark methodology and baselines.
   - File: `docs/specs/SP.15-benchmark-methodology-and-baselines.md`.
 - [x] M0.17 R.01 surgical edits (deferred items and open questions resolved
@@ -2033,8 +2033,7 @@ section is post-1.0.0 parking; neither is counted here.
     legacy metadata coverage and digest tests that keep SP.01 metadata
     digest-neutral while treating `_sigil*` as ordinary payload content.
 - [x] M6.26 README rewrite: installation, examples, configuration.
-  - Spec: `SP.01` - V3 Configuration Surface; `SP.14` - Announcement Kit
-    And Listings (tagline).
+  - Spec: `SP.01` - V3 Configuration Surface; `SP.14` - Release Handoff.
   - AC: installation snippet says `{:sigil_guard, "~> 1.0"}`; MCP examples
     are replaced with Agent Trust attestation examples; the configuration
     table lists exactly the SP.01 kept keys.
@@ -2058,7 +2057,7 @@ section is post-1.0.0 parking; neither is counted here.
     source of truth; removed the remaining Finch example from README extension
     prose; verified forbidden terms and local README links.
 - [x] M6.28 Package metadata cleanup: hosted-registry language removed.
-  - Spec: `SP.12` - V3 Removal Map; `SP.14` - Announcement Kit And
+  - Spec: `SP.12` - V3 Removal Map; `SP.14` - Release Handoff And
     Listings.
   - AC: `mix.exs` package description/links carry no hosted-registry or
     NIF language; metadata matches the v3 positioning.
@@ -2130,7 +2129,7 @@ section is post-1.0.0 parking; neither is counted here.
 > published with the environment block.
 
 - [x] M7.01 ExDoc cheatsheet.
-  - Spec: `docs/specs/SP.14-ecosystem-integrations-and-adoption.md` -
+  - Spec: `docs/specs/SP.14-ecosystem-integrations-and-interoperability.md` -
     ExDoc Artifacts.
   - AC: `guides/cheatsheet.cheatmd` covers gate verdicts, the policy
     grammar, attestation sign/verify calls, and the confirmation flow.

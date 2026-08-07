@@ -1,7 +1,7 @@
 ---
 sigil_guard:
   id: "R.07"
-  topic: "Ecosystem Positioning, Dependencies, And Adoption"
+  topic: "Runtime Dependency Selection, Detection Placement, And Interoperability"
   category: research
   status: complete
   created: "2026-07-02"
@@ -9,25 +9,23 @@ sigil_guard:
   decision: adopted
   tags:
     [
-      "ecosystem",
       "dependencies",
-      "adoption",
+      "interoperability",
       "integrations",
       "adaptive-detection",
       "release-engineering",
-      "positioning"
+      "supply-chain"
     ]
 ---
 
-# R.07 - Ecosystem Positioning, Dependencies, And Adoption
+# R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability
 
 ## Executive Summary
 
-The mid-2026 Elixir ecosystem has exactly one other MCP/LLM security package,
-and it does not compete on architecture. SigilGuard v3 can therefore claim and
-defend a real niche: the only production-grade embedded Elixir security
-runtime for MCP and agent-tool boundaries. This note records four adopted
-decisions that make the claim credible: core runtime dependencies are kept
+SigilGuard v3 is an embedded security runtime for MCP and agent-tool
+boundaries: it mediates a trust boundary in-process rather than at a network
+hop. This note records four adopted decisions that follow from that
+architectural placement. Core runtime dependencies are kept
 minimal and individually justified rather than driven to zero - `:telemetry`,
 `:nimble_options`, and a JSON library (Jason) - on an Elixir `~> 1.18` floor
 justified by OTP 27 crypto and set-theoretic types (D9); adaptive/ML detection
@@ -36,27 +34,27 @@ reference implementation is deferred to an optional post-GA package (D5); v3
 ships no compatibility namespace and migrates users through `MIGRATING-1.0.md`
 and the changelog only (D6); and the release sequence is a direct manual
 alignment to `1.0.0`, followed by git_ops, package, and reference-consumer
-validation (D11). It also
-fixes Tier 1 integration targets (hermes_mcp, Jido, LangChain/ReqLLM,
-Tidewave) and the adoption playbook that SP.14 and SP.15 turn into tasks.
+validation (D11). It also fixes the prioritised interoperability surface
+(hermes_mcp, Jido, LangChain/ReqLLM, Tidewave) and the documentation and
+release artifacts that SP.14 and SP.15 turn into tasks.
 
 ## Research Question
 
-What ecosystem position, dependency posture, adaptive-detection stance,
-compatibility stance, and release/adoption sequence should SigilGuard v3
-adopt?
+What dependency posture, adaptive-detection stance, compatibility stance,
+interoperability surface, and release sequence should SigilGuard v3 adopt?
 
 Five sub-questions:
 
-1. Does the claimed niche exist, or does an incumbent already occupy it in
-   Elixir or nearby ecosystems?
+1. Which architectural shapes already address agent-boundary security, and
+   which properties does an in-process design offer that a network-boundary
+   design structurally cannot?
 2. Which runtime dependencies does the v3 core keep, on what individual
    merits, and what replaces the ones it drops?
 3. Where does ML-backed detection live relative to the deterministic core?
 4. Does v3 carry a compatibility namespace for 0.2.x users, or documentation
    only?
-5. How do 0.2.x and 1.0.0 coexist on Hex, and which artifacts and channels
-   make the library visible to its audience?
+5. How do 0.2.x and 1.0.0 coexist on Hex, and which documentation and
+   supply-chain artifacts does a security library owe its consumers?
 
 ## Methodology
 
@@ -75,18 +73,17 @@ Five sub-questions:
   (Jason referenced in 13 files; finch consumed by the legacy remote bundle
   path, application wiring, and the audit HTTP anchor store), and the
   reference-consumer inventory (44 call sites behind five wrapper seams).
-- Conflict handling: vendor-published statements are preferred over press
-  coverage; press-reported figures such as acquisition prices are marked as
-  reported; latency and size figures without vendor benchmarks are marked as
-  working estimates.
+- Conflict handling: vendor-published statements are preferred over
+  secondary coverage; latency and size figures without vendor benchmarks are
+  marked as working estimates.
 
 ## Context
 
-V3 repositions SigilGuard from a protocol port to a standalone embedded
-security runtime. Positioning, dependency posture, and release mechanics are
-not marketing afterthoughts here: for a security library, every dependency is
-an auditable claim that must justify itself on merit, the migration story is a
-trust signal, and the integration surface decides whether anyone deploys it. A
+V3 moves SigilGuard from a protocol port to a standalone embedded security
+runtime. Dependency posture and release mechanics are load-bearing for a
+security library: every dependency is an auditable claim that must justify
+itself on merit, the migration path is part of the trust model, and the
+interoperability surface determines where the gate can be inserted at all. A
 dependency count is not a marketing metric; the right posture is minimal and
 well-justified, not zero. CLAUDE.md rule 8
 forbids remote network calls in core decision paths without an explicit
@@ -102,34 +99,28 @@ in SP.12, and the two new specs SP.14 (integrations and adoption) and SP.15
 
 ## Findings
 
-### The Elixir Competitive Field Is Effectively Empty
+### Related Work: Architectural Shapes For Agent-Boundary Security
 
-The only other Elixir package in this space is `llm_guard` 0.3.1: roughly
-749 all-time downloads and about 316 in the last month, a single maintainer,
-and a scanner-shaped API (prompt-injection and content checks). It has no
-runtime gate, no signed trust bundles, no capability manifests, and no
-tamper-evident audit chain (accessed 2026-07-02). It is a useful scanner,
-not an embedded trust runtime.
+Existing work clusters into three architectural shapes, none of which runs
+in-process on the BEAM:
 
-Cross-language competitors cluster into three non-embedded shapes:
+- **Gateway proxies** that sit in front of MCP servers and route traffic
+  through a separate process or container.
+- **Guardrail model stacks** that pair a policy layer with a classifier model;
+  these are Python-native and model-dependent.
+- **Scanners and hosted APIs** that expose detection across a network
+  boundary, either as a library call into a model or as a remote service.
 
-- Gateway proxies that sit in front of MCP servers and route traffic through
-  a separate process or container.
-- Guardrail model stacks (LlamaFirewall with Prompt Guard 2, NeMo
-  Guardrails) that are Python-native and model-dependent.
-- Scanners and hosted APIs. The strongest commercial signal is Lakera, whose
-  guardrail platform was acquired by Check Point in a deal announced in
-  September 2025 and reported by the press at about USD 300M (the vendor
-  release does not state a price; accessed 2026-07-02). The category is
-  valuable and consolidating toward proxies and SaaS, not embedded
-  libraries.
+A survey of the Elixir package index (accessed 2026-07-02) found one
+neighbouring package offering scanner-shaped prompt and content checks. It
+addresses a different problem — detection, rather than mediation of a trust
+boundary with signed material and tamper-evident evidence — so the two are
+complementary rather than substitutable.
 
-None of these run in-process on the BEAM, and none combine signed trust
-material, deterministic policy, and tamper-evident evidence in one embedded
-package. The positioning claim "the only production-grade embedded Elixir
-security runtime for MCP and agent-tool boundaries" is supported by the
-accessed evidence and is falsifiable by a Hex search, which is exactly what a
-positioning claim should be.
+The design question is therefore not which shape is preferable in general, but
+which properties an in-process runtime can offer that a network-boundary
+design structurally cannot. Those properties are what the remaining decisions
+optimise for:
 
 | Property | Embedded SigilGuard | Gateway proxy | Hosted guardrail API |
 |----------|---------------------|---------------|----------------------|
@@ -261,11 +252,12 @@ Three mechanical facts shape D11:
   package validates, keeping local path validation separate from production
   dependency updates.
 
-### Tier 1 Integration Targets
+### Tier 1 Interoperability Targets
 
-Reach figures accessed 2026-07-02.
+Prioritised by ecosystem adoption, used as a proxy for how many consumers a
+single integration guide serves. Hex download figures accessed 2026-07-02.
 
-| Target | Reach | Extension point | SigilGuard insertion |
+| Target | Hex downloads | Extension point | SigilGuard insertion |
 |--------|-------|-----------------|----------------------|
 | hermes_mcp | ~171k all-time | Interceptors (SEP-1763 model), middleware, plugs | Pre/post tool-call gate |
 | jido | ~84k all-time, ~56k/month, v2.3.x | Tool wrappers and pre-execution hooks | Action gating before execution |
@@ -295,7 +287,7 @@ Notes per target:
   AGENTS.md by default marks the era in which Phoenix apps are
   agent-navigable out of the box.
 
-### Tier 2 Targets
+### Tier 2 Targets (Tracked, No Guides)
 
 `ex_mcp` (about 3.8k all-time, release-candidate status), Vancouver
 (pre-0.1), and `mcp_sse` are tracked but get no guides until their APIs
@@ -310,24 +302,17 @@ SigilGuard takes zero hard dependencies on any integration target.
 CI-maintained example applications are deferred post-GA; pinned examples
 keep the maintenance cost proportional to Tier 1's release cadence.
 
-### Adoption Signals That Move Elixir Libraries
+### Supply-Chain And Observability Alignment
 
-The libraries that trend in this ecosystem share a reproducible artifact
-set: ExDoc cheatsheets, livebooks with Run in Livebook badges, 100% doc
-coverage, clean dialyzer, disciplined changelogs, published benchmarks, a
-SECURITY.md, and visible supply-chain hygiene. The channels are equally
-consistent: ElixirForum announcements, Elixir Radar, the Thinking Elixir
-podcast, ElixirConf talks, and awesome-elixir listing.
-
-Two alignment facts strengthen the supply-chain story specifically for
-SigilGuard: Elixir itself has been OpenChain ISO/IEC 5230 certified since
-2025-02-26 and ships attested source SBOMs (CycloneDX 1.6+/SPDX 2.3+) with
-its releases, so a security library that publishes SLSA provenance and SBOMs
-matches the language's own posture rather than inventing one. And on
-observability, the OpenTelemetry GenAI semantic conventions (`gen_ai.*`)
-remain experimental, so the stable pattern used by Oban, Ecto, and Phoenix
-applies: keep library-owned telemetry events as the contract and offer
-`opentelemetry_api` attribute mapping as an optional dependency.
+Two ecosystem facts constrain the artifact set a security library should
+publish. Elixir itself has been OpenChain ISO/IEC 5230 certified since
+2025-02-26 and ships attested source SBOMs (CycloneDX 1.6+/SPDX 2.3+) with its
+releases, so a library that publishes SLSA provenance and SBOMs matches the
+language's own posture rather than inventing one. On observability, the
+OpenTelemetry GenAI semantic conventions (`gen_ai.*`) remain experimental, so
+the stable pattern used by Oban, Ecto, and Phoenix applies: keep library-owned
+telemetry events as the contract and offer `opentelemetry_api` attribute
+mapping as an optional dependency.
 
 ## Comparative Analysis
 
@@ -448,7 +433,7 @@ NimbleOptions-rejection mandates.
 **Decision:** adopted.
 
 All four decision areas above are adopted, together with the Tier 1/Tier 2
-integration tiering, the delivery model, and the adoption playbook below.
+interoperability tiering, the delivery model, and the artifact set below.
 This closes R.01's fourth Deferred item (whether adaptive anomaly detection
 belongs in the main package or an optional provider behaviour) and R.01 Open
 Questions 4 (compatibility namespace versus `MIGRATING-1.0.md`) and 5
@@ -456,29 +441,25 @@ Questions 4 (compatibility namespace versus `MIGRATING-1.0.md`) and 5
 closes the task-list open decisions on adaptive detectors, the compatibility
 namespace, and the release sequence.
 
-**Rationale:** The niche is real and empty; the only Elixir neighbor is a
-single-maintainer scanner without gate, bundle, or audit architecture, and
-the cross-language competition is structurally non-embedded. For a security
-library, every dependency is a claim that must survive an audit, and the
+**Rationale:** The in-process design occupies a different point in the design
+space from the proxy and hosted shapes surveyed above, and the properties it
+offers — call-path cost, OTP supervision, deterministic verdicts, local signed
+evidence — follow from that placement rather than from feature count. For a
+security library, every dependency is a claim that must survive an audit, and
+the
 defensible posture is minimal and well-justified rather than zero: keep
 `telemetry`, adopt `nimble_options` for validated config schemas, keep
 `jason`, and drop finch by deleting its only consumer. That is stronger than
 a bare dependency count, which forces worse hand-rolled code the moment it is
-treated as a goal. Determinism is the product's differentiator, so ML stays
-optional and advisory forever. The download data makes compatibility
-machinery pure cost with no beneficiary. And the release sequence is honest
-to an install base of roughly 180 downloads while protecting rc consumers
-from the prerelease-resolution trap.
+treated as a goal. Determinism is the architectural commitment, so ML stays
+optional and advisory. The download data makes compatibility machinery pure
+cost with no beneficiary. And the release sequence is proportionate to the
+current install base while protecting rc consumers from the
+prerelease-resolution trap.
 
-### Adopted Adoption Playbook
+### Adopted Documentation And Release Artifacts
 
-Positioning statement: SigilGuard is the only production-grade embedded
-Elixir security runtime for MCP and agent-tool boundaries.
-
-Tagline for README, Hex, and talks: "In-process. OTP-supervised.
-Deterministic. No sidecar. Signed evidence."
-
-Artifacts (SP.14 owns acceptance criteria; SP.15 owns benchmark rules):
+SP.14 owns acceptance criteria; SP.15 owns benchmark rules.
 
 - ExDoc cheatsheets (`.cheatmd`) covering the gate, policy, and audit APIs.
 - Five livebooks with Run in Livebook badges, each executing top-to-bottom
@@ -486,21 +467,18 @@ Artifacts (SP.14 owns acceptance criteria; SP.15 owns benchmark rules):
   lethal trifecta; audit export and proofs; hermes_mcp integration; and
   threat scenarios.
 - 100% documentation coverage enforced by `mix doctor`; dialyzer clean.
-- Published benchmarks per SP.15, including an honest scanner-scope-only
-  comparison against Python llm-guard: same corpus, versions disclosed, and
-  no claims beyond the shared scanning scope.
+- Published benchmarks per SP.15, including a scope-limited comparison
+  against the Python `llm-guard` scanner suite as a baseline: same corpus,
+  versions disclosed, and no claims beyond the shared scanning scope.
 - SECURITY.md with a responsible-disclosure process, and the OpenSSF Best
   Practices badge worked through bestpractices.dev.
 - Signed releases, SLSA Build L3 provenance via GitHub's
   attest-build-provenance action, and SBOMs from the existing SPDX mix
   task, explicitly aligned with Elixir's own OpenChain-certified,
   SBOM-attested release posture.
-- Announcement kit gated on 1.0.0 GA: ElixirForum post, Elixir Radar pitch,
-  Thinking Elixir pitch, ElixirConf US CFP (date-gated), awesome-elixir PR,
-  and curated Hex keywords.
 
 Integration delivery: Tier 1 guides (hermes_mcp with the anubis_mcp note,
-Jido, LangChain/ReqLLM, and the Tidewave showcase) ship as ExDoc guides plus
+Jido, LangChain/ReqLLM, and the Tidewave example) ship as ExDoc guides plus
 pinned `examples/`; Tier 2 targets are tracked without guides; CI example
 apps stay deferred.
 
@@ -525,8 +503,8 @@ attribute prefix decision is recorded in SP.05 (D16).
 - Specs to create/update: SP.05 (`SigilGuard.HTTPClient` behaviour contract
   and OTel prefix resolution), SP.12 (dependency-removal and
   release-sequence sections), SP.04 (adaptive-detector behaviour), new
-  SP.14 (ecosystem integrations and adoption), new SP.15 (benchmark
-  methodology and llm-guard comparison fairness rules).
+  SP.14 (ecosystem integrations and interoperability), new SP.15
+  (benchmark methodology and baseline comparison fairness rules).
 - Migration needed: yes. `MIGRATING-1.0.md` carries a 1:1 mapping for every
   removal; no runtime compatibility namespace; historical vectors move to
   `test/fixtures/historical/`.
@@ -537,8 +515,8 @@ attribute prefix decision is recorded in SP.05 (D16).
 
 ## Sources
 
-Hex download figures and competitor stats are post-cutoff observations
-recorded as accessed values (accessed 2026-07-02 unless noted).
+Hex download figures are post-cutoff observations recorded as accessed
+values (accessed 2026-07-02 unless noted).
 
 - [Hex: sigil_guard](https://hex.pm/packages/sigil_guard) - ~180 all-time
   downloads, no visible reverse dependencies (first recorded 2026-07-01 in
@@ -580,10 +558,6 @@ recorded as accessed values (accessed 2026-07-02 unless noted).
 - [protectai/deberta-v3-base-injection-onnx model card](https://huggingface.co/protectai/deberta-v3-base-injection-onnx)
 - [meta-llama/Llama-Prompt-Guard-2-86M model card](https://huggingface.co/meta-llama/Llama-Prompt-Guard-2-86M)
 - [meta-llama/Llama-Prompt-Guard-2-22M model card](https://huggingface.co/meta-llama/Llama-Prompt-Guard-2-22M)
-- [Check Point acquires Lakera (press release)](https://www.checkpoint.com/press-releases/check-point-acquires-lakera-to-deliver-end-to-end-ai-security-for-enterprises/)
-- [Calcalist: Check Point acquires Lakera in $300 million deal](https://www.calcalistech.com/ctechnews/article/rj5bc1vige) -
-  price reported by press, not stated in the vendor release (accessed
-  2026-07-02).
 - [OpenSSF Best Practices badge](https://www.bestpractices.dev/)
 - [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
 - [GitHub attest-build-provenance action](https://github.com/actions/attest-build-provenance)
