@@ -26,7 +26,7 @@ when moving production code to the 1.0 release line.
 
 ## Migration Checklist
 
-- Rename policy files to the SIGILGUARD filename family.
+- Rename policy files to the `SIGILGUARD` filename family.
 - Move MCP trust metadata from `_sigil` to `_agent_trust`.
 - Move MCP confirmation metadata from `_sigil_confirmation` to
   `_agent_confirmation`.
@@ -53,8 +53,8 @@ when moving production code to the 1.0 release line.
 
 ## Policy Filenames
 
-SigilGuard 1.0 renames repo policy files from the old SIGIL filename family
-to the SIGILGUARD filename family. Legacy filenames fail closed with
+SigilGuard 1.0 renames repository policy files from the old `SIGIL` filename
+family to the `SIGILGUARD` filename family. Legacy filenames fail closed with
 `{:error, {:legacy_policy_filename, found, use}}` and are never parsed as
 fallbacks.
 
@@ -332,7 +332,7 @@ evidence in `matched_rules`.
 | `Envelope.verify(envelope, public_key_b64u, opts)` | `Attestation.verify(envelope, trust_material, opts)`. |
 | `_sigil` | `_agent_trust` (`Attestation.attach/2`, `fetch/1`). |
 | `_sigil_confirmation` | `_agent_confirmation` (`attach_confirmation/2`, `fetch_confirmation/1`). |
-| Legacy envelope fixtures | Moved to `test/fixtures/historical/` (SP.06). |
+| Legacy envelope fixtures | Moved to `test/fixtures/historical/`. |
 
 ### Signing A Tool Request
 
@@ -450,10 +450,10 @@ Remove deleted 0.2.x keys before booting 1.0. Removed keys fail closed with
 |-------------|-------------|
 | `:backend` | None; the native Elixir backend is the only backend. |
 | `:protocol_profile` | None; 1.0 has one profile, `sigil_guard_agent_trust/v1`. |
-| `:registry_url`, `:registry_ttl_ms`, `:registry_timeout_ms`, `:registry_retry_ms` | `:trust_bundle` local sources (SP.02). |
+| `:registry_url`, `:registry_ttl_ms`, `:registry_timeout_ms`, `:registry_retry_ms` | `:trust_bundle` local sources. |
 | `:registry_enabled` | None; no registry runtime path exists. |
-| `:registry_require_signed_bundles`, `:registry_bundle_public_keys` | Bundle roots and thresholds inside the trust bundle (SP.02). |
-| `:registry_bundle_max_age_seconds`, `:registry_bundle_clock_skew_seconds` | Bundle expiry and skew fields inside the trust bundle (SP.02). |
+| `:registry_require_signed_bundles`, `:registry_bundle_public_keys` | Bundle roots and thresholds inside the trust bundle. |
+| `:registry_bundle_max_age_seconds`, `:registry_bundle_clock_skew_seconds` | Bundle expiry and skew fields inside the trust bundle. |
 | `scanner_patterns: :registry` (value) | `scanner_patterns: :bundle`. |
 
 Kept 1.0 keys are `:trust_bundle`, `:scanner_patterns`, `:http_client`,
@@ -613,9 +613,9 @@ resource metadata. The host still owns resource fetching, HTML5 validation,
 iframe origins and sandboxing, CSP and Permissions Policy enforcement,
 authorization, and rendering.
 
-## Decision Struct And The Unified Verdict (SP.07)
+## Decision Struct And The Unified Verdict
 
-The runtime gate now evaluates through `SigilGuard.BoundaryPolicy` (SP.04) and
+The runtime gate now evaluates through `SigilGuard.BoundaryPolicy`, and
 `%SigilGuard.Decision{}` carries the unified verdict enum on `:action`:
 
 - **`:action` is the unified verdict** `:allow | :redact | :confirm | :quarantine

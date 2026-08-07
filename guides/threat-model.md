@@ -1,10 +1,11 @@
 # SigilGuard Threat Model
 
-This guide renders the normative R.06 control mapping for operators and
-integrators. It does not expand any claim beyond the source research note:
-SigilGuard is an embedded library that controls MCP and agent-tool boundaries,
-not host authentication, transport security, sandbox execution, model behavior,
-or ecosystem tooling.
+This guide is the operator- and integrator-facing rendering of SigilGuard's
+threat model. Every claim is scoped to what the library controls: SigilGuard is
+an embedded runtime that mediates MCP and agent-tool boundaries — not host
+authentication, transport security, sandbox execution, model behavior, or
+ecosystem tooling. The underlying research note, with sources and derivations,
+lives in `docs/research/` in the source repository.
 
 ## Control Mapping
 

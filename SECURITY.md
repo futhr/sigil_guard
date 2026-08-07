@@ -47,5 +47,5 @@ Out of scope:
 ## Signer Compromise
 
 Treat signing-key compromise as an incident. For trust-bundle signer compromise,
-follow the emergency rotation ceremony defined in
-`docs/specs/SP.02-embedded-trust-bundles.md`.
+follow the emergency rotation ceremony defined in the trust-bundle
+specification, found under `docs/specs/` in the source repository.

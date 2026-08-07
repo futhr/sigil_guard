@@ -3,7 +3,8 @@
 This guide covers two host-owned operational surfaces: verifying a release's
 SBOM and provenance, and implementing a write-once/read-many (WORM) or
 append-only audit anchor store. SigilGuard ships the primitives; transport,
-storage, and CI are owned by the host (CLAUDE.md rule 8; `SP.05`).
+storage, and CI are owned by the host. The library performs no network calls
+of its own in any decision path.
 
 ## Verifying a release SBOM
 
@@ -23,7 +24,7 @@ mix sigil_guard.sbom --verify dist/sigil_guard.spdx.json
 
 **Digest** verification additionally binds the file to the exact bytes attested
 in the release provenance (the SLSA `attest-build-provenance` subject and the
-SP.01 `release` statement's `artifacts` list). Compute the digest and pass it:
+`artifacts` list of the signed release statement). Compute the digest and pass it:
 
 ```bash
 shasum -a 256 dist/sigil_guard.spdx.json
@@ -59,7 +60,7 @@ SBOM digest, and structure — before trusting the release:
 ```
 
 The tagged-release workflow produces these subjects with
-`actions/attest-build-provenance`, signs the SP.01 `release` statement
+`actions/attest-build-provenance`, signs the release statement
 (`mix sigil_guard.release_statement`), and runs `gh attestation verify` itself
 before `mix hex.publish`, so a failed verification blocks the publish.
 
@@ -75,8 +76,8 @@ appliances) a host provides an HTTP endpoint and reaches it through the
 ### The HTTP client seam
 
 The anchor HTTP store performs no network itself — it routes every request
-through a host-provided `SigilGuard.HTTPClient` (the only sanctioned HTTP seam,
-`SP.05` D9). Configure it per call (`http_client:` in the store options) or in
+through a host-provided `SigilGuard.HTTPClient`, the library's only
+sanctioned HTTP seam. Configure it per call (`http_client:` in the store options) or in
 the application environment:
 
 ```elixir

@@ -210,7 +210,7 @@ end
 
 ## Error Mapping
 
-Always return SigilGuard denials through the SP.03 JSON-RPC error registry via
+Always return SigilGuard denials through the library's JSON-RPC error registry via
 `SigilGuard.ToolGateway.response_for_decision/3`:
 
 | Decision action | JSON-RPC status | Code |

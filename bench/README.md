@@ -1,6 +1,8 @@
 # SigilGuard Benchmarks
 
-This directory holds the reproducible SP.15 benchmark harness.
+This directory holds the reproducible benchmark harness. The methodology and
+fairness rules it implements are specified under `docs/specs/` in the source
+repository.
 
 ## Commands
 
