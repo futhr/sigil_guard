@@ -218,8 +218,8 @@ section is post-1.0.0 parking; neither is counted here.
 - [x] M0.05 Research note R.06 - agentic threat model and control mapping
       (D12; defines test families TM.01-TM.12).
   - File: `docs/research/R.06-agentic-threat-model-and-control-mapping.md`.
-- [x] M0.06 Research note R.07 - ecosystem positioning, dependencies,
-      adoption (D5, D6, D9, D11).
+- [x] M0.06 Research note R.07 - runtime dependency selection, detection
+      placement, and interoperability (D5, D6, D9, D11).
   - File: `docs/research/R.07-runtime-dependencies-and-interoperability.md`.
 - [x] M0.07 SP.01 full upgrade: DSSE + JCS normative encoding, statement
       registry, digest computation, golden vectors, v3 config surface,
@@ -253,7 +253,7 @@ section is post-1.0.0 parking; neither is counted here.
     `SP.12-legacy-remote-bundle-adapter-contracts.md`.
 - [x] M0.14 Create SP.13 - agent-to-agent trust statements.
   - File: `docs/specs/SP.13-agent-to-agent-trust-statements.md`.
-- [x] M0.15 Create SP.14 - ecosystem integrations and adoption.
+- [x] M0.15 Create SP.14 - ecosystem integrations and interoperability.
   - File: `docs/specs/SP.14-ecosystem-integrations-and-interoperability.md`.
 - [x] M0.16 Create SP.15 - benchmark methodology and baselines.
   - File: `docs/specs/SP.15-benchmark-methodology-and-baselines.md`.

@@ -56,14 +56,15 @@ decision = ToolGateway.guard_result(result, result_context)
 
 ## Policy Grammar
 
-Repository policy files are loaded from the `SIGILGUARD` filename family:
+Repository policy files are loaded from the <code>SIGILGUARD</code> filename
+family:
 
 - `SIGILGUARD_POLICY`
 - `.sigilguard-policy`
 - `.sigilguard/policy`
 - `.github/sigilguard-policy`
 
-Legacy `SIGIL` filenames fail closed.
+Legacy <code>SIGIL</code> filenames fail closed.
 
 Minimal boundary-policy file:
 

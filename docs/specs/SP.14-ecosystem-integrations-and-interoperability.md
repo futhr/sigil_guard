@@ -1,13 +1,13 @@
 ---
 sigil_guard:
   id: "SP.14"
-  title: "Ecosystem Integrations And Adoption"
-  domain: adoption
+  title: "Ecosystem Integrations And Interoperability"
+  domain: interoperability
   status: implemented
   priority: high
   created: "2026-07-02"
-  updated: "2026-07-07"
-  tags: ["integrations", "adoption", "livebooks", "openssf", "tier-1", "v3"]
+  updated: "2026-08-11"
+  tags: ["integrations", "interoperability", "livebooks", "openssf", "tier-1", "v3"]
   depends_on: ["R.06", "R.07"]
 ---
 
@@ -24,9 +24,10 @@ watchlist, and the documentation artifacts, each with acceptance criteria.
 ## Business Value
 
 - **Problem:** A correct security runtime nobody wires into hermes_mcp,
-  Jido, or LangChain protects nothing; v3 has no adoption surface yet.
+  Jido, or LangChain protects nothing; v3 needs a documented interoperability
+  surface.
 - **Solution:** Per-target integration contracts at the `ToolGateway` seam
-  plus the reproducible artifact set that moves Elixir libraries (R.07).
+  plus reproducible documentation and release artifacts (R.07).
 - **Beneficiary:** Hosts on Tier 1 frameworks, and evaluators who judge a
   security library by its docs, evidence, and supply-chain posture.
 - **Impact:** SigilGuard is installable at every major Elixir agent/tool
@@ -229,7 +230,7 @@ guide under the same contract.
 | Vancouver | pre-0.1 | 0.1 published with a documented extension point. |
 | `mcp_sse` | niche transport | A named consumer requests a guide, or downloads pass `llm_guard`'s. |
 
-## Adoption Artifacts
+## Documentation And Release Artifacts
 
 ### ExDoc Artifacts
 
@@ -284,7 +285,7 @@ evidence levels defined in R.06.
 
 No new data model. Integrations consume the existing
 `%SigilGuard.Decision{}` and boundary-context vocabulary (SP.01, SP.04);
-adoption artifacts are documentation files listed in the module map.
+documentation and release artifacts are the files listed in the module map.
 
 ## Module Map
 
@@ -385,7 +386,7 @@ items are maintainer-owned release handoff.
 ## Sources
 
 - [R.06 - Agentic Threat Model And Control Mapping](../research/R.06-agentic-threat-model-and-control-mapping.md)
-- [R.07 - Ecosystem Positioning, Dependencies, And Adoption](../research/R.07-ecosystem-positioning-dependencies-and-adoption.md)
+- [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)
 - [Hex: hermes_mcp](https://hex.pm/packages/hermes_mcp)
 - [Hex: anubis_mcp](https://hex.pm/packages/anubis_mcp)
 - [Hex: jido](https://hex.pm/packages/jido)

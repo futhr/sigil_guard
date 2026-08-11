@@ -5,7 +5,7 @@ sigil_guard:
   category: research
   status: complete
   created: "2026-07-02"
-  updated: "2026-07-02"
+  updated: "2026-08-11"
   decision: adopted
   tags:
     [
@@ -94,15 +94,15 @@ runs Elixir 1.19 and isolates the library behind wrapper modules, which
 bounds the real-world migration cost of every decision below. These
 decisions gate the mix.exs work in milestones M1 and M6, the
 `SigilGuard.HTTPClient` behaviour in SP.05, the dependency-removal section
-in SP.12, and the two new specs SP.14 (integrations and adoption) and SP.15
-(benchmarks).
+in SP.12, and the two new specs SP.14 (ecosystem integrations and
+interoperability) and SP.15 (benchmarks).
 
 ## Findings
 
 ### Related Work: Architectural Shapes For Agent-Boundary Security
 
-Existing work clusters into three architectural shapes, none of which runs
-in-process on the BEAM:
+Prominent cross-language work clusters into three architectural shapes, none
+of which runs in-process on the BEAM:
 
 - **Gateway proxies** that sit in front of MCP servers and route traffic
   through a separate process or container.

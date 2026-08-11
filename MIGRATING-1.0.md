@@ -26,7 +26,7 @@ when moving production code to the 1.0 release line.
 
 ## Migration Checklist
 
-- Rename policy files to the `SIGILGUARD` filename family.
+- Rename policy files to the <code>SIGILGUARD</code> filename family.
 - Move MCP trust metadata from `_sigil` to `_agent_trust`.
 - Move MCP confirmation metadata from `_sigil_confirmation` to
   `_agent_confirmation`.
@@ -53,8 +53,9 @@ when moving production code to the 1.0 release line.
 
 ## Policy Filenames
 
-SigilGuard 1.0 renames repository policy files from the old `SIGIL` filename
-family to the `SIGILGUARD` filename family. Legacy filenames fail closed with
+SigilGuard 1.0 renames repository policy files from the old
+<code>SIGIL</code> filename family to the <code>SIGILGUARD</code> filename
+family. Legacy filenames fail closed with
 `{:error, {:legacy_policy_filename, found, use}}` and are never parsed as
 fallbacks.
 
@@ -630,7 +631,7 @@ The runtime gate now evaluates through `SigilGuard.BoundaryPolicy`, and
 - **New fields**: `matched_rules` (`[%{rule_id, explanation}]`), `evidence_refs`,
   `effect`, and the boundary labels `source`, `sink`, `trust_zone`, `actor`,
   `resource`. The `:require_approval` repo action is closed to `:confirm`.
-- **Facades unchanged (D17)**: `SigilGuard.scan/1`, `scan_and_redact/1`, and
+- **Facades remain unchanged**: `SigilGuard.scan/1`, `scan_and_redact/1`, and
   `policy_verdict/3` return shapes are byte-identical; hit maps gained additive
   optional keys only.
 - **Sandbox matrix** applies in the gate only when a call declares a `tool` or
