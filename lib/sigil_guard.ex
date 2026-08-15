@@ -56,6 +56,7 @@ defmodule SigilGuard do
   - `SigilGuard.Policy` — Risk classification and trust gating
   - `SigilGuard.Audit` — Tamper-evident audit chain
   - `SigilGuard.Audit.Export` — Portable signed checkpoint + anchor packages
+  - `SigilGuard.Assessment.OSCAL` — Host-context OSCAL observation projection
   - `SigilGuard.Vault` — Secure secret storage
   - `SigilGuard.Identity` — Trust level hierarchy
   - `SigilGuard.Signer` — Cryptographic signing behaviour

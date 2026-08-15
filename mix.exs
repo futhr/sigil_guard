@@ -225,6 +225,9 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Audit.Proof,
           SigilGuard.Audit.Witness
         ],
+        Assessment: [
+          SigilGuard.Assessment.OSCAL
+        ],
         "Signing & Vault": [
           SigilGuard.Signer,
           SigilGuard.Signer.Ed25519,

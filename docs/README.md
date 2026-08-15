@@ -95,6 +95,7 @@ flowchart TD
     Audit --> CloudEvents[Audit.CloudEvents]
     Audit --> Anchor[Audit.Anchor + Store]
     Audit --> Export[Audit.Export]
+    Export --> Assessment[Assessment.OSCAL]
 
     API --> Peers[AgentCard]
     Peers --> AgentTrust[AgentTrust]
@@ -187,6 +188,7 @@ flowchart LR
     Signature --> Export[Portable audit export]
     Receipt --> Export
     Proofs --> Export
+    Export --> Assessment[Optional OSCAL observation projection]
 ```
 
 ## Components
@@ -199,6 +201,7 @@ flowchart LR
 | MCP Apps Boundary | App/model visibility, same-server app callers, and offline UI byte/CSP/permission verification; rendering remains host-owned. |
 | Boundary Runtime | The deterministic gate, boundary normalization, source-to-sink policy, staged scanner, quarantine, lifecycle hooks, and streaming sanitizer. |
 | Audit | HMAC-linked event chains, Merkle checkpoints with proofs, external anchor stores, and portable signed exports. |
+| External Assessment | Host-context OSCAL Assessment Results v1.2.3 observations that reference a pinned audit-export digest without inferring findings or control satisfaction. |
 | Agent-to-Agent Trust | Signed agent cards and delegation-chain validation for inter-agent calls. |
 | Host Behaviours | Signing, vault, identity, audit persistence, and outbound HTTP, supplied by the host application. |
 | Infrastructure | Configuration, telemetry with OpenTelemetry attribute mapping, and replay protection. |
@@ -210,3 +213,5 @@ flowchart LR
 - No remote network trust in core decision paths by default.
 - No ML model weights in core; adaptive detection is an optional behaviour with
   a deterministic nil-path.
+- No inferred assessment findings or control-satisfaction claims; hosts and
+  assessors own assessment authority and mappings.

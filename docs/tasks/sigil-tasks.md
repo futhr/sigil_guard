@@ -2,15 +2,15 @@
 
 This is the canonical execution checklist for SigilGuard v3, the embedded
 Agent Trust Profile runtime. V3 is a deliberate, spec-governed breaking
-release: every architectural decision (D1-D20) is closed, research-backed,
+release: every architectural decision (D1-D21) is closed, research-backed,
 and recorded below with rationale (see Closed Decisions); no open choices
-remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M9. A
+remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M10. A
 task is done only when its AC bullets hold and its named test families
 exist. Migration lives in `MIGRATING-1.0.md`, `CHANGELOG.md`, and release
 notes - never in permanent legacy runtime shims.
 
-This file, the research notes (`../research/R.01`-`R.08`), and the specs
-(`../specs/SP.01`-`SP.16`) are the complete, self-contained plan of record.
+This file, the research notes (`../research/R.01`-`R.10`), and the specs
+(`../specs/SP.01`-`SP.17`) are the complete, self-contained plan of record.
 An implementer needs nothing outside `docs/` and the codebase. The decisions
 were derived from primary-source research and adversarially verified against
 those sources; do not reopen a closed decision without a superseding
@@ -63,7 +63,7 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 242 / 242 tasks done (100%).** Milestones: 12 complete.
+**Overall: 243 / 243 tasks done (100%).** Milestones: 13 complete.
 **Current milestone: complete - maintainer-owned release handoff remains.**
 
 | # | Milestone | Done | Total | % | Status |
@@ -80,12 +80,17 @@ trailers (rule 10); the maintainer pushes manually.
 | M7A | Pre-release audit hardening | 14 | 14 | 100% | Complete |
 | M8 | Release | 8 | 8 | 100% | Complete |
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
-| — | **Total** | **242** | **242** | **100%** | 12 done |
+| M10 | External assessment projection | 1 | 1 | 100% | Complete |
+| — | **Total** | **243** | **243** | **100%** | 13 done |
 
 ### Release Handoff
 
 M9 aligned the unreleased 1.0 gateway, confirmation, manifest, Apps, docs, and
 release artifacts with MCP `2026-07-28`.
+
+M10 added an optional, host-context OSCAL Assessment Results v1.2.3
+observation projection without changing native audit exports or Agent Trust
+statements.
 
 Post-release maintenance includes ongoing dependency-audit remediation,
 per-module security coverage review, policy-loader symlink containment,
@@ -101,7 +106,7 @@ are maintainer-owned operations and are intentionally outside this checklist.
 After the owner-managed package flow, validate the reference consumer against
 the actual 1.0.0 package artifact as release handoff evidence.
 
-The table counts every milestone task (F through M9, including M7A) exactly
+The table counts every milestone task (F through M10, including M7A) exactly
 once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
 section is post-1.0.0 parking; neither is counted here.
@@ -2746,6 +2751,27 @@ section is post-1.0.0 parking; neither is counted here.
   - AC: every `CLAUDE.md` and `done` skill gate passes; coverage remains at
     least 95%; no publish, push, or tag is performed.
 
+## M10 - External Assessment Projection
+
+> References: `docs/specs/SP.17-external-assessment-projection.md`,
+> `docs/research/R.10-external-assessment-formats-and-evidence-projection.md`
+> Effort: M
+> Status: complete
+> Dependencies: SP.05, R.10
+
+- [x] M10.01 Host-authorized OSCAL observation projection.
+  - AC: `SigilGuard.Assessment.OSCAL.project/2` accepts only a closed host
+    context, binds the digest of the exact `Audit.Export.canonical_bytes/1`
+    resource, rejects fragment/query-only locators, and emits OSCAL Assessment
+    Results v1.2.3 observations with explicit control and subject scope.
+  - AC: findings, risks, assessment attestations, satisfaction states, network
+    access, clock access, and changes to `Audit.Export` or Agent Trust statement
+    contracts are absent.
+  - AC: deterministic UUIDs, OSCAL-schema-validated golden output, digest
+    tamper, malformed UTF-8 and nested-term properties, scope, time/expiry,
+    privacy, totality, and export compatibility tests are green.
+  - AC: all repository quality gates pass with coverage at or above 95%.
+
 ## Closed Decisions
 
 All architectural decisions are final and research-backed; each lives in
@@ -2756,14 +2782,16 @@ sources. Do not reopen a decision without a superseding research note.
 D1-D18 were set during the first research round; D9 was revised and D19
 added during an adversarial hardening round (both verified against primary
 sources, 2026-07-02). D20 supersedes D19 for final MCP `2026-07-28`
-compatibility before the unreleased 1.0 publication.
+compatibility before the unreleased 1.0 publication. D21 adds the separately
+versioned external assessment projection without reopening native evidence or
+Agent Trust contracts.
 
 | # | Decision and rationale | Owning doc(s) |
 |---|------------------------|---------------|
 | D1 | **DSSE envelope over a JCS-canonical, in-toto-style Statement** for every signed artifact (attestations, bundles, checkpoints, exports). Signing opaque PAE bytes removes the canonicalization attack surface; the multi-signature array enables witnesses/thresholds; the shape is Sigstore/in-toto/SLSA-proven. JCS pitfalls (int >2^53 -> string, UTF-16 key sort, no unicode normalization) are normative. | `R.02`, `SP.01` |
 | D2 | **SPIFFE-ID-shaped actor/issuer strings, carried opaquely**; arbitrary strings accepted; optional offline `did:key`. No first-class DID/VC infrastructure (adoption still early); OAuth 2.1/8707/9728 is host-owned at the MCP layer; WIMSE watch-only. | `R.05`, `SP.10` |
 | D3 | **TUF role-subset bundles**: root + delegated signer roles, m-of-n threshold schema (v1 enforces 1), per-role expiry, sequence floors (rollback protection), revocation by list and omission, documented emergency-rotation ceremony. Snapshot/timestamp roles rejected (embedded hosts control update cadence). | `R.03`, `SP.02` |
-| D4 | **SCITT is vocabulary alignment plus an optional post-GA adapter, never core.** A networked transparency service would break the offline guarantee; checkpoint + witness cosigning gives equivalent properties offline. | `R.04` |
+| D4 | **SCITT is vocabulary alignment plus an optional post-GA adapter, never core.** Registration and non-equivocation auditing require service participation; offline checkpoint, witness, and receipt verification remain useful but do not provide every transparency-service property. No network enters a core decision path. | `R.04`, `R.10` |
 | D5 | **Adaptive/ML detection is a core behaviour with a deterministic nil-path**; results are advisory (raise risk, never lower, never sole basis for allow). The ONNX/DeBERTa reference detector ships as an optional post-GA package so core stays zero-ML. | `R.07`, `SP.04` |
 | D6 | **No `SigilGuard.Compatibility` namespace.** Legacy modules are deleted; migration lives in `MIGRATING-1.0.md` + `CHANGELOG.md`; historical vectors move to `test/fixtures/historical/`. Justified by near-zero public adoption and the reference consumer's small isolated surface. | `R.07`, `SP.06` |
 | D7 | **Eight statement types**: the six original plus `agent_request`/`agent_response` (protocol-neutral names; A2A predicate specifics live in SP.13). Motivated by OWASP ASI07 inter-agent communication. | `SP.01`, `SP.13` |
@@ -2780,6 +2808,7 @@ compatibility before the unreleased 1.0 publication.
 | D18 | **Shell-command AST risk analysis is an explicit v1.0 non-goal** (hosts keep their own analyzers); parked in Deferred, revisit post-GA. | `SP.04` |
 | D19 | **Superseded by D20.** The pre-release gateway selected `-32050..-32056` before MCP reserved that range. It never ships as the 1.0 contract. | `SP.03`, `SP.08` |
 | D20 | **MCP `2026-07-28` alignment without a framework/transport dependency.** SigilGuard uses `-31990..-31984`, canonical structured MCP action binding, required modern result discrimination, manifest v2 display/UI/header coverage, and app-origin/UI-resource verification. Transport sessions, discovery, authorization, subscriptions, tasks, HTTP headers, and rendering remain host-owned. | `R.08`, `SP.16`, `SP.03`, `SP.08` |
+| D21 | **OSCAL Assessment Results v1.2.3 is an optional host-context observation projection, never a source of inferred compliance claims.** The adapter binds a pinned native export digest, requires exact reviewed controls and subjects, emits no findings or satisfaction states, and leaves audit export and Agent Trust bytes unchanged. | `R.10`, `SP.17` |
 
 ## Deferred (Post-1.0.0)
 

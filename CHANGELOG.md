@@ -40,6 +40,10 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
   CSP domains, dedicated app domains, and browser permissions. Verification is
   strictly optioned and bounded to 1 MiB by default; rendering remains
   host-owned.
+- Added `SigilGuard.Assessment.OSCAL.project/2`, a pure optional OSCAL
+  Assessment Results v1.2.3 observation projection that binds a host-pinned
+  canonical audit-export digest, rejects dangling fragment/query-only
+  locators, and never infers findings or control satisfaction.
 - Removed Finch from the runtime dependency set; HTTP anchor stores use the
   host-provided `SigilGuard.HTTPClient` behaviour.
 - Runtime dependencies are intentionally limited to `:telemetry`,

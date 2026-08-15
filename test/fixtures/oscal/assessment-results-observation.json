@@ -1,0 +1,181 @@
+{
+  "assessment-results": {
+    "back-matter": {
+      "resources": [
+        {
+          "description": "Verified boundary decision export.",
+          "props": [
+            {
+              "name": "verification",
+              "ns": "https://sigilguard.dev/ns/oscal",
+              "value": "host-policy-required"
+            }
+          ],
+          "rlinks": [
+            {
+              "hashes": [
+                {
+                  "algorithm": "SHA-256",
+                  "value": "a056907959ff7c63aa62b1eb50e570b65d16fe09d09bf8b11847f8d1a3712408"
+                }
+              ],
+              "href": "https://evidence.example/audit/export.json",
+              "media-type": "application/json"
+            }
+          ],
+          "title": "SigilGuard audit export",
+          "uuid": "383b1ffc-3f61-57df-b26d-2f20b9f8be4c"
+        }
+      ]
+    },
+    "import-ap": {
+      "href": "https://assessment.example/oscal/assessment-plan.json"
+    },
+    "metadata": {
+      "last-modified": "2026-07-02T12:15:00.000Z",
+      "oscal-version": "1.2.3",
+      "props": [
+        {
+          "name": "projection-profile",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "assessment-observation/v1"
+        },
+        {
+          "name": "authoritative-artifact",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "sigil_guard.audit.export"
+        },
+        {
+          "name": "verification",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "host-policy-required"
+        },
+        {
+          "name": "loss",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "signature-binding"
+        },
+        {
+          "name": "loss",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "actor-binding"
+        },
+        {
+          "name": "loss",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "issuance-time-binding"
+        },
+        {
+          "name": "loss",
+          "ns": "https://sigilguard.dev/ns/oscal",
+          "value": "assessment-conclusion"
+        }
+      ],
+      "title": "SigilGuard boundary evidence observations",
+      "version": "1.0.0"
+    },
+    "results": [
+      {
+        "description": "Host-authorized observations backed by a finalized audit export.",
+        "end": "2026-07-02T12:10:00.000Z",
+        "observations": [
+          {
+            "collected": "2026-07-02T12:01:00.000Z",
+            "description": "The guard blocked a host-designated privileged boundary action.",
+            "expires": "2026-07-02T13:01:00.000Z",
+            "methods": [
+              "TEST"
+            ],
+            "props": [
+              {
+                "name": "control-id",
+                "ns": "https://sigilguard.dev/ns/oscal",
+                "value": "ac-3"
+              },
+              {
+                "name": "verdict",
+                "ns": "https://sigilguard.dev/ns/oscal",
+                "value": "block"
+              },
+              {
+                "name": "risk-level",
+                "ns": "https://sigilguard.dev/ns/oscal",
+                "value": "high"
+              },
+              {
+                "name": "phase",
+                "ns": "https://sigilguard.dev/ns/oscal",
+                "value": "tool-request"
+              },
+              {
+                "name": "sink",
+                "ns": "https://sigilguard.dev/ns/oscal",
+                "value": "tool"
+              }
+            ],
+            "relevant-evidence": [
+              {
+                "description": "Verified boundary decision export.",
+                "href": "#383b1ffc-3f61-57df-b26d-2f20b9f8be4c"
+              }
+            ],
+            "subjects": [
+              {
+                "subject-uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "title": "Agent boundary service",
+                "type": "component"
+              }
+            ],
+            "title": "Privileged boundary decision",
+            "uuid": "ccaed027-a5bc-5a24-92f4-3d8e0e9dacd0"
+          },
+          {
+            "collected": "2026-07-02T12:02:00.000Z",
+            "description": "The export records host-designated audit evidence generation.",
+            "methods": [
+              "EXAMINE"
+            ],
+            "props": [
+              {
+                "name": "control-id",
+                "ns": "https://sigilguard.dev/ns/oscal",
+                "value": "au-2"
+              }
+            ],
+            "relevant-evidence": [
+              {
+                "description": "Verified boundary decision export.",
+                "href": "#383b1ffc-3f61-57df-b26d-2f20b9f8be4c"
+              }
+            ],
+            "subjects": [
+              {
+                "subject-uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "type": "component"
+              }
+            ],
+            "uuid": "90b1be02-45c6-560a-ba5c-70019b1a5cc4"
+          }
+        ],
+        "reviewed-controls": {
+          "control-selections": [
+            {
+              "include-controls": [
+                {
+                  "control-id": "ac-3"
+                },
+                {
+                  "control-id": "au-2"
+                }
+              ]
+            }
+          ]
+        },
+        "start": "2026-07-02T12:00:00.000Z",
+        "title": "Boundary evidence collection",
+        "uuid": "c459a934-6b08-54bb-97e1-f8256dce73bf"
+      }
+    ],
+    "uuid": "11111111-2222-4333-8444-555555555555"
+  }
+}

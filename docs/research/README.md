@@ -42,6 +42,9 @@ flowchart TD
     R09 --> SP07[SP.07]
     R09 --> SP14
     R09 --> SP15
+    R10[R.10 External Assessment Formats]
+    R10 --> SP05
+    R10 --> SP09[SP.09]
 ```
 
 ## Current Research Notes
@@ -57,6 +60,7 @@ flowchart TD
 | [`R.07`](R.07-runtime-dependencies-and-interoperability.md) | complete | adopted | [`SP.05`](../specs/SP.05-audit-and-release-provenance.md), [`SP.12`](../specs/SP.12-legacy-remote-bundle-adapter-contracts.md), [`SP.14`](../specs/SP.14-ecosystem-integrations-and-interoperability.md), [`SP.15`](../specs/SP.15-benchmark-methodology-and-baselines.md) | V3 keeps a minimal, individually justified runtime dependency set (telemetry, nimble_options, jason — not zero), adaptive detection stays a behaviour with an optional post-GA package, no compatibility namespace ships, and the release sequence and documentation artifact set are fixed. |
 | [`R.08`](R.08-mcp-2026-07-28-and-apps-security.md) | complete | adopted | [`SP.03`](../specs/SP.03-mcp-attestation-gateway.md), [`SP.08`](../specs/SP.08-mcp-gateway-and-confirmation-contracts.md), [`SP.16`](../specs/SP.16-mcp-2026-07-28-and-apps-contracts.md) | MCP v2 (`2026-07-28`) requires structured MRTR-aware action binding, application-defined error codes outside reserved ranges, result discriminators, expanded manifest coverage, and optional MCP Apps boundary controls while transport and rendering remain host-owned. |
 | [`R.09`](R.09-adversarial-hallucination-squatting.md) | complete | adopted | [`SP.04`](../specs/SP.04-boundary-scanner-and-policy-kernel.md), [`SP.07`](../specs/SP.07-runtime-gate-and-streaming-contracts.md), [`SP.14`](../specs/SP.14-ecosystem-integrations-and-interoperability.md), [`SP.15`](../specs/SP.15-benchmark-methodology-and-baselines.md) | Adversarial hallucination squatting is an end-to-end resource-selection and prompt-injection scenario: hosts own canonical resolution and acquisition, execution runtimes own isolation, and SigilGuard preserves untrusted influence, mediates derived actions, binds evidence, and gains no named detector or registry path. |
+| [`R.10`](R.10-external-assessment-formats-and-evidence-projection.md) | complete | adopted | [`SP.17`](../specs/SP.17-external-assessment-projection.md) | OSCAL Assessment Results v1.2.3 can reference hashed evidence but does not authorize SigilGuard to infer control satisfaction; a separate host-context adapter emits observations only, with explicit loss markers and no changes to authoritative export or Statement bytes. |
 
 ## Evidence Map
 
@@ -71,6 +75,7 @@ flowchart TD
 | Elixir ecosystem integration surfaces | Adoption depends on MCP SDK interceptors, agent frameworks, and observability norms. | `R.07`, `SP.14`, `SP.15` |
 | Existing SigilGuard implementation | Compatibility contracts must be preserved while terminology moves forward. | `SP.06` through `SP.12` |
 | MCP v2 (`2026-07-28`) and MCP Apps | Stateless requests, MRTR, result discrimination, error allocation, and embedded UI introduce new security boundaries. | `R.08`, `SP.16` |
+| OSCAL assessment interchange | Assessment Results v1.2.3 can reference hashed evidence, but control conclusions remain assessor-owned; the optional host-context projection is observation-only and explicitly lossy. | `R.10`, `SP.17` |
 | Hallucinated resource resolution and promptware | Predictable repository, package, and skill identifiers become an attack path only when untrusted retrieval gains unmediated authority. | `R.09`, `SP.04`, `SP.07`, `SP.14`, `SP.15` |
 
 ## Resolved Backlog
