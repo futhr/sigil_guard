@@ -15,14 +15,16 @@ Thank you for your interest in contributing to SigilGuard!
 mix setup          # Install dependencies
 mix test           # Run tests
 mix lint           # Run linters (format, credo, dialyzer)
-mix check          # Run all quality checks
+./bin/check         # Run the clean-clone-safe complete gate
 mix docs           # Generate documentation
 mix bench          # Run benchmarks
 ```
 
 ## Code Quality
 
-Before submitting a PR, ensure:
+Before submitting a PR, run `./bin/check`. It bootstraps the locked dependency
+graph and enforces every required check, including the production package build.
+The focused commands below remain useful while iterating:
 
 - [ ] All tests pass: `mix test`
 - [ ] Code is formatted: `mix format`
@@ -45,15 +47,18 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 Releases are managed by maintainers using git_ops:
 
-1. Ensure all tests pass: `mix check`
+1. Ensure the complete gate passes: `./bin/check`
 2. Run `mix release` (alias for `mix git_ops.release`) — updates changelog, bumps version, commits, and tags
 3. Push with tags: `git push --follow-tags`
-4. CI will publish to Hex.pm on the `v*` tag
+4. CI verifies the exact version tag and commit, then validates, attests, and
+   publishes through isolated jobs
 
-The publish workflow builds a release tarball preview, generates an SPDX SBOM
-with `mix sigil_guard.sbom`, uploads both as workflow artifacts, and creates
-GitHub artifact attestations for package provenance and SBOM linkage before
-publishing.
+The publish workflow builds a Hex tarball and SPDX SBOM after the complete gate,
+signs a release predicate that names both artifacts and their SHA-256 digests,
+and verifies both provenance forms. The protected publish job has no OIDC or
+attestation-write permission; it receives the Hex key only for the publish
+step, requires a fresh build to equal the attested tar, then compares the Hex
+registry download byte for byte.
 
 ## Pull Request Process
 

@@ -23,8 +23,9 @@ mix sigil_guard.sbom --verify dist/sigil_guard.spdx.json
 ```
 
 **Digest** verification additionally binds the file to the exact bytes attested
-in the release provenance (the SLSA `attest-build-provenance` subject and the
-`artifacts` list of the signed release statement). Compute the digest and pass it:
+in the release provenance (the SLSA build-provenance subject and the `artifacts`
+list under the signed predicate's `release` object). Compute the digest and pass
+it:
 
 ```bash
 shasum -a 256 dist/sigil_guard.spdx.json
@@ -40,6 +41,8 @@ Verify the build provenance itself with the GitHub CLI, gating publish on it:
 
 ```bash
 gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard
+gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard \
+  --predicate-type https://sigilguard.dev/attestation/release/v1
 ```
 
 ### Consumer-side verification in CI
@@ -54,15 +57,23 @@ SBOM digest, and structure — before trusting the release:
   run: |
     gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard
     gh attestation verify sigil_guard-1.0.0.spdx.json --repo refpath/sigil_guard
+    gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard \
+      --predicate-type https://sigilguard.dev/attestation/release/v1
+    gh attestation verify sigil_guard-1.0.0.spdx.json --repo refpath/sigil_guard \
+      --predicate-type https://sigilguard.dev/attestation/release/v1
     mix sigil_guard.sbom \
       --verify sigil_guard-1.0.0.spdx.json \
       --sha256 "$(shasum -a 256 sigil_guard-1.0.0.spdx.json | cut -d' ' -f1)"
 ```
 
-The tagged-release workflow produces these subjects with
-`actions/attest-build-provenance`, signs the release statement
-(`mix sigil_guard.release_statement`), and runs `gh attestation verify` itself
-before `mix hex.publish`, so a failed verification blocks the publish.
+The tagged-release workflow accepts only the exact Mix-project version tag at
+the triggering commit. It produces build provenance with `actions/attest`, then
+signs the predicate from `mix sigil_guard.release_statement` against both the
+tarball and SBOM. The predicate's `release` object directly records the package,
+version, artifact names, and SHA-256 values. Both predicate types are verified
+before the protected publish job starts. That job also requires a fresh Hex
+build and the downloaded registry tar to match the attested package byte for
+byte.
 
 ## Implementing a WORM / append-only anchor store
 

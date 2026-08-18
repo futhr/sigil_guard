@@ -13,8 +13,11 @@ mix test --cover
 mix doctor
 mix dialyzer
 mix docs
-mix check --no-retry
+./bin/check
 ```
+
+`./bin/check` is the canonical clean-clone entry point. It fetches the locked
+dependencies before invoking ExCheck without retries.
 
 Also run local scans for forbidden inspiration-project terms and dead public
 protocol/registry URLs without committing those literal strings to repo text.

@@ -6,9 +6,10 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatement do
 
   Given the built Hex tarball and the SBOM, this task computes each artifact's
   SHA-256 and emits the `https://sigilguard.dev/attestation/release/v1`
-  statement whose `artifacts` list carries `{name, sha256}` entries (sorted by
-  name). The release workflow signs the emitted statement with the release key
-  and `gh attestation verify` gates publish.
+  statement. Its `predicate.release` object directly names the package,
+  semantic version, and sorted `{name, sha256}` artifact entries. The release
+  workflow signs that predicate against both artifact subjects, and
+  `gh attestation verify` gates publish.
 
       mix sigil_guard.release_statement \\
         --tarball dist/sigil_guard-1.0.0.tar \\
@@ -56,23 +57,29 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatement do
   Build the release `release` statement for the tarball and SBOM in `opts`.
 
   Options: `:tarball` and `:sbom` (required file paths), `:package` and
-  `:version` (default to the Mix project), and `:actor` (the release identity).
+  semantic `:version` (default to the Mix project), and `:actor` (the release
+  identity).
   """
   @spec statement(keyword()) :: {:ok, map()} | {:error, term()}
   def statement(opts) when is_list(opts) do
     with {:ok, tarball} <- fetch_path(opts, :tarball),
          {:ok, sbom} <- fetch_path(opts, :sbom),
-         {:ok, artifacts} <- artifacts([tarball, sbom]) do
+         {:ok, artifacts} <- artifacts([tarball, sbom]),
+         {:ok, package} <- release_package(opts),
+         {:ok, version} <- release_version(opts) do
       payload = %{
-        "package" => Keyword.get(opts, :package, project_app()),
-        "version" => Keyword.get(opts, :version, project_version()),
+        "package" => package,
+        "version" => version,
         "artifacts" => artifacts
       }
 
-      Attestation.from_decision(release_decision(), release_context(opts),
-        payload: payload,
-        statement_type: "release"
-      )
+      with {:ok, statement} <-
+             Attestation.from_decision(release_decision(), release_context(opts),
+               payload: payload,
+               statement_type: "release"
+             ) do
+        {:ok, put_in(statement, ["predicate", "release"], payload)}
+      end
     end
   end
 
@@ -93,8 +100,28 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatement do
       end)
 
     case result do
-      {:ok, artifacts} -> {:ok, Enum.reverse(artifacts)}
+      {:ok, artifacts} -> {:ok, Enum.sort_by(artifacts, & &1["name"])}
       error -> error
+    end
+  end
+
+  defp release_package(opts) do
+    case Keyword.get(opts, :package, project_app()) do
+      package when is_binary(package) and package != "" -> {:ok, package}
+      _ -> {:error, {:invalid_option, :package}}
+    end
+  end
+
+  defp release_version(opts) do
+    case Keyword.get(opts, :version, project_version()) do
+      version when is_binary(version) ->
+        case Version.parse(version) do
+          {:ok, _} -> {:ok, version}
+          :error -> {:error, {:invalid_option, :version}}
+        end
+
+      _ ->
+        {:error, {:invalid_option, :version}}
     end
   end
 

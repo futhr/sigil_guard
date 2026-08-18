@@ -369,14 +369,16 @@ OpenTelemetry-style attributes under the `sigilguard.*` namespace.
 mix setup            # install dependencies
 mix test             # run tests
 mix lint             # format + Credo + Dialyzer
-mix check            # full quality gate
+./bin/check           # clean-clone-safe full quality gate
 mix docs             # generate documentation
 mix bench            # run benchmarks
 mix sigil_guard.sbom --output dist/sigil_guard.spdx.json
 ```
 
-Coverage is held at or above 95%, and security modules carry negative, tamper,
-replay, expiration, and malformed-input tests.
+The full gate fetches the locked dependency graph, checks the production build
+and Hex package, and then enforces coverage at or above 95% plus the repository's
+security, documentation, type, and migration checks. Security modules carry
+negative, tamper, replay, expiration, and malformed-input tests.
 
 ## Architecture
 

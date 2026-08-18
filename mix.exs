@@ -152,7 +152,8 @@ defmodule SigilGuard.MixProject do
           Mix.Tasks.Sigil.LivebookCheck,
           Mix.Tasks.Sigil.MigrationGate,
           Mix.Tasks.SigilGuard.ReleaseStatement,
-          Mix.Tasks.SigilGuard.Sbom
+          Mix.Tasks.SigilGuard.Sbom,
+          Mix.Tasks.SigilGuard.VerifyReleaseRef
         ],
         "Core API": [
           SigilGuard,

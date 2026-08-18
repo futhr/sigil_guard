@@ -55,7 +55,7 @@ manual major-version alignment is committed and verified with
 publish, push, tag, and production consumer movement manually; consumers move
 to `~> 1.0` only after the package is published and validated.
 
-**Gate and conventions.** Canonical gate `mix check --no-retry` (full list in
+**Gate and conventions.** Canonical gate `./bin/check` (full list in
 `CLAUDE.md`); coverage >= 95%; run `mix credo --strict` before each commit.
 Security modules need negative/tamper/replay/expiration/malformed tests
 (`CLAUDE.md` rule 9). Conventional commits, no AI attribution or co-author
@@ -153,7 +153,7 @@ section is post-1.0.0 parking; neither is counted here.
 - [ ] `mix doctor`.
 - [ ] `mix dialyzer`.
 - [ ] `mix docs`.
-- [ ] `mix check --no-retry`.
+- [ ] `./bin/check`.
 
 ## Milestone F - Completed Foundation And Research
 
@@ -289,7 +289,7 @@ section is post-1.0.0 parking; neither is counted here.
 
 > Specs: `SP.01`; `SP.12` (Dependency Removal); `SP.13` (predicates).
 > Depends on: M0.
-> Exit criteria: `mix check --no-retry` clean; conformance module (M1.02)
+> Exit criteria: `./bin/check` clean; conformance module (M1.02)
 > green (tier-1 gate, required at every later milestone exit too); golden
 > vectors committed for all eight statement types; `:nimble_options`
 > adopted and validating the config surface.
@@ -506,7 +506,7 @@ section is post-1.0.0 parking; neither is counted here.
 ## M2 - Embedded Trust Bundles
 
 > Specs: `SP.02`. Depends on: M1 (JCS/DSSE from M1.04-M1.06).
-> Exit criteria: `mix check --no-retry` clean; M1.02 conformance green;
+> Exit criteria: `./bin/check` clean; M1.02 conformance green;
 > negative verification matrix green; no-network test green for all source
 > classes and `dev_bundle/1`.
 
@@ -664,7 +664,7 @@ section is post-1.0.0 parking; neither is counted here.
 ## M3 - Manifests, Gateway, And Agent Trust
 
 > Specs: `SP.03`, `SP.08`, `SP.13`. Depends on: M1, M2.
-> Exit criteria: `mix check --no-retry` clean; M1.02 conformance green;
+> Exit criteria: `./bin/check` clean; M1.02 conformance green;
 > facade parity table green; manifest drift matrix green; agent-card
 > golden vectors committed.
 
@@ -901,7 +901,7 @@ section is post-1.0.0 parking; neither is counted here.
 ## M4 - Boundary Scanner And Policy Kernel
 
 > Specs: `SP.04`, `SP.07`, `SP.10`, `SP.11`. Depends on: M1-M3.
-> Exit criteria: `mix check --no-retry` clean; M1.02 conformance green;
+> Exit criteria: `./bin/check` clean; M1.02 conformance green;
 > streaming properties green (zero leaked prefixes); all 20 sandbox matrix
 > cells tested; canonical policy fixtures committed.
 
@@ -1165,7 +1165,7 @@ section is post-1.0.0 parking; neither is counted here.
 ## M5 - Audit, Telemetry, Provenance, And Threat Suite
 
 > Specs: `SP.05`, `SP.09`, `R.06`. Depends on: M1-M4.
-> Exit criteria: `mix check --no-retry` clean; M1.02 conformance green;
+> Exit criteria: `./bin/check` clean; M1.02 conformance green;
 > all twelve TM families green; proofs verify unmodified 0.2.x checkpoint
 > roots.
 > Rule for TM tasks (move-don't-duplicate): scenarios already implemented
@@ -1429,23 +1429,25 @@ section is post-1.0.0 parking; neither is counted here.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15).
   - AC: the maintainer-triggered tagged-release workflow is configured to run
-    `attest-build-provenance`
-    (permissions `id-token: write`, `attestations: write`) with subjects =
-    Hex tarball + SBOM; `gh attestation verify` gates publish; the release
-    additionally signs an SP.01 `release` statement whose `artifacts` list
-    includes tarball and SBOM `{name, sha256}` entries; a CI example shows
-    consumer-side verification.
+    `actions/attest` in an isolated OIDC/write job with subjects = Hex tarball
+    + SBOM; SLSA and custom `gh attestation verify` checks gate publish; the
+    release additionally signs an SP.01 `release` predicate against both
+    subjects whose directly inspectable `release` object names the validated
+    package/version and both artifact `{name, sha256}` entries; a CI example
+    shows consumer-side verification.
   - Tests: release-statement builder and negative verification paths are
     unit-tested; tag execution remains maintainer-owned.
   - Done: added `mix sigil_guard.release_statement` (computes each artifact's
     SHA-256 and emits the profile-valid `.../release/v1` statement whose action
-    digest binds the `{name, sha256}` artifacts; 100% covered). Rewired
-    `.github/workflows/publish.yml` to `--sha256`-verify the SBOM, build/sign
-    the release statement predicate via `actions/attest`, attest the tarball +
-    SBOM with `actions/attest-build-provenance`, and gate `mix hex.publish` on
-    `gh attestation verify` (failed verify blocks publish). Added a
-    consumer-side verification CI example to the release guide. Workflow-level
-    tag execution is maintainer-owned; the Elixir builders are unit-tested.
+    digest and `predicate.release` object bind the validated package/version and
+    sorted `{name, sha256}` artifacts; 100% covered). Rewired
+    `.github/workflows/publish.yml` to `--sha256`-verify the SBOM, attest both
+    subjects with SLSA and the custom release predicate via `actions/attest`,
+    and gate the protected Hex job on both `gh attestation verify` forms. The
+    publish job compares a fresh build before publish and the registry download
+    afterward with the attested tar. Added a consumer-side verification CI
+    example to the release guide. Workflow-level tag execution is
+    maintainer-owned; the Elixir builders are unit-tested.
 - [x] M5.14 Rename the legacy scanner interception audit event.
   - Spec: `docs/specs/SP.09-audit-chain-and-anchor-contracts.md` - V3
     Extensions (Owned By SP.05).
@@ -1712,7 +1714,7 @@ section is post-1.0.0 parking; neither is counted here.
 
 > Specs: `SP.12`, `SP.06`, `SP.01` (V3 Configuration Surface).
 > Depends on: M1-M5.
-> Exit criteria (tier-2 consolidated gate): `mix check --no-retry` clean;
+> Exit criteria (tier-2 consolidated gate): `./bin/check` clean;
 > M1.02 conformance green; the M6.24 completeness script proves every
 > deleted surface has a 1:1 `MIGRATING-1.0.md` row; runtime dependency set
 > is exactly the intended minimal set (`:telemetry`, `:nimble_options`,
@@ -2129,7 +2131,7 @@ section is post-1.0.0 parking; neither is counted here.
 ## M7 - Integrations And Adoption
 
 > Specs: `SP.14`, `SP.15`. Depends on: M6.
-> Exit criteria: `mix check --no-retry` clean; M1.02 conformance green;
+> Exit criteria: `./bin/check` clean; M1.02 conformance green;
 > all five livebooks execute offline; `bench/output/benchmarks.md`
 > published with the environment block.
 
@@ -2603,7 +2605,7 @@ section is post-1.0.0 parking; neither is counted here.
 > Specs: `SP.12` (Release Sequence (D11)), `SP.15` (SLO Ratification),
 > `SP.05` (Release Provenance). Depends on: M6 (M7 required before GA;
 > M7A.01-M7A.03 block M8 exit).
-> Agent-owned exit criteria: `mix check --no-retry` clean; M1.02 conformance
+> Agent-owned exit criteria: `./bin/check` clean; M1.02 conformance
 > green; reference-consumer path-dependency validation green (M6.29); SLOs
 > ratified. Publish, push, tag, release-checklist execution, package-artifact
 > validation, and production consumer bumps are maintainer-owned operations
@@ -2631,17 +2633,21 @@ section is post-1.0.0 parking; neither is counted here.
 - [x] M8.03 SLSA L3 provenance and SBOM workflow readiness.
   - Spec: `docs/specs/SP.05-audit-and-release-provenance.md` - Release
     Provenance (D15).
-  - AC: the maintainer-triggered 1.0.0 tag workflow is configured to produce
-    SLSA v1 provenance via `attest-build-provenance` with tarball + SBOM
-    subjects; `gh attestation verify` gates publish; the SP.01 `release`
-    statement signs tarball and SBOM digests.
+  - AC: the maintainer-triggered 1.0.0 tag workflow verifies exact
+    tag/version/SHA identity and produces SLSA v1 provenance via
+    `actions/attest` with tarball + SBOM subjects; both SLSA and custom
+    `gh attestation verify` checks gate publish; the SP.01 `release` predicate
+    directly binds the validated package/version and both artifact names and
+    digests, and is attached to both subjects.
   - Tests: Elixir builders and negative verification paths are unit-tested;
     tag execution remains maintainer-owned.
-  - Done: `.github/workflows/publish.yml` is configured to build the Hex
-    tarball and SPDX SBOM, verify the SBOM digest, emit the SP.01 release
-    statement, attest tarball plus SBOM with `actions/attest-build-provenance`,
-    sign the release predicate with `actions/attest`, verify both subjects with
-    `gh attestation verify`, and only then run `mix hex.publish --yes`.
+  - Done: `.github/workflows/publish.yml` separates validation/build,
+    OIDC-backed attestation, and protected publication. It verifies the exact
+    tag and triggering commit, builds the Hex tarball and SPDX SBOM after
+    `./bin/check`, signs both SLSA and the directly bound release predicate for
+    both subjects, and verifies both forms before publication. The Hex-only job
+    receives the secret solely for `mix hex.publish`, compares a fresh build to
+    the attested tar first, and checks the downloaded registry bytes afterward.
 - [x] M8.04 Socket-denying no-network sweep.
   - Spec: `SP.02` - Loading Sources (No-network guarantee); `SP.05` -
     SigilGuard.HTTPClient Behaviour (trust model).
@@ -2802,7 +2808,7 @@ Agent Trust contracts.
 | D12 | **Formal threat model** mapping OWASP Agentic Top 10 2026 (ASI01-ASI10) and named MCP attacks to SigilGuard controls with claim level (mitigates/detects/out-of-scope) and a named `TM.01`-`TM.12` test family per claim; host-owned exclusions explicit. | `R.06` |
 | D13 | **Policy filenames `SIGILGUARD_POLICY`, `.sigilguard-policy`, `.sigilguard/policy`, `.github/sigilguard-policy`.** Old `SIGIL_POLICY`/`.sigil-policy` names produce a typed `:legacy_policy_filename` startup error naming the new file - no silent fallback. | `SP.04`, `SP.11` |
 | D14 | **`SigilGuard.MCP.Gateway` stays a permanent thin facade** over `ToolGateway` (not deprecated), preserving the consumer entry point. | `SP.03`, `SP.08` |
-| D15 | **SPDX 2.3 SBOM (existing `mix sigil_guard.sbom`) stays canonical**; SLSA L3 provenance via GitHub attest-build-provenance; CycloneDX optional later; Rekor anchoring optional. | `SP.05` |
+| D15 | **SPDX 2.3 SBOM (existing `mix sigil_guard.sbom`) stays canonical**; SLSA L3 provenance via GitHub artifact attestations; CycloneDX optional later; Rekor anchoring optional. | `SP.05` |
 | D16 | **Single OTel attribute namespace `sigilguard.*`** (resolves the v0.2 `sigil.*` vs draft `sigil_guard.*` split; rename is mechanical). | `SP.05` |
 | D17 | **Consumer-facing contracts kept byte-identical in v3**: `scan/1` `{:ok,_}|{:hit,[%{name: _}]}`, `scan_and_redact/1`, `policy_verdict/3` `:allowed|:blocked|{:confirm, reason}`, the Identity/Signer/Vault behaviours, `Signer.Ed25519.new/1|sign_with/2|verify/3`, and `%Audit{}` fields. Hit maps extend additively only. Deliberate breaks get 1:1 MIGRATING mappings. | `SP.07` |
 | D18 | **Shell-command AST risk analysis is an explicit v1.0 non-goal** (hosts keep their own analyzers); parked in Deferred, revisit post-GA. | `SP.04` |

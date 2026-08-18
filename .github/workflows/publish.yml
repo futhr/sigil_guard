@@ -4,31 +4,36 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
-  artifact-metadata: write
 
 jobs:
-  publish:
-    name: Publish to Hex.pm
+  build:
+    name: Validate and build release artifacts
     runs-on: ubuntu-latest
+    outputs:
+      release-version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Elixir
-        uses: erlef/setup-beam@v1
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.18"
           otp-version: "28"
 
       - name: Restore deps cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             deps
@@ -36,77 +41,186 @@ jobs:
           key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
 
       - name: Install dependencies
-        run: mix deps.get
+        run: mix deps.get --check-locked
 
-      - name: Compile
-        run: mix compile
+      - name: Verify release identity
+        run: mix sigil_guard.verify_release_ref
 
-      - name: Run tests
-        run: mix test
+      - name: Run canonical quality gate
+        run: ./bin/check
 
-      - name: Check formatting
-        run: mix format --check-formatted
-
-      - name: Run Credo
-        run: mix credo --strict
-
-      - name: Run Doctor
-        run: mix doctor
-
-      - name: Generate documentation
-        run: mix docs
-
-      - name: Build release artifacts
+      - name: Resolve validated release version
+        id: release
         run: |
+          version="$(mix run --no-compile --no-deps-check --no-start \
+            -e 'IO.write(Mix.Project.config()[:version])')"
+          test -n "${version}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and verify release artifacts
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          package="sigil_guard-${RELEASE_VERSION}.tar"
+          sbom="sigil_guard-${RELEASE_VERSION}.spdx.json"
+          statement="sigil_guard-${RELEASE_VERSION}.release.json"
+          predicate="sigil_guard-${RELEASE_VERSION}.release-predicate.json"
           mkdir -p dist
-          mix hex.build --output "dist/sigil_guard-${GITHUB_REF_NAME}.tar"
-          mix sigil_guard.sbom --output "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json"
-          SBOM_SHA256="$(shasum -a 256 "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" | cut -d' ' -f1)"
-          mix sigil_guard.sbom \
-            --verify "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" \
-            --sha256 "${SBOM_SHA256}"
-
-      - name: Build the SP.01 release statement
-        run: |
+          mix hex.build --output "dist/${package}"
+          mix sigil_guard.sbom --output "dist/${sbom}"
+          sbom_sha256="$(sha256sum "dist/${sbom}" | cut -d' ' -f1)"
+          mix sigil_guard.sbom --verify "dist/${sbom}" --sha256 "${sbom_sha256}"
           mix sigil_guard.release_statement \
-            --tarball "dist/sigil_guard-${GITHUB_REF_NAME}.tar" \
-            --sbom "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" \
-            --version "${GITHUB_REF_NAME#v}" \
-            --output "dist/sigil_guard-${GITHUB_REF_NAME}.release.json"
-          jq '.predicate' "dist/sigil_guard-${GITHUB_REF_NAME}.release.json" \
-            > "dist/sigil_guard-${GITHUB_REF_NAME}.release-predicate.json"
+            --tarball "dist/${package}" \
+            --sbom "dist/${sbom}" \
+            --output "dist/${statement}"
+          jq '.predicate' "dist/${statement}" > "dist/${predicate}"
+          jq -e \
+            --arg package_name "sigil_guard" \
+            --arg version "${RELEASE_VERSION}" \
+            --arg tarball "${package}" \
+            --arg sbom "${sbom}" \
+            '.predicate.release.package == $package_name and
+             .predicate.release.version == $version and
+             ([.predicate.release.artifacts[].name] | sort) == ([$tarball, $sbom] | sort) and
+             all(.predicate.release.artifacts[]; .sha256 | test("^[0-9a-f]{64}$"))' \
+            "dist/${statement}"
 
-      - name: Attest build provenance (SLSA)
-        uses: actions/attest-build-provenance@v1
+      - name: Upload validated release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sigil_guard-${{ steps.release.outputs.version }}-release-artifacts
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 90
+
+  attest:
+    name: Attest validated release artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      RELEASE_VERSION: ${{ needs.build.outputs.release-version }}
+
+    steps:
+      - name: Download validated release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sigil_guard-${{ env.RELEASE_VERSION }}-release-artifacts
+          path: dist
+
+      - name: Verify downloaded artifact digests
+        run: |
+          statement="dist/sigil_guard-${RELEASE_VERSION}.release.json"
+          for artifact in \
+            "sigil_guard-${RELEASE_VERSION}.tar" \
+            "sigil_guard-${RELEASE_VERSION}.spdx.json"; do
+            expected="$(jq -r --arg name "${artifact}" \
+              '.predicate.release.artifacts[] | select(.name == $name) | .sha256' \
+              "${statement}")"
+            echo "${expected}  dist/${artifact}" | sha256sum --check --strict
+          done
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
-            dist/sigil_guard-${{ github.ref_name }}.tar
-            dist/sigil_guard-${{ github.ref_name }}.spdx.json
+            dist/sigil_guard-${{ env.RELEASE_VERSION }}.tar
+            dist/sigil_guard-${{ env.RELEASE_VERSION }}.spdx.json
 
-      - name: Sign the SP.01 release statement
-        uses: actions/attest@v4
+      - name: Sign the release predicate for both artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: dist/sigil_guard-${{ github.ref_name }}.tar
+          subject-path: |
+            dist/sigil_guard-${{ env.RELEASE_VERSION }}.tar
+            dist/sigil_guard-${{ env.RELEASE_VERSION }}.spdx.json
           predicate-type: https://sigilguard.dev/attestation/release/v1
-          predicate-path: dist/sigil_guard-${{ github.ref_name }}.release-predicate.json
+          predicate-path: dist/sigil_guard-${{ env.RELEASE_VERSION }}.release-predicate.json
 
-      - name: Verify provenance before publishing
+      - name: Verify provenance and release predicate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh attestation verify "dist/sigil_guard-${GITHUB_REF_NAME}.tar" \
-            --repo "${GITHUB_REPOSITORY}"
-          gh attestation verify "dist/sigil_guard-${GITHUB_REF_NAME}.spdx.json" \
-            --repo "${GITHUB_REPOSITORY}"
+          for artifact in \
+            "dist/sigil_guard-${RELEASE_VERSION}.tar" \
+            "dist/sigil_guard-${RELEASE_VERSION}.spdx.json"; do
+            gh attestation verify "${artifact}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --source-digest "${GITHUB_SHA}" \
+              --source-ref "${GITHUB_REF}"
+            gh attestation verify "${artifact}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --predicate-type "https://sigilguard.dev/attestation/release/v1" \
+              --source-digest "${GITHUB_SHA}" \
+              --source-ref "${GITHUB_REF}"
+          done
 
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+  publish:
+    name: Publish verified bytes to Hex.pm
+    needs: [build, attest]
+    runs-on: ubuntu-latest
+    environment: hex-publish
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.build.outputs.release-version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          name: sigil_guard-${{ github.ref_name }}-release-artifacts
-          path: dist/*
-          if-no-files-found: error
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Publish to Hex.pm
+      - name: Setup Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: "1.18"
+          otp-version: "28"
+
+      - name: Restore deps cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            deps
+            _build
+          key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+
+      - name: Install dependencies
+        run: mix deps.get --check-locked
+
+      - name: Verify release identity
+        run: mix sigil_guard.verify_release_ref
+
+      - name: Download attested release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sigil_guard-${{ env.RELEASE_VERSION }}-release-artifacts
+          path: dist
+
+      - name: Match publish workspace to attested package
+        run: |
+          package="sigil_guard-${RELEASE_VERSION}.tar"
+          preview="${RUNNER_TEMP}/${package}"
+          mix hex.build --output "${preview}"
+          sha256sum "${preview}" "dist/${package}"
+          cmp --silent "${preview}" "dist/${package}"
+
+      - name: Publish package and documentation to Hex.pm
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
         run: mix hex.publish --yes
+
+      - name: Verify published registry bytes
+        run: |
+          package="sigil_guard-${RELEASE_VERSION}.tar"
+          registry_package="${RUNNER_TEMP}/registry-${package}"
+          curl --fail --location --retry 12 --retry-all-errors --retry-delay 5 \
+            --output "${registry_package}" \
+            "https://repo.hex.pm/tarballs/${package}"
+          sha256sum "dist/${package}" "${registry_package}"
+          cmp --silent "dist/${package}" "${registry_package}"

@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+package_path="$(mktemp "${TMPDIR:-/tmp}/sigil_guard-package.XXXXXX")"
+trap 'rm -f "${package_path}"' EXIT HUP INT TERM
+
+MIX_ENV=prod mix compile --warnings-as-errors
+MIX_ENV=prod mix hex.build --output "${package_path}"

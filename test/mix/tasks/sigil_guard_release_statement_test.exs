@@ -36,6 +36,26 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
 
       assert statement["predicateType"] == "https://sigilguard.dev/attestation/release/v1"
       assert statement["predicate"]["statement_type"] == "release"
+
+      assert statement["predicate"]["release"] == %{
+               "package" => "sigil_guard",
+               "version" => "1.0.0",
+               "artifacts" => [
+                 %{
+                   "name" => Path.basename(sbom),
+                   "sha256" => sha256(File.read!(sbom))
+                 },
+                 %{
+                   "name" => Path.basename(tarball),
+                   "sha256" => sha256(File.read!(tarball))
+                 }
+               ]
+             }
+
+      assert Enum.all?(statement["predicate"]["release"]["artifacts"], fn artifact ->
+               Regex.match?(~r/\A[0-9a-f]{64}\z/, artifact["sha256"])
+             end)
+
       assert TrustProfile.validate(statement) == {:ok, statement}
       assert is_binary(action_digest(statement))
     end
@@ -65,6 +85,16 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
       gone = tmp_path("gone")
       assert ReleaseStatement.statement(tarball: gone, sbom: sbom) == {:error, {:enoent, gone}}
     end
+
+    test "rejects non-semantic versions and empty package names" do
+      {tarball, sbom} = write_artifacts()
+
+      assert ReleaseStatement.statement(tarball: tarball, sbom: sbom, version: "main") ==
+               {:error, {:invalid_option, :version}}
+
+      assert ReleaseStatement.statement(tarball: tarball, sbom: sbom, package: "") ==
+               {:error, {:invalid_option, :package}}
+    end
   end
 
   describe "run/1" do
@@ -78,6 +108,8 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
 
       assert {:ok, decoded} = Jason.decode(File.read!(output))
       assert decoded["predicateType"] == "https://sigilguard.dev/attestation/release/v1"
+      assert decoded["predicate"]["release"]["package"] == "sigil_guard"
+      assert decoded["predicate"]["release"]["version"] == "1.0.0"
     end
 
     test "raises on invalid options" do
@@ -102,5 +134,11 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
 
     on_exit(fn -> File.rm(path) end)
     path
+  end
+
+  defp sha256(bytes) do
+    :sha256
+    |> :crypto.hash(bytes)
+    |> Base.encode16(case: :lower)
   end
 end

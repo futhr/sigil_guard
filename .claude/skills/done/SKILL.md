@@ -22,7 +22,7 @@ mix test --cover
 mix doctor
 mix dialyzer
 mix docs
-mix check --no-retry
+./bin/check
 ```
 
 Also run the local forbidden inspiration-project term scan without committing

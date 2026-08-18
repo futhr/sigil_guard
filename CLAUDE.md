@@ -85,14 +85,16 @@ mix test --cover
 mix doctor
 mix dialyzer
 mix docs
-mix check --no-retry
+./bin/check
 ```
 
 Also run local scans for forbidden inspiration-project terms and dead public
 protocol/registry URLs without committing those literal strings to repo text.
 
-`mix check --no-retry` is the repo-level gate. The individual commands make
-failures easier to diagnose. All gates must be clean.
+`./bin/check` is the repo-level gate. It fetches the locked dependencies first,
+so the same command works in a clean clone, then runs ExCheck without retries.
+The individual commands make failures easier to diagnose. All gates must be
+clean.
 
 ## Commit Rules
 

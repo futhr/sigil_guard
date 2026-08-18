@@ -27,7 +27,7 @@ sigil_guard:
 - [ ] `mix doctor`.
 - [ ] `mix dialyzer`.
 - [ ] `mix docs`.
-- [ ] `mix check --no-retry`.
+- [ ] `./bin/check`.
 
 ## [SPEC-ID] - [Task Title]
 

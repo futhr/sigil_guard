@@ -7,6 +7,7 @@
 
     # Elixir compilation (--force is default for ex_check compiler)
     {:compiler, command: "mix compile --warnings-as-errors"},
+    {:prod_package, command: "./bin/check-prod-package"},
 
     # Formatting
     {:formatter, command: "mix format --check-formatted"},
@@ -23,8 +24,9 @@
 
     # Documentation
     {:docs_lint, command: "mix sigil.docs_lint"},
+    {:migration_gate, command: "mix sigil.migration_gate"},
     {:doctor, command: "mix doctor"},
-    {:ex_doc, command: "mix docs"},
+    {:ex_doc, command: "mix docs --warnings-as-errors"},
 
     # Tests
     {:ex_unit, command: "mix test --cover"}

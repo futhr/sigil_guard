@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-07"
+  updated: "2026-08-18"
   tags: ["audit", "merkle", "proofs", "witnessing", "privacy", "otel", "sbom", "release-provenance", "http-client", "v3"]
   depends_on: ["R.01", "R.02", "R.04", "R.07", "SP.01"]
 ---
@@ -592,21 +592,45 @@ uses the CloudEvents distributed tracing extension (`traceparent`).
   tooling emits today; Elixir's own OpenChain-certified releases ship
   SPDX/CycloneDX SBOMs, so SPDX matches the language posture. CycloneDX
   output is an optional post-GA addition, not a v3 requirement.
-- **SLSA Build L3:** the tagged-release workflow runs GitHub's
-  `attest-build-provenance` action (workflow permissions `id-token:
-  write`, `attestations: write`) with subjects = the Hex tarball and the
-  SBOM file. The action emits an in-toto Statement with predicateType
+- **Release identity:** the workflow accepts only
+  `refs/tags/v<Mix.Project.version>` and verifies that the tag and checked-out
+  `HEAD` both resolve to the triggering SHA. Artifact names use that validated
+  Mix version. Manual branch dispatch is not a release input.
+- **SLSA Build L3:** the isolated attestation job runs GitHub's `actions/attest`
+  action (job permissions `id-token: write`, `attestations: write`, and
+  `artifact-metadata: write`) with subjects = the Hex tarball and the SBOM file.
+  The action emits an in-toto Statement with predicateType
   `https://slsa.dev/provenance/v1`; no bespoke provenance format exists.
 - **Profile layer:** the release additionally signs an SP.01 `release`
-  statement (`https://sigilguard.dev/attestation/release/v1`) whose
-  `artifacts` list MUST include the tarball and SBOM `{name, sha256}`
-  entries, binding the release into the same evidence model as runtime
-  decisions.
+  predicate (`https://sigilguard.dev/attestation/release/v1`) against both
+  artifacts. Its required `release` object is:
+
+```json
+{
+  "package": "sigil_guard",
+  "version": "1.0.0",
+  "artifacts": [
+    {"name": "sigil_guard-1.0.0.spdx.json", "sha256": "<64 lowercase hex>"},
+    {"name": "sigil_guard-1.0.0.tar", "sha256": "<64 lowercase hex>"}
+  ]
+}
+```
+
+  Artifact entries are sorted by name. The package is non-empty, the version
+  is semantic, and the workflow verifies the names and digests before signing.
 - **CI verification:** the release workflow MUST verify before publish:
 
 ```bash
 gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard
+gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard \
+  --predicate-type https://sigilguard.dev/attestation/release/v1
 ```
+
+  Validation/build, attestation, and publication are separate jobs. Only the
+  attestation job has OIDC/write permissions. Only the protected publication
+  job can read the Hex key, and only its `mix hex.publish` step receives it.
+  Before publish, a fresh Hex build MUST equal the attested tar; after publish,
+  the registry download MUST match it byte for byte.
 
 - **Rekor:** anchoring release attestations in the public Rekor
   transparency log is optional post-GA hardening; GitHub's attestation
@@ -721,8 +745,10 @@ are unchanged.
   never affects chain verification; projections are allowlist-only.
 - The HTTP client is reachable exclusively from the anchor store; decision
   paths remain network-free and the test suite proves it.
-- Release verification (`gh attestation verify`, SBOM digest check) runs
-  before publish; a failed check blocks the release.
+- Release verification (`gh attestation verify`, release-predicate artifact
+  digest checks, SBOM digest check, and fresh-build comparison) runs before
+  publish; a failed check blocks the release. Registry-byte comparison runs
+  immediately after publication and fails the workflow on any divergence.
 
 ## Testing Strategy
 
@@ -770,9 +796,10 @@ are unchanged.
 - [x] The HTTP anchor store has zero direct `Finch.` calls and fails with
       `:http_client_not_configured` when no client resolves; LocalFile is
       unchanged.
-- [x] The release workflow is configured to produce SLSA v1 provenance and
-      the SPDX SBOM, run `gh attestation verify` before publish, and sign
-      the SP.01 `release` statement over tarball + SBOM digests.
+- [x] The release workflow verifies exact tag/version/SHA identity, produces
+      SLSA v1 provenance and the SPDX SBOM, verifies both provenance predicate
+      types before publish, and signs a release predicate whose directly
+      inspectable `release` object binds both artifact names and digests.
 - [x] Every SP.05-owned error atom is produced by at least one test.
 
 ## Implementation Roadmap
@@ -792,8 +819,9 @@ cut lands in M6 per SP.12.
       CloudEvents projection.
 - [x] M5: `SigilGuard.HTTPClient` behaviour and anchor-store conversion;
       no-network tests.
-- [x] M5: release workflow: `attest-build-provenance`, SBOM attachment,
-      `gh attestation verify` gate, SP.01 `release` statement.
+- [x] M5: isolated release workflow: `actions/attest`, SBOM attachment,
+      dual-predicate `gh attestation verify` gate, directly bound SP.01
+      `release` predicate, protected Hex publication, and registry-byte check.
 - [x] M6: remove finch and the `SigilGuard.Finch` pool per SP.12;
       runtime-dependency assertion test.
 
@@ -823,7 +851,7 @@ cut lands in M6 per SP.12.
 - [transparency.dev witness implementation](https://github.com/transparency-dev/witness)
 - [SLSA v1 specification levels](https://slsa.dev/spec/v1.2/levels)
 - [SLSA Build Provenance](https://slsa.dev/spec/v1.2/build-provenance)
-- [GitHub attest-build-provenance action](https://github.com/actions/attest-build-provenance)
+- [GitHub attest action](https://github.com/actions/attest)
 - [GitHub artifact attestations / gh attestation verify](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations)
 - [Sigstore Rekor](https://docs.sigstore.dev/logging/overview/)
 - [SPDX Specification 2.3](https://spdx.github.io/spdx-spec/v2.3/)
