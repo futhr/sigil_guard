@@ -1,115 +1,116 @@
 {
   "environment": {
-    "benchee": "warmup 2 s, time 5 s, memory_time 2 s",
-    "cores": 16,
-    "date": "2026-07-07",
+    "benchee": "warmup 0 ns, time 10 ms, memory_time 0 ns",
+    "cores": 18,
+    "date": "2026-08-19",
     "elixir": "1.20.2",
-    "hardware": "Apple M4 Max",
+    "hardware": "Apple M5 Pro",
     "os": "unix/darwin",
     "otp": "29",
-    "sigil_guard": "1.0.0 (298d787)"
+    "sigil_guard": "1.0.0 (6d34e71)"
   },
-  "recorded_at": "2026-07-07",
+  "mode": "smoke",
+  "recorded_at": "2026-08-19",
   "scenarios": {
     "BM.01 scan clean 1k": {
-      "median_ns": 13083,
-      "memory_bytes": 4448,
-      "p99_ns": 23750
+      "median_ns": 11167,
+      "memory_bytes": 0,
+      "p99_ns": 20902
     },
     "BM.01 scan clean 1m": {
-      "median_ns": 12421875,
-      "memory_bytes": 4592,
-      "p99_ns": 12814930
+      "median_ns": 11303333,
+      "memory_bytes": 0,
+      "p99_ns": 11303333
     },
     "BM.01 scan clean 64k": {
-      "median_ns": 777292,
-      "memory_bytes": 4472,
-      "p99_ns": 889357
+      "median_ns": 748354,
+      "memory_bytes": 0,
+      "p99_ns": 782667
     },
     "BM.02 scan hits 1k": {
-      "median_ns": 13500,
-      "memory_bytes": 4448,
-      "p99_ns": 24875
+      "median_ns": 11875,
+      "memory_bytes": 0,
+      "p99_ns": 17672
     },
     "BM.02 scan hits 1m": {
-      "median_ns": 13400917,
-      "memory_bytes": 1507832,
-      "p99_ns": 14751770
+      "median_ns": 12846875,
+      "memory_bytes": 0,
+      "p99_ns": 12846875
     },
     "BM.02 scan hits 64k": {
-      "median_ns": 802042,
-      "memory_bytes": 97720,
-      "p99_ns": 901206
+      "median_ns": 749854,
+      "memory_bytes": 0,
+      "p99_ns": 840666
     },
     "BM.03 runtime gate allow": {
-      "median_ns": 122334,
-      "memory_bytes": 51328,
-      "p99_ns": 150625
+      "median_ns": 107625,
+      "memory_bytes": 0,
+      "p99_ns": 7760416
     },
     "BM.03 runtime gate block": {
-      "median_ns": 23166,
-      "memory_bytes": 58448,
-      "p99_ns": 57917
+      "median_ns": 21417,
+      "memory_bytes": 0,
+      "p99_ns": 33992
     },
     "BM.03 runtime gate quarantine": {
-      "median_ns": 46250,
-      "memory_bytes": 68000,
-      "p99_ns": 66584
+      "median_ns": 38667,
+      "memory_bytes": 0,
+      "p99_ns": 338127
     },
     "BM.03 runtime gate redact": {
-      "median_ns": 27875,
-      "memory_bytes": 63336,
-      "p99_ns": 47283
+      "median_ns": 25604,
+      "memory_bytes": 0,
+      "p99_ns": 36778
     },
     "BM.04 runtime stream 64k split secret": {
-      "median_ns": 84997,
-      "memory_bytes": 78992,
-      "p99_ns": 239243
+      "median_ns": 75063,
+      "memory_bytes": 0,
+      "p99_ns": 1318447
     },
     "BM.05 attestation sign": {
-      "median_ns": 85747,
-      "memory_bytes": 72616,
-      "p99_ns": 108913
+      "median_ns": 88791,
+      "memory_bytes": 0,
+      "p99_ns": 153610
     },
     "BM.05 attestation verify": {
-      "median_ns": 63081,
-      "memory_bytes": 59336,
-      "p99_ns": 80956
+      "median_ns": 66313,
+      "memory_bytes": 0,
+      "p99_ns": 177882
     },
     "BM.06 trust bundle cache warm": {
-      "median_ns": 333,
-      "memory_bytes": 48,
-      "p99_ns": 2666
+      "median_ns": 334,
+      "memory_bytes": 0,
+      "p99_ns": 2250
     },
     "BM.06 trust bundle verify cold": {
-      "median_ns": 62081,
-      "memory_bytes": 27752,
-      "p99_ns": 81169
+      "median_ns": 64292,
+      "memory_bytes": 0,
+      "p99_ns": 141646
     },
     "BM.07 audit append onto 10k chain": {
-      "median_ns": 1625,
-      "memory_bytes": 1712,
-      "p99_ns": 2459
+      "median_ns": 1458,
+      "memory_bytes": 0,
+      "p99_ns": 3167
     },
     "BM.07 audit checkpoint create 10k": {
-      "median_ns": 5960520,
-      "memory_bytes": 4161314,
-      "p99_ns": 7416339
+      "median_ns": 6150896,
+      "memory_bytes": 0,
+      "p99_ns": 6372542
     },
     "BM.07 audit inclusion verify 10k": {
-      "median_ns": 6500,
-      "memory_bytes": 5808,
-      "p99_ns": 47498
+      "median_ns": 6167,
+      "memory_bytes": 0,
+      "p99_ns": 14920
     },
     "BM.08 no-op baseline": {
-      "median_ns": 2,
+      "median_ns": 4,
       "memory_bytes": 0,
-      "p99_ns": 3
+      "p99_ns": 13
     },
     "BM.08 tool gateway guard_request": {
-      "median_ns": 24457,
-      "memory_bytes": 58856,
-      "p99_ns": 45831
+      "median_ns": 27896,
+      "memory_bytes": 0,
+      "p99_ns": 101675
     }
   },
   "schema": "sigil_guard_bench_baseline/v1"

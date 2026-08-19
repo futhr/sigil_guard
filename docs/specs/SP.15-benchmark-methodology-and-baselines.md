@@ -303,4 +303,4 @@ Aligned with task milestones M7 and M8 (the task list owns task IDs).
 - [Benchee documentation](https://hexdocs.pm/benchee/Benchee.html)
 - [benchee_markdown formatter](https://hexdocs.pm/benchee_markdown/)
 - [llm-guard (protectai) repository](https://github.com/protectai/llm-guard)
-- [llm-guard input scanners documentation](https://llm-guard.com/input_scanners/anonymize/)
+- [llm-guard input scanner documentation](https://protectai.github.io/llm-guard/input_scanners/anonymize/)
