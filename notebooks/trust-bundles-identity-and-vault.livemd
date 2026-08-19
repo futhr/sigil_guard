@@ -1,0 +1,290 @@
+# Operating Local Trust: Bundles, Identity, And The Vault
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Ftrust-bundles-identity-and-vault.livemd)
+
+Runtime policy is only as trustworthy as the material it consumes. A pattern
+set fetched ad hoc from the network, an actor label supplied by a model, or a
+provider key copied into tool arguments can undermine an otherwise careful
+gate.
+
+This chapter operates the local side of that problem: a signed offline trust
+bundle, per-boot rollback state, audit-safe quarantine, host-resolved identity,
+and an encrypted in-memory vault. SigilGuard intentionally performs no trust
+bundle HTTP fetch. The host owns transport and passes bytes into verification.
+
+## Setup
+
+```elixir
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
+```
+
+## Build A Deterministic Development Bundle
+
+`dev_bundle/1` exists for development and tests. It produces a real signed
+DSSE bundle, marks its provenance as `dev`, and is intentionally not a
+substitute for production key ceremony. The fixed seed and clock make this
+tutorial repeatable.
+
+```elixir
+alias SigilGuard.TrustBundle
+alias SigilGuard.TrustBundle.{Cache, Quarantine}
+
+Cache.clear()
+Quarantine.clear()
+
+bundle_now = ~U[2026-08-19 10:00:00.000Z]
+bundle_seed = :crypto.hash(:sha256, "sigil-guard-livebook-dev-bundle")
+
+custom_patterns = [
+  %{
+    "set" => "secret",
+    "name" => "conference_badge",
+    "regex" => "BADGE-[A-Z0-9]{8}",
+    "severity" => "high",
+    "replacement_hint" => "[CONFERENCE_BADGE]",
+    "max_match_bytes" => 32
+  }
+]
+
+{:ok, bundle} =
+  TrustBundle.dev_bundle(
+    seed: bundle_seed,
+    now: bundle_now,
+    ttl_ms: 3_600_000,
+    patterns: custom_patterns,
+    policies: [%{"id" => "talk-policy", "digest" => String.duplicate("a", 64)}],
+    identity_issuers: ["spiffe://conference"],
+    cache: true
+  )
+
+true = bundle.dev?
+1 = bundle.sequence
+1 = bundle.root_version
+{:ok, ^bundle} = Cache.get(bundle.bundle_id)
+
+%{
+  bundle_id: bundle.bundle_id,
+  digest: bundle.digest,
+  sequence: bundle.sequence,
+  root_version: bundle.root_version,
+  development_only?: bundle.dev?,
+  provenance: bundle.document["provenance"]
+}
+```
+
+The verified bundle can be passed through an in-memory map, JSON bytes, a local
+file, or an application `priv/` resource. Core verification opens no network
+connection. Here we round-trip its envelope as bytes without touching disk.
+
+```elixir
+encoded_envelope = Jason.encode!(bundle.envelope)
+
+{:ok, loaded_from_bytes} =
+  TrustBundle.load({:binary, encoded_envelope},
+    now: bundle_now,
+    cache: false,
+    quarantine: true
+  )
+
+true = loaded_from_bytes.digest == bundle.digest
+%{source: elem(loaded_from_bytes.source, 0), digest_stable?: true}
+```
+
+## Resolve Pattern Sets Deliberately
+
+Each of the three sets — secrets, injection, and poisoning — is independently
+replaceable. Providing a custom secret set replaces that set; absent injection
+and poisoning sets keep their built-in defaults. This avoids an update to one
+class accidentally disabling the others.
+
+```elixir
+{:ok, pattern_sets} = TrustBundle.pattern_sets(bundle)
+
+[conference_pattern] = pattern_sets.secret
+true = length(pattern_sets.injection) > 0
+true = length(pattern_sets.poisoning) > 0
+
+{:hit, [badge_hit]} =
+  SigilGuard.scan("check in with BADGE-AB12CD34", patterns: pattern_sets.secret)
+
+"conference_badge" = badge_hit.name
+
+redacted_badge =
+  SigilGuard.scan_and_redact(
+    "check in with BADGE-AB12CD34",
+    patterns: pattern_sets.secret
+  )
+
+false = String.contains?(redacted_badge, "BADGE-AB12CD34")
+
+%{
+  custom_secret_pattern: conference_pattern.name,
+  injection_defaults_retained: length(pattern_sets.injection),
+  poisoning_defaults_retained: length(pattern_sets.poisoning),
+  output: redacted_badge
+}
+```
+
+## Cache Floors Resist Rollback
+
+The cache is per boot. It stores only verified snapshots and remembers the
+highest accepted sequence/root floor for each bundle id. Re-inserting the exact
+same verified snapshot is idempotent. A fabricated conflicting snapshot is
+shown only to make the cache contract visible; normal callers reach
+`Cache.put/1` only after signature verification.
+
+```elixir
+{:ok, ^bundle} = Cache.put(bundle)
+
+conflicting_snapshot = %{
+  bundle
+  | digest: String.duplicate("0", 64)
+}
+
+{:error, :sequence_below_floor} = Cache.put(conflicting_snapshot)
+1 = Cache.floor(bundle.bundle_id)
+
+%{accepted_floor: Cache.floor(bundle.bundle_id), rollback: :rejected}
+```
+
+## Failed Material Goes To Audit-Safe Quarantine
+
+Quarantine keeps a reason and bounded evidence metadata, never the trust
+bundle payload or signature bytes. That makes it useful for operations without
+turning the diagnostic table into a second sensitive store.
+
+```elixir
+{:error, :invalid_envelope} =
+  TrustBundle.load({:map, %{"payload" => "not-a-valid-envelope"}},
+    cache: false,
+    quarantine: true
+  )
+
+[quarantine_record | _] = Enum.reverse(Quarantine.list())
+
+false = Map.has_key?(quarantine_record, :payload)
+false = Map.has_key?(quarantine_record, :signature)
+
+%{
+  reason: quarantine_record.reason,
+  recorded_fields: quarantine_record |> Map.keys() |> Enum.sort(),
+  raw_material_retained?: false
+}
+```
+
+## Identity Is Host Truth
+
+For simple deployments, `Identity.Static` resolves an actor through an ordered,
+validated prefix table. A full deployment can implement the same behaviour
+from OIDC, SPIFFE, a session, or hardware-backed identity. The model does not
+get to announce its own trust level.
+
+```elixir
+alias SigilGuard.Identity
+alias SigilGuard.Identity.Static
+
+previous_mappings = Application.get_env(:sigil_guard, :trust_mappings)
+
+Application.put_env(:sigil_guard, :trust_mappings, [
+  {"spiffe://conference/operators/*", :high},
+  {"user:*", :medium}
+])
+
+:high = Static.trust_level("spiffe://conference/operators/alice")
+:medium = Static.trust_level("user:bob")
+:low = Static.trust_level("model:self-asserted-admin")
+true = Identity.sufficient_trust?(:high, :medium)
+false = Identity.sufficient_trust?(:low, :medium)
+
+identity_summary = %{
+  operator: Static.trust_level("spiffe://conference/operators/alice"),
+  user: Static.trust_level("user:bob"),
+  unknown: Static.trust_level("model:self-asserted-admin"),
+  hierarchy: Identity.trust_levels()
+}
+
+if is_nil(previous_mappings) do
+  Application.delete_env(:sigil_guard, :trust_mappings)
+else
+  Application.put_env(:sigil_guard, :trust_mappings, previous_mappings)
+end
+
+identity_summary
+```
+
+## Keep Secret Values Out Of Tool Arguments
+
+The built-in vault is an ETS-backed development backend. It encrypts each
+entry with AES-256-GCM under a 32-byte master key and returns an opaque
+reference. Entries are process-local and disappear on restart; durable
+deployments implement the `SigilGuard.Vault` behaviour against their KMS or
+secret store.
+
+```elixir
+alias SigilGuard.Vault
+alias SigilGuard.Vault.InMemory
+
+vault_pid =
+  case Process.whereis(InMemory) do
+    nil ->
+      {:ok, pid} =
+        InMemory.start_link(master_key: :crypto.hash(:sha256, "livebook-vault-key"))
+
+      pid
+
+    pid ->
+      pid
+  end
+
+true = Process.alive?(vault_pid)
+
+provider_secret = "synthetic-provider-key-for-livebook"
+{:ok, vault_id} = Vault.encrypt(provider_secret, "Conference provider credential", InMemory)
+
+true = Vault.exists?(vault_id, InMemory)
+false = String.contains?(vault_id, provider_secret)
+true = {vault_id, "Conference provider credential"} in InMemory.list_entries()
+
+%{
+  reference: vault_id,
+  description: "Conference provider credential",
+  plaintext_in_reference?: String.contains?(vault_id, provider_secret)
+}
+```
+
+Only the narrow host callback that needs the credential should resolve it, at
+the final moment. Do not give a model a generic vault lookup tool.
+
+```elixir
+{:ok, resolved_secret} = Vault.decrypt(vault_id, InMemory)
+true = resolved_secret == provider_secret
+
+:ok = InMemory.delete(vault_id)
+false = Vault.exists?(vault_id, InMemory)
+{:error, :not_found} = Vault.decrypt(vault_id, InMemory)
+
+%{resolved_inside_host_callback?: true, deleted_after_use?: true}
+```
+
+## Takeaway
+
+Trust bundles bring reviewed policy material to the process without giving core
+a network client. Identity comes from the host, not the prompt. Secrets remain
+opaque until a narrow callback needs them. Together those choices prevent the
+security plane from becoming another source of ambient authority.

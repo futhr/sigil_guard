@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: high
   created: "2026-07-02"
-  updated: "2026-08-11"
+  updated: "2026-08-19"
   tags: ["integrations", "interoperability", "livebooks", "openssf", "tier-1", "v3"]
   depends_on: ["R.06", "R.07"]
 ---
@@ -244,22 +244,34 @@ guide under the same contract.
 
 ### Livebooks
 
-Five livebooks ship under `notebooks/`, each with a Run in Livebook badge.
+The conference-ready tutorial track ships under `notebooks/`. Every `.livemd`
+has a Run in Livebook badge and the reader-facing `notebooks/README.md`
+provides self-study, 45-minute talk, and 90-minute workshop paths.
 
 | Notebook | Demonstrates |
 |----------|--------------|
 | `notebooks/quick-start.livemd` | Install, first scan, gate verdicts, redaction. |
 | `notebooks/policy-and-lethal-trifecta.livemd` | Boundary policy plus the R.06 row-10 trifecta rule, executable. |
-| `notebooks/audit-export-and-proofs.livemd` | Chain, checkpoint, inclusion proof, signed export verification. |
+| `notebooks/audit-export-and-proofs.livemd` | Chain, proofs, witnesses, anchors, exports, CloudEvents, evidence refs, and OSCAL observations. |
 | `notebooks/hermes-integration.livemd` | The interceptor contract against an in-notebook stub client. |
-| `notebooks/threat-scenarios.livemd` | Selected TM families (tool poisoning, rug pull, schema injection). |
+| `notebooks/threat-scenarios.livemd` | Tool poisoning, rug pulls, schema injection, stale approval, and confused authority. |
+| `notebooks/agent-trust-gateway.livemd` | Manifest pinning, structured action binding, confirmation, DSSE attestation, tamper, and replay. |
+| `notebooks/ai-agent-under-attack.livemd` | Deterministic replay plus optional live ReqLLM tool proposals through the identical guarded tool loop. |
+| `notebooks/runtime-streaming-and-telemetry.livemd` | Chunk-safe streaming, lifecycle hooks, adaptive signals, telemetry, and OTel attribute projection. |
+| `notebooks/trust-bundles-identity-and-vault.livemd` | Offline bundle verification, pattern sections, cache/quarantine behavior, identity ordering, and the vault seam. |
+| `notebooks/agent-to-agent-trust.livemd` | Signed agent cards, capability and delegation binding, unknown-peer quarantine, and result rescanning. |
+| `notebooks/mcp-v2-and-apps.livemd` | MCP `2026-07-28`, MRTR structured binding, result shaping, and pinned MCP Apps resources. |
 
-Each livebook MUST execute top-to-bottom via `Mix.install` on the local
-repository path with zero network access; the M7 validation script runs
-every notebook's code cells in a network-denied environment and fails on
-any error. The hermes notebook MUST NOT fetch `hermes_mcp`: it exercises
-the interceptor contract against a stub shaped like the pinned interface,
-and real wiring lives in the ExDoc guide.
+Each livebook MUST execute top-to-bottom via `Mix.install` with zero network
+access from a repository checkout. Local execution reuses the repository
+configuration and lockfile; a Run in Livebook import falls back to the
+published `sigil_guard` Hex package. The M7 validation script runs every
+deterministic code cell in a network-denied environment and fails on any error.
+The AI notebook MUST default to a deterministic proposal replay and MUST keep
+the optional live provider call outside the security authority path. The
+hermes notebook MUST NOT fetch `hermes_mcp`: it exercises the interceptor
+contract against a stub shaped like the pinned interface, and real wiring lives
+in the ExDoc guide.
 
 ### SECURITY.md
 
@@ -295,7 +307,8 @@ documentation and release artifacts are the files listed in the module map.
 | `guides/threat-model.md` | Threat-model guide rendered from R.06. |
 | `guides/integrations/*.md` | Four Tier 1 guides (hermes_mcp, jido, langchain, tidewave). |
 | `examples/` | Pinned illustrative modules and the Tidewave policy. |
-| `notebooks/*.livemd` | The five livebooks. |
+| `notebooks/README.md` | Tutorial catalog, capability coverage, talk plans, and AI-demo operating notes. |
+| `notebooks/*.livemd` | The executable tutorial track. |
 | `SECURITY.md` | Disclosure policy and runbook pointer. |
 
 ## Integration Points
@@ -369,7 +382,7 @@ items are maintainer-owned release handoff.
 
 - [x] M7: cheatsheet, threat-model guide, and doc-coverage enforcement.
 - [x] M7: four Tier 1 guides plus `examples/` with pinned validation records.
-- [x] M7: five livebooks plus the offline execution validation script.
+- [x] M7: eleven Livebook tutorials plus the offline execution validation script.
 - [x] M7: SECURITY.md and documentation gates completed.
 - [x] M8/GA: leave tags, pushes, and publication to the maintainer.
 
@@ -378,7 +391,7 @@ items are maintainer-owned release handoff.
 | Metric | Target | Measurement |
 |--------|--------|-------------|
 | Hexdocs completeness | 100% docs, all guides render | `mix doctor` + `mix docs`. |
-| Livebook pass rate | 5/5 offline | M7 validation script. |
+| Livebook pass rate | 11/11 offline | M7 validation script. |
 | Tier 1 guide validity | 4/4 compile at pins | pinned-version records. |
 | OpenSSF badge | maintainer-owned release handoff | bestpractices.dev project page. |
 | Claim discipline | zero claims beyond R.06 | docs review against the control map. |

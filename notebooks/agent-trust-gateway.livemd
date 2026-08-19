@@ -1,0 +1,381 @@
+# The Agent Trust Gateway: Pin, Approve, Attest
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fagent-trust-gateway.livemd)
+
+A model asking for a tool is not yet an authorized tool call. Between those
+two facts, a production host needs to answer three different questions:
+
+1. Is this still the tool definition we reviewed?
+2. Did a human approve this exact action in this exact context?
+3. Can the next system verify what was decided without trusting our prose?
+
+This chapter answers them with capability manifests, confirmation tokens, and
+DSSE attestations. Each object binds a different thing. Treating them as one
+generic “signature” is where security designs tend to become hand-wavy.
+
+## Setup
+
+```elixir
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
+```
+
+## Pin The Capability, Not Merely Its Name
+
+This is a carried v2 capability manifest. It binds the description, complete
+schemas, side effects, network posture, sandbox requirement, scopes, and
+expiry to one canonical digest. In a real host it belongs in reviewed trust
+configuration; it should not be accepted merely because the tool server sent
+it during discovery.
+
+```elixir
+manifest = %{
+  "allowed_sink_zones" => ["semi_trusted", "trusted"],
+  "allowed_source_zones" => ["semi_trusted", "trusted"],
+  "annotations" => %{"destructiveHint" => false, "title" => "Repo File Write"},
+  "description" => "Write one UTF-8 text file inside the repository working tree.",
+  "expires_at" => "2027-01-01T00:00:00.000Z",
+  "input_schema" => %{
+    "$schema" => "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties" => false,
+    "properties" => %{
+      "content" => %{"type" => "string"},
+      "path" => %{"type" => "string"}
+    },
+    "required" => ["content", "path"],
+    "type" => "object"
+  },
+  "input_sensitivity" => "internal",
+  "issuer_keyid" =>
+    "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8",
+  "manifest_format" => "sigil_guard_capability_manifest/v2",
+  "name" => "repo_file_write",
+  "network_access" => "none",
+  "output_sensitivity" => "internal",
+  "reversibility" => "reversible",
+  "sandbox" => %{"min_isolation" => "container", "required" => true},
+  "scopes" => ["repo:write"],
+  "server" => "repo-mcp",
+  "side_effects" => ["write"],
+  "suspicious_params" => [],
+  "version" => "1.4.2"
+}
+
+{:ok, capability} = SigilGuard.CapabilityManifest.new(manifest)
+
+%{
+  name: capability.name,
+  digest: capability.digest,
+  side_effects: capability.side_effects,
+  minimum_isolation: capability.sandbox["min_isolation"]
+}
+```
+
+Canonicalization is observable and deterministic. JCS ensures two systems do
+not sign different byte encodings of the same JSON-shaped value.
+
+```elixir
+{:ok, canonical} =
+  SigilGuard.Canonical.JCS.encode(%{
+    "tool" => capability.name,
+    "manifest_digest" => capability.digest
+  })
+
+true = canonical =~ ~s("manifest_digest")
+canonical
+```
+
+## Ask The Gateway
+
+The request is MCP-shaped. The context is host truth: who is acting, which
+server is involved, and which sandbox will contain the effect.
+
+```elixir
+request = %{
+  "jsonrpc" => "2.0",
+  "id" => "talk-write-1",
+  "method" => "tools/call",
+  "params" => %{
+    "name" => "repo_file_write",
+    "arguments" => %{"path" => "notes/talk.txt", "content" => "hello from Livebook"}
+  }
+}
+
+context = [
+  phase: :tool_request,
+  origin: :model,
+  sink: :tool,
+  actor: "spiffe://conference/agents/demo",
+  trust_level: :high,
+  mcp_server: "repo-mcp",
+  tool: "repo_file_write",
+  action: "repo_file_write",
+  resource_uri: "mcp://repo-mcp",
+  metadata: %{sandbox_id: "talk-sandbox-1", isolation_level: "container"}
+]
+
+allowed =
+  SigilGuard.ToolGateway.guard_request(request, context,
+    manifests: %{capability.name => capability},
+    require_manifest: true,
+    now: ~U[2026-08-19 10:00:00.000Z]
+  )
+
+:allowed = allowed.verdict
+:allow = allowed.action
+
+%{
+  verdict: allowed.verdict,
+  action: allowed.action,
+  manifest_digest: allowed.audit_metadata.manifest_digest,
+  action_digest: allowed.audit_metadata.action_digest
+}
+```
+
+Change the declared network posture after review and the request never reaches
+runtime policy. Manifest drift fails before useful-but-untrusted arguments can
+distract us.
+
+```elixir
+drifted_manifest = Map.put(manifest, "network_access", "outbound")
+
+drifted =
+  SigilGuard.ToolGateway.guard_request(request, context,
+    manifests: %{capability.name => {manifest, drifted_manifest}},
+    require_manifest: true
+  )
+
+:blocked = drifted.verdict
+:manifest_digest_mismatch = drifted.audit_metadata.deny_reason
+
+%{verdict: drifted.verdict, reason: drifted.audit_metadata.deny_reason}
+```
+
+## Confirm The Exact Action
+
+Credential-shaped required parameters are particularly dangerous because a
+schema can make exfiltration look mandatory. SigilGuard permits a reviewed
+manifest to disclose such a parameter, but it forces an explicit confirmation.
+
+```elixir
+suspicious_manifest =
+  manifest
+  |> put_in(["input_schema", "properties", "apiKey"], %{"type" => "string"})
+  |> put_in(["input_schema", "required"], ["apiKey", "content", "path"])
+  |> Map.put("suspicious_params", ["apiKey"])
+
+confirmation_request =
+  put_in(request, ["params", "arguments", "apiKey"], "reference-to-host-secret")
+
+confirmation_opts = [
+  manifests: %{capability.name => suspicious_manifest},
+  require_manifest: true
+]
+
+pending = SigilGuard.ToolGateway.guard_request(confirmation_request, context, confirmation_opts)
+
+{:confirm, "suspicious_required_param"} = pending.verdict
+:confirm = pending.action
+
+%{
+  verdict: pending.verdict,
+  suspicious_params: pending.audit_metadata.suspicious_params,
+  action_digest: pending.audit_metadata.action_digest
+}
+```
+
+The opaque HMAC token is not a reusable “yes.” It is bound to the normalized
+payload, actor, boundary, sandbox identity, and manifest digest, and it has a
+short lifetime. The fixed key below is tutorial material; production hosts
+load a rotated key from their own secret system.
+
+```elixir
+alias SigilGuard.{Attestation, ReplayStore, ToolGateway}
+
+ReplayStore.clear()
+now = ~U[2026-08-19 10:00:00.000Z]
+confirmation_key = :crypto.hash(:sha256, "livebook-confirmation-demo-only")
+
+{:ok, token} =
+  ToolGateway.issue_confirmation(
+    confirmation_request,
+    context,
+    pending,
+    confirmation_key,
+    now: now,
+    manifest: pending.audit_metadata.manifest_digest,
+    nonce: String.duplicate("c", 32),
+    ttl_ms: 60_000
+  )
+
+approved_request = Attestation.attach_confirmation(confirmation_request, token)
+
+approved =
+  ToolGateway.guard_request(approved_request, context,
+    confirmation_opts ++ [confirmation_key: confirmation_key, now: now]
+  )
+
+:allowed = approved.verdict
+:accepted = approved.audit_metadata.confirmation_status
+
+%{verdict: approved.verdict, confirmation: approved.audit_metadata.confirmation_status}
+```
+
+**On stage:** reuse the same request immediately. A token is one-shot by
+default; the second call is a replay, not another authorization.
+
+```elixir
+replay =
+  ToolGateway.guard_request(approved_request, context,
+    confirmation_opts ++ [confirmation_key: confirmation_key, now: now]
+  )
+
+:blocked = replay.verdict
+:replay_detected = replay.audit_metadata.confirmation_reason
+
+%{verdict: replay.verdict, reason: replay.audit_metadata.confirmation_reason}
+```
+
+Approval also dies if the payload changes. We disable consumption here only so
+the cell isolates binding from replay protection; production should keep the
+one-shot default.
+
+```elixir
+changed_after_approval =
+  approved_request
+  |> put_in(["params", "arguments", "path"], "lib/changed_after_approval.ex")
+
+changed =
+  ToolGateway.guard_request(changed_after_approval, context,
+    confirmation_opts ++
+      [confirmation_key: confirmation_key, consume_confirmation: false, now: now]
+  )
+
+:blocked = changed.verdict
+:digest_mismatch = changed.audit_metadata.confirmation_reason
+
+%{verdict: changed.verdict, reason: changed.audit_metadata.confirmation_reason}
+```
+
+## Attest What Was Allowed
+
+Confirmation answers “may this run?” Attestation answers “what did this host
+observe and decide?” This deterministic signer keeps the tutorial repeatable.
+Real deployments should use a protected Ed25519 key and publish its trust
+material through their normal identity system.
+
+```elixir
+defmodule GatewayTalkSigner do
+  @behaviour SigilGuard.Signer
+  @seed :crypto.hash(:sha256, "sigil-guard-livebook-gateway-signer")
+
+  @impl true
+  def sign(message) do
+    {_public, private} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    :crypto.sign(:eddsa, :none, message, [private, :ed25519])
+  end
+
+  @impl true
+  def public_key do
+    {public, _private} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    public
+  end
+end
+
+{:ok, envelope} =
+  ToolGateway.attest_request(allowed, context,
+    payload: request,
+    signer: GatewayTalkSigner,
+    keyid: "conference-demo",
+    now: now,
+    nonce: "conference-request-attestation",
+    manifest: capability,
+    resource: "mcp://repo-mcp",
+    audience: "repo-mcp",
+    scopes: ["repo:write"]
+  )
+
+trust_material = %{"conference-demo" => GatewayTalkSigner.public_key()}
+
+{:ok, statement} =
+  Attestation.verify(envelope, trust_material,
+    payload: SigilGuard.MCP.SecurityPayload.for_gate(request, :request),
+    context: context,
+    manifest_digest: capability.digest,
+    now: now
+  )
+
+%{
+  envelope_type: envelope["payloadType"],
+  statement_type: statement["predicate"]["statement_type"],
+  subject_digest: get_in(statement, ["subject", Access.at(0), "digest", "sha256"]),
+  manifest_digest: statement["predicate"]["tool"]["manifest_digest"]
+}
+```
+
+An inbound peer can require that envelope before accepting the request. The
+transport field `_agent_trust` is deliberately separate from user arguments.
+
+```elixir
+attested_request = Attestation.attach(request, envelope)
+
+accepted_attestation =
+  ToolGateway.guard_request(attested_request, context,
+    manifests: %{capability.name => capability},
+    require_manifest: true,
+    attestation: :required,
+    trust_material: trust_material,
+    now: now
+  )
+
+:allowed = accepted_attestation.verdict
+
+missing_attestation =
+  ToolGateway.guard_request(request, context,
+    manifests: %{capability.name => capability},
+    require_manifest: true,
+    attestation: :required,
+    trust_material: trust_material,
+    now: now
+  )
+
+:blocked = missing_attestation.verdict
+:invalid_attestation = missing_attestation.audit_metadata.deny_reason
+
+%{
+  signed: accepted_attestation.verdict,
+  unsigned: missing_attestation.verdict,
+  unsigned_reason: missing_attestation.audit_metadata.deny_reason
+}
+```
+
+## What To Take Away
+
+The manifest binds the tool definition. The confirmation binds temporary human
+authority. The attestation binds portable evidence. None of them transfers
+callback ownership to the model, and none replaces the runtime boundary gate.
+
+```elixir
+%{
+  pinned_manifest: capability.digest,
+  drift: drifted.verdict,
+  explicit_approval: approved.verdict,
+  replay: replay.verdict,
+  signed_evidence: accepted_attestation.verdict
+}
+```

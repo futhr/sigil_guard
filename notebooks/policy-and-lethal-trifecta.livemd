@@ -1,20 +1,44 @@
-# Policy And Lethal Trifecta
+# Policy As Data: The Lethal Trifecta
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fpolicy-and-lethal-trifecta.livemd)
 
-This notebook demonstrates the lethal-trifecta rule from SigilGuard's threat
-model: private data, untrusted content, and an external sink must never cross
-in one flow without a deterministic policy verdict.
+The dangerous agent shape is not “an LLM with tools.” It is an agent that can
+read private data, consume untrusted instructions, and communicate externally
+in the same flow. Remove any one edge and the risk drops sharply. Leave all
+three connected and a prompt injection can become an exfiltration path.
+
+SigilGuard turns those edges into ordinary, reviewable policy data. This
+chapter compiles one policy file, exercises its boundary rules, applies its
+repository rules, and enforces its outbound data contract.
 
 ## Setup
 
 ```elixir
-Mix.install([
-  {:sigil_guard, path: Path.expand("..", __DIR__)}
-])
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
 ```
 
-## Compile A Policy
+## One File, Three Kinds Of Policy
+
+The `[rules]` section governs runtime boundaries. `[repo]` governs proposed
+file changes. `[contracts]` constrains content that is otherwise allowed to
+cross an outbound sink. These are separate jobs, but keeping them in one
+signed and reviewable artifact makes the authority legible.
 
 ```elixir
 policy_text = """
@@ -25,19 +49,45 @@ default allow
 block sensitivity:private origin:tool,resource,repo zone:untrusted sink:external,network trust:low,medium
 confirm sensitivity:private origin:tool,resource,repo zone:untrusted sink:external,network trust:high
 allow sensitivity:public sink:model
+
+[repo]
+default require_approval
+allow agent:spiffe://demo.example/agents/docs action:modify docs/** README.md
+block agent:* priv/secrets/**
+
+[contracts]
+contract sink:external,network max_size:96 no_raw_credentials:true digest_only_pii:true classes:text credential_transform:mask
 """
 
 {:ok, policy} = SigilGuard.BoundaryPolicy.File.parse(policy_text)
-policy.digest
+
+64 = String.length(policy.digest)
+3 = length(policy.rules)
+true = not is_nil(policy.repo)
+true = Map.has_key?(policy.contracts, "external")
+
+%{
+  digest: policy.digest,
+  boundary_rules: length(policy.rules),
+  repo_rules: length(policy.repo.rules),
+  contract_sinks: policy.contracts |> Map.keys() |> Enum.sort()
+}
 ```
 
-## Private Data + Untrusted Content + External Sink
+The digest is over the raw policy bytes. A comment, newline, or rule edit is a
+different reviewed artifact even when two parsed structures happen to behave
+the same.
+
+## Make The Three Edges Explicit
+
+Here is the risky path: a tool supplied private content, the content came from
+an untrusted zone, and the agent wants to send it outside the system.
 
 ```elixir
 digest = String.duplicate("a", 64)
 
-boundary = [
-  phase: :tool_result,
+trifecta = [
+  phase: :model_egress,
   source: :tool,
   origin: :tool,
   sink: :external,
@@ -49,47 +99,162 @@ boundary = [
   context_digest: digest
 ]
 
-decision = SigilGuard.BoundaryPolicy.evaluate(boundary, policy: policy)
+blocked = SigilGuard.BoundaryPolicy.evaluate(trifecta, policy: policy)
 
-%{action: decision.action, reason: decision.reason, rules: decision.matched_rules}
+:block = blocked.action
+true = Enum.any?(blocked.matched_rules, &(&1.rule_id == "line_5"))
+
+%{action: blocked.action, reason: blocked.reason, rules: blocked.matched_rules}
 ```
 
-## High-Trust Variant Requires Confirmation
+> **On stage:** draw the three edges before evaluating. The point is not the
+> phrase “lethal trifecta”; it is that every edge is now a typed policy input.
+
+## Trust Changes The Workflow, Not The Facts
+
+A high-trust actor does not turn private, untrusted content into public data.
+The policy changes the workflow from a hard block to exact human approval.
 
 ```elixir
-high_trust = Keyword.put(boundary, :trust_level, :high)
-confirmed = SigilGuard.BoundaryPolicy.evaluate(high_trust, policy: policy)
+high_trust = Keyword.put(trifecta, :trust_level, :high)
+approval_required = SigilGuard.BoundaryPolicy.evaluate(high_trust, policy: policy)
 
-%{action: confirmed.action, reason: confirmed.reason}
+:confirm = approval_required.action
+
+%{action: approval_required.action, reason: approval_required.reason}
 ```
 
-## Public Model-Bound Content Is Allowed
+Remove one edge and the matching rule no longer applies. This variant sends
+public content back to the model, not to an external system.
 
 ```elixir
-public_boundary = [
-  phase: :tool_result,
-  source: :tool,
-  origin: :tool,
-  sink: :model,
-  source_sensitivity: :public,
-  trust_zone: :semi_trusted,
-  trust_level: :medium,
+public_model_boundary =
+  trifecta
+  |> Keyword.put(:sink, :model)
+  |> Keyword.put(:source_sensitivity, :public)
+  |> Keyword.put(:trust_zone, :semi_trusted)
+
+allowed = SigilGuard.BoundaryPolicy.evaluate(public_model_boundary, policy: policy)
+
+:allow = allowed.action
+%{action: allowed.action, reason: allowed.reason}
+```
+
+## Repository Changes Use A Path Kernel
+
+Repository governance has a smaller vocabulary: allow, require approval, or
+block. Paths are normalized and unsafe relative paths fail before rule
+matching. A documentation agent can edit docs, but it cannot wander into a
+secret-bearing directory.
+
+```elixir
+docs_change =
+  SigilGuard.RepoPolicy.evaluate(policy.repo,
+    agent: "spiffe://demo.example/agents/docs",
+    action: "modify",
+    changed_paths: ["docs/architecture.md", "README.md"]
+  )
+
+secret_change =
+  SigilGuard.RepoPolicy.evaluate(policy.repo,
+    agent: "spiffe://demo.example/agents/docs",
+    action: "modify",
+    changed_paths: ["priv/secrets/provider.key"]
+  )
+
+unmatched_change =
+  SigilGuard.RepoPolicy.evaluate(policy.repo,
+    agent: "spiffe://demo.example/agents/docs",
+    action: "modify",
+    changed_paths: ["lib/payment.ex"]
+  )
+
+:allow = docs_change.verdict
+:block = secret_change.verdict
+:require_approval = unmatched_change.verdict
+
+%{
+  docs: docs_change.verdict,
+  secrets: secret_change.verdict,
+  unmatched: unmatched_change.verdict,
+  unmatched_paths: unmatched_change.unmatched_paths
+}
+```
+
+The repo decision can be folded into a boundary decision without inventing a
+second policy language at the adapter seam.
+
+```elixir
+repo_facts = SigilGuard.RepoPolicy.policy_facts(policy.repo, unmatched_change)
+
+repo_boundary = [
+  phase: :model_egress,
+  source: :model,
+  origin: :model,
+  sink: :repo,
+  trust_zone: :trusted,
+  trust_level: :high,
   action_digest: digest,
   payload_digest: digest,
   context_digest: digest
 ]
 
-allowed = SigilGuard.BoundaryPolicy.evaluate(public_boundary, policy: policy)
+repo_gate =
+  SigilGuard.BoundaryPolicy.evaluate(repo_boundary,
+    policy: policy,
+    repo_facts: repo_facts
+  )
 
-%{action: allowed.action, reason: allowed.reason}
+:confirm = repo_gate.action
+%{action: repo_gate.action, repo: unmatched_change.verdict}
 ```
 
-## Summary
+## Allowed Does Not Mean Unconstrained
+
+An output contract runs only after policy permits a crossing. It can restrict
+the content class, replace raw credentials, hash designated PII, and cap the
+final UTF-8 byte size. The host supplies the credential and PII spans from its
+approved detectors.
 
 ```elixir
-%{
-  lethal_trifecta: decision.action,
-  high_trust_external: confirmed.action,
-  public_model_content: allowed.action
-}
+alias SigilGuard.BoundaryPolicy.Contract
+
+contract = policy.contracts["external"]
+credential = "AKIAIOSFODNN7EXAMPLE"
+email = "operator@example.test"
+
+outbound =
+  "Build owner #{email}; credential #{credential}; " <>
+    String.duplicate("diagnostic ", 12)
+
+{:ok, constrained} =
+  Contract.enforce(contract, "external", outbound,
+    verdict: :allow,
+    credentials: [credential],
+    pii: [email]
+  )
+
+false = String.contains?(constrained, credential)
+false = String.contains?(constrained, email)
+true = byte_size(constrained) <= 96
+true = String.ends_with?(constrained, "[TRUNCATED]")
+
+%{bytes: byte_size(constrained), output: constrained}
 ```
+
+A structured payload is blocked here because this contract admits only text.
+There is no lossy conversion to “make it fit.”
+
+```elixir
+{:block, "contract.external.class"} =
+  Contract.enforce(contract, "external", %{"status" => "ok"}, verdict: :allow)
+```
+
+## Takeaway
+
+Policy is doing three different forms of work: deciding whether a boundary may
+be crossed, deciding which repository paths an agent may change, and
+constraining the bytes that leave after an allow. Keeping those jobs explicit
+is what makes the result deterministic and auditable.
+
+Next: [An AI Agent Under Attack](ai-agent-under-attack.livemd).

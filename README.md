@@ -10,6 +10,7 @@
 
 [Installation](#installation) ·
 [Quick Start](#quick-start) ·
+[Livebook Tutorials](#livebook-tutorials) ·
 [Agent Trust Profile](#agent-trust-profile) ·
 [Agent Trust Gateway](#agent-trust-gateway) ·
 [Configuration](#configuration) ·
@@ -125,6 +126,29 @@ calls it before tool execution, after tool results, and before outbound writes,
 without pulling any specific MCP adapter into the core. The MCP gateway,
 attestation signing, confirmation flow, trust bundles, and audit chain build on
 this same decision. The [architecture](docs/README.md) covers the full surface.
+
+## Livebook Tutorials
+
+The executable [Livebook tutorial track](notebooks/README.md) teaches the
+complete public surface as one agent-security story. It starts with scanner and
+boundary fundamentals, puts an optional live ReqLLM proposal behind a
+host-owned tool callback, and continues through manifests, confirmations,
+attestations, MCP v2/Apps, streaming, trust bundles, agent-to-agent trust, and
+portable audit evidence.
+
+Every chapter also runs without a provider or network connection. The AI
+chapter uses a deterministic adversarial replay by default, so the security
+result remains repeatable during a talk; a Livebook `OPENAI_API_KEY` secret
+enables the optional live proposal without giving the model authority to run
+the callback.
+
+```bash
+mix sigil.livebook_check
+```
+
+Start with [An AI Agent Under Attack](notebooks/ai-agent-under-attack.livemd)
+for the conference demo, or follow the full self-study path from the tutorial
+catalog.
 
 ## Agent Trust Profile
 

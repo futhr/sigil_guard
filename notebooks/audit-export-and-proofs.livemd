@@ -1,17 +1,36 @@
-# Audit Export And Proofs
+# Audit Evidence: Chains, Merkle Proofs, Witnesses, Anchors, And OSCAL
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Faudit-export-and-proofs.livemd)
 
-This notebook builds a signed audit chain, creates portable checkpoint
-evidence, verifies inclusion and consistency proofs, and verifies a signed
-export package against the local events.
+Auditability is more than writing JSON lines. We want to detect deletion and
+reordering, prove one event belongs to a large log without disclosing the rest,
+show that a later checkpoint extends an earlier one, and carry the result into
+another assurance system without overstating what it proves.
+
+This chapter builds that evidence path entirely in memory. External WORM
+storage is represented by an anchor record; the host still owns the actual
+storage client and retention policy.
 
 ## Setup
 
 ```elixir
-Mix.install([
-  {:sigil_guard, path: Path.expand("..", __DIR__)}
-])
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
 ```
 
 ## Build A Signed Audit Chain
@@ -20,6 +39,7 @@ Mix.install([
 alias SigilGuard.Audit
 
 chain_key = :crypto.hash(:sha256, "audit-livebook-chain-key")
+field_hash_key = :crypto.hash(:sha256, "audit-livebook-actor-classification-key")
 
 unsigned_events =
   [
@@ -32,6 +52,7 @@ unsigned_events =
   |> Enum.with_index()
   |> Enum.map(fn {{type, actor, action, result}, index} ->
     Audit.new_event(type, actor, action, result, %{"sequence" => index})
+    |> Audit.classify(field_hash_key: field_hash_key, chain_key: chain_key)
   end)
 
 events = Audit.build_chain(unsigned_events, chain_key)
@@ -39,10 +60,16 @@ events = Audit.build_chain(unsigned_events, chain_key)
 %{
   count: length(events),
   first_prev_hmac: hd(events).prev_hmac,
+  actor_is_classified: String.starts_with?(hd(events).actor, "fh1:"),
   last_hmac: List.last(events).hmac,
   chain_verified: Audit.verify_chain(events, chain_key)
 }
 ```
+
+Actor classification happens before signing, so the chain covers the
+privacy-preserving actor value. Destroying the separate field-hash key later is
+a crypto-erasure strategy; reusing the chain key for that purpose is rejected
+by design.
 
 ## Create And Verify A Checkpoint
 
@@ -159,6 +186,197 @@ issuer = "did:web:audit-livebook"
   has_anchor: not is_nil(verified_export.anchor),
   inclusion_proofs: length(export["inclusion_proofs"]),
   export_digest: verified_export.digest
+}
+```
+
+## Add Independent Witnesses
+
+An operator signature proves who produced the checkpoint. Witness signatures
+reduce dependence on that one operator key. Witnesses sign the identical DSSE
+payload; they do not rewrite the checkpoint to insert their opinion.
+
+```elixir
+defmodule AuditWitnessOne do
+  @behaviour SigilGuard.Signer
+  @seed :binary.copy(<<0x51>>, 32)
+
+  @impl true
+  def sign(message) do
+    {_public, private} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    :crypto.sign(:eddsa, :none, message, [private, :ed25519])
+  end
+
+  @impl true
+  def public_key, do: elem(:crypto.generate_key(:eddsa, :ed25519, @seed), 0)
+end
+
+defmodule AuditWitnessTwo do
+  @behaviour SigilGuard.Signer
+  @seed :binary.copy(<<0x52>>, 32)
+
+  @impl true
+  def sign(message) do
+    {_public, private} = :crypto.generate_key(:eddsa, :ed25519, @seed)
+    :crypto.sign(:eddsa, :none, message, [private, :ed25519])
+  end
+
+  @impl true
+  def public_key, do: elem(:crypto.generate_key(:eddsa, :ed25519, @seed), 0)
+end
+
+alias SigilGuard.Attestation.Envelope
+alias SigilGuard.Audit.Witness
+
+{:ok, checkpoint_statement} = Checkpoint.to_statement(checkpoint)
+{:ok, checkpoint_statement_bytes} = SigilGuard.Canonical.JCS.encode(checkpoint_statement)
+{:ok, checkpoint_envelope} = Envelope.sign(checkpoint_statement_bytes, AuditNotebookSigner)
+
+{:ok, witnessed_once} = Witness.cosign(checkpoint_envelope, AuditWitnessOne)
+{:ok, witnessed_twice} = Witness.cosign(witnessed_once, AuditWitnessTwo)
+
+witness_keys = %{
+  Envelope.keyid(AuditWitnessOne.public_key()) => AuditWitnessOne.public_key(),
+  Envelope.keyid(AuditWitnessTwo.public_key()) => AuditWitnessTwo.public_key()
+}
+
+{:ok, witness_status} = Witness.verify_threshold(witnessed_twice, witness_keys, 2)
+{:error, :witness_threshold_not_met} =
+  Witness.verify_threshold(witnessed_once, witness_keys, 2)
+
+%{
+  signature_count: length(witnessed_twice["signatures"]),
+  verified_witnesses: witness_status.verified_keyids,
+  threshold: 2
+}
+```
+
+## Resolve Portable Evidence References
+
+The export contains a checkpoint and an external-anchor record. Evidence refs
+are content digests, so an attestation or audit event can name the artifact
+without embedding it. Resolution detects a missing or substituted artifact.
+
+```elixir
+alias SigilGuard.Audit.{Anchor, Evidence}
+
+export_checkpoint = export["checkpoint"]
+export_anchor = export["anchor"]
+
+{:ok, verified_anchor} = Anchor.verify(export_anchor, export_checkpoint)
+
+evidence_refs = [
+  Evidence.ref(:checkpoint, export_checkpoint),
+  Evidence.ref(:export, export),
+  Evidence.ref(:anchor, export_anchor)
+]
+
+:ok =
+  Evidence.resolve(evidence_refs, [
+    {:checkpoint, export_checkpoint},
+    {:export, export},
+    {:anchor, export_anchor}
+  ])
+
+dangling = put_in(hd(evidence_refs), ["ref"], String.duplicate("0", 64))
+
+{:error, :dangling_evidence_ref} =
+  Evidence.resolve([dangling], [{:checkpoint, export_checkpoint}])
+
+%{
+  anchor_digest: verified_anchor.digest,
+  refs: evidence_refs,
+  external_write_performed_by_core?: false
+}
+```
+
+## Project A Privacy-Filtered CloudEvent
+
+CloudEvents projection provides an interoperability envelope, not another
+authority decision. Only reserved audit metadata crosses into `data`; unknown
+host metadata and raw content are omitted.
+
+```elixir
+cloud_event =
+  SigilGuard.Audit.CloudEvents.project(hd(events),
+    source: "urn:sigilguard:conference-demo"
+  )
+
+"1.0" = cloud_event["specversion"]
+"io.sigilguard.decision.v1" = cloud_event["type"]
+false = Map.has_key?(cloud_event["data"]["metadata"], "sequence")
+true = String.starts_with?(cloud_event["data"]["actor"], "fh1:")
+
+%{
+  id: cloud_event["id"],
+  source: cloud_event["source"],
+  type: cloud_event["type"],
+  projected_actor: cloud_event["data"]["actor"]
+}
+```
+
+## Project Bounded OSCAL Observations
+
+OSCAL projection is deliberately observation-only. The host supplies the
+assessment plan, reviewed controls, subject, wording, and collection time. The
+adapter binds those observations to the exact canonical export digest; it does
+not declare a control satisfied or manufacture assessment authority.
+
+```elixir
+oscal_context = %{
+  assessment_results_uuid: "11111111-2222-4333-8444-555555555555",
+  assessment_plan_href: "https://assessment.example.test/plans/agent-boundary.json",
+  title: "SigilGuard boundary evidence observations",
+  version: "1.0.0",
+  last_modified: "2026-08-19T10:15:00.000Z",
+  result: %{
+    title: "Conference boundary evidence collection",
+    description: "Host-authorized observations backed by a finalized audit export.",
+    start: "2026-08-19T10:00:00.000Z",
+    end: "2026-08-19T10:10:00.000Z",
+    reviewed_controls: ["ac-3", "au-2"],
+    observations: [
+      %{
+        title: "Boundary decision evidence",
+        description: "The guard recorded an externally verifiable boundary decision chain.",
+        collected: "2026-08-19T10:05:00.000Z",
+        control_ids: ["au-2"],
+        methods: [:examine],
+        subjects: [
+          %{
+            uuid: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            type: :component,
+            title: "Agent boundary service"
+          }
+        ],
+        sigilguard: %{
+          verdict: "block",
+          risk_level: "high",
+          phase: "tool-request",
+          sink: "tool"
+        }
+      }
+    ]
+  },
+  evidence: %{
+    href: "https://evidence.example.test/audit/conference-export.json",
+    digest: Export.digest(export),
+    media_type: "application/json",
+    description: "Verified SigilGuard audit export."
+  }
+}
+
+{:ok, oscal} = SigilGuard.Assessment.OSCAL.project(export, oscal_context)
+[oscal_result] = oscal["assessment-results"]["results"]
+
+false = Map.has_key?(oscal_result, "findings")
+false = Map.has_key?(oscal_result, "risks")
+1 = length(oscal_result["observations"])
+
+%{
+  oscal_version: oscal["assessment-results"]["metadata"]["oscal-version"],
+  reviewed_controls: oscal_result["reviewed-controls"],
+  observations: length(oscal_result["observations"]),
+  assessment_conclusion_emitted?: false
 }
 ```
 

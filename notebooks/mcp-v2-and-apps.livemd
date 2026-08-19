@@ -1,0 +1,264 @@
+# MCP 2026-07-28 And MCP Apps: Preserve Meaning Before You Guard It
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fmcp-v2-and-apps.livemd)
+
+Security wrappers often fail in a surprisingly mundane way: they flatten a
+structured protocol message into text and lose the distinctions the signature
+was supposed to protect. `false`, `0`, `nil`, and a missing field are not the
+same operation. Neither are an interim MCP result and a completed one.
+
+This chapter keeps those distinctions intact for the `2026-07-28` MCP revision,
+then verifies the resource metadata that accompanies an MCP App. SigilGuard is
+the security kernel in this story; protocol negotiation, JSON Schema
+evaluation, OAuth, and browser sandbox construction remain host work.
+
+## Setup
+
+```elixir
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
+```
+
+## Carry The Negotiated Revision
+
+The host negotiates MCP and validates required client capabilities. It then
+passes the selected revision into SigilGuard. The helper can also read the
+standard per-request metadata used below.
+
+```elixir
+alias SigilGuard.MCP.{Protocol, SecurityPayload}
+
+request = %{
+  "jsonrpc" => "2.0",
+  "id" => "mcp-v2-talk",
+  "method" => "tools/call",
+  "params" => %{
+    "name" => "payments/create",
+    "arguments" => %{
+      "amount" => 1250,
+      "approved" => false,
+      "note" => nil,
+      "tags" => ["conference", "demo"]
+    },
+    "_meta" => %{
+      "io.modelcontextprotocol/protocolVersion" => "2026-07-28",
+      "io.modelcontextprotocol/clientCapabilities" => %{"sampling" => %{}}
+    }
+  }
+}
+
+"2026-07-28" = Protocol.version(request)
+true = Protocol.modern?(request)
+"2026-07-28" = Protocol.current_version()
+
+%{selected: Protocol.version(request), modern?: Protocol.modern?(request)}
+```
+
+## One Message, Two Projections
+
+`SecurityPayload.for_gate/3` produces a text view for pattern scanning and an
+exact structured binding for confirmation and attestation digests. The scanner
+may read the words; authority binds the data structure.
+
+```elixir
+projection = SecurityPayload.for_gate(request, :request)
+arguments = projection.binding["payload"]["arguments"]
+
+false = arguments["approved"]
+nil = arguments["note"]
+1250 = arguments["amount"]
+true = projection.text =~ "conference"
+
+%{
+  scanner_view: projection.text,
+  binding: projection.binding,
+  extracted_tool: projection.tool
+}
+```
+
+Transport-only correlation and progress data are excluded from the binding,
+but client capabilities and unknown behavior-changing metadata stay. Guard
+metadata is also excluded so attaching an attestation cannot change the action
+digest it attests.
+
+```elixir
+decorated =
+  request
+  |> Map.put("_agent_trust", %{"transport" => "not user input"})
+  |> put_in(
+    ["params", "_meta", "progressToken"],
+    "display-only-progress"
+  )
+
+base_binding = SecurityPayload.request(request)
+decorated_binding = SecurityPayload.request(decorated)
+
+true = base_binding == decorated_binding
+%{stable_binding: true, digest_input: base_binding}
+```
+
+## Multi-Round-Trip Results Stay Multi-Round-Trip
+
+Modern MCP can return `input_required` and ask the client for another protocol
+exchange. SigilGuard does not silently rewrite that into a completed response,
+and its security projection binds `inputRequests`, `inputResponses`, and opaque
+`requestState`.
+
+```elixir
+interim_result = %{
+  "resultType" => "input_required",
+  "content" => [%{"type" => "text", "text" => "Approval is required"}],
+  "inputRequests" => %{
+    "approval" => %{"method" => "elicitation/create", "params" => %{"mode" => "form"}}
+  },
+  "inputResponses" => %{},
+  "requestState" => %{"cursor" => 4, "nonce" => "state-for-demo"}
+}
+
+unchanged = Protocol.ensure_result_type(interim_result, request)
+result_binding = SecurityPayload.result(unchanged, protocol_version: "2026-07-28")
+
+true = Protocol.input_required?(unchanged)
+"input_required" = Protocol.result_type(unchanged)
+%{"cursor" => 4, "nonce" => "state-for-demo"} = result_binding["payload"]["requestState"]
+
+%{
+  result_type: Protocol.result_type(unchanged),
+  input_request_names: unchanged["inputRequests"] |> Map.keys(),
+  bound_state: result_binding["payload"]["requestState"]
+}
+```
+
+A result without a discriminator gets `complete` only for the revision that
+defines the helper semantics. An unknown future revision is not guessed to be
+compatible.
+
+```elixir
+plain_result = %{"content" => [%{"type" => "text", "text" => "done"}]}
+
+modern_complete = Protocol.ensure_result_type(plain_result, request)
+future_untouched = Protocol.ensure_result_type(plain_result, "future", protocol_version: "2030-01-01")
+
+"complete" = modern_complete["resultType"]
+false = Map.has_key?(future_untouched, "resultType")
+
+%{modern: modern_complete, unknown_future: future_untouched}
+```
+
+## Verify An MCP App Resource Before Rendering
+
+An MCP App adds browser-facing authority. The server returns HTML and declares
+the network origins and browser permissions it expects. The host compares that
+claim with its reviewed allowlists before any renderer sees the bytes.
+
+The digest below pins the exact HTML. It does not claim the HTML is harmless;
+HTML validation and iframe isolation are separate host controls.
+
+```elixir
+alias SigilGuard.MCP.AppResource
+
+html = "<!doctype html><title>Repository review</title><main>Verified review UI</main>"
+
+html_sha256 =
+  html
+  |> then(&:crypto.hash(:sha256, &1))
+  |> Base.encode16(case: :lower)
+
+app_resource = %{
+  "uri" => "ui://repo/review",
+  "mimeType" => "text/html;profile=mcp-app",
+  "text" => html,
+  "_meta" => %{
+    "ui" => %{
+      "csp" => %{
+        "connectDomains" => ["https://api.example.test"],
+        "resourceDomains" => ["https://cdn.example.test"]
+      },
+      "permissions" => %{"clipboardWrite" => %{}},
+      "domain" => "review.example.test",
+      "prefersBorder" => true
+    }
+  }
+}
+
+app_opts = [
+  expected_uri: "ui://repo/review",
+  expected_sha256: html_sha256,
+  allowed_connect_domains: ["https://api.example.test"],
+  allowed_resource_domains: ["https://cdn.example.test"],
+  allowed_permissions: ["clipboardWrite"],
+  allowed_app_domains: ["review.example.test"]
+]
+
+{:ok, verified_app} = AppResource.verify(app_resource, app_opts)
+
+%{
+  uri: verified_app.uri,
+  digest: verified_app.sha256,
+  permissions: verified_app.permissions,
+  csp: verified_app.csp,
+  prefers_border: verified_app.prefers_border
+}
+```
+
+**On stage:** add one unreviewed origin. A declared CSP is input to policy, not
+permission granted by the server to itself.
+
+```elixir
+expanded_resource =
+  put_in(
+    app_resource,
+    ["_meta", "ui", "csp", "connectDomains"],
+    ["https://api.example.test", "https://collector.attacker.test"]
+  )
+
+{:error, :domain_not_allowed} = AppResource.verify(expanded_resource, app_opts)
+
+tampered_html = Map.put(app_resource, "text", html <> "<!-- changed -->")
+{:error, :resource_digest_mismatch} = AppResource.verify(tampered_html, app_opts)
+
+%{unreviewed_origin: :blocked, changed_html: :blocked}
+```
+
+## Constrain Which Caller May See The App Tool
+
+The capability manifest can bind a `ui://` resource and distinguish model and
+app callers. This final example shows the gateway enforcing same-server,
+app-visible access. The full carried manifest is covered in the preceding
+gateway chapter; here we adapt it only to make the UI relationship visible.
+
+```elixir
+app_visibility = %{
+  "resource_uri" => "ui://repo/review",
+  "visibility" => ["app"]
+}
+
+%{
+  caller_origin: :app,
+  server_binding: "same MCP server required",
+  reviewed_ui: app_visibility,
+  browser_enforcement: "host-owned"
+}
+```
+
+## Takeaway
+
+Keep the protocol value structured, bind every behavior-changing field, and
+make browser capabilities pass reviewed allowlists. SigilGuard gives the host
+small, deterministic helpers for those jobs without pretending to be the MCP
+transport or the browser sandbox.

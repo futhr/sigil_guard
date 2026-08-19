@@ -145,7 +145,10 @@ defmodule Mix.Tasks.Sigil.LivebookCheck do
   defp offline_env do
     [
       {"HEX_OFFLINE", "1"},
-      {"REBAR_OFFLINE", "1"}
+      {"REBAR_OFFLINE", "1"},
+      {"SIGILGUARD_AI_MODE", "scripted"},
+      {"LB_OPENAI_API_KEY", ""},
+      {"LB_SIGILGUARD_MODEL", ""}
     ]
   end
 end

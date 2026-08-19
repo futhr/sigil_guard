@@ -1,17 +1,68 @@
-# Hermes Integration Stub
+# Integrating At The Framework Seam: A Hermes-Shaped MCP Server
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fhermes-integration.livemd)
 
-This notebook exercises the SigilGuard interceptor contract against a local
-Hermes-shaped stub. It does not fetch `hermes_mcp`; the real package wiring is
-covered by `guides/integrations/hermes-mcp.md`.
+Framework integration should be boring. The request is guarded immediately
+before the callback that owns side effects; the result is guarded immediately
+before it returns to model context. Everything else — supervision, transport,
+routing, and protocol negotiation — remains the framework's job.
+
+This notebook exercises that placement against a tiny Hermes-shaped stub. It
+does not install `hermes_mcp`, so the tutorial remains offline and does not
+pretend a stub validates a moving framework API. The versioned compile record
+and production wiring live in `guides/integrations/hermes-mcp.md`.
 
 ## Setup
 
 ```elixir
-Mix.install([
-  {:sigil_guard, path: Path.expand("..", __DIR__)}
-])
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
+```
+
+## Transport Changes Labels, Not The Kernel
+
+The same gateway works for HTTP MCP, stdio MCP, and an in-process tool. The
+host supplies a canonical server/resource identifier; SigilGuard never tries
+to infer authority from a socket or process name.
+
+```elixir
+alias SigilGuard.TransportExamples
+
+http_context =
+  TransportExamples.http_mcp_context(
+    "https://mcp.example.test/mcp",
+    "repo_file_write"
+  )
+
+stdio_context =
+  TransportExamples.stdio_mcp_context("stdio:repo-tools", "repo_file_write")
+
+in_process_context =
+  TransportExamples.in_process_context("local:release-runner", "repo_file_write")
+
+%{
+  http: %{server: http_context.mcp_server, resource: http_context.resource_uri},
+  stdio: %{server: stdio_context.mcp_server, resource: stdio_context.resource_uri},
+  in_process: %{
+    server: in_process_context.mcp_server,
+    resource: in_process_context.resource_uri
+  }
+}
 ```
 
 ## Hermes-Shaped Frame Stub

@@ -46,6 +46,22 @@ defmodule Mix.Tasks.Sigil.LivebookCheckTest do
       assert :ok = LivebookCheck.check(["notebooks/clean.livemd"], root: root)
     end
 
+    test "forces the offline AI path and clears Livebook provider settings" do
+      root =
+        fixture_root(%{
+          "notebooks/offline.livemd" =>
+            livebook([
+              "\"scripted\" = System.fetch_env!(\"SIGILGUARD_AI_MODE\")",
+              "nil = System.get_env(\"LB_OPENAI_API_KEY\")",
+              "nil = System.get_env(\"LB_SIGILGUARD_MODEL\")",
+              "\"1\" = System.fetch_env!(\"HEX_OFFLINE\")",
+              "\"1\" = System.fetch_env!(\"REBAR_OFFLINE\")"
+            ])
+        })
+
+      assert :ok = LivebookCheck.check(["notebooks/offline.livemd"], root: root)
+    end
+
     test "returns failures without raising" do
       root =
         fixture_root(%{

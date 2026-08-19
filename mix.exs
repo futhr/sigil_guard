@@ -103,6 +103,7 @@ defmodule SigilGuard.MixProject do
       files: ~w[
         lib
         guides
+        notebooks
         docs/README.md
         bench/output/benchmarks.md
         .formatter.exs
@@ -125,6 +126,34 @@ defmodule SigilGuard.MixProject do
       extras: [
         "README.md": [title: "Overview"],
         "docs/README.md": [title: "Architecture"],
+        "notebooks/README.md": [title: "Livebook Tutorials"],
+        "notebooks/quick-start.livemd": [title: "Tutorial 1 — Quick Start"],
+        "notebooks/policy-and-lethal-trifecta.livemd": [
+          title: "Tutorial 2 — Policy And The Lethal Trifecta"
+        ],
+        "notebooks/ai-agent-under-attack.livemd": [
+          title: "Tutorial 3 — An AI Agent Under Attack"
+        ],
+        "notebooks/agent-trust-gateway.livemd": [
+          title: "Tutorial 4 — The Agent Trust Gateway"
+        ],
+        "notebooks/threat-scenarios.livemd": [title: "Tutorial 5 — Threat Lab"],
+        "notebooks/mcp-v2-and-apps.livemd": [title: "Tutorial 6 — MCP v2 And Apps"],
+        "notebooks/runtime-streaming-and-telemetry.livemd": [
+          title: "Tutorial 7 — Runtime, Streaming, And Telemetry"
+        ],
+        "notebooks/trust-bundles-identity-and-vault.livemd": [
+          title: "Tutorial 8 — Trust Bundles, Identity, And Vault"
+        ],
+        "notebooks/agent-to-agent-trust.livemd": [
+          title: "Tutorial 9 — Agent-To-Agent Trust"
+        ],
+        "notebooks/audit-export-and-proofs.livemd": [
+          title: "Tutorial 10 — Audit Evidence And Proofs"
+        ],
+        "notebooks/hermes-integration.livemd": [
+          title: "Tutorial 11 — Hermes Integration"
+        ],
         "guides/cheatsheet.cheatmd": [title: "Cheatsheet"],
         "guides/threat-model.md": [title: "Threat Model"],
         "guides/integrations/hermes-mcp.md": [title: "Hermes MCP Integration"],
@@ -141,6 +170,7 @@ defmodule SigilGuard.MixProject do
         LICENSE: [title: "License"]
       ],
       groups_for_extras: [
+        Tutorials: ~r/notebooks/,
         "Getting Started": ~r/README/,
         Guides: ~r/guides/,
         Performance: ~r/benchmarks/,

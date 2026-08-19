@@ -1,29 +1,75 @@
-# Threat Scenarios
+# Threat Lab: Poisoning, Rug Pulls, Schema Injection, And Confused Authority
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Frefpath%2Fsigil_guard%2Fblob%2Fmain%2Fnotebooks%2Fthreat-scenarios.livemd)
 
-This notebook demonstrates selected SigilGuard threat-model controls end to
-end: tool poisoning, rug pulls, and schema injection. It runs against the local
-checkout and uses the same capability-manifest fixture as the threat tests.
+Security APIs make more sense when we attack them. This lab starts with one
+reviewed write tool, then changes the words, schema, and authority around it.
+Every scenario asks the same operational question: does the changed action
+reach a side-effecting callback?
+
+The examples use a synthetic manifest and credential. They perform no file
+write and no network call.
 
 ## Setup
 
 ```elixir
-Mix.install([
-  {:sigil_guard, path: Path.expand("..", __DIR__)}
-])
+repo_root = Path.expand("..", __DIR__)
+local_checkout? = File.regular?(Path.join(repo_root, "mix.exs"))
+
+{sigil_guard_dep, install_opts} =
+  if local_checkout? do
+    {
+      {:sigil_guard, path: repo_root, env: :prod},
+      [
+        config_path: Path.join(repo_root, "config/config.exs"),
+        lockfile: Path.join(repo_root, "mix.lock")
+      ]
+    }
+  else
+    {{:sigil_guard, "~> 1.0"}, []}
+  end
+
+Mix.install([sigil_guard_dep], install_opts)
 ```
 
 ## Load A Pinned Tool Manifest
 
-```elixir
-manifest_path =
-  Path.expand("../test/fixtures/capability_manifest/repo_file_write.manifest.json", __DIR__)
+The manifest is inline so the notebook also works when imported from its Run in
+Livebook badge. It is a reviewed snapshot, not something we trust because a
+server returned it.
 
-manifest =
-  manifest_path
-  |> File.read!()
-  |> Jason.decode!()
+```elixir
+manifest = %{
+  "allowed_sink_zones" => ["semi_trusted", "trusted"],
+  "allowed_source_zones" => ["semi_trusted", "trusted"],
+  "annotations" => %{"destructiveHint" => false, "title" => "Repo File Write"},
+  "description" => "Write one UTF-8 text file inside the repository working tree.",
+  "expires_at" => "2027-01-01T00:00:00.000Z",
+  "input_schema" => %{
+    "$schema" => "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties" => false,
+    "properties" => %{
+      "content" => %{"type" => "string"},
+      "path" => %{"type" => "string"}
+    },
+    "required" => ["content", "path"],
+    "type" => "object"
+  },
+  "input_sensitivity" => "internal",
+  "issuer_keyid" =>
+    "sha256:65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8",
+  "manifest_format" => "sigil_guard_capability_manifest/v2",
+  "name" => "repo_file_write",
+  "network_access" => "none",
+  "output_sensitivity" => "internal",
+  "reversibility" => "reversible",
+  "sandbox" => %{"min_isolation" => "container", "required" => true},
+  "scopes" => ["repo:write"],
+  "server" => "repo-mcp",
+  "side_effects" => ["write"],
+  "suspicious_params" => [],
+  "version" => "1.4.2"
+}
 
 opts = [
   manifests: %{manifest["name"] => manifest},
@@ -186,6 +232,53 @@ undisclosed_result =
 }
 ```
 
+## A Confused Deputy Cannot Pass Its Own Token Through
+
+An agent may be authorized to call the repository server without being
+authorized to forward a credential meant for the host application. Resource
+and audience checks keep “who may call” separate from “where this token was
+issued to be used.”
+
+```elixir
+authority_context = [
+  trust_level: :high,
+  metadata: %{sandbox_id: "sandbox-1", isolation_level: "container"}
+]
+
+confused_request = %{
+  "method" => "tools/call",
+  "params" => %{
+    "name" => "repo_file_write",
+    "arguments" => %{"path" => "README.md", "content" => "hello"}
+  }
+}
+
+confused_deputy =
+  SigilGuard.ToolGateway.guard_request(confused_request, authority_context,
+    manifests: %{"repo_file_write" => manifest},
+    resource: "repo-mcp",
+    audience: "host-app",
+    self_resource: "host-app"
+  )
+
+matching_authority =
+  SigilGuard.ToolGateway.guard_request(confused_request, authority_context,
+    manifests: %{"repo_file_write" => manifest},
+    resource: "repo-mcp",
+    audience: "repo-mcp"
+  )
+
+:blocked = confused_deputy.verdict
+:token_passthrough_denied = confused_deputy.audit_metadata.deny_reason
+:allowed = matching_authority.verdict
+
+%{
+  passthrough: confused_deputy.verdict,
+  passthrough_reason: confused_deputy.audit_metadata.deny_reason,
+  correctly_scoped: matching_authority.verdict
+}
+```
+
 ## Summary
 
 ```elixir
@@ -194,6 +287,7 @@ undisclosed_result =
   rug_pull_refresh: rug_pull_refresh,
   stale_approval_after_drift: changed_manifest,
   schema_injection_action: schema_decision.action,
-  undisclosed_schema: undisclosed_result
+  undisclosed_schema: undisclosed_result,
+  confused_deputy: confused_deputy.verdict
 }
 ```
