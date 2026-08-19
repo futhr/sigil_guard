@@ -51,11 +51,47 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
   detector examples add no runtime dependency, and `mix deps.audit` is clean
   for the 1.0.0 release line. The test-only Bypass/Cowboy tree currently
   resolves Cowlib 2.19.0, for which Hex reports CVE-2026-43966 and
-  CVE-2026-43969; Cowlib is absent from the production dependency tree, the
-  two advisories are explicitly acknowledged in the Hex project configuration,
-  affected encoders are not called by SigilGuard, and no patched Hex release
-  is available as of 2026-07-31. Recheck this owner-side immediately before
-  release.
+  CVE-2026-43969, plus CVE-2026-43971 published on 2026-08-18; Cowlib is absent
+  from the production dependency tree, all three advisories are explicitly
+  acknowledged in the Hex project configuration, affected encoders are not
+  called by SigilGuard, and no patched Hex release is available as of
+  2026-08-19. The canonical gate runs both `mix deps.audit` and
+  `mix hex.audit`. Recheck the exceptions before 2026-09-19 and immediately
+  before release, whichever comes first.
+- Added a canonical full-history secret scan using a pinned,
+  checksum-verified Gitleaks binary. Its ignore file contains only exact
+  fingerprints for reviewed synthetic scanner fixtures.
+- Malformed hook lists, adaptive-detector modules, and timeout options now fail
+  closed at direct policy and runtime-gate entry points instead of allowing an
+  invalid `receive ... after` timeout to raise.
+- Repo and boundary-policy loaders now validate option containers, keys,
+  candidate sets, legacy mappings, and byte limits before filesystem access;
+  malformed inputs return `:invalid_options` instead of raising or weakening
+  the configured size bound.
+- Tagged publication now fails closed unless GitHub reports the exact release
+  ref as protected; release documentation distinguishes the environment named
+  in workflow YAML from the required owner-managed reviewer, deployment-tag,
+  and environment-secret protections.
+- Added an unoptimized, 100%-threshold mutation gate for the pure verdict
+  ordering primitive; all 78 compilable mutants are killed.
+- SPDX generation now binds the declared license from each matching locked Hex
+  runtime artifact and fails on missing, malformed, or version-mismatched
+  dependency metadata instead of emitting `NOASSERTION`.
+- Boundary hook telemetry now covers successful and failed invocations with a
+  native-time duration measurement and a normalized `hook_result`, matching the
+  observability contract instead of reporting failures only.
+- Reconciled the profile, gateway, and boundary specs to the final 1.0 event
+  families and made boundary-policy decision telemetry use the shared policy
+  shape with a system-time measurement.
+- MCP gateway decision telemetry now fires after protocol/result enrichment on
+  success and pre-gate denial paths; protocol revision and result type remain
+  opt-in high-cardinality OpenTelemetry attributes.
+- Revalidated reader-facing research and specification links, replacing moved
+  SLSA, NIST, IETF, llm-guard, mcp-use, and historical crate references.
+- Expanded `notebooks/` into an eleven-chapter, offline-validated Livebook
+  tutorial track with conference/workshop run sheets, a deterministic AI-agent
+  attack replay, and an optional ReqLLM proposal path using Livebook secrets;
+  the canonical quality gate now executes every shipped Elixir cell offline.
 - Changed selected trust-bundle error atoms and config boot errors; see
   [Error Changes](MIGRATING-1.0.md#error-changes).
 - Version adoption is explicit: `~> 0.2` remains on the 0.2.x line and

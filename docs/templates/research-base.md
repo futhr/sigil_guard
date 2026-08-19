@@ -63,4 +63,4 @@ sigil_guard:
 
 ## Sources
 
-- [Reference](URL)
+- Reference — replace this line with a stable primary-source link.

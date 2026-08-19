@@ -69,10 +69,10 @@ Five sub-questions:
   2025-11-25 authorization specification, W3C DID Core 1.1, the did:key
   method specification, W3C VC Data Model 2.0, RFC 7515 (JWS), and the A2A
   protocol repository.
-- Draft-stage material (the WIMSE architecture draft and the OAuth
+- Draft-stage material (the WIMSE architecture draft and the now-expired OAuth
   on-behalf-of-for-AI-agents draft) is classified watch-only and is never
   used as a normative dependency. Post-knowledge-cutoff status claims were
-  re-verified on 2026-07-02 and are marked as accessed values.
+  re-verified on 2026-08-19 and are marked as accessed values.
 - Internal evidence: `lib/sigil_guard/identity.ex` (behaviour plus
   trust-level ordering), `lib/sigil_guard/identity/binding.ex` (near-stub
   struct), and the reference-consumer inventory, including its identity
@@ -210,11 +210,12 @@ embedded verification. Two rules govern the core:
   Maximum chain depth and trust-derivation-across-hops rules are SP.13
   policy, not core verification.
 
-The OAuth on-behalf-of-for-AI-agents draft (a token-exchange profile for
-agents acting for users, introducing a `requested_actor` parameter;
-accessed 2026-07-02) is convergent evidence: the ecosystem is converging on
-act-claim-based delegation for agents, so adopting the same model keeps
-SigilGuard chains mappable to whatever tokens hosts eventually receive.
+The now-expired OAuth on-behalf-of-for-AI-agents draft (a token-exchange
+profile for agents acting for users, introducing a `requested_actor`
+parameter; status reverified 2026-08-19) remains convergent historical
+evidence: the proposal followed act-claim-based delegation for agents, so
+adopting the same model keeps SigilGuard chains mappable to tokens hosts may
+receive. It remains watch-only and non-normative.
 
 ### MCP-Layer OAuth Authorization Is Host-Owned
 
@@ -364,4 +365,4 @@ shape today, WIMSE vocabulary and act-claim agent delegation next.
 - [A2A Protocol Repository (agent cards)](https://github.com/a2aproject/A2A)
 - [IETF WIMSE Working Group (accessed 2026-07-02)](https://datatracker.ietf.org/wg/wimse/about/)
 - [WIMSE Architecture Internet-Draft (accessed 2026-07-02)](https://datatracker.ietf.org/doc/draft-ietf-wimse-arch/)
-- [OAuth On-Behalf-Of Authorization for AI Agents Internet-Draft (accessed 2026-07-02)](https://datatracker.ietf.org/doc/draft-oauth-ai-agents-on-behalf-of/)
+- [OAuth On-Behalf-Of User Authorization for AI Agents Internet-Draft (expired; status reverified 2026-08-19)](https://datatracker.ietf.org/doc/draft-oauth-ai-agents-on-behalf-of-user/)

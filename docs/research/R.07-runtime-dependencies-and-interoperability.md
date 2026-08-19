@@ -5,7 +5,7 @@ sigil_guard:
   category: research
   status: complete
   created: "2026-07-02"
-  updated: "2026-08-11"
+  updated: "2026-08-19"
   decision: adopted
   tags:
     [
@@ -372,7 +372,7 @@ NimbleOptions-rejection mandates.
   dependency; it is an option, not a requirement.
 - Scope: this rule governs runtime dependencies only. Dev and test
   dependencies (credo, dialyxir, sobelow, mix_audit, ex_check, ex_doc,
-  doctor, excoveralls, mox, benchee, stream_data, git_ops, and similar)
+  doctor, excoveralls, mox, benchee, stream_data, muex, git_ops, and similar)
   remain exempt.
 - M6 MUST land an assertion test that fails whenever the runtime dependency
   set differs from the intended set (`:telemetry`, `:nimble_options`,
@@ -428,6 +428,58 @@ NimbleOptions-rejection mandates.
    version line, and move
    the reference consumer to `~> 1.0`.
 
+### 2026-08-19 Livebook Delivery Refresh
+
+This implementation refresh checked the current primary HexDocs before
+expanding the tutorial suite.
+
+**Facts.** Livebook 0.19 documents package tutorials as a first-class use case
+and recommends that a notebook inside a Mix project install the project by
+local path while reusing its configuration and lockfile. A Run in Livebook
+badge imports one `.livemd` file rather than cloning its repository, so a
+local-path-only setup is insufficient for badge users. Livebook exposes a
+secret named `OPENAI_API_KEY` to notebook code as `LB_OPENAI_API_KEY`. ReqLLM
+1.20 represents proposed tool calls separately from tool execution:
+`ReqLLM.Response.tool_calls/1` returns the model's proposals and the host
+chooses whether and when to execute them.
+
+**Inference.** The repository tutorials need two dependency paths: the local
+checkout path with the repository lock/config for development and the
+published `sigil_guard` Hex package for a badge import. A conference AI demo
+must not make its security result depend on network access, a provider key, or
+the model choosing the expected action. The model is a planner; the host still
+owns the tool loop and can put `SigilGuard.ToolGateway` between the proposed
+call and its callback.
+
+**Recommendation.** Keep an offline, deterministic replay as the default AI
+demo and enable a live ReqLLM proposal only when the Livebook secret is
+present. Both paths construct the same MCP-shaped candidate and pass through
+the same SigilGuard boundary. The full notebook suite gets a reader-facing
+catalog, explicit learning paths, expected outcomes, production caveats, and
+speaker cues; every deterministic cell remains executable by
+`mix sigil.livebook_check` with network access disabled.
+
+### 2026-08-19 Hex Advisory Refresh
+
+**Facts.** The locked test dependency path `bypass -> plug_cowboy -> cowboy ->
+cowlib` resolves Cowlib 2.19.0. Hex currently lists CVE-2026-43966,
+CVE-2026-43969, and CVE-2026-43971 for that release. Cowlib is absent from the
+production dependency tree, SigilGuard does not call the affected Cowlib
+encoders, and Hex has no patched Cowlib release as of 2026-08-19.
+
+**Decision.** These three advisories are explicitly acknowledged as
+non-production, unreachable findings, not silently suppressed. The canonical
+gate runs both `mix deps.audit` and `mix hex.audit`, so an unreviewed Hex
+advisory fails CI. Re-review the exceptions before 2026-09-19 and immediately
+before the 1.0.0 release, whichever comes first; remove each exception as soon
+as the test dependency path can resolve a fixed Cowlib release.
+
+The same refresh verified the locked production graph's license metadata:
+Jason 1.4.5, NimbleOptions 1.1.1, and Telemetry 1.4.2 each declare
+`Apache-2.0`. SBOM generation now reads that metadata from the installed,
+locked Hex artifacts and fails rather than emitting `NOASSERTION` when runtime
+license evidence is absent or version-mismatched.
+
 ## Recommendation
 
 **Decision:** adopted.
@@ -462,10 +514,11 @@ prerelease-resolution trap.
 SP.14 owns acceptance criteria; SP.15 owns benchmark rules.
 
 - ExDoc cheatsheets (`.cheatmd`) covering the gate, policy, and audit APIs.
-- Five livebooks with Run in Livebook badges, each executing top-to-bottom
-  offline via `Mix.install` on a local path: quick-start; policy and the
-  lethal trifecta; audit export and proofs; hermes_mcp integration; and
-  threat scenarios.
+- Eleven Livebook tutorials with Run in Livebook badges, each executing
+  top-to-bottom offline via `Mix.install`, plus a reader catalog with
+  self-study, conference-talk, and workshop routes. The AI chapter defaults to
+  a deterministic replay and optionally uses a Livebook secret for a ReqLLM
+  proposal; both routes pass through the same host-owned boundary gate.
 - 100% documentation coverage enforced by `mix doctor`; dialyzer clean.
 - Published benchmarks per SP.15, including a scope-limited comparison
   against the Python `llm-guard` scanner suite as a baseline: same corpus,
@@ -561,9 +614,13 @@ values (accessed 2026-07-02 unless noted).
 - [OpenSSF Best Practices badge](https://www.bestpractices.dev/)
 - [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
 - [GitHub attest-build-provenance action](https://github.com/actions/attest-build-provenance)
-- [SLSA v1 specification levels](https://slsa.dev/spec/v1.2/levels)
+- [SLSA v1.2 build-level requirements](https://slsa.dev/spec/v1.2/build-requirements)
 - [git_ops](https://hexdocs.pm/git_ops/)
 - [Livebook](https://livebook.dev/)
+- [Livebook 0.19: documentation with `Mix.install`](https://livebook.hexdocs.pm/use_cases.html)
+- [Livebook 0.19: shared secrets](https://livebook.hexdocs.pm/shared_secrets.html)
+- [ReqLLM 1.20: getting started and tool calling](https://req-llm.hexdocs.pm/getting-started-3.html)
+- [ReqLLM: canonical tool-call data structures](https://req-llm.hexdocs.pm/data-structures.html)
 - [Elixir Radar](https://elixir-radar.com/)
 - [Thinking Elixir podcast](https://podcast.thinkingelixir.com/)
 - [ElixirForum](https://elixirforum.com/)

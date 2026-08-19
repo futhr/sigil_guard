@@ -162,6 +162,6 @@ bindings, while excluding correlation, logging, progress, and trace metadata.
 - [MCP discovery](https://modelcontextprotocol.io/specification/2026-07-28/server/discover)
 - [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
 - [MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
-- [mcp-use v2 beta](https://github.com/mcp-use/mcp-use/tree/beta)
-- [mcp-use v2 benchmark methodology](https://github.com/mcp-use/mcp-use/blob/beta/benchmark.md)
+- [mcp-use v2](https://github.com/mcp-use/mcp-use)
+- [mcp-use v2 benchmark methodology](https://github.com/mcp-use/mcp-use/blob/main/benchmark.md)
 - [MCP v2 release event](https://www.youtube.com/watch?v=W9XtugrmHts)

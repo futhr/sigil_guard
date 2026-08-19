@@ -610,4 +610,4 @@ docs and historical fixtures.
 - [AgentDyn: Dynamic Prompt Injection Benchmarking](https://arxiv.org/html/2602.03117v1)
 - [MCPTox: Tool Misuse and Toxicity in MCP Agents](https://arxiv.org/html/2508.14925v1)
 - [Original SIGIL repository](https://github.com/sigil-eu/sigil)
-- [sigil-protocol crate](https://crates.io/crates/sigil-protocol)
+- [sigil-protocol crate documentation](https://docs.rs/sigil-protocol)

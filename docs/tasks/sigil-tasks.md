@@ -63,7 +63,7 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 243 / 243 tasks done (100%).** Milestones: 13 complete.
+**Overall: 256 / 256 tasks done (100%).** Milestones: 13 complete.
 **Current milestone: complete - maintainer-owned release handoff remains.**
 
 | # | Milestone | Done | Total | % | Status |
@@ -76,12 +76,12 @@ trailers (rule 10); the maintainer pushes manually.
 | M4 | Boundary scanner and policy kernel | 25 | 25 | 100% | Complete |
 | M5 | Audit, telemetry, provenance, threat suite | 26 | 26 | 100% | Complete |
 | M6 | Legacy removal, dep cut, migration gate | 31 | 31 | 100% | Complete |
-| M7 | Integrations and adoption | 17 | 17 | 100% | Complete |
-| M7A | Pre-release audit hardening | 14 | 14 | 100% | Complete |
+| M7 | Integrations and adoption | 18 | 18 | 100% | Complete |
+| M7A | Pre-release audit hardening | 26 | 26 | 100% | Complete |
 | M8 | Release | 8 | 8 | 100% | Complete |
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
 | M10 | External assessment projection | 1 | 1 | 100% | Complete |
-| — | **Total** | **243** | **243** | **100%** | 13 done |
+| — | **Total** | **256** | **256** | **100%** | 13 done |
 
 ### Release Handoff
 
@@ -93,13 +93,13 @@ observation projection without changing native audit exports or Agent Trust
 statements.
 
 Post-release maintenance includes ongoing dependency-audit remediation,
-per-module security coverage review, policy-loader symlink containment,
-receipt-URL allowlisting, and bounded local-anchor log reads. These are
-recurring hardening obligations rather than unfinished v3 milestones. Runtime
-and anchor-store public boundaries also maintain malformed option-container
-campaigns so improper input fails closed without exceptions. Direct scanner
-calls reject malformed options explicitly, policy evaluates them as blocked,
-and trust-bundle loading classifies them as invalid sources.
+per-module security coverage review, and periodic regression review of the
+implemented policy-loader symlink containment, receipt-URL allowlisting, and
+bounded local-anchor log reads. Runtime and anchor-store public boundaries also
+maintain malformed option-container campaigns so improper input fails closed
+without exceptions. Direct scanner calls reject malformed options explicitly,
+policy evaluates them as blocked, and trust-bundle loading classifies them as
+invalid sources.
 
 Publish, push, tag, release-checklist execution, and production consumer bumps
 are maintainer-owned operations and are intentionally outside this checklist.
@@ -148,8 +148,12 @@ section is post-1.0.0 parking; neither is counted here.
 - [ ] `mix compile --warnings-as-errors`.
 - [ ] `mix credo --strict`.
 - [ ] `mix sobelow --config --compact`.
+- [ ] `./bin/check-secrets`.
 - [ ] `mix deps.audit`.
+- [ ] `mix hex.audit`.
 - [ ] `mix test --cover` with coverage >= 95%.
+- [ ] focused verdict mutation gate at 100%.
+- [ ] `mix sigil.livebook_check`.
 - [ ] `mix doctor`.
 - [ ] `mix dialyzer`.
 - [ ] `mix docs`.
@@ -1443,11 +1447,12 @@ section is post-1.0.0 parking; neither is counted here.
     sorted `{name, sha256}` artifacts; 100% covered). Rewired
     `.github/workflows/publish.yml` to `--sha256`-verify the SBOM, attest both
     subjects with SLSA and the custom release predicate via `actions/attest`,
-    and gate the protected Hex job on both `gh attestation verify` forms. The
-    publish job compares a fresh build before publish and the registry download
-    afterward with the attested tar. Added a consumer-side verification CI
-    example to the release guide. Workflow-level tag execution is
-    maintainer-owned; the Elixir builders are unit-tested.
+    and gate the environment-scoped Hex job on both `gh attestation verify`
+    forms. The publish job compares a fresh build before publish and the
+    registry download afterward with the attested tar. Added a consumer-side
+    verification CI example to the release guide. Workflow-level tag execution
+    and environment protection are maintainer-owned; the Elixir builders are
+    unit-tested.
 - [x] M5.14 Rename the legacy scanner interception audit event.
   - Spec: `docs/specs/SP.09-audit-chain-and-anchor-contracts.md` - V3
     Extensions (Owned By SP.05).
@@ -2357,6 +2362,27 @@ section is post-1.0.0 parking; neither is counted here.
     vulnerability reporting instructions, 72 h / 7 d / 90 d response targets,
     scope boundaries, and the SP.02 signer-compromise rotation pointer.
     Verified `git diff --check` and `mix sigil.docs_lint`.
+- [x] M7.18 Conference-ready Livebook tutorial track.
+  - Spec: `SP.14` - Livebooks; `R.07` - 2026-08-19 Livebook Delivery
+    Refresh.
+  - AC: `notebooks/README.md` maps the complete public capability groups to a
+    self-study path and talk run sheets; every notebook uses a local
+    lock/config-aware setup with a published-Hex fallback; the expanded track
+    covers the gateway trust flow, MCP v2/Apps, streaming and extension seams,
+    trust bundles/identity/vault, A2A, and audit assessment projection; the AI
+    chapter offers a deterministic offline replay and an optional ReqLLM 1.20
+    tool proposal using a Livebook secret, with both paths crossing the same
+    gate before any callback runs.
+  - Validation: `mix sigil.livebook_check`; Run in Livebook links and local
+    setup paths checked; AI offline mode passes without provider dependencies
+    or network; `mix docs` renders the tutorial catalog.
+  - Done: expanded `notebooks/` into an eleven-chapter self-study, workshop,
+    and conference-talk track covering every public capability group. Added a
+    deterministic adversarial AI replay plus optional ReqLLM 1.20 tool
+    proposal, both routed through the same host-owned SigilGuard gate. Packaged
+    every notebook in the Hex archive and ExDoc, added offline-environment
+    regression coverage, and verified all eleven notebooks plus the complete
+    repository quality gate.
 
 ## M7A - Pre-Release Audit Hardening
 
@@ -2599,6 +2625,121 @@ section is post-1.0.0 parking; neither is counted here.
     `TrustBundle`; added direct `Audit.Logger` callback success/error
     coverage; verified `mix docs` and focused gateway/attestation/
     confirmation/trust-bundle/logger tests.
+- [x] M7A.15 Make Hex advisory triage executable and current.
+  - Spec: `R.07`; CLAUDE.md dependency and quality-gate rules.
+  - AC: the canonical clean-clone gate runs both `mix deps.audit` and
+    `mix hex.audit`; every ignored Hex advisory has a current, documented
+    reachability decision and re-review deadline; a newly published advisory
+    fails CI until it is fixed or explicitly triaged.
+  - Validation: both advisory commands and `./bin/check` exit zero.
+  - Done: added `mix hex.audit` to ExCheck and every documented full-gate
+    list; triaged CVE-2026-43971 as test-only and unreachable from SigilGuard;
+    recorded the absent fixed release and mandatory pre-release recheck.
+- [x] M7A.16 Add reproducible full-history secret scanning.
+  - Spec: `SP.05` release and supply-chain controls; `SECURITY.md`.
+  - AC: the canonical clean-clone gate scans Git history with a pinned,
+    checksum-verified Gitleaks release; CI checks out full history; only exact,
+    reviewed synthetic-fixture fingerprints may be ignored.
+  - Validation: `./bin/check-secrets`, `actionlint`, and `./bin/check` exit zero.
+  - Done: added the portable pinned scanner bootstrap, wired it into ExCheck,
+    fetched full history in the CI quality job, and recorded exact fingerprints
+    for the 27 reviewed scanner-fixture findings already present in history.
+- [x] M7A.17 Fail closed on malformed hook and detector options.
+  - Spec: `SP.04` - Hooks Behaviour and Error Handling.
+  - AC: malformed option containers, hook lists, detector modules, and timeout
+    values never reach `receive ... after`; direct hooks block on blockable
+    phases and log on notification phases; policy/runtime entry points emit a
+    terminal `:invalid_options` block.
+  - Validation: focused hook, adaptive-detector, boundary-policy, and runtime
+    gate tests plus `./bin/check` exit zero.
+  - Done: validated module-list and BEAM timeout boundaries at every public
+    entry point and added direct and integrated negative-path regressions.
+- [x] M7A.18 Add focused mutation testing for verdict precedence.
+  - Spec: `SP.04` - Decision Combination; resilience-report verification
+    quality rule.
+  - AC: the canonical gate performs unoptimized code mutation against the
+    small, high-risk pure verdict-order primitive and fails below 100%; no
+    surviving mutant may invert or weaken strongest-wins behavior.
+  - Validation: the focused Muex command and `./bin/check` exit zero.
+  - Done: added the dependency-locked Muex gate over `SigilGuard.Verdict`;
+    78/78 compilable mutants are killed, 13 invalid mutants are reported, and
+    the mutation score is 100%.
+- [x] M7A.19 Make runtime-license evidence release-enforced.
+  - Spec: `SP.05` - Release Provenance (D15); `R.07` dependency review.
+  - AC: every production package in the SPDX SBOM carries the license declared
+    by the matching installed Hex artifact; absent, malformed, empty, or
+    version-mismatched metadata fails SBOM generation instead of producing
+    `NOASSERTION`.
+  - Validation: SBOM tests, generation/verification, package gate, and
+    `./bin/check` exit zero.
+  - Done: bound all three locked runtime packages to their Apache-2.0 Hex
+    metadata and added completeness assertions for the generated SPDX document.
+- [x] M7A.20 Align hook telemetry with the observability contract.
+  - Spec: `SP.04` - Telemetry And Observability.
+  - AC: every invoked hook emits one bounded-cardinality outcome event with a
+    native-time duration measurement; successful outcomes and fail-closed
+    failures are distinguishable without payload or matched-text metadata.
+  - Validation: focused hook telemetry tests and `./bin/check` exit zero.
+  - Done: normalized success, signal, deny-side, timeout, crash, invalid-result,
+    and invalid-option outcomes under `hook_result`; added duration measurements
+    and direct success/failure telemetry regressions.
+- [x] M7A.21 Execute every shipped Livebook in the canonical gate.
+  - Spec: `SP.14`; resilience-report public-contract and deterministic-
+    verification hard gates.
+  - AC: `./bin/check` executes every Elixir cell from every packaged Livebook
+    offline, so a broken conference tutorial fails the same gate as broken API
+    documentation.
+  - Validation: `mix sigil.livebook_check` and `./bin/check` exit zero.
+  - Done: added the existing offline Livebook validator to ExCheck and every
+    documented full-gate command list.
+- [x] M7A.22 Revalidate public research and specification links.
+  - Spec: `SP.05`, `SP.15`, and research source discipline; resilience-report
+    public-contract verification rule.
+  - AC: reader-facing sources resolve to the current canonical documents or an
+    explicitly identified historical/expired artifact; templates do not ship a
+    deliberately dead placeholder link.
+  - Validation: full Markdown/Livebook link crawl plus `mix docs` exit zero.
+  - Done: updated moved SLSA, NIST, IETF, llm-guard, mcp-use, and crate links and
+    made the research-template placeholder non-link text.
+- [x] M7A.23 Reconcile every telemetry specification with the 1.0 event surface.
+  - Spec: `SP.01`, `SP.03`, `SP.04`, `SP.13`; resilience-report comment/spec/
+    code agreement and observability rules.
+  - AC: no specification promises a retired or never-emitted event family;
+    direct pure primitives say so explicitly; policy events carry a measurable,
+    common metadata shape; `Telemetry.events/0` remains the exact public list.
+  - Validation: telemetry, boundary-policy, hook, and documentation tests plus
+    `./bin/check` exit zero.
+  - Done: removed stale attestation, tool-gateway, boundary-evaluate, and
+    boundary-contract event promises; documented their consolidated owners and
+    added the boundary-policy system-time/common-shape regression.
+- [x] M7A.24 Emit MCP telemetry after gateway enrichment.
+  - Spec: `SP.16` - Telemetry And Observability; resilience-report disconnected-
+    observability rule.
+  - AC: request/result protocol classification is present on the consolidated
+    MCP event for successful and pre-gate-denied calls; raw request/result data
+    stays absent; arbitrary protocol/result strings do not become default metric
+    dimensions.
+  - Validation: gateway and OTel high-cardinality regressions plus
+    `./bin/check` exit zero.
+  - Done: centralized the bounded MCP metadata allowlist, emitted after top-level
+    enrichment, and classified protocol revision/result type as opt-in OTel
+    attributes.
+- [x] M7A.25 Make policy-loader option validation total and fail closed.
+  - `RepoPolicy` and `BoundaryPolicy.File` reject malformed option containers,
+    unknown keys, invalid candidate/replacement shapes, and invalid byte limits
+    before filesystem access.
+  - Non-integer byte limits can no longer weaken the size cap through Erlang
+    term ordering.
+  - Tests: repo-policy and boundary-policy loader suites cover malformed lists,
+    unknown keys, bad shapes, invalid limits, and invalid path/root inputs.
+- [x] M7A.26 Fail closed when a release tag is not protected.
+  - `sigil_guard.verify_release_ref` requires the workflow-provided
+    `github.ref_protected` signal during strict CI identity verification.
+  - Release guidance distinguishes code-owned workflow isolation from the
+    owner-managed tag ruleset, environment reviewers, tag restrictions, and
+    environment-secret configuration required before publication.
+  - Tests: exact protected-tag identity succeeds; false or missing protection
+    state fails `:unprotected_ref`; `actionlint` validates the workflow binding.
 
 ## M8 - Release
 
@@ -2642,8 +2783,9 @@ section is post-1.0.0 parking; neither is counted here.
   - Tests: Elixir builders and negative verification paths are unit-tested;
     tag execution remains maintainer-owned.
   - Done: `.github/workflows/publish.yml` separates validation/build,
-    OIDC-backed attestation, and protected publication. It verifies the exact
-    tag and triggering commit, builds the Hex tarball and SPDX SBOM after
+    OIDC-backed attestation, and environment-scoped publication. It verifies
+    the exact protected tag and triggering commit, builds the Hex tarball and
+    SPDX SBOM after
     `./bin/check`, signs both SLSA and the directly bound release predicate for
     both subjects, and verifies both forms before publication. The Hex-only job
     receives the secret solely for `mix hex.publish`, compares a fresh build to
