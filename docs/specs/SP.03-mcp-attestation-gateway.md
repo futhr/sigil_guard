@@ -86,7 +86,7 @@ sequenceDiagram
 | GenServer | no | Guard calls are pure; pinned manifests come from the bundle or host. |
 | Behaviour | no | `ToolGateway` is concrete; transports adapt by shaping maps. |
 | ETS | yes | `SigilGuard.ReplayStore` consumes single-use confirmation nonces. |
-| Telemetry | yes | Request, result, and manifest verification events. |
+| Telemetry | yes | One consolidated MCP decision event plus the runtime-gate event; manifest and result facts remain metadata, not separate event families. |
 
 ## CapabilityManifest Canonical Form
 
@@ -543,15 +543,17 @@ statements.
 
 ## Telemetry And Observability
 
-| Event | Type | Metadata | Purpose |
-|-------|------|----------|---------|
-| `[:sigil_guard, :tool_gateway, :manifest]` | event | `%{status: :verified \| :unknown \| :drift \| :expired \| :suspicious, tool: String.t() \| nil, server: String.t() \| nil}` | Listing-time verification outcomes. |
-| `[:sigil_guard, :tool_gateway, :request]` | event | `%{verdict, action, tool, mcp_server, manifest_status, attestation_status, confirmation_status}` | Request decisions. |
-| `[:sigil_guard, :tool_gateway, :result]` | event | request metadata plus `quarantine_status` | Result decisions. |
-
-Events supersede the v2 `[:sigil_guard, :mcp, :request]` event and use the
-existing emit helper with `%{system_time: System.system_time()}`. Prefix
-reconciliation (D16) is owned by SP.05.
+The stable 1.0 gateway event is `[:sigil_guard, :mcp, :request]`, with
+`%{system_time: integer}` measurements and bounded decision metadata: phase,
+origin, sink, tool/server identity, trust/risk/verdict/action, counts and
+indicator ids, payload/action digests, envelope status/reason, and confirmation
+status/reason. The runtime gate also emits `[:sigil_guard, :runtime, :gate]` for
+the underlying boundary decision. Manifest verification and request/result
+facts stay metadata on those consolidated events; there are no separate
+`:tool_gateway` event families. SP.16 extends the same metadata for MCP v2 and
+Apps without renaming the event. Raw request/result content and credential
+material never enter metadata. The exact public list is
+`SigilGuard.Telemetry.events/0`; prefix reconciliation (D16) is owned by SP.05.
 
 ## Error Handling
 

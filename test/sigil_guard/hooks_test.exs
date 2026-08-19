@@ -207,6 +207,22 @@ defmodule SigilGuard.HooksTest do
       assert [{:block, [rule]}] = result.contributions
       assert rule["explanation"] == "hook_timeout"
     end
+
+    test "malformed hook options block without raising" do
+      boundary = Boundary.new(%{phase: :tool_request})
+
+      for opts <- [
+            :not_options,
+            [hooks: :not_a_list],
+            [hooks: ["not-a-module"]],
+            [hooks: [ContinueHook], hook_timeout_ms: -1],
+            [hooks: [ContinueHook], hook_timeout_ms: :infinity],
+            [hooks: [ContinueHook], hook_timeout_ms: 4_294_967_296]
+          ] do
+        assert [{:block, [rule]}] = Hooks.dispatch(boundary, opts).contributions
+        assert rule["explanation"] == "invalid_hook_options"
+      end
+    end
   end
 
   describe "fail-closed matrix (notification-only phase)" do
@@ -228,6 +244,11 @@ defmodule SigilGuard.HooksTest do
       assert dispatch([NotifySlowHook], :session_start, hook_timeout_ms: 20).contributions == []
     end
 
+    test "malformed options log and continue" do
+      boundary = Boundary.new(%{phase: :session_start})
+      assert Hooks.dispatch(boundary, hooks: :not_a_list).contributions == []
+    end
+
     test "notify failures emit the boundary hook telemetry event" do
       ref = make_ref()
       parent = self()
@@ -236,8 +257,8 @@ defmodule SigilGuard.HooksTest do
       :telemetry.attach(
         handler,
         [:sigil_guard, :boundary, :hook],
-        fn _, _, metadata, _ ->
-          send(parent, {:hook_event, metadata})
+        fn _, measurements, metadata, _ ->
+          send(parent, {:hook_event, measurements, metadata})
         end,
         nil
       )
@@ -246,7 +267,39 @@ defmodule SigilGuard.HooksTest do
 
       dispatch([NotifyCrashHook], :session_start)
 
-      assert_received {:hook_event, %{hook_result: :hook_crash, phase: :session_start}}
+      assert_received {:hook_event, %{duration: duration},
+                       %{hook_result: :hook_crash, phase: :session_start}}
+
+      assert is_integer(duration) and duration >= 0
+    end
+
+    test "successful hooks emit their normalized outcome and duration" do
+      ref = make_ref()
+      parent = self()
+      handler = "hooks-success-test-#{inspect(ref)}"
+
+      :telemetry.attach(
+        handler,
+        [:sigil_guard, :boundary, :hook],
+        fn _, measurements, metadata, _ ->
+          send(parent, {:hook_success_event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      dispatch([ContinueHook], :tool_request)
+
+      assert_received {:hook_success_event, %{duration: duration},
+                       %{
+                         module: module,
+                         phase: :tool_request,
+                         hook_result: :continue
+                       }}
+
+      assert module == inspect(ContinueHook)
+      assert is_integer(duration) and duration >= 0
     end
   end
 end

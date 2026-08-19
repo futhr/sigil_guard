@@ -299,6 +299,22 @@ defmodule SigilGuard.RepoPolicyTest do
       assert {:error, :invalid_decision} = RepoPolicy.load_file(invalid)
     end
 
+    test "malformed loader options fail closed instead of raising", %{dir: dir} do
+      path = Path.join(dir, "SIGILGUARD_POLICY")
+      File.write!(path, "default allow\n")
+
+      for opts <- [:bad, [{:candidates}], [unknown: true]] do
+        assert {:error, :invalid_options} = RepoPolicy.load(dir, opts)
+        assert {:error, :invalid_options} = RepoPolicy.find_file(dir, opts)
+        assert {:error, :invalid_options} = RepoPolicy.load_file(path, opts)
+      end
+
+      assert {:error, :invalid_max_bytes} = RepoPolicy.load_file(path, max_bytes: :unbounded)
+      assert {:error, :invalid_options} = RepoPolicy.load(:bad_root)
+      assert {:error, :invalid_options} = RepoPolicy.find_file(:bad_root)
+      assert {:error, :invalid_options} = RepoPolicy.load_file(:bad_path)
+    end
+
     test "rejects every legacy policy filename with its v3 replacement", %{dir: dir} do
       legacy_names = [
         {"SIGIL_POLICY", "SIGILGUARD_POLICY"},

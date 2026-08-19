@@ -57,6 +57,7 @@ defmodule SigilGuard.ToolGateway do
   alias SigilGuard.Decision
   alias SigilGuard.MCP.Protocol
   alias SigilGuard.MCP.SecurityPayload
+  alias SigilGuard.Telemetry
   alias SigilGuard.ToolGateway.Base, as: GatewayBase
   alias SigilGuard.TrustBundle
 
@@ -118,21 +119,27 @@ defmodule SigilGuard.ToolGateway do
     payload = request_payload(request, opts)
     request_context = request_context(request, context)
 
-    with {:ok, capability} <- resolve_manifest(payload.tool, opts),
-         :ok <- manifest_freshness(capability, opts),
-         :ok <- passthrough_resource_audience(capability, opts),
-         :ok <- verify_caller_visibility(capability, request_context),
-         :ok <- require_sandbox(capability, request_context),
-         :ok <- verify_inbound_attestation(request, payload, request_context, capability, opts) do
-      request
-      |> GatewayBase.guard_request(context, opts)
-      |> put_protocol_metadata(request, opts)
-      |> put_manifest_metadata(capability)
-      |> maybe_force_suspicious_confirmation(payload, request_context, capability, opts)
-      |> maybe_apply_confirmation(payload, request_context, request, opts)
-    else
-      {:error, denial} -> deny(denial, payload, request_context)
-    end
+    decision =
+      with {:ok, capability} <- resolve_manifest(payload.tool, opts),
+           :ok <- manifest_freshness(capability, opts),
+           :ok <- passthrough_resource_audience(capability, opts),
+           :ok <- verify_caller_visibility(capability, request_context),
+           :ok <- require_sandbox(capability, request_context),
+           :ok <- verify_inbound_attestation(request, payload, request_context, capability, opts) do
+        request
+        |> GatewayBase.guard_request(context, opts)
+        |> put_protocol_metadata(request, opts)
+        |> put_manifest_metadata(capability)
+        |> maybe_force_suspicious_confirmation(payload, request_context, capability, opts)
+        |> maybe_apply_confirmation(payload, request_context, request, opts)
+      else
+        {:error, denial} ->
+          denial
+          |> deny(payload, request_context)
+          |> put_protocol_metadata(request, opts)
+      end
+
+    emit_mcp_decision(decision)
   end
 
   @doc """
@@ -277,17 +284,22 @@ defmodule SigilGuard.ToolGateway do
     payload = result_payload(result, opts)
     result_context = result_context(result, context)
 
-    case request_action_digest(opts) do
-      :ok ->
-        result
-        |> GatewayBase.guard_result(context, opts)
-        |> put_protocol_metadata(result, opts)
-        |> put_result_binding_metadata(opts)
-        |> maybe_apply_result_confirmation(payload, result_context, result, opts)
+    decision =
+      case request_action_digest(opts) do
+        :ok ->
+          result
+          |> GatewayBase.guard_result(context, opts)
+          |> put_protocol_metadata(result, opts)
+          |> put_result_binding_metadata(opts)
+          |> maybe_apply_result_confirmation(payload, result_context, result, opts)
 
-      {:error, reason} ->
-        deny(reason, payload, result_context)
-    end
+        {:error, reason} ->
+          reason
+          |> deny(payload, result_context)
+          |> put_protocol_metadata(result, opts)
+      end
+
+    emit_mcp_decision(decision)
   end
 
   @doc """
@@ -1263,6 +1275,11 @@ defmodule SigilGuard.ToolGateway do
     do: Map.put(metadata, :mcp_result_type, result_type)
 
   defp maybe_put_result_type(metadata, _), do: metadata
+
+  defp emit_mcp_decision(%Decision{} = decision) do
+    Telemetry.emit_mcp_decision(decision.audit_metadata)
+    decision
+  end
 
   defp put_manifest_metadata(%Decision{} = decision, nil), do: decision
 

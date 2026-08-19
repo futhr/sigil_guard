@@ -147,6 +147,10 @@ resource.
 Existing `[:sigil_guard, :mcp, :request]` and result/gate events add
 `protocol_version`, `mcp_result_type`, and `origin` where available. Raw
 request state, input responses, HTML, and header values never enter telemetry.
+The consolidated MCP event is emitted only after the top-level gateway has
+attached protocol/result classification, including on pre-gate denials. The
+protocol and result-type OTel attributes are high-cardinality and therefore
+require `include_high_cardinality: true` in metric/span projections.
 
 ## Error Handling
 

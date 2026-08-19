@@ -146,6 +146,8 @@ defmodule SigilGuard.TelemetryTest do
         content_hash: "abc123",
         confirmation_actor: "did:sigil:agent",
         resource_uri: "file://x",
+        protocol_version: "2026-07-28",
+        mcp_result_type: "input_required",
         hit_count: 3
       }
 
@@ -158,7 +160,8 @@ defmodule SigilGuard.TelemetryTest do
       # High-cardinality attributes are dropped by default.
       for key <- ~w(sigilguard.actor.hash sigilguard.identity.hash sigilguard.action.digest
                     sigilguard.payload.digest sigilguard.confirmation.actor.hash
-                    sigilguard.resource.uri) do
+                    sigilguard.resource.uri sigilguard.mcp.protocol_version
+                    sigilguard.mcp.result_type) do
         refute Map.has_key?(bounded, key)
       end
 
@@ -170,6 +173,8 @@ defmodule SigilGuard.TelemetryTest do
       assert opted_in["sigilguard.actor.hash"] == "did:sigil:agent"
       assert opted_in["sigilguard.payload.digest"] == "abc123"
       assert opted_in["sigilguard.resource.uri"] == "file://x"
+      assert opted_in["sigilguard.mcp.protocol_version"] == "2026-07-28"
+      assert opted_in["sigilguard.mcp.result_type"] == "input_required"
     end
 
     test "uses official URL attribute naming and drops removed registry keys" do

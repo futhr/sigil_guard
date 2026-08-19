@@ -6,7 +6,7 @@ sigil_guard:
   status: implemented
   priority: critical
   created: "2026-07-01"
-  updated: "2026-07-07"
+  updated: "2026-08-19"
   tags:
     ["scanner", "policy", "boundary", "lifecycle", "output-contracts",
      "sandbox", "hooks", "streaming", "v3"]
@@ -318,6 +318,10 @@ surface this as a typed startup error. Candidate paths keep the implemented
 safety rules: safe relative paths only, resolved inside the repo root. A
 candidate or parent component that is a symbolic link is not eligible, so a
 lexically in-root path cannot redirect policy loading outside the trust root.
+Loader options are a validated keyword list limited to `:candidates`,
+`:legacy_replacements`, and `:max_bytes`; malformed option containers, keys,
+candidate sets, replacement pairs, and byte limits fail with
+`:invalid_options` before filesystem access.
 
 ### Policy File Digest
 
@@ -334,7 +338,7 @@ checks but is not the evidence value.
 ```elixir
 defmodule SigilGuard.BoundaryPolicy.File do
   @type parse_error ::
-          :invalid_policy_file | :invalid_output_contract | :unknown_transform
+          :invalid_policy_file | :invalid_options | :invalid_output_contract | :unknown_transform
 
   @spec load(repo_root :: Path.t(), opts :: keyword()) ::
           {:ok, t()}
@@ -529,7 +533,12 @@ contributions with matched rule id `hook.<module>.<phase>`. Hooks cannot emit
 ### Timeouts And Fail-Closed Matrix
 
 Every hook invocation MUST be time-bounded by `:hook_timeout_ms`
-(default `5_000` ms).
+(default `5_000` ms). The value MUST be an integer in the BEAM timeout range
+`0..4_294_967_295`; `:infinity`, negative values, and non-integers are invalid.
+The hooks option MUST be a list of module atoms. A malformed option container,
+hook list, detector module, or timeout fails closed with
+`:invalid_hook_options` at the direct hooks boundary and `:invalid_options` at
+the policy/runtime boundary; it never reaches `receive ... after` or raises.
 
 | Failure | Blockable phase | Notification-only phase |
 |---------|-----------------|-------------------------|
@@ -752,15 +761,19 @@ post-GA.
 
 ## Telemetry And Observability
 
-| Event | Type | Metadata | Purpose |
-|-------|------|----------|---------|
-| `[:sigil_guard, :boundary, :evaluate, :start \| :stop \| :exception]` | span | `%{phase, verdict, matched_rule_count, policy_file_digest, isolation_level}` | Kernel latency and outcome. |
-| `[:sigil_guard, :boundary, :hook]` | event | `%{module, phase, result, duration}`; `result` includes `:hook_timeout`, `:hook_crash`, `:invalid_hook_result` | Hook behavior and failures. |
-| `[:sigil_guard, :boundary, :contract]` | event | `%{sink, transforms, bytes_in, bytes_out}` | Contract transform effects. |
+| Event | Type | Measurements and metadata | Purpose |
+|-------|------|---------------------------|---------|
+| `[:sigil_guard, :scan, :start \| :stop \| :exception]` | span | start `%{system_time}` / stop `%{duration}`; bounded scanner configuration and hit counts | Scanner latency and outcome. |
+| `[:sigil_guard, :policy, :decision]` | event | `%{system_time}`; common `%{action, risk_level, trust_level, trust_required, error_reason}`, plus boundary `%{phase, verdict}` | Direct policy and boundary-kernel outcomes. |
+| `[:sigil_guard, :boundary, :hook]` | event | measurements `%{duration: non_neg_integer}` in native time units; metadata `%{module, phase, hook_result}`; `hook_result` includes successful normalized outcomes and `:hook_timeout`, `:hook_crash`, `:invalid_hook_result`, or `:invalid_hook_options` | Every invoked hook outcome and option-validation failure. |
 | `[:sigil_guard, :boundary, :adaptive]` | event | `%{detector, indicator_count, error}` | Advisory detector outcomes. |
+| `[:sigil_guard, :runtime, :gate]` | event | `%{system_time}`; bounded boundary, verdict, count, digest, input-error, and repo-policy metadata | End-to-end runtime outcome, including any sanitization/contract effect represented by the final action and decision. |
 
-Metadata never carries raw payloads or matched text. OpenTelemetry attribute
-prefix reconciliation (D16) is owned by SP.05.
+`BoundaryPolicy.Contract.enforce/4` is a pure host-invoked transform and emits no
+separate event; its effect is observed at the enclosing runtime/gateway
+decision. Metadata never carries raw payloads or matched text. The exact public
+list is `SigilGuard.Telemetry.events/0`; OpenTelemetry attribute-prefix
+reconciliation (D16) is owned by SP.05.
 
 ## Error Handling
 
@@ -775,6 +788,7 @@ SP.01's profile-wide taxonomy applies by reference (`:invalid_context`,
 | `:unknown_transform` | return tuple | use `mask` or `hash` | policy not loaded |
 | `:hook_timeout` | decision reason | raise `:hook_timeout_ms` or fix hook | blockable phase blocks; notify-only logged |
 | `:invalid_hook_result` | decision reason | fix the hook return value | treated as crash per the matrix |
+| `:invalid_hook_options` | decision reason | pass a keyword list, module-atom hook list, and bounded integer timeout | blockable phase blocks; notify-only logged |
 | `:sandbox_required` | decision reason | supply sandbox identity or add an explicit `isolation:` rule | quarantine/block per the matrix |
 | `:invalid_isolation_level` | context validation | use a closed-enum value | request blocked |
 | `:scanner_timeout` | decision | fail closed for outbound sinks | output blocked |
@@ -811,6 +825,7 @@ SP.01's profile-wide taxonomy applies by reference (`:invalid_context`,
 | legacy filenames | `FileTest` | Each of the four legacy names yields `:legacy_policy_filename` naming its replacement, even with a new-name file present. |
 | hook matrix | `HooksTest` | Timeout/crash/invalid-result block on every blockable phase and log-and-continue on notification-only phases. |
 | adaptive nil path | `AdaptiveDetectorTest` | Decisions byte-identical with detector unset; detector errors change nothing. |
+| verdict mutation | `VerdictTest` + Muex | Every compilable unoptimized mutation of the closed verdict set and strongest-wins order is killed; threshold 100%. |
 | hit shape and sets | `Scanner.PipelineTest`, `QuarantineTest` | `scan/1`/`scan_and_redact/1` shapes unchanged; additive fields typed; the seven indicators split into sets and are bundle-overridable. |
 | holdback properties | `Runtime.StreamTest` | Exhaustive split offsets, UTF-8/grapheme splits, and the curated vector file leak nothing. |
 
@@ -836,6 +851,8 @@ SP.01's profile-wide taxonomy applies by reference (`:invalid_context`,
       and notification-only phases.
 - [x] Adaptive nil-path byte-equality holds; adaptive indicators raise but
       never lower risk and never produce an allow.
+- [x] Focused unoptimized mutation testing kills every compilable mutant in
+      the verdict-order primitive at a 100% threshold.
 - [x] `scan/1` and `scan_and_redact/1` return shapes are unchanged; `name` is
       preserved on every hit; additive fields validate; `span` equals
       `{offset, length}`.
@@ -878,6 +895,7 @@ modules land in M5 on top of this work.
 | Explainability | every block has rule/reason | decision tests. |
 | Determinism | same input gives same digest/verdict | policy tests. |
 | Sandbox matrix | 20/20 cells tested | `BoundaryPolicyTest`. |
+| Verdict mutation score | 100% | focused unoptimized Muex gate. |
 | Coverage | >= 95% | `mix test --cover`. |
 
 ## Sources

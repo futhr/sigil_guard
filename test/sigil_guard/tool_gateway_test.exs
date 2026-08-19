@@ -1623,6 +1623,40 @@ defmodule SigilGuard.ToolGatewayTest do
       assert input_required["result"]["resultType"] == "input_required"
     end
 
+    test "emits enriched MCP telemetry after protocol and result classification" do
+      parent = self()
+      handler = "tool-gateway-mcp-telemetry-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler,
+        [:sigil_guard, :mcp, :request],
+        fn _, measurements, metadata, _ ->
+          send(parent, {:mcp_decision_event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      modern_result = put_in(result(), ["result", "resultType"], "input_required")
+
+      assert %Decision{action: :allow} =
+               ToolGateway.guard_result(modern_result, [trust_level: :high],
+                 protocol_version: "2026-07-28",
+                 request_action_digest: @request_action_digest
+               )
+
+      assert_received {:mcp_decision_event, %{system_time: system_time},
+                       %{
+                         phase: :tool_result,
+                         protocol_version: "2026-07-28",
+                         mcp_result_type: "input_required",
+                         action: :allow
+                       }}
+
+      assert is_integer(system_time)
+    end
+
     test "delegates decision responses with v2 JSON-RPC shape" do
       decision =
         ToolGateway.guard_request(request(), sandbox_context(),

@@ -49,6 +49,7 @@ defmodule SigilGuard.RepoPolicy do
     {".github/sigil-policy", ".github/sigilguard-policy"}
   ]
   @default_max_policy_bytes 262_144
+  @loader_option_keys [:candidates, :max_bytes]
   @decisions [:allow, :require_approval, :block]
   @decision_rank %{allow: 0, require_approval: 1, block: 2}
   @atom_fields %{
@@ -174,13 +175,22 @@ defmodule SigilGuard.RepoPolicy do
 
     * `:candidates` - override the repo-relative candidate paths.
     * `:max_bytes` - maximum policy file size. Defaults to 256 KiB.
+
+  The option container must be a keyword list containing only these keys.
+  Malformed options return `{:error, :invalid_options}` before filesystem
+  access.
   """
   @spec load(Path.t(), keyword()) :: {:ok, t()} | {:error, term()}
-  def load(repo_root, opts \\ []) when is_binary(repo_root) do
-    with {:ok, path} <- find_file(repo_root, opts) do
+  def load(repo_root, opts \\ [])
+
+  def load(repo_root, opts) when is_binary(repo_root) do
+    with :ok <- validate_loader_options(opts),
+         {:ok, path} <- find_file(repo_root, opts) do
       load_file(path, opts)
     end
   end
+
+  def load(_, _), do: {:error, :invalid_options}
 
   @doc """
   Return the first policy file path found under a repo root.
@@ -189,10 +199,13 @@ defmodule SigilGuard.RepoPolicy do
   rejected before any filesystem lookup.
   """
   @spec find_file(Path.t(), keyword()) :: {:ok, Path.t()} | {:error, term()}
-  def find_file(repo_root, opts \\ []) when is_binary(repo_root) do
+  def find_file(repo_root, opts \\ [])
+
+  def find_file(repo_root, opts) when is_binary(repo_root) do
     root = Path.expand(repo_root)
 
-    with :ok <- reject_legacy_policy_paths(root),
+    with :ok <- validate_loader_options(opts),
+         :ok <- reject_legacy_policy_paths(root),
          {:ok, candidates} <-
            normalize_policy_paths(Keyword.get(opts, :candidates, @default_policy_paths)) do
       case first_existing_policy_path(root, candidates) do
@@ -202,23 +215,30 @@ defmodule SigilGuard.RepoPolicy do
     end
   end
 
+  def find_file(_, _), do: {:error, :invalid_options}
+
   @doc """
   Load a policy from a specific file path.
 
   The file must be regular and no larger than `:max_bytes`.
   """
   @spec load_file(Path.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def load_file(path, opts \\ [])
+
   # sobelow_skip ["Traversal.FileModule"]
-  def load_file(path, opts \\ []) when is_binary(path) do
+  def load_file(path, opts) when is_binary(path) do
     path = Path.expand(path)
 
-    with {:ok, max_bytes} <-
+    with :ok <- validate_loader_options(opts),
+         {:ok, max_bytes} <-
            normalize_max_bytes(Keyword.get(opts, :max_bytes, @default_max_policy_bytes)),
          :ok <- ensure_policy_file(path, max_bytes),
          {:ok, text} <- File.read(path) do
       parse(text)
     end
   end
+
+  def load_file(_, _), do: {:error, :invalid_options}
 
   @doc """
   Evaluate a compiled policy against a repo-change context.
@@ -859,6 +879,17 @@ defmodule SigilGuard.RepoPolicy do
 
   defp normalize_max_bytes(value) when is_integer(value) and value >= 0, do: {:ok, value}
   defp normalize_max_bytes(_), do: {:error, :invalid_max_bytes}
+
+  defp validate_loader_options(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) and
+         Enum.all?(Keyword.keys(opts), &(&1 in @loader_option_keys)) do
+      :ok
+    else
+      {:error, :invalid_options}
+    end
+  end
+
+  defp validate_loader_options(_), do: {:error, :invalid_options}
 
   defp normalize_id(nil, index), do: {:ok, "rule_#{index}"}
 

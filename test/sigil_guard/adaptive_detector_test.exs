@@ -122,6 +122,18 @@ defmodule SigilGuard.AdaptiveDetectorTest do
     test "a timeout degrades" do
       assert run(adaptive_detector: SlowDetector, hook_timeout_ms: 20) == @degraded
     end
+
+    test "malformed detector options degrade instead of raising" do
+      for opts <- [
+            :not_options,
+            [adaptive_detector: "not-a-module"],
+            [adaptive_detector: EchoDetector, hook_timeout_ms: -1],
+            [adaptive_detector: EchoDetector, hook_timeout_ms: :infinity],
+            [adaptive_detector: EchoDetector, hook_timeout_ms: 4_294_967_296]
+          ] do
+        assert run(opts) == @degraded
+      end
+    end
   end
 
   describe "telemetry" do

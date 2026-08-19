@@ -71,6 +71,21 @@ defmodule SigilGuard.BoundaryPolicyTest do
       assert %Decision{action: :block, verdict: :blocked, reason: "invalid_phase"} = decision
     end
 
+    test "malformed per-call options block terminally instead of raising" do
+      for opts <- [
+            :not_options,
+            [hooks: :not_a_list],
+            [hooks: ["not-a-module"]],
+            [adaptive_detector: "not-a-module"],
+            [hooks: [RequestConfirmHook], hook_timeout_ms: -1],
+            [hooks: [RequestConfirmHook], hook_timeout_ms: :infinity],
+            [hooks: [RequestConfirmHook], hook_timeout_ms: 4_294_967_296]
+          ] do
+        decision = BoundaryPolicy.evaluate(base(), opts)
+        assert %Decision{action: :block, verdict: :blocked, reason: "invalid_options"} = decision
+      end
+    end
+
     test "carries phase, trust level, hits, indicators, and audit facts" do
       decision =
         BoundaryPolicy.evaluate(base(%{phase: :model_egress, sink: :external, source: :model}))
@@ -79,6 +94,37 @@ defmodule SigilGuard.BoundaryPolicyTest do
       assert decision.trust_level == :high
       assert decision.audit_metadata.source == :model
       assert decision.audit_metadata.sink == :external
+    end
+
+    test "emits the shared policy telemetry shape with system time" do
+      parent = self()
+      handler = "boundary-policy-telemetry-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler,
+        [:sigil_guard, :policy, :decision],
+        fn _, measurements, metadata, _ ->
+          send(parent, {:boundary_policy_event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      assert BoundaryPolicy.evaluate(base()).action == :allow
+
+      assert_received {:boundary_policy_event, %{system_time: system_time},
+                       %{
+                         action: :allow,
+                         verdict: :allow,
+                         phase: :tool_request,
+                         risk_level: :low,
+                         trust_level: :high,
+                         trust_required: nil,
+                         error_reason: nil
+                       }}
+
+      assert is_integer(system_time)
     end
   end
 

@@ -82,6 +82,7 @@ defmodule SigilGuard.BoundaryPolicy do
   @external_sinks [:external, :network, "external", "network"]
   @secret_categories [:secret, "secret"]
   @risk_rank %{low: 0, medium: 1, high: 2}
+  @max_timeout_ms 4_294_967_295
 
   @sandbox_phases [:tool_request, :tool_result]
 
@@ -154,8 +155,10 @@ defmodule SigilGuard.BoundaryPolicy do
     boundary = Boundary.new(input)
 
     decision =
-      case Boundary.validate(boundary) do
-        :ok -> decide(boundary, opts)
+      with :ok <- validate_options(opts),
+           :ok <- Boundary.validate(boundary) do
+        decide(boundary, opts)
+      else
         {:error, reason} -> terminal_block(boundary, reason)
       end
 
@@ -169,6 +172,23 @@ defmodule SigilGuard.BoundaryPolicy do
     emit(decision)
     decision
   end
+
+  defp validate_options(opts) do
+    if Keyword.keyword?(opts) do
+      hooks = Keyword.get(opts, :hooks, [])
+      detector = Keyword.get(opts, :adaptive_detector)
+      timeout = Keyword.get(opts, :hook_timeout_ms, 5_000)
+
+      if valid_hooks?(hooks) and (is_nil(detector) or is_atom(detector)) and
+           is_integer(timeout) and timeout >= 0 and timeout <= @max_timeout_ms,
+         do: :ok,
+         else: {:error, :invalid_options}
+    else
+      {:error, :invalid_options}
+    end
+  end
+
+  defp valid_hooks?(hooks), do: is_list(hooks) and Enum.all?(hooks, &is_atom/1)
 
   defp decide(boundary, opts) do
     matching = policy_matching_rules(boundary, opts)
@@ -486,10 +506,14 @@ defmodule SigilGuard.BoundaryPolicy do
   defp rule(id, explanation), do: %{"id" => id, "explanation" => explanation}
 
   defp emit(%Decision{} = decision) do
-    Telemetry.emit([:sigil_guard, :policy, :decision], %{}, %{
+    Telemetry.emit([:sigil_guard, :policy, :decision], %{system_time: System.system_time()}, %{
+      action: decision.action,
       verdict: decision.action,
       phase: decision.phase,
-      risk_level: decision.risk_level
+      risk_level: decision.risk_level,
+      trust_level: decision.trust_level,
+      trust_required: nil,
+      error_reason: nil
     })
   end
 end

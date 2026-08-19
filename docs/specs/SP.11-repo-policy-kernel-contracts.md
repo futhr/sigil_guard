@@ -257,11 +257,15 @@ In v3 the repo policy kernel contributes exactly this map to
 | `:invalid_path` | block decision or return tuple | use safe relative path | change blocked. |
 | `:policy_too_large` | return tuple | reduce file size | policy load fails. |
 | `:not_found` | return tuple | provide policy | caller can use defaults. |
+| `:invalid_options` | return tuple | pass a keyword list containing only documented loader options | policy load fails closed before filesystem access. |
 | `{:legacy_policy_filename, legacy, replacement}` | return tuple | rename the file to the named v3 filename | policy load fails closed. |
 
 ## Security Considerations
 
 - Absolute paths and traversal are rejected before rule matching.
+- Loader option containers and keys are validated before filesystem access;
+  malformed options return `{:error, :invalid_options}`, and invalid byte
+  limits cannot bypass the file-size bound through Erlang term ordering.
 - Rules match exact agent/action strings or `*`; no dynamic atom creation from
   external policy input is required.
 - `:block` always outranks weaker decisions.

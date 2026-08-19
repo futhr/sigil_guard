@@ -35,6 +35,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
     {".sigil/policy", ".sigilguard/policy"},
     {".github/sigil-policy", ".github/sigilguard-policy"}
   ]
+  @load_option_keys [:candidates, :legacy_replacements, :max_bytes]
   @sections ~w([rules] [repo] [contracts])
   @section_regex ~r/^\[[a-z_]+\]$/
   @decisions ~w(allow redact confirm quarantine block)
@@ -65,6 +66,7 @@ defmodule SigilGuard.BoundaryPolicy.File do
 
   @type parse_error ::
           :invalid_policy_file
+          | :invalid_options
           | :policy_too_large
           | :invalid_output_contract
           | :unknown_transform
@@ -126,7 +128,9 @@ defmodule SigilGuard.BoundaryPolicy.File do
   `.github/sigil-policy`) present under the repo root fails closed with
   `{:error, {:legacy_policy_filename, found, use}}` - even when a new-name file
   also exists. There is no silent fallback or coexistence; candidate paths
-  resolve inside the repo root only.
+  resolve inside the repo root only. Loader options are validated before
+  filesystem access; malformed containers, unknown keys, candidate sets,
+  legacy mappings, or byte limits fail with `{:error, :invalid_options}`.
   """
   @spec load(Path.t(), keyword()) ::
           {:ok, t()}
@@ -134,11 +138,14 @@ defmodule SigilGuard.BoundaryPolicy.File do
              parse_error()
              | :not_found
              | {:legacy_policy_filename, Path.t(), Path.t()}}
-  def load(repo_root, opts \\ []) when is_binary(repo_root) do
+  def load(repo_root, opts \\ [])
+
+  def load(repo_root, opts) when is_binary(repo_root) do
     root = Path.expand(repo_root)
 
-    with :ok <- reject_legacy(root, opts) do
-      candidates = Keyword.get(opts, :candidates, @default_candidates)
+    with :ok <- validate_load_options(opts),
+         :ok <- reject_legacy(root, opts) do
+      candidates = normalize_candidates(Keyword.get(opts, :candidates, @default_candidates))
 
       case first_existing(root, candidates) do
         nil -> {:error, :not_found}
@@ -146,6 +153,43 @@ defmodule SigilGuard.BoundaryPolicy.File do
       end
     end
   end
+
+  def load(_, _), do: {:error, :invalid_options}
+
+  defp validate_load_options(opts) when is_list(opts) do
+    if Keyword.keyword?(opts) and
+         Enum.all?(Keyword.keys(opts), &(&1 in @load_option_keys)) and
+         valid_candidates?(Keyword.get(opts, :candidates, @default_candidates)) and
+         valid_legacy_replacements?(Keyword.get(opts, :legacy_replacements, @legacy_replacements)) and
+         valid_max_bytes?(Keyword.get(opts, :max_bytes, @max_bytes)) do
+      :ok
+    else
+      {:error, :invalid_options}
+    end
+  end
+
+  defp validate_load_options(_), do: {:error, :invalid_options}
+
+  defp valid_candidates?(candidate) when is_binary(candidate), do: true
+
+  defp valid_candidates?(candidates) when is_list(candidates),
+    do: Enum.all?(candidates, &is_binary/1)
+
+  defp valid_candidates?(_), do: false
+
+  defp valid_legacy_replacements?(replacements) when is_list(replacements) do
+    Enum.all?(replacements, fn
+      {found, replacement} when is_binary(found) and is_binary(replacement) -> true
+      _ -> false
+    end)
+  end
+
+  defp valid_legacy_replacements?(_), do: false
+
+  defp valid_max_bytes?(max_bytes), do: is_integer(max_bytes) and max_bytes >= 0
+
+  defp normalize_candidates(candidate) when is_binary(candidate), do: [candidate]
+  defp normalize_candidates(candidates), do: candidates
 
   defp reject_legacy(root, opts) do
     legacy = Keyword.get(opts, :legacy_replacements, @legacy_replacements)

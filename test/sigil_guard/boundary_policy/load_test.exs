@@ -106,5 +106,22 @@ defmodule SigilGuard.BoundaryPolicy.LoadTest do
       write(root, "SIGILGUARD_POLICY", "version 3\n" <> String.duplicate("x", 256 * 1024))
       assert PolicyFile.load(root) == {:error, :policy_too_large}
     end
+
+    test "malformed loader options fail closed instead of raising", %{root: root} do
+      write(root, "SIGILGUARD_POLICY", @policy)
+
+      for opts <- [
+            :bad,
+            [{:candidates}],
+            [unknown: true],
+            [candidates: [:bad]],
+            [legacy_replacements: [:bad]],
+            [max_bytes: :unbounded]
+          ] do
+        assert PolicyFile.load(root, opts) == {:error, :invalid_options}
+      end
+
+      assert PolicyFile.load(:bad_root) == {:error, :invalid_options}
+    end
   end
 end

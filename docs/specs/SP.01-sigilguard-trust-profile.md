@@ -99,7 +99,7 @@ sequenceDiagram
 | GenServer | no | Sign/verify are pure functions; no process state. |
 | Behaviour | yes | `SigilGuard.Signer` supplies Ed25519 signing. |
 | ETS | yes | `SigilGuard.ReplayStore` (`:sigil_guard_replay`) for replay scope. |
-| Telemetry | yes | Span events around sign and verify. |
+| Telemetry | no at this primitive | Direct sign/verify stay pure; the host-facing Agent Trust helpers own operational spans in SP.13. |
 
 ## Attestation Envelope And Canonical Encoding
 
@@ -827,13 +827,13 @@ advisory; v3 records scanner evidence in `matched_rules` instead).
 
 ## Telemetry And Observability
 
-| Event | Type | Metadata | Purpose |
-|-------|------|----------|---------|
-| `[:sigil_guard, :attestation, :sign, :start \| :stop \| :exception]` | span | `%{statement_type: atom(), result: :ok \| :error}` | Signing latency and outcome. |
-| `[:sigil_guard, :attestation, :verify, :start \| :stop \| :exception]` | span | `%{statement_type: atom(), result: :ok \| :error, error: atom() \| nil}` | Verification latency and failure class. |
-
-Events use the existing span helper. OpenTelemetry attribute-prefix
-reconciliation (D16) is owned by SP.05.
+Direct `SigilGuard.Attestation` and `Attestation.Envelope` operations are pure
+and emit no event. Host-facing agent operations use the
+`[:sigil_guard, :agent_trust, :attest | :verify, :start | :stop | :exception]`
+spans owned by SP.13. Trust bundles and audit artifacts that reuse the same DSSE
+primitive retain their own component-level events, so one logical operation is
+not double-counted. The exact public list is `SigilGuard.Telemetry.events/0`;
+OpenTelemetry attribute-prefix reconciliation (D16) is owned by SP.05.
 
 ## Error Handling
 

@@ -21,6 +21,7 @@ defmodule SigilGuard.AdaptiveDetector do
   alias SigilGuard.Telemetry
 
   @default_timeout_ms 5_000
+  @max_timeout_ms 4_294_967_295
   @severities [:low, :medium, :high]
   @risk_rank %{low: 0, medium: 1, high: 2}
 
@@ -57,9 +58,25 @@ defmodule SigilGuard.AdaptiveDetector do
   """
   @spec run(Boundary.t(), keyword()) :: result()
   def run(%Boundary{} = boundary, opts) do
-    case Keyword.get(opts, :adaptive_detector) do
-      nil -> empty()
-      detector -> invoke(detector, boundary, opts)
+    if valid_options?(opts) do
+      case Keyword.get(opts, :adaptive_detector) do
+        nil -> empty()
+        detector -> invoke(detector, boundary, opts)
+      end
+    else
+      degraded(__MODULE__)
+    end
+  end
+
+  defp valid_options?(opts) do
+    if Keyword.keyword?(opts) do
+      timeout = Keyword.get(opts, :hook_timeout_ms, @default_timeout_ms)
+      detector = Keyword.get(opts, :adaptive_detector)
+
+      (is_nil(detector) or is_atom(detector)) and is_integer(timeout) and timeout >= 0 and
+        timeout <= @max_timeout_ms
+    else
+      false
     end
   end
 

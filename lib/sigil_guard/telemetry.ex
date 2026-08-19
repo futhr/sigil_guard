@@ -34,11 +34,12 @@ defmodule SigilGuard.Telemetry do
 
     * `[:sigil_guard, :policy, :decision]`
       Measurements: `%{system_time: integer}`
-      Metadata: `%{action: String.t(), risk_level: atom, trust_level: atom,
-      trust_required: atom, error_reason: atom | nil}`
+      Metadata: `%{action: String.t() | atom, risk_level: atom, trust_level: atom,
+      trust_required: atom | nil, error_reason: atom | nil}`; boundary-kernel
+      decisions additionally carry `%{verdict: atom, phase: atom}`
 
     * `[:sigil_guard, :boundary, :hook]`
-      Measurements: `%{}`
+      Measurements: `%{duration: non_neg_integer}` (native time units)
       Metadata: `%{module: String.t(), phase: atom, hook_result: atom}`
 
     * `[:sigil_guard, :boundary, :adaptive]`
@@ -61,13 +62,15 @@ defmodule SigilGuard.Telemetry do
     * `[:sigil_guard, :mcp, :request]`
       Measurements: `%{system_time: integer}`
       Metadata: `%{phase: atom, origin: atom, sink: atom, tool: String.t() | nil,
-      actor: String.t() | nil, identity: String.t() | nil, trust_zone: atom,
-      trust_level: atom, risk_level: atom, verdict: atom, action: atom,
-      envelope_status: :valid | :invalid, envelope_reason: atom | nil,
+      mcp_server: String.t() | nil, protocol_version: String.t() | nil,
+      mcp_result_type: String.t() | nil, actor: String.t() | nil,
+      identity: String.t() | nil, trust_zone: atom, trust_level: atom,
+      risk_level: atom, verdict: atom, action: atom,
+      envelope_status: :valid | :invalid | nil, envelope_reason: atom | nil,
       confirmation_status: :accepted | :invalid | nil,
       confirmation_reason: atom | nil, confirmation_actor: String.t() | nil,
       confirmation_nonce_hash: String.t() | nil,
-      content_hash: String.t()}`
+      content_hash: String.t() | nil}`
 
     * `[:sigil_guard, :audit, :logged]`
       Measurements: `%{system_time: integer}`
@@ -141,6 +144,43 @@ defmodule SigilGuard.Telemetry do
     [:sigil_guard, :agent_trust, :quarantine]
   ]
 
+  @mcp_metadata_keys [
+    :phase,
+    :actor,
+    :identity,
+    :origin,
+    :sink,
+    :tool,
+    :mcp_server,
+    :resource_uri,
+    :protocol_version,
+    :mcp_result_type,
+    :trust_zone,
+    :trust_level,
+    :risk_level,
+    :verdict,
+    :action,
+    :hit_count,
+    :indicator_count,
+    :indicator_ids,
+    :content_hash,
+    :action_digest,
+    :action_digest_error,
+    :scanner_error,
+    :runtime_input_error,
+    :envelope_status,
+    :envelope_reason,
+    :confirmation_status,
+    :confirmation_reason,
+    :confirmation_actor,
+    :confirmation_nonce_hash,
+    :confirmation_issued_at,
+    :confirmation_expires_at,
+    :repo_policy_verdict,
+    :repo_policy_rules,
+    :repo_unmatched_paths
+  ]
+
   # The 1.0 attribute namespace is `sigilguard.*` throughout. The mapping is
   # mechanical - leading `sigil.` becomes `sigilguard.` and the redundant
   # `.security.` segment is dropped - plus the exact-name exceptions (hashed
@@ -177,12 +217,14 @@ defmodule SigilGuard.Telemetry do
     indicator_count: "sigilguard.indicator_count",
     indicator_ids: "sigilguard.indicator_ids",
     mcp_server: "sigilguard.mcp.server",
+    mcp_result_type: "sigilguard.mcp.result_type",
     module: "sigilguard.boundary.hook.module",
     origin: "sigilguard.origin",
     outcome: "sigilguard.outcome",
     patterns_checked: "sigilguard.scanner.patterns_checked",
     phase: "sigilguard.phase",
     pipeline: "sigilguard.scanner.pipeline",
+    protocol_version: "sigilguard.mcp.protocol_version",
     reason: "sigilguard.error.reason",
     release_status: "sigilguard.release.status",
     repo_policy_error: "sigilguard.repo_policy.error",
@@ -218,6 +260,8 @@ defmodule SigilGuard.Telemetry do
     "sigilguard.confirmation.actor.hash",
     "sigilguard.confirmation.nonce_hash",
     "sigilguard.identity.hash",
+    "sigilguard.mcp.protocol_version",
+    "sigilguard.mcp.result_type",
     "sigilguard.payload.digest",
     "sigilguard.resource.uri",
     "sigilguard.trust_bundle.digest"
@@ -239,6 +283,16 @@ defmodule SigilGuard.Telemetry do
   @spec emit(event_name(), map(), map()) :: :ok
   def emit(event, measurements, metadata) do
     :telemetry.execute(event, measurements, metadata)
+  end
+
+  @doc false
+  @spec emit_mcp_decision(map()) :: :ok
+  def emit_mcp_decision(metadata) when is_map(metadata) do
+    emit(
+      [:sigil_guard, :mcp, :request],
+      %{system_time: System.system_time()},
+      Map.take(metadata, @mcp_metadata_keys)
+    )
   end
 
   @doc "Return all SigilGuard telemetry events known to this version."

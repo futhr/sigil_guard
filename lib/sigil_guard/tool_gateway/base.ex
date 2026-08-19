@@ -805,41 +805,10 @@ defmodule SigilGuard.ToolGateway.Base do
   defp emit_signed_request(%Decision{} = decision, envelope_status, envelope_reason) do
     metadata =
       decision.audit_metadata
-      |> Map.take([
-        :phase,
-        :actor,
-        :identity,
-        :origin,
-        :sink,
-        :tool,
-        :mcp_server,
-        :resource_uri,
-        :trust_zone,
-        :trust_level,
-        :risk_level,
-        :verdict,
-        :action,
-        :hit_count,
-        :indicator_count,
-        :indicator_ids,
-        :content_hash,
-        :action_digest,
-        :action_digest_error,
-        :scanner_error,
-        :confirmation_status,
-        :confirmation_reason,
-        :confirmation_actor,
-        :confirmation_nonce_hash,
-        :confirmation_issued_at,
-        :confirmation_expires_at,
-        :repo_policy_verdict,
-        :repo_policy_rules,
-        :repo_unmatched_paths
-      ])
       |> Map.put(:envelope_status, envelope_status)
       |> Map.put(:envelope_reason, envelope_reason)
 
-    Telemetry.emit([:sigil_guard, :mcp, :request], %{system_time: System.system_time()}, metadata)
+    Telemetry.emit_mcp_decision(metadata)
   end
 
   defp jsonrpc_result(%{"jsonrpc" => _, "id" => id, "result" => result} = source, _, opts) do

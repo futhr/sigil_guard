@@ -34,6 +34,7 @@ defmodule SigilGuard.Runtime.Gate do
 
   @external_sinks ~w(external network log repo tool)a
   @risk_levels ~w(low medium high)a
+  @max_timeout_ms 4_294_967_295
 
   @doc """
   Evaluate whether a payload can cross the labeled boundary.
@@ -89,8 +90,21 @@ defmodule SigilGuard.Runtime.Gate do
   defp normalize_runtime_context(_), do: {:error, :invalid_context}
 
   defp validate_runtime_options(opts) do
-    if Keyword.keyword?(opts), do: :ok, else: {:error, :invalid_options}
+    if Keyword.keyword?(opts) do
+      hooks = Keyword.get(opts, :hooks, [])
+      detector = Keyword.get(opts, :adaptive_detector)
+      timeout = Keyword.get(opts, :hook_timeout_ms, 5_000)
+
+      if valid_hooks?(hooks) and (is_nil(detector) or is_atom(detector)) and
+           is_integer(timeout) and timeout >= 0 and timeout <= @max_timeout_ms,
+         do: :ok,
+         else: {:error, :invalid_options}
+    else
+      {:error, :invalid_options}
+    end
   end
+
+  defp valid_hooks?(hooks), do: is_list(hooks) and Enum.all?(hooks, &is_atom/1)
 
   defp runtime_inputs(payload, context) do
     with {:ok, text} <- Context.fetch_text(payload),

@@ -10,6 +10,9 @@ defmodule SigilGuard.Hooks do
 
   `dispatch/3` invokes the callback matching the boundary phase on each hook in
   registration order, time-bounded by `:hook_timeout_ms` (default `5_000`).
+  Malformed options, a non-module hook entry, or an invalid timeout fail closed
+  as `:invalid_hook_options` on a blockable phase and log-and-continue on a
+  notification-only phase.
   Results:
 
   - `{:ok, :continue}` / `:ok` - proceed.
@@ -32,6 +35,7 @@ defmodule SigilGuard.Hooks do
   alias SigilGuard.Telemetry
 
   @default_timeout_ms 5_000
+  @max_timeout_ms 4_294_967_295
   @risk_rank %{low: 0, medium: 1, high: 2}
 
   @callback_for %{
@@ -104,25 +108,58 @@ defmodule SigilGuard.Hooks do
   """
   @spec dispatch(Boundary.t(), keyword()) :: result()
   def dispatch(%Boundary{} = boundary, opts) do
-    hooks = Keyword.get(opts, :hooks, [])
     callback = Map.get(@callback_for, boundary.phase)
 
-    if callback == nil or hooks == [] do
-      empty_result()
-    else
-      run_hooks(hooks, boundary, callback, opts)
+    case normalize_options(opts) do
+      {:ok, hooks, timeout} when callback != nil and hooks != [] ->
+        run_hooks(hooks, boundary, callback, opts, timeout)
+
+      {:ok, _, _} ->
+        empty_result()
+
+      :error ->
+        invalid_options(boundary)
     end
   end
 
-  defp run_hooks(hooks, boundary, callback, opts) do
+  defp normalize_options(opts) do
+    if Keyword.keyword?(opts) do
+      hooks = Keyword.get(opts, :hooks, [])
+      timeout = Keyword.get(opts, :hook_timeout_ms, @default_timeout_ms)
+
+      if valid_hooks?(hooks) and valid_timeout?(timeout),
+        do: {:ok, hooks, timeout},
+        else: :error
+    else
+      :error
+    end
+  end
+
+  defp valid_hooks?(hooks), do: is_list(hooks) and Enum.all?(hooks, &is_atom/1)
+
+  defp valid_timeout?(timeout) do
+    is_integer(timeout) and timeout >= 0 and timeout <= @max_timeout_ms
+  end
+
+  defp invalid_options(boundary) do
+    reason = :invalid_hook_options
+    emit(__MODULE__, boundary.phase, reason, 0)
+
+    if Lifecycle.blockable?(boundary.phase) do
+      %{empty_result() | contributions: [{:block, [rule(__MODULE__, boundary.phase, reason)]}]}
+    else
+      empty_result()
+    end
+  end
+
+  defp run_hooks(hooks, boundary, callback, opts, timeout) do
     blockable? = Lifecycle.blockable?(boundary.phase)
-    timeout = Keyword.get(opts, :hook_timeout_ms, @default_timeout_ms)
 
     hooks
     |> Enum.reduce_while(empty_result(), fn module, acc ->
       if exports?(module, callback) do
-        outcome = invoke(module, callback, boundary, opts, timeout)
-        fold(interpret(outcome, module, boundary.phase, blockable?), acc)
+        {outcome, duration} = invoke(module, callback, boundary, opts, timeout)
+        fold(interpret(outcome, module, boundary.phase, blockable?, duration), acc)
       else
         {:cont, acc}
       end
@@ -146,27 +183,29 @@ defmodule SigilGuard.Hooks do
     {:halt, %{acc | contributions: [{:block, [rule]} | acc.contributions]}}
   end
 
-  defp interpret({:ok, value}, module, phase, blockable?) do
-    interpret_value(value, module, phase, blockable?)
+  defp interpret({:ok, value}, module, phase, blockable?, duration) do
+    {result, hook_result} = interpret_value(value, module, phase, blockable?)
+    emit(module, phase, hook_result, duration)
+    result
   end
 
-  defp interpret({:error, reason}, module, phase, blockable?) do
-    emit(module, phase, reason)
+  defp interpret({:error, reason}, module, phase, blockable?, duration) do
+    emit(module, phase, reason, duration)
     fail_closed(reason, module, phase, blockable?)
   end
 
   # Deny-side verdicts are valid only on blockable phases. On a notification-only
   # phase they are a contract violation (handled as invalid-result: log-and-continue).
   defp interpret_value({:block, reason}, module, phase, true) when is_binary(reason) do
-    {:block, rule(module, phase, reason)}
+    {{:block, rule(module, phase, reason)}, :block}
   end
 
   defp interpret_value({:confirm, reason}, module, phase, true) when is_binary(reason) do
-    {:confirm, rule(module, phase, reason)}
+    {{:confirm, rule(module, phase, reason)}, :confirm}
   end
 
-  defp interpret_value({:ok, :continue}, _, _, _), do: :continue
-  defp interpret_value(:ok, _, _, _), do: :continue
+  defp interpret_value({:ok, :continue}, _, _, _), do: {:continue, :continue}
+  defp interpret_value(:ok, _, _, _), do: {:continue, :continue}
 
   defp interpret_value({:ok, :continue, signal}, module, phase, blockable?) when is_map(signal) do
     signal_or_invalid(signal, module, phase, blockable?)
@@ -177,18 +216,16 @@ defmodule SigilGuard.Hooks do
   end
 
   defp interpret_value(_, module, phase, blockable?) do
-    emit(module, phase, :invalid_hook_result)
-    fail_closed(:invalid_hook_result, module, phase, blockable?)
+    {fail_closed(:invalid_hook_result, module, phase, blockable?), :invalid_hook_result}
   end
 
   defp signal_or_invalid(signal, module, phase, blockable?) do
     case normalize_signal(signal) do
       {:ok, normalized} ->
-        {:signal, normalized}
+        {{:signal, normalized}, :signal}
 
       :error ->
-        emit(module, phase, :invalid_hook_result)
-        fail_closed(:invalid_hook_result, module, phase, blockable?)
+        {fail_closed(:invalid_hook_result, module, phase, blockable?), :invalid_hook_result}
     end
   end
 
@@ -241,7 +278,9 @@ defmodule SigilGuard.Hooks do
   end
 
   defp invoke(module, callback, boundary, opts, timeout) do
-    run_bounded(fn -> apply(module, callback, [boundary, opts]) end, timeout)
+    started_at = System.monotonic_time()
+    outcome = run_bounded(fn -> apply(module, callback, [boundary, opts]) end, timeout)
+    {outcome, System.monotonic_time() - started_at}
   end
 
   defp run_bounded(fun, timeout) do
@@ -282,8 +321,8 @@ defmodule SigilGuard.Hooks do
 
   defp empty_result, do: %{contributions: [], risk_level: nil, indicators: []}
 
-  defp emit(module, phase, result) do
-    Telemetry.emit([:sigil_guard, :boundary, :hook], %{}, %{
+  defp emit(module, phase, result, duration) do
+    Telemetry.emit([:sigil_guard, :boundary, :hook], %{duration: duration}, %{
       module: inspect(module),
       phase: phase,
       hook_result: result
