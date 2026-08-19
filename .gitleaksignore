@@ -1,0 +1,30 @@
+# Exact, reviewed synthetic scanner fixtures. Path-wide exclusions are
+# intentionally forbidden: a changed fixture receives a new fingerprint and
+# must be reviewed again.
+23650277a76f964caf42e203efeb0043e9733217:docs/specs/SP.06-envelope-and-native-backend-contracts.md:generic-api-key:62
+0b82816b4bdca0c02cb7c5796ded085937f17ffe:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:290
+0b82816b4bdca0c02cb7c5796ded085937f17ffe:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:291
+db18aabad20dca81eebe18095b913bed32951808:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:283
+db18aabad20dca81eebe18095b913bed32951808:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:284
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/fixtures/streaming/split_secret_vectors.json:generic-api-key:1
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/fixtures/streaming/split_secret_vectors.json:generic-api-key:1
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/fixtures/streaming/split_secret_vectors.json:generic-api-key:1
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/fixtures/streaming/split_secret_vectors.json:generic-api-key:1
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/fixtures/streaming/split_secret_vectors.json:generic-api-key:1
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/fixtures/streaming/split_secret_vectors.json:generic-api-key:1
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/support/streaming_vector_fixture.ex:generic-api-key:15
+ed0d43b0df0efcc4327f919b00d04d60fa535e0f:test/support/streaming_vector_fixture.ex:generic-api-key:19
+a0163ce5c962a59ea098523878e780f509d2b7f7:docs/specs/SP.06-envelope-and-native-backend-contracts.md:generic-api-key:62
+2180cb705dcd9818cd8c12428e00676c8dec8c59:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:192
+d1a2db4d200329fee4a64e20dcf6d4560838268a:test/sigil_guard/runtime/gate_test.exs:generic-api-key:186
+6527c57ecddeed8822d558eff2ae652eca827a24:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:168
+a5a9fd4131ab7859bb066a908307f1a012a10c02:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:73
+f91c3b7a2d03b2054ee1b6b2b3ac0e0941878c80:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:62
+f91c3b7a2d03b2054ee1b6b2b3ac0e0941878c80:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:71
+f91c3b7a2d03b2054ee1b6b2b3ac0e0941878c80:test/sigil_guard/scanner/pipeline_test.exs:generic-api-key:72
+2f581d1bae9b745d07582f5aed1b7698b62c4e00:test/sigil_guard/runtime/gate_test.exs:stripe-access-token:103
+34a901d6d87b83b8f9b31da2a1918c751e0c3f55:lib/sigil_guard/backend/elixir.ex:generic-api-key:33
+99e9d15f512a7bcab2de502e3f2652df2aa6a48d:bench/run.exs:stripe-access-token:100
+441f3507c393843d729d827b4541c6279a898aaf:test/sigil_guard/scanner_test.exs:stripe-access-token:36
+441f3507c393843d729d827b4541c6279a898aaf:test/sigil_guard/scanner_test.exs:private-key:73
+441f3507c393843d729d827b4541c6279a898aaf:test/sigil_guard/scanner_test.exs:private-key:85

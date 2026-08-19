@@ -49,3 +49,14 @@ Out of scope:
 Treat signing-key compromise as an incident. For trust-bundle signer compromise,
 follow the emergency rotation ceremony defined in the trust-bundle
 specification, found under `docs/specs/` in the source repository.
+
+## Repository Secret Scanning
+
+`./bin/check-secrets` scans the complete Git history with a pinned Gitleaks
+release and verifies the downloaded archive checksum before execution. The
+canonical `./bin/check` gate runs it in CI and locally.
+
+SigilGuard's scanner tests deliberately contain synthetic credential-shaped
+strings. `.gitleaksignore` acknowledges only the exact reviewed historical
+fingerprints for those fixtures. Do not add path-wide exclusions: any changed
+or new credential-shaped fixture must be reviewed as a fresh finding.

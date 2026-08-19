@@ -80,8 +80,12 @@ mix format --check-formatted
 mix compile --warnings-as-errors
 mix credo --strict
 mix sobelow --config --compact
+./bin/check-secrets
 mix deps.audit
+mix hex.audit
 mix test --cover
+mix muex --files lib/sigil_guard/verdict.ex --test-paths test/sigil_guard/verdict_test.exs --no-optimize --fail-at 100 --concurrency 1 --timeout 30000
+mix sigil.livebook_check
 mix doctor
 mix dialyzer
 mix docs

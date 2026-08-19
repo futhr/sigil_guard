@@ -17,7 +17,9 @@
     {:sobelow, command: "mix sobelow --config --compact"},
 
     # Security and dependencies
+    {:secret_scan, command: "./bin/check-secrets"},
     {:mix_audit, command: "mix deps.audit"},
+    {:hex_audit, command: "mix hex.audit"},
 
     # Type checking
     {:dialyzer, command: "mix dialyzer"},
@@ -30,6 +32,11 @@
     {:ex_doc, command: "mix docs --warnings-as-errors"},
 
     # Tests
-    {:ex_unit, command: "mix test --cover"}
+    {:ex_unit, command: "mix test --cover"},
+    {:mutation,
+     command:
+       "mix muex --files lib/sigil_guard/verdict.ex " <>
+         "--test-paths test/sigil_guard/verdict_test.exs --no-optimize " <>
+         "--fail-at 100 --concurrency 1 --timeout 30000"}
   ]
 ]

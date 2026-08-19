@@ -19,7 +19,8 @@ defmodule SigilGuard.MixProject do
       hex: [
         ignore_advisories: [
           "CVE-2026-43966",
-          "CVE-2026-43969"
+          "CVE-2026-43969",
+          "CVE-2026-43971"
         ]
       ],
       docs: docs(),
@@ -75,6 +76,7 @@ defmodule SigilGuard.MixProject do
       # Testing
       {:excoveralls, "~> 0.18", only: :test},
       {:bypass, "~> 2.1", only: :test},
+      {:muex, "~> 0.8.1", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.4", only: :test},
 
       # Benchmarks
