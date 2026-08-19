@@ -55,10 +55,13 @@ Releases are managed by maintainers using git_ops:
 
 The publish workflow builds a Hex tarball and SPDX SBOM after the complete gate,
 signs a release predicate that names both artifacts and their SHA-256 digests,
-and verifies both provenance forms. The protected publish job has no OIDC or
-attestation-write permission; it receives the Hex key only for the publish
-step, requires a fresh build to equal the attested tar, then compares the Hex
-registry download byte for byte.
+and verifies both provenance forms. The environment-scoped publish job has no
+OIDC or attestation-write permission; it receives the Hex key only for the
+publish step, requires a fresh build to equal the attested tar, then compares
+the Hex registry download byte for byte. Before any release, administrators
+must complete the tag-ruleset, `hex-publish` protection, environment-secret,
+and `main` protection checklist in `guides/release-and-anchoring.md`; release
+verification rejects an unprotected tag.
 
 ## Pull Request Process
 

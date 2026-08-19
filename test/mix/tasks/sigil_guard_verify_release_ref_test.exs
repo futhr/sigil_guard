@@ -70,6 +70,17 @@ defmodule Mix.Tasks.SigilGuard.VerifyReleaseRefTest do
              VerifyReleaseRef.verify("1.0.0", malformed, context.repository)
   end
 
+  test "rejects a release tag that GitHub does not report as protected", context do
+    unprotected = Map.put(context.environment, "GITHUB_REF_PROTECTED", "false")
+    missing = Map.delete(context.environment, "GITHUB_REF_PROTECTED")
+
+    assert {:error, :unprotected_ref} =
+             VerifyReleaseRef.verify("1.0.0", unprotected, context.repository)
+
+    assert {:error, :unprotected_ref} =
+             VerifyReleaseRef.verify("1.0.0", missing, context.repository)
+  end
+
   test "rejects a tag that does not resolve to the triggering SHA", context do
     File.write!(Path.join(context.repository, "release.txt"), "second\n")
     git!(context.repository, ["add", "release.txt"])
@@ -97,6 +108,7 @@ defmodule Mix.Tasks.SigilGuard.VerifyReleaseRefTest do
     %{
       "GITHUB_REF" => "refs/tags/v1.0.0",
       "GITHUB_REF_NAME" => "v1.0.0",
+      "GITHUB_REF_PROTECTED" => "true",
       "GITHUB_SHA" => sha
     }
   end

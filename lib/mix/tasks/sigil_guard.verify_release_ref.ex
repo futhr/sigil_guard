@@ -4,11 +4,12 @@ defmodule Mix.Tasks.SigilGuard.VerifyReleaseRef do
   @moduledoc """
   Verify that a release runs from the exact tag for the Mix project version.
 
-  In GitHub Actions, `GITHUB_REF`, `GITHUB_REF_NAME`, and `GITHUB_SHA` are
-  checked together: the expected tag must resolve to the triggering commit and
-  the checked-out `HEAD`. For a local preflight, setting only
-  `GITHUB_REF_NAME=v<version>` validates the tag name without requiring the tag
-  to exist locally.
+  In GitHub Actions, `GITHUB_REF`, `GITHUB_REF_NAME`, `GITHUB_SHA`, and the
+  workflow-provided `GITHUB_REF_PROTECTED` are checked together: the expected
+  tag must be covered by branch protection or a ruleset, resolve to the
+  triggering commit, and match the checked-out `HEAD`. For a local preflight,
+  setting only `GITHUB_REF_NAME=v<version>` validates the tag name without
+  requiring the tag to exist locally.
 
       GITHUB_REF_NAME=v1.0.0 mix sigil_guard.verify_release_ref
   """
@@ -22,6 +23,7 @@ defmodule Mix.Tasks.SigilGuard.VerifyReleaseRef do
           | :missing_ref_name
           | :incomplete_github_identity
           | :invalid_github_sha
+          | :unprotected_ref
           | {:unexpected_ref_name, String.t(), String.t()}
           | {:unexpected_ref, String.t(), String.t()}
           | {:cannot_resolve, String.t(), String.t()}
@@ -88,7 +90,9 @@ defmodule Mix.Tasks.SigilGuard.VerifyReleaseRef do
         :ok
 
       {github_ref, github_sha} when is_binary(github_ref) and is_binary(github_sha) ->
-        verify_git_identity(repository, expected_ref, github_ref, github_sha)
+        with :ok <- validate_protected_ref(Map.get(environment, "GITHUB_REF_PROTECTED")) do
+          verify_git_identity(repository, expected_ref, github_ref, github_sha)
+        end
 
       _ ->
         {:error, :incomplete_github_identity}
@@ -108,6 +112,9 @@ defmodule Mix.Tasks.SigilGuard.VerifyReleaseRef do
   defp validate_sha(sha) do
     if Regex.match?(@sha_pattern, sha), do: :ok, else: {:error, :invalid_github_sha}
   end
+
+  defp validate_protected_ref("true"), do: :ok
+  defp validate_protected_ref(_), do: {:error, :unprotected_ref}
 
   defp compare_sha(sha, sha, _), do: :ok
 

@@ -426,7 +426,7 @@ MUST NOT write raw secrets. Digests referenced by attestation subjects
   WP29 anonymisation opinion): identity-bearing fields use the keyed
   `fh1:` form; high-sensitivity fields are `omitted` outright.
 - Destroying the field-hash key is cryptographic erasure (NIST SP
-  800-88r1): stored digests stay byte-identical and verifiable while the
+  800-88r2): stored digests stay byte-identical and verifiable while the
   person linkage is severed. Because the field-hash key differs from the
   chain key, crypto-erasure never degrades chain verifiability.
 
@@ -591,7 +591,11 @@ uses the CloudEvents distributed tracing extension (`traceparent`).
   emits SPDX 2.3. Recorded rationale: the task exists and SPDX is what the
   tooling emits today; Elixir's own OpenChain-certified releases ship
   SPDX/CycloneDX SBOMs, so SPDX matches the language posture. CycloneDX
-  output is an optional post-GA addition, not a v3 requirement.
+  output is an optional post-GA addition, not a v3 requirement. Every locked
+  runtime dependency MUST carry non-empty license metadata in its installed
+  Hex artifact; generation fails if the metadata is absent, malformed, or
+  names a different locked version, and the declared expression is bound into
+  the verified SBOM instead of `NOASSERTION`.
 - **Release identity:** the workflow accepts only
   `refs/tags/v<Mix.Project.version>` and verifies that the tag and checked-out
   `HEAD` both resolve to the triggering SHA. Artifact names use that validated
@@ -627,8 +631,13 @@ gh attestation verify sigil_guard-1.0.0.tar --repo refpath/sigil_guard \
 ```
 
   Validation/build, attestation, and publication are separate jobs. Only the
-  attestation job has OIDC/write permissions. Only the protected publication
-  job can read the Hex key, and only its `mix hex.publish` step receives it.
+  attestation job has OIDC/write permissions. Release verification MUST reject
+  a tag unless GitHub reports `github.ref_protected == true`. Only the
+  environment-scoped publication job can read the Hex key, and only its
+  `mix hex.publish` step receives it. Repository administrators MUST configure
+  the `hex-publish` required-reviewer and deployment-tag protections and store
+  the key as an environment secret; naming the environment in YAML is not proof
+  that these owner-managed controls exist.
   Before publish, a fresh Hex build MUST equal the attested tar; after publish,
   the registry download MUST match it byte for byte.
 
@@ -766,6 +775,7 @@ are unchanged.
 | no network | `Anchor.Store.HTTPTest` | No configured client yields `:http_client_not_configured`; zero `Finch.` references; decision paths never touch the client. |
 | OTel mapping | `TelemetryTest` | Every attribute `sigilguard.*` or `url.full`; high-cardinality absent unless opted in; rename table covered. |
 | SBOM verify | `Mix.Tasks.SigilGuard.SbomTest` | Digest verification catches drift (`:sbom_digest_mismatch`). |
+| SBOM dependency licenses | `Mix.Tasks.SigilGuard.SbomTest` | Locked Hex metadata supplies every runtime license; absent/mismatched metadata fails generation. |
 
 ## Acceptance Criteria
 
@@ -821,7 +831,9 @@ cut lands in M6 per SP.12.
       no-network tests.
 - [x] M5: isolated release workflow: `actions/attest`, SBOM attachment,
       dual-predicate `gh attestation verify` gate, directly bound SP.01
-      `release` predicate, protected Hex publication, and registry-byte check.
+      `release` predicate, protected-tag enforcement, environment-scoped Hex
+      publication, and registry-byte check. Owner-managed environment
+      protections remain a release prerequisite, not a code-owned claim.
 - [x] M6: remove finch and the `SigilGuard.Finch` pool per SP.12;
       runtime-dependency assertion test.
 
@@ -849,7 +861,7 @@ cut lands in M6 per SP.12.
 - [RFC 8785 - JSON Canonicalization Scheme](https://www.rfc-editor.org/info/rfc8785)
 - [C2SP tlog-cosignature specification](https://c2sp.org/tlog-cosignature)
 - [transparency.dev witness implementation](https://github.com/transparency-dev/witness)
-- [SLSA v1 specification levels](https://slsa.dev/spec/v1.2/levels)
+- [SLSA v1.2 build-level requirements](https://slsa.dev/spec/v1.2/build-requirements)
 - [SLSA Build Provenance](https://slsa.dev/spec/v1.2/build-provenance)
 - [GitHub attest action](https://github.com/actions/attest)
 - [GitHub artifact attestations / gh attestation verify](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations)
@@ -861,4 +873,4 @@ cut lands in M6 per SP.12.
 - [OpenTelemetry AI Agent Observability](https://opentelemetry.io/blog/2025/ai-agent-observability/)
 - [GDPR Article 17 - Right to erasure](https://gdpr-info.eu/art-17-gdpr/)
 - [GDPR Recital 26](https://gdpr-info.eu/recitals/no-26/)
-- [NIST SP 800-88 Rev. 1 - Guidelines for Media Sanitization](https://csrc.nist.gov/pubs/pubs/sp/800/88/r1/final)
+- [NIST SP 800-88 Rev. 2 - Guidelines for Media Sanitization](https://csrc.nist.gov/pubs/sp/800/88/r2/final)

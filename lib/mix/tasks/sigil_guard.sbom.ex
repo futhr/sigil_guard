@@ -290,12 +290,13 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
 
   defp dependency_graph(project, locks) do
     with {:ok, root_dependencies} <- runtime_root_dependencies(project),
-         {:ok, dependency_names} <- dependency_closure(root_dependencies, locks) do
+         {:ok, dependency_names} <- dependency_closure(root_dependencies, locks),
+         {:ok, dependencies} <- dependency_packages(locks, dependency_names) do
       {:ok,
        %{
          root_dependencies: root_dependencies,
          dependency_names: dependency_names,
-         dependencies: dependency_packages(locks, dependency_names),
+         dependencies: dependencies,
          dependency_edges: dependency_edges(root_dependencies, dependency_names, locks)
        }}
     end
@@ -357,43 +358,90 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   end
 
   defp dependency_packages(locks, dependency_names) do
-    dependency_names
-    |> Enum.flat_map(fn name ->
-      case Map.fetch(locks, name) do
-        {:ok, lock} -> dependency_package(lock)
-        :error -> []
-      end
-    end)
+    result =
+      Enum.reduce_while(dependency_names, {:ok, []}, &prepend_dependency_package(&1, &2, locks))
+
+    case result do
+      {:ok, packages} -> {:ok, Enum.reverse(packages)}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp prepend_dependency_package(name, {:ok, packages}, locks) do
+    with {:ok, lock} <- fetch_dependency_lock(locks, name),
+         {:ok, package} <- dependency_package(lock) do
+      {:cont, {:ok, [package | packages]}}
+    else
+      {:error, _} = error -> {:halt, error}
+    end
+  end
+
+  defp fetch_dependency_lock(locks, name) do
+    case Map.fetch(locks, name) do
+      {:ok, lock} -> {:ok, lock}
+      :error -> {:error, {:missing_runtime_dependency_lock, name}}
+    end
   end
 
   defp dependency_package({:hex, package, version, checksum, _, _, repo, outer}) do
     name = Atom.to_string(package)
 
-    [
-      %{
-        "name" => name,
-        "SPDXID" => package_id(name),
-        "versionInfo" => version,
-        "downloadLocation" => "https://hex.pm/packages/#{name}",
-        "filesAnalyzed" => false,
-        "licenseConcluded" => "NOASSERTION",
-        "licenseDeclared" => "NOASSERTION",
-        "supplier" => "NOASSERTION",
-        "checksums" => [
-          %{"algorithm" => "SHA256", "checksumValue" => outer || checksum}
-        ],
-        "externalRefs" => [
-          %{
-            "referenceCategory" => "PACKAGE-MANAGER",
-            "referenceType" => "purl",
-            "referenceLocator" => "pkg:hex/#{name}@#{version}?repository_url=#{repo}"
-          }
-        ]
-      }
-    ]
+    with {:ok, declared_license} <- dependency_license(package, version) do
+      {:ok,
+       %{
+         "name" => name,
+         "SPDXID" => package_id(name),
+         "versionInfo" => version,
+         "downloadLocation" => "https://hex.pm/packages/#{name}",
+         "filesAnalyzed" => false,
+         "licenseConcluded" => declared_license,
+         "licenseDeclared" => declared_license,
+         "supplier" => "NOASSERTION",
+         "checksums" => [
+           %{"algorithm" => "SHA256", "checksumValue" => outer || checksum}
+         ],
+         "externalRefs" => [
+           %{
+             "referenceCategory" => "PACKAGE-MANAGER",
+             "referenceType" => "purl",
+             "referenceLocator" => "pkg:hex/#{name}@#{version}?repository_url=#{repo}"
+           }
+         ]
+       }}
+    end
   end
 
-  defp dependency_package(_), do: []
+  defp dependency_package(_), do: {:error, :unsupported_runtime_dependency_lock}
+
+  defp dependency_license(package, version) do
+    metadata_path =
+      Path.join([Mix.Project.deps_path(), Atom.to_string(package), "hex_metadata.config"])
+
+    with {:ok, metadata} <- :file.consult(String.to_charlist(metadata_path)),
+         {:ok, ^version} <- metadata_binary(metadata, "version"),
+         {:ok, licenses} <- metadata_licenses(metadata) do
+      {:ok, Enum.join(licenses, " OR ")}
+    else
+      _ -> {:error, {:invalid_runtime_dependency_metadata, package}}
+    end
+  end
+
+  defp metadata_binary(metadata, key) do
+    case List.keyfind(metadata, key, 0) do
+      {^key, value} when is_binary(value) -> {:ok, value}
+      _ -> :error
+    end
+  end
+
+  defp metadata_licenses(metadata) do
+    case List.keyfind(metadata, "licenses", 0) do
+      {"licenses", licenses} when is_list(licenses) and licenses != [] ->
+        if Enum.all?(licenses, &(is_binary(&1) and &1 != "")), do: {:ok, licenses}, else: :error
+
+      _ ->
+        :error
+    end
+  end
 
   defp dependency_edges(root_dependencies, dependency_names, locks) do
     dependency_set = MapSet.new(dependency_names)

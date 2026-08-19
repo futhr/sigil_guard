@@ -71,9 +71,25 @@ the triggering commit. It produces build provenance with `actions/attest`, then
 signs the predicate from `mix sigil_guard.release_statement` against both the
 tarball and SBOM. The predicate's `release` object directly records the package,
 version, artifact names, and SHA-256 values. Both predicate types are verified
-before the protected publish job starts. That job also requires a fresh Hex
-build and the downloaded registry tar to match the attested package byte for
-byte.
+before the environment-scoped publish job starts. Release verification also
+fails unless GitHub reports the exact version tag as protected by a tag
+ruleset. That job requires a fresh Hex build and the downloaded registry tar
+to match the attested package byte for byte.
+
+### Required GitHub release settings
+
+Workflow YAML cannot create or prove owner-managed repository protections.
+Before releasing, an administrator must:
+
+1. activate a ruleset covering `v*` tags so `github.ref_protected` is `true`;
+2. create the `hex-publish` environment, require a non-initiating reviewer,
+   disable protection-rule bypass, and restrict deployment tags to `v*`;
+3. store `HEX_API_KEY` as an environment secret, not a repository secret; and
+4. protect `main` with required pull-request review and the complete CI checks.
+
+Without the protected tag the workflow fails during release-identity
+verification. Without the environment protections, the workflow declaration
+alone is not a protected publication boundary and the release must not proceed.
 
 ## Implementing a WORM / append-only anchor store
 

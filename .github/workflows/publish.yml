@@ -44,6 +44,8 @@ jobs:
         run: mix deps.get --check-locked
 
       - name: Verify release identity
+        env:
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
         run: mix sigil_guard.verify_release_ref
 
       - name: Run canonical quality gate
@@ -194,6 +196,8 @@ jobs:
         run: mix deps.get --check-locked
 
       - name: Verify release identity
+        env:
+          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
         run: mix sigil_guard.verify_release_ref
 
       - name: Download attested release artifacts

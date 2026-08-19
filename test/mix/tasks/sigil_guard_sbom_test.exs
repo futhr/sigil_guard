@@ -164,6 +164,14 @@ defmodule Mix.Tasks.SigilGuard.SbomTest do
                package["name"] == "jason" and package["versionInfo"] == "1.4.5"
              end)
 
+      for name <- ["jason", "nimble_options", "telemetry"] do
+        package = Enum.find(sbom["packages"], &(&1["name"] == name))
+        assert package["licenseDeclared"] == "Apache-2.0"
+        assert package["licenseConcluded"] == "Apache-2.0"
+      end
+
+      refute Enum.any?(sbom["packages"], &(&1["licenseDeclared"] == "NOASSERTION"))
+
       refute MapSet.member?(package_names, "finch")
       refute MapSet.member?(package_names, "mint")
       refute MapSet.member?(package_names, "credo")
