@@ -14,7 +14,8 @@ sigil_guard:
 
 ## Executive Summary
 
-[One to three sentences with the research question, conclusion, and decision.]
+[State the research question, conclusion, decision, decisive evidence, and
+material uncertainty completely.]
 
 ## Research Question
 

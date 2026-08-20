@@ -15,7 +15,8 @@ sigil_guard:
 
 ## Executive Summary
 
-[One to three sentences describing what this spec defines and why it matters.]
+[Explain what this specification defines, why it matters, its boundaries, and
+the material decisions it owns.]
 
 ## Business Value
 

@@ -119,3 +119,9 @@ Do research before protocol/security design. Prefer primary sources: MCP
 specifications, RFCs, OWASP, NIST/NSA guidance, TUF/SLSA/Sigstore specs, W3C
 DID/VC specs, and source repositories. Each accepted design needs a spec and a
 task entry before broad implementation.
+
+Project documents have no fixed token, word, character, page, line, file-size,
+or diff-size budget. Size them to the evidence and decisions required for a
+safe result. Split only for coherent ownership or lifecycle boundaries, never
+merely because a document is long. Runtime limits and deliberately bounded
+product-output contracts are separate and remain explicit.
