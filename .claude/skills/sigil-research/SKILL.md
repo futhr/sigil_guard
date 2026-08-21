@@ -1,8 +1,6 @@
 ---
 name: sigil-research
-description: Create or update SigilGuard research notes under docs/research with primary sources, tradeoff analysis, and an explicit decision. Use for protocol, MCP, trust-bundle, audit, scanner, or security design research.
-disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(rg *), Bash(sed *), WebSearch, WebFetch
+description: "Apply automatically when a SigilGuard protocol, MCP, trust-bundle, audit, scanner, replay/expiry, canonical-digest, or security design decision depends on facts outside the repository. Use primary sources, compare tradeoffs against v3 compatibility and authority boundaries, cite dates, and record the decision under docs/research."
 ---
 
 # Sigil Research

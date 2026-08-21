@@ -1,7 +1,6 @@
 ---
 name: sigil-review
-description: Review SigilGuard changes for security, compatibility, tests, docs, AI-slop/test-integrity signals, and quality-gate risk. Use when the user asks for review, audit, bug hunt, coverage review, or architecture review.
-allowed-tools: Bash(rg *), Bash(mix *), Bash(git *)
+description: "Apply automatically when SigilGuard work involving trust profiles, policy, canonical digests, replay/expiry, bundles, MCP effects, and v3 compatibility needs review sigilguard changes for security, compatibility, tests, docs, ai-slop/test-integrity signals, and quality-gate risk. use when the user asks for review, audit, bug hunt, coverage review, or architecture review. Use repository evidence, preserve authority boundaries, and report blocked or unavailable proof explicitly."
 ---
 
 # Sigil Review

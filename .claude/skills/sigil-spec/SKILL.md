@@ -1,8 +1,6 @@
 ---
 name: sigil-spec
-description: Create or update SigilGuard implementation specs under docs/specs. Use before implementing trust-profile, MCP gateway, scanner, policy, audit, bundle, or compatibility changes.
-disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(rg *), Bash(sed *)
+description: "Apply automatically when authoring or revising a SigilGuard implementation spec under docs/specs. Define observable trust-profile, digest, bundle, MCP, scanner, policy, audit, replay, expiry, and compatibility behavior, including negative cases and unresolved authority decisions, before code changes begin."
 ---
 
 # Sigil Spec

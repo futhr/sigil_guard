@@ -1,8 +1,6 @@
 ---
 name: sigil-implement
-description: Implement a SigilGuard task from docs/tasks/sigil-tasks.md or docs/specs. Use for code changes in trust profile, bundles, MCP gateway, scanner, policy, audit, or docs-backed feature work.
-disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(mix *), Bash(rg *), Bash(git *)
+description: "Apply automatically when delivering a bounded SigilGuard task that changes trust profiles, canonical digests, bundles, MCP gateway behavior, scanning, policy enforcement, audit records, or v3 compatibility. Follow the linked task/spec, preserve replay, expiry, confirmation, and authority invariants, and prove affected behavior."
 ---
 
 # Sigil Implement

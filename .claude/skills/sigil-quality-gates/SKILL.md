@@ -1,7 +1,6 @@
 ---
-name: done
-description: Run SigilGuard's full quality gate after implementation, docs changes, or before committing. Use when work is finished, ready to commit, ship-ready, or whenever the user asks for clean gates.
-allowed-tools: Bash(mix *), Bash(git *), Bash(rg *)
+name: sigil-quality-gates
+description: "Apply automatically before a SigilGuard completion or release-readiness claim. Run the smallest authoritative gate matrix that covers trust profiles, policy, canonical digests, replay/expiry, bundles, MCP effects, and v3 compatibility, and report every skipped, blocked, failed, and hosted-only check."
 ---
 
 # Done - SigilGuard Quality Gate
