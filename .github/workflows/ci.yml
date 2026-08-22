@@ -50,8 +50,9 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+            ~/.hex
+          key: deps-hex-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: deps-hex-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -99,13 +100,19 @@ jobs:
           elixir-version: "1.18"
           otp-version: "28"
 
+      # `~/.hex` rides along with `deps`: the livebook gate resolves
+      # `Mix.install` under HEX_OFFLINE, which needs a cached registry entry
+      # for every package in the lock. A warm `deps` cache makes `mix deps.get`
+      # a no-op, so without this the registry stays cold and the gate fails on
+      # whichever transitive package it reaches first.
       - name: Restore deps cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+            ~/.hex
+          key: deps-hex-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
 
       - name: Run canonical quality gate
         run: ./bin/check
@@ -150,7 +157,8 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+            ~/.hex
+          key: deps-hex-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
 
       - name: Restore PLT cache
         id: plt-cache
@@ -200,7 +208,8 @@ jobs:
           path: |
             deps
             _build
-          key: deps-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
+            ~/.hex
+          key: deps-hex-${{ runner.os }}-28-1.18-${{ hashFiles('**/mix.lock') }}
 
       - name: Install dependencies
         run: mix deps.get
