@@ -44,7 +44,7 @@ defmodule Mix.Tasks.Sigil.LivebookCheck do
   def check(paths \\ [], opts \\ []) when is_list(paths) and is_list(opts) do
     root = opts |> Keyword.get(:root, File.cwd!())
     root = Path.expand(root)
-    env = Keyword.get(opts, :env, offline_env())
+    env = Keyword.get(opts, :env, offline_env(root))
     failures = check_failures(root, paths, env)
 
     case failures do
@@ -142,10 +142,11 @@ defmodule Mix.Tasks.Sigil.LivebookCheck do
      |> Enum.join("\n")}
   end
 
-  defp offline_env do
+  defp offline_env(root) do
     [
       {"HEX_OFFLINE", "1"},
       {"REBAR_OFFLINE", "1"},
+      {"MIX_DEPS_PATH", Path.join(root, "deps")},
       {"SIGILGUARD_AI_MODE", "scripted"},
       {"LB_OPENAI_API_KEY", ""},
       {"LB_SIGILGUARD_MODEL", ""}

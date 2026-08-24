@@ -55,7 +55,8 @@ defmodule Mix.Tasks.Sigil.LivebookCheckTest do
               "nil = System.get_env(\"LB_OPENAI_API_KEY\")",
               "nil = System.get_env(\"LB_SIGILGUARD_MODEL\")",
               "\"1\" = System.fetch_env!(\"HEX_OFFLINE\")",
-              "\"1\" = System.fetch_env!(\"REBAR_OFFLINE\")"
+              "\"1\" = System.fetch_env!(\"REBAR_OFFLINE\")",
+              "\"deps\" = System.fetch_env!(\"MIX_DEPS_PATH\") |> Path.basename()"
             ])
         })
 
