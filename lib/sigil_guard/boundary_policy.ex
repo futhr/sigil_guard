@@ -200,7 +200,7 @@ defmodule SigilGuard.BoundaryPolicy do
         untrusted_tool_request(boundary),
         sensitive_sink(boundary, opts),
         quarantine_indicators(boundary),
-        sandbox_matrix(boundary, matching),
+        sandbox_matrix(boundary, matching, opts),
         repo_facts(opts),
         policy_contribution(boundary, opts, matching)
       ]
@@ -290,16 +290,17 @@ defmodule SigilGuard.BoundaryPolicy do
   # only when no matching `[rules]` line carries an `isolation:` matcher. That
   # explicit override weakens the matrix deliberately, and the
   # overriding rule's verdict flows through the normal policy contribution.
-  defp sandbox_matrix(%Boundary{phase: phase} = boundary, matching)
+  defp sandbox_matrix(%Boundary{phase: phase} = boundary, matching, opts)
        when phase in @sandbox_phases do
     cond do
+      not Keyword.get(opts, :evaluate_sandbox, true) -> nil
       not sandbox_scoped?(boundary) -> nil
       isolation_override?(matching) -> nil
       true -> sandbox_cell(boundary)
     end
   end
 
-  defp sandbox_matrix(_, _), do: nil
+  defp sandbox_matrix(_, _, _), do: nil
 
   defp sandbox_cell(boundary) do
     level = sandbox_level(boundary)

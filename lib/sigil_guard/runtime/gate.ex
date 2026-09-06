@@ -110,7 +110,16 @@ defmodule SigilGuard.Runtime.Gate do
   defp runtime_inputs(payload, context) do
     with {:ok, text} <- Context.fetch_text(payload),
          {:ok, action} <- Context.fetch_action_name(context, payload) do
-      {:ok, text, action}
+      scan_text =
+        case payload do
+          %{binding: binding} when is_map(binding) ->
+            SigilGuard.MCP.SecurityPayload.scan_text(binding)
+
+          _ ->
+            text
+        end
+
+      {:ok, scan_text, action}
     end
   end
 
@@ -450,7 +459,18 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp build_boundary(state) do
     context = state.context
-    payload_digest = state.quarantine.content_hash
+
+    payload_digest =
+      case Digest.payload_digest(state.payload) do
+        {:ok, digest} -> digest
+        {:error, _} -> nil
+      end
+
+    action_digest =
+      case Confirmation.fetch_action_digest(state.payload, context) do
+        {:ok, digest} -> digest
+        {:error, _} -> nil
+      end
 
     Boundary.new(%{
       phase: boundary_phase(context.phase),
@@ -460,12 +480,19 @@ defmodule SigilGuard.Runtime.Gate do
       trust_level: context.trust_level,
       trust_zone: context.trust_zone,
       hits: state.hits,
-      action_digest: derived_digest("action:" <> payload_digest),
+      actor: boundary_fact("id", context.actor || context.identity),
+      tool: boundary_fact("name", context.tool),
+      resource: boundary_fact("uri", context.resource_uri),
+      indicators: state.quarantine.indicators,
+      action_digest: action_digest,
       payload_digest: payload_digest,
       context_digest: boundary_context_digest(context),
       sandbox: boundary_sandbox(context)
     })
   end
+
+  defp boundary_fact(_, nil), do: nil
+  defp boundary_fact(key, value), do: %{key => value}
 
   defp boundary_context_digest(context) do
     statement_type = boundary_statement_type(context.phase)
@@ -483,6 +510,7 @@ defmodule SigilGuard.Runtime.Gate do
 
   defp boundary_opts(state) do
     [
+      evaluate_sandbox: not is_nil(state.context.isolation_level),
       on_sensitive: Keyword.get(state.opts, :on_sensitive, :block),
       policy: Keyword.get(state.opts, :boundary_policy),
       hooks: Keyword.get(state.opts, :hooks, []),
@@ -493,7 +521,8 @@ defmodule SigilGuard.Runtime.Gate do
   end
 
   # Supply a sandbox only when the host declared an isolation level. The gate
-  # carries no tool side-effect facts, so it never sets `tool`.
+  # carries the tool name but no verified side-effect facts. Sandbox evaluation
+  # remains opt-in through a host-supplied isolation level.
   defp boundary_sandbox(%Context{isolation_level: nil}), do: nil
 
   defp boundary_sandbox(%Context{isolation_level: level, sandbox_id: id}) do

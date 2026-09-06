@@ -899,4 +899,46 @@ defmodule SigilGuard.Runtime.GateTest do
     # action moves to `effect` (runtime verdict/effect split).
     defp consistent_verdict?({:confirm, _}, action), do: action == :confirm
   end
+
+  test "policy receives the actor and tool name from normalized context" do
+    for {matcher, context} <- [
+          {"actor:denied-actor", [actor: "denied-actor"]},
+          {"tool:read_file", [tool: "read_file"]}
+        ] do
+      {:ok, policy} =
+        SigilGuard.BoundaryPolicy.File.parse(
+          "version 3\n[rules]\ndefault allow\nblock #{matcher}\n"
+        )
+
+      decision =
+        Gate.evaluate(
+          "safe",
+          context ++ [phase: :tool_request, origin: :user, sink: :internal, trust_level: :high],
+          boundary_policy: policy
+        )
+
+      assert decision.action == :block
+    end
+  end
+
+  test "MCP object keys are scanned without changing the signed wrapper text" do
+    payload =
+      SigilGuard.MCP.SecurityPayload.for_gate(
+        %{"params" => %{"name" => "read", "arguments" => %{"AKIAIOSFODNN7EXAMPLE" => true}}},
+        :request
+      )
+
+    refute payload.text =~ "AKIAIOSFODNN7EXAMPLE"
+
+    decision =
+      Gate.evaluate(payload,
+        phase: :tool_request,
+        origin: :user,
+        sink: :external,
+        trust_level: :high
+      )
+
+    assert decision.action == :block
+    assert Enum.any?(decision.hits, &(&1.name == "aws_access_key"))
+  end
 end

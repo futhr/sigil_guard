@@ -21,8 +21,9 @@ defmodule SigilGuard.MCP.SecurityPayload do
 
   `for_gate/3` returns two views of the same action. `:binding` is the exact
   structured value used by confirmation and attestation digests. `:text` is
-  only a scanner projection made from string values; it never becomes the
-  authority-bearing representation.
+  the original value-only text projection, retained in the published digest
+  preimage. The gate uses `scan_text/1` to scan object keys and string values
+  separately; scanner text never replaces the structured binding.
 
   ## Example
 
@@ -140,7 +141,7 @@ defmodule SigilGuard.MCP.SecurityPayload do
     %{
       tool: context_field(tool),
       action: action_field(action, tool),
-      text: scan_text(binding),
+      text: legacy_scan_text(binding),
       binding: binding
     }
   end
@@ -295,12 +296,31 @@ defmodule SigilGuard.MCP.SecurityPayload do
     end
   end
 
-  defp scan_text(payload) do
+  @doc "Return scanner text including object keys and values, separate from signed bytes."
+  @spec scan_text(projection()) :: String.t()
+  def scan_text(payload) do
     payload
     |> collect_strings([])
     |> Enum.reverse()
     |> Enum.join("\n")
   end
+
+  defp legacy_scan_text(value) do
+    value
+    |> legacy_strings([])
+    |> Enum.reverse()
+    |> Enum.join("\n")
+  end
+
+  defp legacy_strings(value, acc) when is_binary(value), do: [value | acc]
+
+  defp legacy_strings(value, acc) when is_list(value),
+    do: Enum.reduce(value, acc, &legacy_strings/2)
+
+  defp legacy_strings(value, acc) when is_map(value),
+    do: Enum.reduce(Map.values(value), acc, &legacy_strings/2)
+
+  defp legacy_strings(_, acc), do: acc
 
   defp collect_strings(value, acc) when is_binary(value), do: [value | acc]
 
@@ -309,8 +329,10 @@ defmodule SigilGuard.MCP.SecurityPayload do
 
   defp collect_strings(value, acc) when is_map(value) do
     value
-    |> Map.values()
-    |> Enum.reduce(acc, &collect_strings/2)
+    |> Enum.sort_by(fn {key, _} -> to_string(key) end)
+    |> Enum.reduce(acc, fn {key, item}, acc ->
+      collect_strings(item, collect_strings(to_string(key), acc))
+    end)
   end
 
   defp collect_strings(_, acc), do: acc
