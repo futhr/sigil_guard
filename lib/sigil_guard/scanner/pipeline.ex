@@ -58,6 +58,7 @@ defmodule SigilGuard.Scanner.Pipeline do
 
     text
     |> regex_candidates(patterns)
+    |> Enum.map(&measure_entropy/1)
     |> Enum.filter(&valid_candidate?(&1, opts))
     |> Enum.map(&enrich_hit(&1, opts))
     |> Enum.filter(&(&1.confidence >= min_confidence))
@@ -111,7 +112,7 @@ defmodule SigilGuard.Scanner.Pipeline do
     label_boundary?(candidate) and token_boundary?(candidate, &bearer_token_byte?/1) and
       match
       |> bearer_value()
-      |> token_like?(20, entropy_option(opts, :token_min_entropy, 3.0))
+      |> token_like?(20, entropy_option(opts, :token_min_entropy, 3.0), candidate)
   end
 
   defp structurally_valid?(%{pattern: %{name: "database_uri"}, match: match} = candidate, _) do
@@ -127,7 +128,7 @@ defmodule SigilGuard.Scanner.Pipeline do
     assignment_boundary?(candidate) and
       match
       |> assignment_value()
-      |> token_like?(20, entropy_option(opts, :token_min_entropy, 3.0))
+      |> token_like?(20, entropy_option(opts, :token_min_entropy, 3.0), candidate)
   end
 
   defp structurally_valid?(%{pattern: %{name: "generic_secret"}, match: match} = candidate, opts) do
@@ -137,7 +138,8 @@ defmodule SigilGuard.Scanner.Pipeline do
       secret_like?(
         value,
         positive_integer_option(opts, :generic_secret_min_length, 10),
-        entropy_option(opts, :generic_secret_min_entropy, 2.8)
+        entropy_option(opts, :generic_secret_min_entropy, 2.8),
+        candidate
       )
   end
 
@@ -178,7 +180,7 @@ defmodule SigilGuard.Scanner.Pipeline do
       known_key_format?(candidate) && :known_key_format,
       assignment_context?(candidate.match) && :assignment_context,
       assignment_boundary?(candidate) && :assignment_boundary,
-      high_entropy?(value) && :high_entropy,
+      candidate.entropy >= 3.0 && :high_entropy,
       byte_size(value) >= 20 && :long_value,
       token_boundary_signal?(candidate) && :token_boundary,
       uri_authority?(candidate) && :uri_with_authority
@@ -249,7 +251,14 @@ defmodule SigilGuard.Scanner.Pipeline do
 
   defp token_boundary_signal?(_), do: false
 
-  defp high_entropy?(value), do: shannon_entropy(value) >= 3.0
+  defp measure_entropy(candidate) do
+    value = secret_value(candidate.match, candidate.pattern.name)
+    {length, frequencies} = byte_frequencies(value)
+
+    candidate
+    |> Map.put(:entropy, shannon_entropy(frequencies, length))
+    |> Map.put(:distinct_bytes, map_size(frequencies))
+  end
 
   defp uri_authority?(%{pattern: %{name: "database_uri"}, match: match}) do
     String.contains?(match, "://") and String.ends_with?(match, "@")
@@ -334,15 +343,15 @@ defmodule SigilGuard.Scanner.Pipeline do
     ascii_alphanumeric_byte?(byte) or byte in [?., ?_, ?~, ?+, ?/, ?=, ?-]
   end
 
-  defp token_like?(value, min_length, min_entropy) do
-    secret_like?(value, min_length, min_entropy)
+  defp token_like?(value, min_length, min_entropy, candidate) do
+    secret_like?(value, min_length, min_entropy, candidate)
   end
 
-  defp secret_like?(value, min_length, min_entropy) do
+  defp secret_like?(value, min_length, min_entropy, candidate) do
     value = String.trim(value)
 
     byte_size(value) >= min_length and not weak_secret_value?(value) and
-      sufficient_entropy?(value, min_entropy)
+      candidate.distinct_bytes >= 4 and candidate.entropy >= min_entropy
   end
 
   defp weak_secret_value?(value) do
@@ -363,18 +372,6 @@ defmodule SigilGuard.Scanner.Pipeline do
 
   defp repeated_value?(value) do
     Regex.match?(~r/\A(.{1,4})\1{2,}\z/s, value)
-  end
-
-  defp sufficient_entropy?(value, min_entropy) do
-    {length, frequencies} = byte_frequencies(value)
-
-    map_size(frequencies) >= 4 and shannon_entropy(frequencies, length) >= min_entropy
-  end
-
-  defp shannon_entropy(value) when is_binary(value) do
-    {length, frequencies} = byte_frequencies(value)
-
-    shannon_entropy(frequencies, length)
   end
 
   defp shannon_entropy(_, 0), do: 0.0
