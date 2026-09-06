@@ -91,6 +91,7 @@ defmodule SigilGuard.Attestation do
           | :unknown_manifest
           | :expired_attestation
           | :replay_detected
+          | :replay_capacity_exceeded
 
   @type from_decision_error ::
           :unknown_statement_type
@@ -701,9 +702,14 @@ defmodule SigilGuard.Attestation do
 
   defp decode_statement(payload) do
     case Jason.decode(payload) do
-      {:ok, statement} when is_map(statement) -> {:ok, statement}
-      {:ok, _} -> {:error, :invalid_profile}
-      {:error, _} -> {:error, :invalid_profile}
+      {:ok, statement} when is_map(statement) ->
+        with :ok <- SigilGuard.Limits.check(statement), do: {:ok, statement}
+
+      {:ok, _} ->
+        {:error, :invalid_profile}
+
+      {:error, _} ->
+        {:error, :invalid_profile}
     end
   end
 
@@ -835,22 +841,22 @@ defmodule SigilGuard.Attestation do
   end
 
   defp replay_ttl_ms(predicate, opts) do
-    cond do
-      Keyword.has_key?(opts, :replay_ttl_ms) ->
-        configured_positive_integer(opts, :replay_ttl_ms, :replay_ttl_ms, 300_000)
-
-      Keyword.has_key?(opts, :ttl_ms) ->
-        configured_positive_integer(opts, :ttl_ms, :replay_ttl_ms, 300_000)
-
-      true ->
-        remaining_lifetime_ms(predicate, opts)
+    with {:ok, required} <- remaining_lifetime_ms(predicate, opts),
+         {:ok, configured} <- requested_replay_ttl(opts) do
+      {:ok, max(required, configured)}
     end
+  end
+
+  defp requested_replay_ttl(opts) do
+    key = if Keyword.has_key?(opts, :replay_ttl_ms), do: :replay_ttl_ms, else: :ttl_ms
+    configured_positive_integer(opts, key, :replay_ttl_ms, 300_000)
   end
 
   defp remaining_lifetime_ms(predicate, opts) do
     with {:ok, now} <- verify_now(opts),
-         {:ok, expires_at} <- parse_required_datetime(Map.get(predicate, "expires_at")) do
-      {:ok, max(DateTime.diff(expires_at, now, :millisecond), 1)}
+         {:ok, expires_at} <- parse_required_datetime(Map.get(predicate, "expires_at")),
+         {:ok, skew} <- max_skew_ms(opts) do
+      {:ok, max(DateTime.diff(expires_at, now, :millisecond) + skew + 1, 1)}
     end
   end
 

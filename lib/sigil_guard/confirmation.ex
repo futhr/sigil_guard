@@ -352,7 +352,7 @@ defmodule SigilGuard.Confirmation do
   defp replay_ttl_ms(%{"expires_at" => expires_at}, opts) do
     with {:ok, now} <- issue_now(opts),
          {:ok, expires_at_dt} <- parse_datetime(expires_at) do
-      {:ok, max(DateTime.diff(expires_at_dt, now, :millisecond), 1)}
+      {:ok, max(DateTime.diff(expires_at_dt, now, :millisecond) + 1, 1)}
     end
   end
 
