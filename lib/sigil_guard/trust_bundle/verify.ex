@@ -68,7 +68,8 @@ defmodule SigilGuard.TrustBundle.Verify do
     signatures = field(envelope, "signatures")
 
     valid? =
-      is_binary(payload) and is_binary(payload_type) and is_list(signatures) and signatures != []
+      is_binary(payload) and is_binary(payload_type) and is_list(signatures) and
+        signatures != [] and SigilGuard.Limits.check(envelope) == :ok and length(signatures) <= 64
 
     if valid? do
       {:ok, %{payload: payload, payload_type: payload_type, signatures: signatures}}
@@ -149,8 +150,13 @@ defmodule SigilGuard.TrustBundle.Verify do
 
   defp decode_document(payload) do
     case Jason.decode(payload) do
-      {:ok, %{} = document} -> {:ok, document}
-      _ -> {:error, :invalid_bundle_format}
+      {:ok, %{} = document} ->
+        if SigilGuard.Limits.check(document) == :ok,
+          do: {:ok, document},
+          else: {:error, :invalid_bundle_format}
+
+      _ ->
+        {:error, :invalid_bundle_format}
     end
   end
 

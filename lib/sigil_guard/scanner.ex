@@ -25,6 +25,7 @@ defmodule SigilGuard.Scanner do
 
   ## Options
 
+    * `:max_input_bytes` — binary-data budget (default: 1 MiB); exhaustion raises `ArgumentError`.
     * `:patterns` — compiled patterns to use. Defaults to built-in patterns.
     * `:pipeline` — `:staged` (default), `:regex`, or a module with `scan/3`.
     * `:validate` — set to `false` to keep all regex candidates in staged mode.
@@ -45,6 +46,10 @@ defmodule SigilGuard.Scanner do
   @spec scan(String.t(), keyword()) :: {:ok, String.t()} | {:hit, [Patterns.scan_hit()]}
   def scan(text, opts \\ []) do
     validate_options!(opts)
+
+    if SigilGuard.Limits.check(text, opts) != :ok,
+      do: raise(ArgumentError, "scanner input budget exceeded")
+
     patterns = Keyword.get_lazy(opts, :patterns, &Patterns.built_in/0)
     telemetry_metadata = telemetry_metadata(patterns, opts)
 

@@ -64,6 +64,7 @@ defmodule SigilGuard.Runtime.Gate do
         decision =
           with :ok <- Context.validate(context),
                :ok <- validate_runtime_options(opts),
+               :ok <- SigilGuard.Limits.check(payload, opts),
                {:ok, text, action} <- runtime_inputs(payload, context) do
             evaluate_checked(payload, context, text, action, opts)
           else

@@ -243,7 +243,7 @@ defmodule SigilGuard.Runtime.GateTest do
       refute decision.sanitized_text =~ "Ignore previous instructions"
     end
 
-    test "blocks confirmable payloads when action digests cannot be computed" do
+    test "rejects non-JSON payloads before confirmation binding" do
       ref = make_ref()
       parent = self()
       handler_id = "runtime-gate-digest-error-test-#{System.unique_integer()}"
@@ -270,13 +270,13 @@ defmodule SigilGuard.Runtime.GateTest do
 
       assert decision.verdict == :blocked
       assert decision.action == :block
-      assert decision.reason =~ "Confirmation action digest could not be computed"
+      assert decision.reason =~ "Malformed runtime input: invalid_payload"
       assert decision.audit_metadata.action_digest == nil
-      assert decision.audit_metadata.action_digest_error == :invalid_payload
-      refute decision.sanitized_text =~ "Ignore previous instructions"
+      assert decision.audit_metadata.runtime_input_error == :invalid_payload
+      assert decision.sanitized_text == nil
 
       assert_receive {^ref, [:sigil_guard, :runtime, :gate], %{system_time: _},
-                      %{action_digest_error: :invalid_payload} = metadata}
+                      %{runtime_input_error: :invalid_payload} = metadata}
 
       assert metadata.action_digest == nil
       assert metadata.verdict == :blocked

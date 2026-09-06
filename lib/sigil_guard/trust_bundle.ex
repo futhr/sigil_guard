@@ -152,7 +152,9 @@ defmodule SigilGuard.TrustBundle do
   end
 
   defp load_binary(bytes, source, opts) do
-    case Jason.decode(bytes) do
+    decoded = with :ok <- SigilGuard.Limits.check(bytes), do: Jason.decode(bytes)
+
+    case decoded do
       {:ok, envelope} when is_map(envelope) ->
         load_envelope(envelope, source, opts)
 
