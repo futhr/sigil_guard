@@ -114,7 +114,6 @@ defmodule SigilGuard.MixProject do
         LICENSE
         SECURITY.md
         CONTRIBUTING.md
-        AGENTS.md
         CHANGELOG.md
         MIGRATING-1.0.md
       ],
@@ -168,7 +167,8 @@ defmodule SigilGuard.MixProject do
         "CHANGELOG.md": [title: "Changelog"],
         "SECURITY.md": [title: "Security"],
         "CONTRIBUTING.md": [title: "Contributing"],
-        "AGENTS.md": [title: "AI Agents"],
+        "guides/strict-deployment.md": [title: "Strict Deployment"],
+        "guides/library-maintenance.md": [title: "Library Maintenance"],
         LICENSE: [title: "License"]
       ],
       groups_for_extras: [
@@ -211,6 +211,7 @@ defmodule SigilGuard.MixProject do
           SigilGuard.Identity.Binding,
           SigilGuard.Identity.Static,
           SigilGuard.Lifecycle,
+          SigilGuard.Limits,
           SigilGuard.PatternSets,
           SigilGuard.Patterns,
           SigilGuard.Quarantine,

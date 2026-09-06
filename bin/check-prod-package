@@ -1,8 +1,27 @@
 #!/usr/bin/env sh
 set -eu
 
-package_path="$(mktemp "${TMPDIR:-/tmp}/sigil_guard-package.XXXXXX")"
-trap 'rm -f "${package_path}"' EXIT HUP INT TERM
+package_dir="$(mktemp -d "${TMPDIR:-/tmp}/sigil_guard-package.XXXXXX")"
+trap 'rm -rf "${package_dir}"' EXIT HUP INT TERM
+package_dir="$(cd "${package_dir}" && pwd -P)"
 
 MIX_ENV=prod mix compile --warnings-as-errors
-MIX_ENV=prod mix hex.build --output "${package_path}"
+MIX_ENV=prod mix hex.build --output "${package_dir}/package.tar"
+mkdir "${package_dir}/archive" "${package_dir}/consumer" "${package_dir}/library"
+tar -xf "${package_dir}/package.tar" -C "${package_dir}/archive"
+tar -xzf "${package_dir}/archive/contents.tar.gz" -C "${package_dir}/library"
+cat > "${package_dir}/consumer/mix.exs" <<'ELIXIR'
+defmodule PackageConsumer.MixProject do
+  use Mix.Project
+  def project do
+    [app: :package_consumer, version: "0.0.0", deps: [{:sigil_guard, path: "../library"}]]
+  end
+  def application, do: [extra_applications: [:sigil_guard]]
+end
+ELIXIR
+# Resolve only the package's declared runtime dependencies in a fresh consumer.
+(cd "${package_dir}/consumer" && MIX_ENV=prod mix deps.get && MIX_ENV=prod mix compile --warnings-as-errors && MIX_ENV=prod mix run -e '
+  {:hit, [_]} = SigilGuard.Scanner.scan("AKIAIOSFODNN7EXAMPLE")
+  {:ok, "{\"a\":1}"} = SigilGuard.Canonical.JCS.encode(%{"a" => 1})
+  true = is_pid(Process.whereis(SigilGuard.Runtime))
+')
