@@ -5,7 +5,10 @@ defmodule SigilGuard.Runtime.Stream do
   Streaming output can split credentials or prompt-injection phrases across
   chunk boundaries. This module keeps a configurable trailing holdback window,
   evaluates each buffered boundary crossing with `SigilGuard.Runtime.Gate`,
-  and only emits content that is outside the holdback window.
+  and only emits content outside that window and any incomplete candidate.
+  Unknown custom regex widths, custom indicators and custom pipelines retain
+  the whole message until `finish/1`. Pending bytes default to a 1 MiB cap;
+  `:max_stream_bytes` changes that cap. Exceeding it fails closed.
 
   If the gate blocks or requires confirmation, no new content is emitted and
   the stream is marked halted. Callers can inspect the returned decision to
@@ -19,6 +22,8 @@ defmodule SigilGuard.Runtime.Stream do
   alias SigilGuard.Scanner
 
   @default_window_bytes 256
+  @default_max_pending_bytes 1_048_576
+  @unbounded_prefix ~r/api[_-]?key|bearer|postgres:\/\/|mysql:\/\/|mongodb:\/\/|secret|password|token|ignore|system|developer|when|before|after|display|visibility/i
 
   @type t :: %__MODULE__{
           context: Context.t(),
@@ -68,18 +73,48 @@ defmodule SigilGuard.Runtime.Stream do
 
   def push(%__MODULE__{} = stream, chunk) when is_binary(chunk) do
     combined = stream.pending <> chunk
-    decision = Gate.evaluate(combined, stream.context, stream.opts)
+    limit = Keyword.get(stream.opts, :max_stream_bytes, @default_max_pending_bytes)
+
+    if not is_integer(limit) or limit <= 0 or byte_size(combined) > limit do
+      halt(stream, "stream capacity exceeded")
+    else
+      push_validated(stream, combined, :unicode.characters_to_binary(combined))
+    end
+  end
+
+  defp push_validated(stream, _, {:error, _, _}), do: halt(stream, "invalid UTF-8")
+
+  defp push_validated(stream, combined, {:incomplete, valid, _}),
+    do: evaluate_chunk(stream, combined, valid)
+
+  defp push_validated(stream, combined, valid), do: evaluate_chunk(stream, combined, valid)
+
+  defp evaluate_chunk(stream, combined, valid) do
+    decision = Gate.evaluate(valid, stream.context, stream.opts)
 
     if Decision.allowed?(decision) do
-      {emittable, pending} = split_emittable(combined, decision.hits, stream.window_bytes)
+      {emittable, pending} = split_emittable(combined, decision.hits, stream, valid)
 
       emitted =
         sanitize_allowed(emittable, decision.hits, byte_size(emittable), decision, stream.opts)
 
       {%{stream | pending: pending, decision: decision}, decision, emitted}
     else
-      {%{stream | pending: combined, halted?: true, decision: decision}, decision, ""}
+      {%{stream | pending: "", halted?: true, decision: decision}, decision, ""}
     end
+  end
+
+  defp halt(stream, reason) do
+    decision = %Decision{
+      verdict: :blocked,
+      action: :block,
+      phase: stream.context.phase,
+      risk_level: :high,
+      trust_level: stream.context.trust_level,
+      reason: reason
+    }
+
+    {%{stream | pending: "", halted?: true, decision: decision}, decision, ""}
   end
 
   @doc """
@@ -94,15 +129,27 @@ defmodule SigilGuard.Runtime.Stream do
   end
 
   def finish(%__MODULE__{} = stream) do
+    if String.valid?(stream.pending),
+      do: finish_valid(stream),
+      else: halt(stream, "incomplete UTF-8")
+  end
+
+  defp finish_valid(stream) do
     decision = Gate.evaluate(stream.pending, stream.context, stream.opts)
     emitted = if Decision.allowed?(decision), do: decision.sanitized_text || "", else: ""
 
     {%{stream | pending: "", decision: decision}, decision, emitted}
   end
 
-  defp split_emittable(text, hits, window_bytes) do
-    base_size = max(byte_size(text) - window_bytes, 0)
-    emit_size = safe_emit_size(base_size, hits)
+  defp split_emittable(text, hits, stream, valid) do
+    base_size = max(byte_size(valid) - stream.window_bytes, 0)
+    candidate_start = candidate_start(valid, stream.opts)
+
+    emit_size =
+      base_size
+      |> min(candidate_start)
+      |> safe_emit_size(hits)
+      |> utf8_boundary(valid)
 
     {
       binary_part(text, 0, emit_size),
@@ -110,8 +157,37 @@ defmodule SigilGuard.Runtime.Stream do
     }
   end
 
+  defp candidate_start(text, opts) do
+    patterns = Keyword.get(opts, :patterns, Patterns.built_in())
+    built_in? = patterns == Patterns.built_in()
+
+    literal? =
+      is_list(patterns) and
+        Enum.all?(patterns, &Regex.match?(~r/\A[a-zA-Z0-9 _-]+\z/, Regex.source(&1.regex)))
+
+    if (built_in? or literal?) and not Keyword.has_key?(opts, :indicator_sets) and
+         Keyword.get(opts, :pipeline, :staged) in [:staged, :regex] do
+      case Regex.run(@unbounded_prefix, text, return: :index) do
+        [{offset, _}] -> offset
+        nil -> byte_size(text)
+      end
+    else
+      0
+    end
+  end
+
+  defp utf8_boundary(0, _), do: 0
+
+  defp utf8_boundary(size, text) do
+    if Bitwise.band(:binary.at(text, size), 0xC0) == 0x80,
+      do: utf8_boundary(size - 1, text),
+      else: size
+  end
+
   defp safe_emit_size(base_size, hits) do
-    Enum.reduce(hits, base_size, fn hit, emit_size ->
+    hits
+    |> Enum.sort_by(& &1.offset, :desc)
+    |> Enum.reduce(base_size, fn hit, emit_size ->
       if crosses_boundary?(hit, emit_size), do: min(emit_size, hit.offset), else: emit_size
     end)
   end
@@ -129,8 +205,8 @@ defmodule SigilGuard.Runtime.Stream do
 
   defp contained?(hit, emit_size), do: hit.offset + hit.length <= emit_size
 
-  # Raise a configured holdback below the largest active `max_match_bytes` so
-  # no match can straddle a chunk boundary.
+  # Width hints set a minimum; candidate_start/2 handles expressions for which
+  # a finite holdback cannot prove a safe emission boundary.
   defp stream_window_bytes(opts) do
     max(configured_window(opts), active_max_match_bytes(opts))
   end
@@ -144,8 +220,13 @@ defmodule SigilGuard.Runtime.Stream do
 
   defp active_max_match_bytes(opts) do
     case Keyword.get(opts, :patterns, Patterns.built_in()) do
-      patterns when is_list(patterns) -> Patterns.largest_max_match_bytes(patterns)
-      _ -> Patterns.default_max_match_bytes()
+      patterns when is_list(patterns) ->
+        Enum.reduce(patterns, Patterns.largest_max_match_bytes(patterns), fn pattern, width ->
+          max(width, byte_size(Regex.source(pattern.regex)))
+        end)
+
+      _ ->
+        Patterns.default_max_match_bytes()
     end
   end
 end

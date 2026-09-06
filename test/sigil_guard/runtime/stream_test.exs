@@ -215,4 +215,73 @@ defmodule SigilGuard.Runtime.StreamTest do
       assert stream.window_bytes == 256
     end
   end
+
+  test "unbounded database prefixes cannot escape the holdback" do
+    text = "postgres://" <> String.duplicate("u", 600) <> ":password@host"
+
+    for cut <- [11, 300, 610, 615] do
+      {stream, _, first} = Stream.push(Stream.new(@stream_ctx), binary_part(text, 0, cut))
+      {stream, _, second} = Stream.push(stream, binary_part(text, cut, byte_size(text) - cut))
+      {_, _, final} = Stream.finish(stream)
+      refute first <> second <> final =~ "postgres://"
+      assert first <> second <> final =~ "[DATABASE_URI]"
+    end
+  end
+
+  test "emitted chunks always contain complete Unicode codepoints" do
+    text = String.duplicate("é", 129) <> "a"
+    {stream, _, first} = Stream.push(Stream.new(@stream_ctx), text)
+    assert first == "é"
+    assert byte_size(stream.pending) >= stream.window_bytes
+    assert String.valid?(first)
+    assert String.valid?(stream.pending)
+    {_, _, last} = Stream.finish(stream)
+    assert first <> last == text
+  end
+
+  test "unknown regex widths buffer conservatively and capacity stops emission" do
+    patterns =
+      Patterns.compile([
+        %{
+          name: "custom",
+          category: "secret",
+          severity: :high,
+          pattern: "begin.*end",
+          max_match_bytes: 1
+        }
+      ])
+
+    {stream, _, first} =
+      Stream.push(
+        Stream.new(@stream_ctx, patterns: patterns),
+        "begin" <> String.duplicate("x", 500)
+      )
+
+    assert first == ""
+    {_, _, final} = Stream.finish(stream)
+    assert final =~ "begin"
+
+    {stream, decision, emitted} =
+      Stream.push(Stream.new(@stream_ctx, max_stream_bytes: 8), "123456789")
+
+    assert decision.action == :block
+    assert stream.halted?
+    assert emitted == ""
+    assert stream.pending == ""
+  end
+
+  test "malformed and truncated UTF-8 fail closed" do
+    {_, decision, ""} = Stream.push(Stream.new(@stream_ctx), <<255>>)
+    assert decision.action == :block
+    {stream, _, ""} = Stream.push(Stream.new(@stream_ctx), <<0xC3>>)
+    {_, decision, ""} = Stream.finish(stream)
+    assert decision.action == :block
+  end
+
+  test "stream capacity accepts exactly the budget and rejects an invalid zero budget" do
+    {_, decision, _} = Stream.push(Stream.new(@stream_ctx, max_stream_bytes: 8), "12345678")
+    assert decision.action == :allow
+    {_, decision, ""} = Stream.push(Stream.new(@stream_ctx, max_stream_bytes: 0), "")
+    assert decision.action == :block
+  end
 end
