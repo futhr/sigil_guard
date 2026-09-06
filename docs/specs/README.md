@@ -136,3 +136,5 @@ These specs capture current behavior that v3 should reuse, rewire, or remove.
 - Local scans find no dead hosted protocol or registry URLs.
 - Local scans find no old public vocabulary in v3 examples except migration
   docs and historical fixtures.
+
+- [SP.18 Security Audit Remediation](SP.18-security-audit-remediation.md): authority continuity, replay, streaming, budgets, dependency and release validation.

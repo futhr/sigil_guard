@@ -4,13 +4,13 @@ This is the canonical execution checklist for SigilGuard v3, the embedded
 Agent Trust Profile runtime. V3 is a deliberate, spec-governed breaking
 release: every architectural decision (D1-D21) is closed, research-backed,
 and recorded below with rationale (see Closed Decisions); no open choices
-remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M10. A
+remain. Execute milestones strictly in order F -> M0 -> M1 -> ... -> M11. A
 task is done only when its AC bullets hold and its named test families
 exist. Migration lives in `MIGRATING-1.0.md`, `CHANGELOG.md`, and release
 notes - never in permanent legacy runtime shims.
 
 This file, the research notes (`../research/R.01`-`R.10`), and the specs
-(`../specs/SP.01`-`SP.17`) are the complete, self-contained plan of record.
+(`../specs/SP.01`-`SP.18`) are the complete, self-contained plan of record.
 An implementer needs nothing outside `docs/` and the codebase. The decisions
 were derived from primary-source research and adversarially verified against
 those sources; do not reopen a closed decision without a superseding
@@ -63,7 +63,7 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 256 / 256 tasks done (100%).** Milestones: 13 complete.
+**Overall: 278 / 278 tasks done (100%).** Milestones: 14 complete.
 **Current milestone: complete - maintainer-owned release handoff remains.**
 
 | # | Milestone | Done | Total | % | Status |
@@ -81,7 +81,8 @@ trailers (rule 10); the maintainer pushes manually.
 | M8 | Release | 8 | 8 | 100% | Complete |
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
 | M10 | External assessment projection | 1 | 1 | 100% | Complete |
-| — | **Total** | **256** | **256** | **100%** | 13 done |
+| M11 | Security audit remediation | 22 | 22 | 100% | Complete |
+| — | **Total** | **278** | **278** | **100%** | 14 done |
 
 ### Release Handoff
 
@@ -2974,3 +2975,35 @@ fresh research or a spec update before work starts.
 - [ ] SCITT receipt adapter over the anchor path (D4).
 - [ ] Tier-2 integration guides: ex_mcp, Vancouver, mcp_sse, and anubis
       variants beyond the compile check (promotion criteria in SP.14).
+
+## M11 - Security Audit Remediation (SP.18)
+
+- [x] M11.01: Root authority continuity.
+- [x] M11.02: Revoked card issuers.
+- [x] M11.03: Cold configured modules.
+- [x] M11.04: Complete policy boundary facts.
+- [x] M11.05: Full replay acceptance lifetime.
+- [x] M11.06: Unambiguous signed payloads.
+- [x] M11.07: Unbounded streaming candidates.
+- [x] M11.08: Overlapping redaction.
+- [x] M11.09: Concurrent trust acceptance.
+- [x] M11.10: JCS floats and malformed lists.
+- [x] M11.11: UTF-8 streaming.
+- [x] M11.12: MCP object-key scanning.
+- [x] M11.13: Explicit runtime pattern selection.
+- [x] M11.14: State and work budgets.
+- [x] M11.15: Monotonic replay retention.
+- [x] M11.16: Atomic rate limits.
+- [x] M11.17: Dependency security and patch updates.
+- [x] M11.18: Mutation integrity and security targets.
+- [x] M11.19: Shared byte-preserving security utilities.
+- [x] M11.20: Documentation drift.
+- [x] M11.21: Measured performance regression evidence.
+- [x] M11.22: Self-contained Hex package verification.
+
+Validation: 1,634 tests, 22 properties and 36 doctests pass on Elixir 1.18.4 /
+OTP 28.5 and Elixir 1.20.2 / OTP 29.0.4; coverage is 95.1%. The canonical gate,
+independent JCS campaign, bounded security mutations and unpacked-package
+consumer pass. Benchmark results live in `bench/output/audit-remediation.json`;
+R.07 records the retained advisory exceptions.
+Hosted scheduled runs and reference-consumer deployment remain maintainer-owned.
