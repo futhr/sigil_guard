@@ -89,6 +89,8 @@ defmodule SigilGuard.Canonical.JCS do
     end
   end
 
+  defp encode_list(_, _), do: {:error, :invalid_map}
+
   defp normalize_pairs(map) do
     normalized =
       Enum.reduce_while(map, {:ok, []}, fn {key, value}, {:ok, pairs} ->
@@ -236,11 +238,11 @@ defmodule SigilGuard.Canonical.JCS do
     decimal_position = decimal_exponent + 1
 
     cond do
-      decimal_position > 0 and decimal_position <= digit_count ->
+      decimal_position > 0 and decimal_position < digit_count ->
         {integer, fraction} = String.split_at(digits, decimal_position)
         integer <> "." <> fraction
 
-      digit_count < decimal_position and decimal_position <= 21 ->
+      digit_count <= decimal_position and decimal_position <= 21 ->
         digits <> String.duplicate("0", decimal_position - digit_count)
 
       decimal_position > -6 and decimal_position <= 0 ->

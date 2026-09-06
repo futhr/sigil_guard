@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+vectors="$(mktemp "${TMPDIR:-/tmp}/sigil-jcs.XXXXXX")"
+trap 'rm -f "${vectors}"' EXIT HUP INT TERM
+mix run bin/jcs_vectors.exs "${vectors}"
+node - "${vectors}" <<'JAVASCRIPT'
+const fs = require('fs');
+const vectors = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+for (const [bits, encoded] of vectors) {
+  const expected = JSON.stringify(Buffer.from(bits, 'hex').readDoubleBE());
+  if (encoded !== expected) throw new Error(`${bits}: ${encoded} != ${expected}`);
+}
+console.log(`${vectors.length} finite IEEE-754 values match ECMAScript JSON serialization`);
+JAVASCRIPT

@@ -8,6 +8,16 @@ defmodule SigilGuard.Canonical.JCSTest do
 
   @fixture_path SigilGuard.FixturePath.path("jcs/adversarial_corpus.json")
 
+  test "integer-position finite floats do not acquire a trailing decimal point" do
+    assert JCS.encode(float_from_hex("435ce41d9a334d1d")) == {:ok, "32528460560544884"}
+    assert JCS.encode(float_from_hex("c35ce41d9a334d1d")) == {:ok, "-32528460560544884"}
+  end
+
+  test "improper lists return an error at any nesting level" do
+    assert JCS.encode([1 | 2]) == {:error, :invalid_map}
+    assert JCS.encode(%{"nested" => [1 | 2]}) == {:error, :invalid_map}
+  end
+
   describe "encode/1" do
     test "matches the RFC 8785 canonical JSON sample byte-for-byte" do
       value = %{
