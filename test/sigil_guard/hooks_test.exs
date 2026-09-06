@@ -302,4 +302,15 @@ defmodule SigilGuard.HooksTest do
       assert is_integer(duration) and duration >= 0
     end
   end
+
+  test "loadable cold modules enforce hooks and can sign" do
+    module = SigilGuard.ColdSecurityFixture
+    :code.purge(module)
+    :code.delete(module)
+    assert verdicts(dispatch([module], :tool_request)) == [:block]
+    :code.purge(module)
+    :code.delete(module)
+    assert {:ok, _} = SigilGuard.Attestation.Envelope.sign("bytes", module)
+    assert verdicts(dispatch([SigilGuard.MissingSecurityHook], :tool_request)) == [:block]
+  end
 end

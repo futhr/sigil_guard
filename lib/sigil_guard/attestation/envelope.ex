@@ -176,7 +176,7 @@ defmodule SigilGuard.Attestation.Envelope do
   defp normalize_signer(_), do: {:error, :invalid_signer}
 
   defp signer_public_key(module) do
-    if function_exported?(module, :public_key, 0) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :public_key, 0) do
       case module.public_key() do
         public_key
         when is_binary(public_key) and byte_size(public_key) == @ed25519_public_key_bytes ->
@@ -197,7 +197,7 @@ defmodule SigilGuard.Attestation.Envelope do
   defp signer_keyid(_, _), do: {:error, :invalid_signer}
 
   defp signer_signature(module, pae) do
-    if function_exported?(module, :sign, 1) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :sign, 1) do
       case module.sign(pae) do
         signature
         when is_binary(signature) and byte_size(signature) == @ed25519_signature_bytes ->

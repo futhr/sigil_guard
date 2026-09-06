@@ -421,7 +421,7 @@ defmodule SigilGuard.AgentTrust do
   end
 
   defp safe_identity(module, actor) do
-    if function_exported?(module, :trust_level, 1) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :trust_level, 1) do
       module.trust_level(actor)
     else
       :low

@@ -135,7 +135,8 @@ defmodule SigilGuard.Hooks do
     end
   end
 
-  defp valid_hooks?(hooks), do: is_list(hooks) and Enum.all?(hooks, &is_atom/1)
+  defp valid_hooks?(hooks),
+    do: is_list(hooks) and Enum.all?(hooks, &(is_atom(&1) and Code.ensure_loaded?(&1)))
 
   defp valid_timeout?(timeout) do
     is_integer(timeout) and timeout >= 0 and timeout <= @max_timeout_ms
