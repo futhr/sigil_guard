@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+export MIX_ENV=test
+mkdir -p _build/security-mutations
+for target in replay_store attestation/digest runtime/stream trust_bundle/verify; do
+  case "${target}" in
+    replay_store) tests=test/sigil_guard/replay_store_test.exs ;;
+    attestation/digest) tests=test/sigil_guard/attestation/digest_test.exs ;;
+    runtime/stream) tests=test/sigil_guard/runtime/stream_test.exs,test/sigil_guard/runtime/streaming_vectors_test.exs ;;
+    trust_bundle/verify) tests=test/sigil_guard/trust_bundle ;;
+  esac
+  report="$(printf '%s' "${target}" | tr / _)"
+  mix muex --files "lib/sigil_guard/${target}.ex" --test-paths "${tests}" \
+    --no-filter --no-optimize --no-tce --mutators arithmetic,comparison --max-mutations 12 --fail-at 100 \
+    --concurrency 1 --timeout 30000 --format json > "_build/security-mutations/${report}.json"
+done

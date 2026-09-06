@@ -1,0 +1,59 @@
+name: Security and performance measurements
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-mutations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: "1.18"
+          otp-version: "28"
+      - run: mix deps.get
+      - run: ./bin/check-security-mutations
+        env:
+          MIX_ENV: test
+      - run: ./bin/check-jcs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: security-mutation-reports
+          path: _build/security-mutations/
+
+  comparable-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: "1.18"
+          otp-version: "28"
+      - name: Measure parent and current code on the same machine
+        run: |
+          git worktree add --detach ../sigil-benchmark-parent HEAD^
+          (cd ../sigil-benchmark-parent && mix deps.get && mix bench)
+          mix deps.get
+          mix bench
+          mix run bench/compare.exs --baseline ../sigil-benchmark-parent/bench/output/benchmarks.json --run bench/output/benchmarks.json --require-comparable
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: comparable-performance-reports
+          path: |
+            bench/output/benchmarks.json
+            ../sigil-benchmark-parent/bench/output/benchmarks.json

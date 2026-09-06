@@ -18,6 +18,11 @@ defmodule SigilGuard.BenchCompare do
     baseline = read_json!(opts.baseline)
     run = read_json!(opts.run)
 
+    if opts.require_comparable and
+         (smoke_run?(run) or runner_class(baseline) != runner_class(run)) do
+      raise ArgumentError, "measured results from a comparable runner are required"
+    end
+
     case compare(baseline, run) do
       {:ok, findings} ->
         print_findings(findings)
@@ -119,23 +124,27 @@ defmodule SigilGuard.BenchCompare do
   end
 
   defp regression_findings(name, baseline_stats, run_stats) do
-    baseline_median = baseline_stats["median_ns"]
-    run_median = run_stats["median_ns"]
+    Enum.flat_map([{"median_ns", "median"}, {"memory_bytes", "allocation"}], fn {metric, label} ->
+      baseline_value = baseline_stats[metric]
+      run_value = run_stats[metric]
 
-    if run_median > baseline_median * (1 + @threshold) do
-      [
-        {:fail,
-         "#{name} median regressed by #{percent(run_median, baseline_median)} " <>
-           "(#{run_median} ns vs #{baseline_median} ns)"}
-      ]
-    else
-      []
-    end
+      if run_value > baseline_value * (1 + @threshold) do
+        [
+          {:fail,
+           "#{name} #{label} regressed by #{percent(run_value, baseline_value)} " <>
+             "(#{run_value} vs #{baseline_value})"}
+        ]
+      else
+        []
+      end
+    end)
   end
 
   defp pass_if_empty(findings, message \\ "no binding benchmark regressions")
   defp pass_if_empty([], message), do: [{:pass, message}]
   defp pass_if_empty(findings, _message), do: findings
+
+  defp percent(_, 0), do: "unbounded increase from zero"
 
   defp percent(run, baseline) when baseline > 0 do
     ((run - baseline) / baseline * 100)
@@ -216,7 +225,7 @@ defmodule SigilGuard.BenchCompare do
   defp parse_args(argv) do
     {opts, _argv, invalid} =
       OptionParser.parse(argv,
-        strict: [baseline: :string, run: :string],
+        strict: [baseline: :string, run: :string, require_comparable: :boolean],
         aliases: [b: :baseline, r: :run]
       )
 
@@ -225,6 +234,7 @@ defmodule SigilGuard.BenchCompare do
     end
 
     %{
+      require_comparable: Keyword.get(opts, :require_comparable, false),
       baseline: Keyword.get(opts, :baseline, "bench/baseline.json"),
       run: Keyword.get(opts, :run, "bench/output/benchmarks.json")
     }

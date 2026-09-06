@@ -1,0 +1,23 @@
+{
+  "otp": "28",
+  "elixir": "1.18.4",
+  "baseline_ref": "1285c36d6789334d6d717d3c0f9bfa78864e4de0",
+  "results": {
+    "pipeline baseline": {
+      "median_ns": 12179666.5,
+      "memory_bytes": 41026936.0
+    },
+    "pipeline current": {
+      "median_ns": 11370125.0,
+      "memory_bytes": 23620680.0
+    },
+    "redaction baseline": {
+      "median_ns": 847750.0,
+      "memory_bytes": 136064.0
+    },
+    "redaction current": {
+      "median_ns": 45459.0,
+      "memory_bytes": 184208.0
+    }
+  }
+}

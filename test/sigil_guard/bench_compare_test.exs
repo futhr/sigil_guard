@@ -137,4 +137,17 @@ defmodule SigilGuard.BenchCompareTest do
     Keyword.merge([median_ns: 100, p99_ns: 150, memory_bytes: 10], overrides)
     |> Map.new(fn {key, value} -> {Atom.to_string(key), value} end)
   end
+
+  test "allocation regressions fail even when latency is unchanged" do
+    assert {:error, [{:fail, message}]} =
+             SigilGuard.BenchCompare.compare(
+               document(memory_bytes: 10),
+               document(memory_bytes: 13)
+             )
+
+    assert message =~ "allocation regressed"
+
+    assert {:error, _} =
+             SigilGuard.BenchCompare.compare(document(memory_bytes: 0), document(memory_bytes: 1))
+  end
 end
