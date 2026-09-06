@@ -8,10 +8,10 @@ defmodule SigilGuard.Confirmation do
   digest of the exact payload and boundary context, so it cannot be reused for
   a different tool call, tool result, sink, actor, or trust boundary.
 
-  Tokens are stateless by default. They prevent cross-action replay by binding
-  to the action digest, manifest digest when present, and expiry. Pass
-  `consume: true` to `verify/5` or `valid?/5` to enforce single-use semantics
-  with `SigilGuard.ReplayStore`.
+  Tokens are single-use by default. They prevent cross-action replay by binding
+  to the action digest, manifest digest when present, and expiry. Single-use
+  verification records the nonce in `SigilGuard.ReplayStore`. Pass
+  `consume: false` to `verify/5` or `valid?/5` only for stateless inspection.
 
   ## Examples
 
@@ -96,7 +96,7 @@ defmodule SigilGuard.Confirmation do
 
   Options:
 
-    * `:actor` - approving actor identifier. Defaults to context actor or identity.
+    * `:actor` - fallback approving actor when context actor and identity are absent.
     * `:ttl_ms` - token lifetime in milliseconds. Defaults to 5 minutes.
     * `:now` - `DateTime` used for deterministic tests.
     * `:nonce` - nonce used for deterministic tests.
@@ -136,8 +136,8 @@ defmodule SigilGuard.Confirmation do
 
   Returns `{:ok, claims}` for a valid token or `{:error, reason}`.
 
-  Pass `consume: true` to record the token nonce in `SigilGuard.ReplayStore`
-  until the token expires and reject a second verification with
+  By default, successful verification records the token nonce in `SigilGuard.ReplayStore`
+  through the token expiry boundary and rejects a second verification with
   `{:error, :replay_detected}`.
   """
   @spec verify(String.t(), term(), Context.t() | map() | keyword(), binary(), keyword()) ::
@@ -161,7 +161,7 @@ defmodule SigilGuard.Confirmation do
   @doc """
   Return true when `token` verifies for the given payload and context.
 
-  When `consume: true` is passed, a successful call consumes the token nonce in
+  Unless `consume: false` is passed, a successful call consumes the token nonce in
   the same way as `verify/5`.
   """
   @spec valid?(String.t(), term(), Context.t() | map() | keyword(), binary(), keyword()) ::

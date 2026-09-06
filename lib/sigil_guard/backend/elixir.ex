@@ -16,8 +16,9 @@ defmodule SigilGuard.Backend.Elixir do
 
   ## Example
 
-      SigilGuard.Backend.Elixir.scan("API_KEY=sk_live_abc123", [])
-      # => {:hit, [%{type: :api_key, match: "sk_live_abc123", ...}]}
+      {:hit, [hit]} = SigilGuard.Backend.Elixir.scan("AKIAIOSFODNN7EXAMPLE", [])
+      hit.name
+      # => "aws_access_key"
 
       SigilGuard.Backend.Elixir.classify_risk("read_file", [])
       # => :low

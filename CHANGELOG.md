@@ -9,6 +9,21 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
 [`MIGRATING-1.0.md`](MIGRATING-1.0.md) before moving a 0.2.x consumer to the
 1.0 line.
 
+- Hardened trust-bundle authority transitions, concurrent rollback floors and
+  cumulative revocations. Successors changing delegated authority require the
+  new root quorum to countersign; revoked or expired card issuers fail closed.
+- Fixed cold security modules, actor/tool policy facts, MCP object-key scanning,
+  full replay retention, atomic rate quotas and bounded untrusted work/state.
+- Rejected ambiguous null-valued application map fields while preserving v3
+  signed bytes. See the [audit acceptance changes](MIGRATING-1.0.md#audit-hardening-of-v3-acceptance).
+- Fixed overlapping redaction, unbounded streaming candidates, UTF-8 chunk
+  boundaries and JCS float formatting. Added independent float vectors,
+  measured scanner improvements and comparable performance regression gates.
+- Updated development dependencies including Mint 1.10.0 security fixes and
+  Muex 0.9.1. Mutation reports distinguish killed, compiler-invalid and proven
+  equivalent mutations; broader bounded security campaigns retain strict scores.
+- Added strict deployment guidance and a fresh unpacked-Hex consumer check.
+
 - Removed `SigilGuard.Registry`, `SigilGuard.Registry.Bundle`, and
   `SigilGuard.Registry.Cache`; use
   [`SigilGuard.TrustBundle`](MIGRATING-1.0.md#registry-to-trust-bundles).

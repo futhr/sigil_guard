@@ -11,7 +11,6 @@
 | Attestation | Signed typed statement about request/result/decision evidence. |
 | Tool Manifest | Signed/hashable MCP tool definition and schema metadata. |
 | Compatibility Contract | Existing public API or wire shape current consumers rely on. |
-| Legacy Remote Bundle | Explicit optional HTTP-loaded bundle for compatibility. |
 
 ## Avoid
 

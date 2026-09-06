@@ -640,3 +640,18 @@ The runtime gate now evaluates through `SigilGuard.BoundaryPolicy`, and
 - The confirmation token's informational `"action"` claim now records the
   unified action (`"confirm"` for confirming decisions); the token's
   cryptographic binding is unchanged.
+
+## Audit hardening of v3 acceptance
+
+The security audit preserves signed v3 byte contracts while narrowing unsafe
+acceptance paths. Application null-valued map fields now fail `:invalid_payload`
+instead of colliding with absent fields. Nullable profile fields and null array
+elements keep their defined meanings. MCP key scanning uses a separate scan view
+so existing confirmation preimages do not acquire scanner-generated keys.
+
+Root rotations that introduce delegate authority require the new root quorum to
+countersign the successor envelope. Existing frozen payload bytes remain valid;
+append root signatures with `SigilGuard.Attestation.Envelope.add_signature/3`.
+Unsigned authority changes, expired or revoked issuers, and stale replay claims
+fail closed. Review the [strict deployment guide](guides/strict-deployment.md)
+for work limits, explicit bundle scanner selection and streaming retention.

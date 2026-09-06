@@ -13,6 +13,12 @@ sigil_guard:
 
 # SP.07 - Runtime Gate And Streaming Contracts
 
+
+Streaming safety is strengthened by [SP.18](SP.18-security-audit-remediation.md):
+a fixed holdback alone cannot protect unbounded regex candidates. Retain those
+candidates, buffer custom patterns of unknown width, enforce the stream byte
+budget, and emit only complete UTF-8 codepoints.
+
 ## Executive Summary
 
 This spec documents the implemented runtime gate, context normalization,
