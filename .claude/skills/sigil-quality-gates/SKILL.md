@@ -20,7 +20,7 @@ mix sobelow --config --compact
 mix deps.audit
 mix hex.audit
 mix test --cover
-mix muex --files lib/sigil_guard/verdict.ex --test-paths test/sigil_guard/verdict_test.exs --no-optimize --fail-at 100 --concurrency 1 --timeout 30000
+./bin/check-verdict-mutations
 mix doctor
 mix dialyzer
 mix docs

@@ -33,10 +33,6 @@
 
     # Tests
     {:ex_unit, command: "mix test --cover"},
-    {:mutation,
-     command:
-       "mix muex --files lib/sigil_guard/verdict.ex " <>
-         "--test-paths test/sigil_guard/verdict_test.exs --no-optimize " <>
-         "--fail-at 100 --concurrency 1 --timeout 30000"}
+    {:mutation, command: "./bin/check-verdict-mutations"}
   ]
 ]

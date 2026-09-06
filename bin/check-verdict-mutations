@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+set -eu
+export MIX_ENV=test
+mkdir -p _build/security-mutations
+report=_build/security-mutations/verdict.log
+status=0
+mix muex --files lib/sigil_guard/verdict.ex --test-paths test/sigil_guard/verdict_test.exs \
+  --no-optimize --fail-at 100 --concurrency 1 --timeout 30000 --format json > "${report}" 2>&1 || status=$?
+if [ "${status}" -gt 1 ]; then
+  cat "${report}"
+  exit "${status}"
+fi
+mix run bin/mutation_report.exs --report "${report}"

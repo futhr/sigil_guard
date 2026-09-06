@@ -17,6 +17,7 @@ defmodule SigilGuard.VerdictTest do
 
   test "the total order is allow < redact < confirm < quarantine < block" do
     ranks = Enum.map(Verdict.verdicts(), &Verdict.rank/1)
+    assert ranks == [0, 1, 2, 3, 4]
     assert ranks == Enum.sort(ranks)
     assert ranks == Enum.uniq(ranks)
   end
