@@ -63,6 +63,8 @@ defmodule SigilGuard.Policy do
   }
 
   @default_rate_table :sigil_guard_rates
+  @rate_count {__MODULE__, :entries}
+  @rate_prune {__MODULE__, :last_prune}
 
   @risk_order %{
     low: 0,
@@ -156,17 +158,13 @@ defmodule SigilGuard.Policy do
 
   This is a fixed-window counter: an identity's first request opens a
   window, requests within `:window_ms` count against `:max_requests`, and
-  the next request after the window expires opens a fresh one. Two limits
-  follow from that design — suitable for coarse abuse protection, not
-  strict quotas:
+  the next request after expiry opens a fresh one. Atomic ETS transitions enforce
+  the per-window quota under contention. Up to `2 × max_requests` can pass in a
+  burst straddling a window boundary, as with any fixed-window scheme.
 
-    * Check and increment are separate ETS operations, so concurrent
-      callers can slightly exceed `:max_requests` under contention.
-    * Up to `2 × max_requests` can pass in a burst straddling a window
-      boundary, as with any fixed-window scheme.
-
-  For strict guarantees, implement the `SigilGuard.Policy` behaviour with
-  a dedicated rate limiter backend.
+  Stores hold at most 100,000 identities. Expired entries are reclaimed on use
+  and through amortized sweeps; capacity exhaustion fails with `:rate_limited`.
+  This is a per-node, per-boot limiter, not a distributed quota.
 
   ## Options
 
@@ -181,13 +179,14 @@ defmodule SigilGuard.Policy do
   """
   @spec rate_check(String.t(), keyword()) :: :ok | {:error, :rate_limited}
   def rate_check(identity, opts \\ []) do
-    with :ok <- validate_options(opts),
+    with true <- is_binary(identity) and byte_size(identity) <= 4096,
+         :ok <- validate_options(opts),
          {:ok, max_requests} <- positive_integer_option(opts, :max_requests, 100),
          {:ok, window_ms} <- positive_integer_option(opts, :window_ms, 60_000),
          {:ok, table} <- rate_store_option(opts) do
       checked_rate(identity, table, max_requests, window_ms)
     else
-      {:error, _} -> {:error, :rate_limited}
+      _ -> {:error, :rate_limited}
     end
   end
 
@@ -363,22 +362,68 @@ defmodule SigilGuard.Policy do
   end
 
   defp checked_rate(identity, table, max_requests, window_ms) do
+    identity = :crypto.hash(:sha256, identity)
     now = System.monotonic_time(:millisecond)
 
     ensure_rate_table(table)
 
-    case :ets.lookup(table, identity) do
-      [{^identity, count, window_start}] when now - window_start < window_ms ->
-        if count >= max_requests do
-          {:error, :rate_limited}
-        else
-          :ets.update_counter(table, identity, {2, 1})
-          :ok
-        end
+    :ets.insert_new(table, {@rate_count, 0})
+    prune_rates(table, now)
+    claim_rate(identity, table, max_requests, now, now + window_ms)
+  end
+
+  defp prune_rates(table, now) do
+    previous = :ets.lookup(table, @rate_prune)
+
+    case previous do
+      [{_, last}] when now - last < 60_000 ->
+        :ok
 
       _ ->
-        :ets.insert(table, {identity, 1, now})
+        :ets.insert(table, {@rate_prune, now})
+
+        removed =
+          :ets.select_delete(table, [{{:"$1", :"$2", :"$3"}, [{:"=<", :"$3", now}], [true]}])
+
+        :ets.update_counter(table, @rate_count, {2, -removed})
+    end
+  end
+
+  defp claim_rate(identity, table, max_requests, now, expiry) do
+    case :ets.lookup(table, identity) do
+      [{^identity, count, current_expiry}] when current_expiry <= now ->
+        removed = :ets.select_delete(table, [{{identity, count, current_expiry}, [], [true]}])
+        :ets.update_counter(table, @rate_count, {2, -removed})
+        claim_rate(identity, table, max_requests, now, expiry)
+
+      [{^identity, count, _}] when count >= max_requests ->
+        {:error, :rate_limited}
+
+      [{^identity, count, current_expiry}] ->
+        match = [
+          {{identity, count, current_expiry}, [], [{{identity, count + 1, current_expiry}}]}
+        ]
+
+        if :ets.select_replace(table, match) == 1,
+          do: :ok,
+          else: claim_rate(identity, table, max_requests, now, expiry)
+
+      [] ->
+        insert_rate(identity, table, max_requests, now, expiry)
+    end
+  end
+
+  defp insert_rate(identity, table, max_requests, now, expiry) do
+    if :ets.update_counter(table, @rate_count, {2, 1}) > 100_000 do
+      :ets.update_counter(table, @rate_count, {2, -1})
+      {:error, :rate_limited}
+    else
+      if :ets.insert_new(table, {identity, 1, expiry}) do
         :ok
+      else
+        :ets.update_counter(table, @rate_count, {2, -1})
+        claim_rate(identity, table, max_requests, now, expiry)
+      end
     end
   end
 

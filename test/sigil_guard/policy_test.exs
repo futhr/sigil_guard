@@ -316,4 +316,31 @@ defmodule SigilGuard.PolicyTest do
       assert Policy.classify_risk("read_file", [{:risk_mappings}]) == :high
     end
   end
+
+  test "concurrent quota claims never exceed the declared limit" do
+    table = :rate_test_atomic_quota
+    Policy.ensure_rate_table(table)
+
+    for round <- 1..5 do
+      results =
+        1..100
+        |> Task.async_stream(
+          fn _ ->
+            Policy.rate_check("actor-#{round}", rate_store: table, max_requests: 7)
+          end,
+          max_concurrency: 100
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      assert Enum.count(results, &(&1 == :ok)) == 7
+    end
+  end
+
+  test "expired windows are reclaimed and malformed identities fail closed" do
+    table = :rate_test_expired_window
+    assert :ok = Policy.rate_check("actor", rate_store: table, max_requests: 1, window_ms: 1)
+    Process.sleep(5)
+    assert :ok = Policy.rate_check("actor", rate_store: table, max_requests: 1)
+    assert {:error, :rate_limited} = Policy.rate_check({:untrusted, :term})
+  end
 end
