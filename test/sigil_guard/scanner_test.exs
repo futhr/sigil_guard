@@ -7,6 +7,27 @@ defmodule SigilGuard.ScannerTest do
 
   alias SigilGuard.Scanner
 
+  test "overlapping built-in matches redact once without leaking or crashing" do
+    text = "api_key=AKIAIOSFODNN7EXAMPLE"
+    assert {:hit, hits} = Scanner.scan(text)
+    assert length(hits) == 2
+    output = Scanner.redact(text, hits)
+    refute output =~ "AKIA"
+    assert output == Scanner.redact(text, Enum.reverse(hits))
+  end
+
+  test "redaction validates spans and accepts a missing replacement hint" do
+    assert Scanner.redact("abc", [%{offset: 0, length: 2}]) == "[REDACTED]c"
+    assert_raise ArgumentError, fn -> Scanner.redact("abc", [%{offset: 1, length: 3}]) end
+
+    assert_raise ArgumentError, fn ->
+      Scanner.redact("abc", [%{offset: 0, length: 1, replacement_hint: 1}])
+    end
+
+    assert Scanner.redact("abc", [%{offset: 0, length: 1}, %{offset: 1, length: 1}]) ==
+             "[REDACTED][REDACTED]c"
+  end
+
   describe "scan/2" do
     test "returns {:ok, text} for clean input" do
       assert {:ok, "hello world"} = Scanner.scan("hello world")

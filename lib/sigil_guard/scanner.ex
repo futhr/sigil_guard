@@ -73,7 +73,8 @@ defmodule SigilGuard.Scanner do
   @doc """
   Replace all matched regions in `text` with their replacement hints.
 
-  Hits are applied in reverse offset order to preserve positions.
+  Overlapping spans are merged against the original bytes. The leftmost,
+  longest hit supplies the replacement; ties sort by replacement text.
 
   ## Options
 
@@ -95,16 +96,38 @@ defmodule SigilGuard.Scanner do
     validate_options!(opts)
     default = Keyword.get(opts, :default_replacement, "[REDACTED]")
 
-    hits
-    |> Enum.sort_by(& &1.offset, :desc)
-    |> Enum.reduce(text, fn hit, acc ->
-      replacement = hit.replacement_hint || default
-      prefix = binary_part(acc, 0, hit.offset)
-      suffix_start = hit.offset + hit.length
-      suffix = binary_part(acc, suffix_start, byte_size(acc) - suffix_start)
-      prefix <> replacement <> suffix
-    end)
+    spans =
+      hits
+      |> Enum.map(&redaction_span!(&1, text, default))
+      |> Enum.sort()
+      |> Enum.reduce([], &merge_span/2)
+      |> Enum.reverse()
+
+    {parts, position} =
+      Enum.reduce(spans, {[], 0}, fn {offset, negative_end, replacement}, {parts, position} ->
+        prefix = binary_part(text, position, offset - position)
+        {[parts, prefix, replacement], -negative_end}
+      end)
+
+    IO.iodata_to_binary([parts, binary_part(text, position, byte_size(text) - position)])
   end
+
+  defp redaction_span!(%{offset: offset, length: length} = hit, text, default)
+       when is_integer(offset) and offset >= 0 and is_integer(length) and length > 0 and
+              offset + length <= byte_size(text) do
+    replacement = Map.get(hit, :replacement_hint) || default
+    if not is_binary(replacement), do: raise(ArgumentError, "replacement must be a binary")
+    {offset, -(offset + length), replacement}
+  end
+
+  defp redaction_span!(_, _, _), do: raise(ArgumentError, "invalid redaction span")
+
+  defp merge_span({offset, ending, _}, [{start, previous_end, replacement} | rest])
+       when offset < -previous_end do
+    [{start, min(ending, previous_end), replacement} | rest]
+  end
+
+  defp merge_span(span, spans), do: [span | spans]
 
   @doc """
   Scan and redact in a single pass. Returns the redacted text.
