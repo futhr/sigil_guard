@@ -122,4 +122,44 @@ defmodule SigilGuard.TrustBundle.CacheTest do
       StreamData.map(StreamData.integer(1..sequence), &{sequence, &1})
     end)
   end
+
+  test "concurrent accepted snapshots keep the largest floor and revocations" do
+    first = bundle(sequence: 1)
+    assert {:ok, _} = Cache.put(first)
+
+    results =
+      2..200
+      |> Task.async_stream(
+        fn sequence ->
+          candidate = bundle(sequence: sequence)
+
+          doc =
+            Map.put(candidate.document, "revocations", [
+              %{"kind" => "key", "id" => "key-#{sequence}"}
+            ])
+
+          Cache.put(%{candidate | document: doc})
+        end,
+        max_concurrency: 100
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    assert Cache.floor(first.bundle_id) == 200
+
+    for {:ok, accepted} <- results do
+      assert MapSet.member?(Cache.revoked_keyids(first.bundle_id), "key-#{accepted.sequence}")
+    end
+  end
+
+  test "direct verified-snapshot acceptance preserves authority and cumulative revocations" do
+    first = bundle(sequence: 1)
+    first = put_in(first.document["revocations"], [%{"kind" => "key", "id" => "revoked"}])
+    assert {:ok, _} = Cache.put(first)
+
+    unauthorized = put_in(bundle(sequence: 2).document["roles"], %{"delegates" => []})
+    assert Cache.put(unauthorized) == {:error, :forked_root_chain}
+    revoked = bundle(sequence: 2, envelope: %{"signatures" => [%{"keyid" => "revoked"}]})
+    assert Cache.put(revoked) == {:error, :revoked_key}
+    assert Cache.get(first.bundle_id) == {:ok, first}
+  end
 end

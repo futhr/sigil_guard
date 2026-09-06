@@ -18,7 +18,7 @@ defmodule SigilGuard.TrustBundle.Cache do
           keyids: [String.t()],
           keys: %{String.t() => binary()}
         }
-  @type put_error :: :sequence_below_floor | :forked_root_chain
+  @type put_error :: :sequence_below_floor | :forked_root_chain | :revoked_key
 
   @doc """
   Create the trust-bundle ETS table if it does not already exist.
@@ -110,7 +110,7 @@ defmodule SigilGuard.TrustBundle.Cache do
 
     case :ets.lookup(@table, bundle_id) do
       [] -> put_new(bundle)
-      [{^bundle_id, cached, floor, _, _, revoked}] -> put_existing(bundle, cached, floor, revoked)
+      [row] -> put_existing(bundle, row)
     end
   end
 
@@ -140,16 +140,17 @@ defmodule SigilGuard.TrustBundle.Cache do
   defp put_new(bundle) do
     floor = accepted_floor(0, bundle)
 
-    :ets.insert(
-      @table,
-      {bundle.bundle_id, bundle, floor, build_root_pin(bundle), rotation_digests(bundle),
-       collect_revoked_keyids(bundle)}
-    )
+    inserted? =
+      :ets.insert_new(
+        @table,
+        {bundle.bundle_id, bundle, floor, build_root_pin(bundle), rotation_digests(bundle),
+         collect_revoked_keyids(bundle)}
+      )
 
-    {:ok, bundle}
+    if inserted?, do: {:ok, bundle}, else: put(bundle)
   end
 
-  defp put_existing(bundle, cached, floor, revoked) do
+  defp put_existing(bundle, {_, cached, floor, pin, digests, revoked} = row) do
     cond do
       same_snapshot?(bundle, cached) ->
         {:ok, cached}
@@ -163,17 +164,44 @@ defmodule SigilGuard.TrustBundle.Cache do
       root_version_below_cached?(bundle, cached) ->
         {:error, :sequence_below_floor}
 
+      revoked_signature?(bundle, revoked) ->
+        {:error, :revoked_key}
+
+      forked_authority?(bundle, cached, digests) ->
+        {:error, :forked_root_chain}
+
       true ->
         accepted = accepted_floor(floor, bundle)
 
-        :ets.insert(
-          @table,
-          {bundle.bundle_id, bundle, accepted, build_root_pin(cached), rotation_digests(bundle),
+        replacement =
+          {bundle.bundle_id, bundle, accepted, pin, Map.merge(digests, rotation_digests(bundle)),
            MapSet.union(revoked, collect_revoked_keyids(bundle))}
-        )
 
-        {:ok, bundle}
+        match = [
+          {{bundle.bundle_id, :"$2", :"$3", :"$4", :"$5", :"$6"},
+           [{:"=:=", :"$_", {:const, row}}], [{:const, replacement}]}
+        ]
+
+        if :ets.select_replace(@table, match) == 1, do: {:ok, bundle}, else: put(bundle)
     end
+  end
+
+  defp revoked_signature?(bundle, revoked) do
+    bundle.envelope
+    |> Map.get("signatures", [])
+    |> Enum.any?(&MapSet.member?(revoked, Map.get(&1, "keyid")))
+  end
+
+  defp forked_authority?(bundle, cached, digests) do
+    changed_roles? =
+      bundle.root_version == cached.root_version and
+        Map.take(bundle.document, ["keys", "roles"]) !=
+          Map.take(cached.document, ["keys", "roles"])
+
+    changed_roles? or
+      Enum.any?(rotation_digests(bundle), fn {version, digest} ->
+        Map.has_key?(digests, version) and Map.fetch!(digests, version) != digest
+      end)
   end
 
   defp same_snapshot?(bundle, cached) do

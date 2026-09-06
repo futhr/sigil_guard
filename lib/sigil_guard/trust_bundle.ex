@@ -164,9 +164,15 @@ defmodule SigilGuard.TrustBundle do
   end
 
   defp load_envelope(envelope, source, opts) do
-    envelope
-    |> verify(Keyword.put_new(opts, :source, source))
-    |> cache_loaded(opts)
+    :global.trans(
+      {{__MODULE__, :load}, self()},
+      fn ->
+        envelope
+        |> verify(Keyword.put_new(opts, :source, source))
+        |> cache_loaded(opts)
+      end,
+      [node()]
+    )
   end
 
   defp cache_loaded({:ok, bundle}, opts) do
