@@ -485,4 +485,79 @@ defmodule SigilGuard.AgentCardTest do
   end
 
   defp sha256_hex(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+
+  test "revoked card issuers, expired roles and unmet role quorums fail closed" do
+    {:ok, envelope} = AgentCard.sign(valid_card(), IssuerSigner)
+    base = bundle_with_role([issuer_keyid()], keys: issuer_material())
+    revoked = put_in(base.document["revocations"], [%{"kind" => "key", "id" => issuer_keyid()}])
+    assert AgentCard.verify(envelope, revoked, now: @now) == {:error, :untrusted_issuer}
+
+    expired =
+      put_in(base.document["roles"]["delegates"], [
+        %{
+          "name" => "agent_card",
+          "keyids" => [issuer_keyid()],
+          "expires_at" => "2026-01-01T00:00:00.000Z"
+        }
+      ])
+
+    assert AgentCard.verify(envelope, expired, now: @now) == {:error, :untrusted_issuer}
+
+    quorum =
+      put_in(base.document["roles"]["delegates"], [
+        %{"name" => "agent_card", "keyids" => [issuer_keyid()], "threshold" => 2}
+      ])
+
+    assert AgentCard.verify(envelope, quorum, now: @now) == {:error, :untrusted_issuer}
+
+    valid =
+      put_in(base.document["roles"]["delegates"], [
+        %{
+          "name" => "agent_card",
+          "keyids" => [issuer_keyid()],
+          "threshold" => 1,
+          "expires_at" => "2026-08-01T12:00:00.000Z"
+        }
+      ])
+
+    assert {:ok, _} = AgentCard.verify(envelope, valid, now: @now)
+    assert AgentCard.verify(envelope, valid, now: :invalid) == {:error, :untrusted_issuer}
+  end
+
+  test "a valid cosigner cannot rehabilitate a revoked card issuer" do
+    other = SigilGuard.TestSigner
+    other_id = Envelope.keyid(other.public_key())
+    keys = Map.put(issuer_material(), other_id, other.public_key())
+    bundle = bundle_with_role([issuer_keyid(), other_id], keys: keys)
+    revoked = put_in(bundle.document["revocations"], [%{"kind" => "key", "id" => issuer_keyid()}])
+    {:ok, envelope} = AgentCard.sign(valid_card(), IssuerSigner)
+    {:ok, envelope} = Envelope.add_signature(envelope, other)
+    assert AgentCard.verify(envelope, revoked, now: @now) == {:error, :untrusted_issuer}
+  end
+
+  test "a retained snapshot cannot bypass newer cached issuer omission or revocation" do
+    alias SigilGuard.TrustBundle.Cache
+
+    id = "agent-card-cache-#{System.unique_integer([:positive])}"
+    on_exit(fn -> :ets.delete(:sigil_guard_trust_bundle, id) end)
+    base = bundle_with_role([issuer_keyid()], keys: issuer_material())
+    base = %{base | bundle_id: id, sequence: 1, root_version: 1, digest: "first", envelope: %{}}
+    {:ok, envelope} = AgentCard.sign(valid_card(), IssuerSigner)
+    assert {:ok, _} = AgentCard.verify(envelope, base, now: @now)
+    assert {:ok, _} = Cache.put(base)
+    assert {:ok, _} = AgentCard.verify(envelope, base, now: @now)
+
+    omitted = put_in(base.document["roles"]["delegates"], [])
+    omitted = %{omitted | sequence: 2, root_version: 2, digest: "omitted"}
+    assert {:ok, _} = Cache.put(omitted)
+    assert AgentCard.verify(envelope, base, now: @now) == {:error, :untrusted_issuer}
+
+    revoked = put_in(base.document["revocations"], [%{"kind" => "key", "id" => issuer_keyid()}])
+    revoked = %{revoked | sequence: 3, root_version: 3, digest: "revoked"}
+    assert {:ok, _} = Cache.put(revoked)
+    restored = %{base | sequence: 4, root_version: 3, digest: "restored"}
+    assert {:ok, _} = Cache.put(restored)
+    assert AgentCard.verify(envelope, base, now: @now) == {:error, :untrusted_issuer}
+    assert AgentCard.verify(envelope, restored, now: @now) == {:error, :untrusted_issuer}
+  end
 end

@@ -172,7 +172,9 @@ defmodule SigilGuard.AgentCard do
 
   `trust_material` is either a `%{keyid => public_key}` map (authorized issuers
   directly) or a verified `%SigilGuard.TrustBundle{}`, whose `"agent_card"`
-  delegate role names the trusted card signers. Verification follows the
+  delegate role names the trusted card signers. Bundle and role expiry,
+  declared card-role quorum, cached key omissions and irreversible revocations
+  are enforced; a revoked signature cannot be rehabilitated by a cosigner. Verification follows the
   normative order: envelope structure, issuer resolution, Ed25519 over PAE,
   schema validation, JCS byte-equality, and freshness (`:now`/`:max_skew_ms`).
   """
@@ -186,8 +188,10 @@ defmodule SigilGuard.AgentCard do
   end
 
   defp do_verify(envelope, trust_material, opts) when is_list(opts) do
-    with {:ok, authorized, resolver} <- resolve_issuers(trust_material),
+    with {:ok, authorized, resolver} <- resolve_issuers(trust_material, opts),
+         :ok <- reject_revoked_issuer(envelope, resolver),
          {:ok, payload} <- verify_envelope(envelope, authorized, resolver),
+         :ok <- issuer_threshold(envelope, authorized, resolver),
          {:ok, card} <- parse_and_validate(payload),
          :ok <- require_canonical(card, payload),
          :ok <- validate_freshness(card, opts) do
@@ -200,19 +204,98 @@ defmodule SigilGuard.AgentCard do
   defp verify_metadata({:ok, _}), do: %{result: :ok, error: nil}
   defp verify_metadata({:error, reason}), do: %{result: :error, error: reason}
 
-  defp resolve_issuers(%TrustBundle{document: document}) when is_map(document) do
-    bundle_keys = bundle_keys(document)
-    role_keyids = card_issuer_keyids(document)
-    authorized = Map.take(bundle_keys, role_keyids)
-    {:ok, authorized, {:bundle, bundle_keys}}
+  defp resolve_issuers(%TrustBundle{bundle_id: id, document: document} = bundle, opts)
+       when is_map(document) do
+    document = current_issuer_document(bundle)
+    keys = bundle_keys(document)
+
+    revoked =
+      document
+      |> Map.get("revocations", [])
+      |> Enum.filter(&(Map.get(&1, "kind") == "key"))
+      |> Enum.map(&Map.get(&1, "id"))
+      |> MapSet.new()
+
+    revoked =
+      if is_binary(id),
+        do: MapSet.union(revoked, SigilGuard.TrustBundle.Cache.revoked_keyids(id)),
+        else: revoked
+
+    role = card_issuer_role(document)
+    authorized = Map.take(keys, card_issuer_keyids(document)) |> Map.drop(MapSet.to_list(revoked))
+
+    with :ok <- issuer_role_fresh?(role, opts),
+         :ok <- issuer_role_fresh?(document, opts),
+         :ok <- issuer_role_fresh?(get_in(document, ["roles", "root"]) || %{}, opts) do
+      {:ok, authorized, {:bundle, keys, Map.get(role, "threshold", 1), revoked}}
+    end
   end
 
-  defp resolve_issuers(trust_material)
+  defp resolve_issuers(trust_material, _)
        when is_map(trust_material) and map_size(trust_material) > 0 do
     {:ok, trust_material, :map}
   end
 
-  defp resolve_issuers(_), do: {:error, :missing_trust_bundle}
+  defp resolve_issuers(_, _), do: {:error, :missing_trust_bundle}
+
+  defp current_issuer_document(%TrustBundle{
+         bundle_id: id,
+         sequence: sequence,
+         document: document
+       })
+       when is_binary(id) do
+    case SigilGuard.TrustBundle.Cache.get(id) do
+      {:ok, cached} when cached.sequence >= sequence -> cached.document
+      _ -> document
+    end
+  end
+
+  defp current_issuer_document(bundle), do: bundle.document
+
+  defp reject_revoked_issuer(envelope, {:bundle, _, _, revoked}) do
+    if Enum.any?(signature_keyids(envelope), &MapSet.member?(revoked, &1)),
+      do: {:error, :untrusted_issuer},
+      else: :ok
+  end
+
+  defp reject_revoked_issuer(_, _), do: :ok
+
+  defp issuer_role_fresh?(%{"expires_at" => expiry}, opts) when is_binary(expiry) do
+    now = Keyword.get_lazy(opts, :now, &DateTime.utc_now/0)
+    skew = Keyword.get(opts, :max_skew_ms, @default_max_skew_ms)
+
+    with %DateTime{} <- now,
+         true <- is_integer(skew) and skew >= 0,
+         {:ok, expiry, _} <- DateTime.from_iso8601(expiry),
+         false <- DateTime.after?(now, DateTime.add(expiry, skew, :millisecond)) do
+      :ok
+    else
+      _ -> {:error, :untrusted_issuer}
+    end
+  end
+
+  defp issuer_role_fresh?(%{"expires_at" => _}, _), do: {:error, :untrusted_issuer}
+  defp issuer_role_fresh?(_, _), do: :ok
+
+  defp issuer_threshold(envelope, authorized, {:bundle, _, threshold, _})
+       when is_integer(threshold) and threshold > 0 do
+    count =
+      envelope
+      |> signature_keyids()
+      |> Enum.uniq()
+      |> Enum.count(&Map.has_key?(authorized, &1))
+
+    if count >= threshold, do: :ok, else: {:error, :untrusted_issuer}
+  end
+
+  defp issuer_threshold(_, _, :map), do: :ok
+  defp issuer_threshold(_, _, _), do: {:error, :untrusted_issuer}
+
+  defp card_issuer_role(%{"roles" => %{"delegates" => delegates}}) when is_list(delegates) do
+    Enum.find(delegates, %{}, &(is_map(&1) and Map.get(&1, "name") == @card_issuer_role))
+  end
+
+  defp card_issuer_role(_), do: %{}
 
   defp bundle_keys(%{"keys" => keys}) when is_map(keys) do
     Map.new(keys, fn
@@ -245,7 +328,7 @@ defmodule SigilGuard.AgentCard do
 
   defp classify_unresolved(_, :map), do: {:error, :unknown_key_id}
 
-  defp classify_unresolved(envelope, {:bundle, bundle_keys}) do
+  defp classify_unresolved(envelope, {:bundle, bundle_keys, _, _}) do
     if Enum.any?(signature_keyids(envelope), &Map.has_key?(bundle_keys, &1)) do
       {:error, :untrusted_issuer}
     else
