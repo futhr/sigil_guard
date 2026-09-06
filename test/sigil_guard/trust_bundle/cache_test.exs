@@ -9,6 +9,7 @@ defmodule SigilGuard.TrustBundle.CacheTest do
 
   setup do
     Cache.clear()
+    on_exit(&Cache.clear/0)
     :ok
   end
 

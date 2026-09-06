@@ -202,7 +202,8 @@ defmodule SigilGuard.TrustBundle.Cache do
       version: bundle.root_version,
       threshold: Map.fetch!(root, "threshold"),
       keyids: Map.fetch!(root, "keyids"),
-      keys: decoded_keys(bundle.document)
+      keys: decoded_keys(bundle.document),
+      authority: Map.take(bundle.document, ["roles", "keys"])
     }
   end
 

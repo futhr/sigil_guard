@@ -1,10 +1,10 @@
 defmodule SigilGuard.TrustBundle.Verify do
   @moduledoc """
-  Pure verification pipeline for trust-bundle envelopes.
+  Offline verification pipeline for trust-bundle envelopes.
 
-  This module validates one DSSE-signed trust-bundle document. It does not
-  load sources, cache snapshots, walk root-rotation chains, or write
-  quarantine records; those responsibilities live in later pipeline stages.
+  Validates schemas, pinned authority, cross-signed rotation chains, signature
+  thresholds and freshness. Reads cached pins and irreversible revocations;
+  loading, cache writes and diagnostic recording belong to `TrustBundle`.
   """
 
   alias SigilGuard.Attestation.Envelope
@@ -25,7 +25,9 @@ defmodule SigilGuard.TrustBundle.Verify do
   even when the role declaration carries a larger threshold. Pass
   `enforce_declared_threshold: true` to require the role's declared threshold.
   Root rotation documents always require the full declared old-root and
-  new-root thresholds regardless of this option.
+  new-root thresholds regardless of this option. A successor introducing new
+  delegate authority also needs the new root quorum to countersign its payload;
+  a root-only rotation document does not bind that delegation.
 
   Options:
 
@@ -48,7 +50,7 @@ defmodule SigilGuard.TrustBundle.Verify do
          {:ok, payload} <- decode_base64(fields.payload),
          {:ok, document} <- decode_document(payload),
          {:ok, :bundle, document} <- Schema.validate(document),
-         :ok <- verify_rotation_chain(document, opts),
+         :ok <- verify_rotation_chain(document, signatures, fields.payload_type, payload, opts),
          {:ok, context} <- verification_context(document, signatures, opts),
          :ok <- reject_revoked_signatures(signatures, context.revoked_keyids),
          :ok <- verify_threshold(signatures, context, fields.payload_type, payload),
@@ -198,9 +200,45 @@ defmodule SigilGuard.TrustBundle.Verify do
     end)
   end
 
-  defp verify_rotation_chain(document, opts) do
-    with {:ok, genesis} <- genesis_root(document, opts) do
-      walk_rotation_chain(document, genesis)
+  defp verify_rotation_chain(document, signatures, payload_type, payload, opts) do
+    with {:ok, genesis} <- genesis_root(document, opts),
+         :ok <- walk_rotation_chain(document, genesis),
+         {:ok, revoked} <- revoked_keyids(document),
+         :ok <- reject_revoked_signatures(signatures, revoked) do
+      authorize_roles(document, genesis, signatures, payload_type, payload)
+    end
+  end
+
+  defp authorize_roles(document, genesis, signatures, payload_type, payload) do
+    authority = Map.take(document, ["roles", "keys"])
+
+    trusted =
+      case Cache.get(document["bundle_id"]) do
+        {:ok, cached} -> Map.take(cached.document, ["roles", "keys"])
+        :error -> Map.get(genesis, :authority)
+      end
+
+    version = String.to_integer(document["roles"]["root"]["version"])
+
+    trusted_version =
+      if get_in(trusted || %{}, ["roles", "root", "version"]),
+        do: String.to_integer(trusted["roles"]["root"]["version"]),
+        else: 0
+
+    cond do
+      version < trusted_version ->
+        {:error, :sequence_below_floor}
+
+      authority == trusted ->
+        :ok
+
+      version == trusted_version ->
+        {:error, :invalid_bundle_format}
+
+      true ->
+        with {:ok, root} <- current_root(document) do
+          verify_rotation_threshold(signatures, root, payload_type, payload)
+        end
     end
   end
 
@@ -229,7 +267,8 @@ defmodule SigilGuard.TrustBundle.Verify do
          version: positive_integer!(Map.fetch!(root, "version")),
          threshold: Map.fetch!(root, "threshold"),
          keyids: Map.fetch!(root, "keyids"),
-         keys: keys
+         keys: keys,
+         authority: Map.take(document, ["roles", "keys"])
        }}
     end
   end
@@ -254,14 +293,22 @@ defmodule SigilGuard.TrustBundle.Verify do
 
     cond do
       current_version == genesis.version ->
-        if chain == [], do: :ok, else: {:error, :invalid_bundle_format}
+        with true <- chain == [],
+             {:ok, keys} <- public_keys(document),
+             true <- current_root["keyids"] == genesis.keyids,
+             true <- current_root["threshold"] == genesis.threshold,
+             true <- Map.take(keys, genesis.keyids) == Map.take(genesis.keys, genesis.keyids) do
+          :ok
+        else
+          _ -> {:error, :invalid_bundle_format}
+        end
 
       current_version < genesis.version ->
         {:error, :sequence_below_floor}
 
       true ->
         with {:ok, terminal} <- walk_rotations(chain, genesis, Map.fetch!(document, "bundle_id")) do
-          terminal_root_matches?(terminal, current_root)
+          terminal_root_matches?(terminal, current_root, document)
         end
     end
   end
@@ -273,10 +320,12 @@ defmodule SigilGuard.TrustBundle.Verify do
       Enum.reduce_while(chain, {:ok, genesis, %{}}, fn envelope, {:ok, previous, seen} ->
         with {:ok, version, digest} <- rotation_version_digest(envelope),
              :ok <- reject_forked_rotation(bundle_id, version, digest, seen),
-             {:ok, next_root} <- verify_rotation(envelope, previous) do
+             {:ok, next_root} <- verify_rotation(envelope, previous),
+             true <- next_root.bundle_id == bundle_id do
           {:cont, {:ok, next_root, Map.put(seen, version, digest)}}
         else
           {:error, reason} -> {:halt, {:error, reason}}
+          false -> {:halt, {:error, :invalid_bundle_format}}
         end
       end)
 
@@ -359,6 +408,7 @@ defmodule SigilGuard.TrustBundle.Verify do
          threshold: Map.fetch!(root, "threshold"),
          keyids: Map.fetch!(root, "keyids"),
          keys: keys,
+         bundle_id: document["bundle_id"],
          descriptor: root,
          digest: document_digest(document)
        }}
@@ -375,9 +425,12 @@ defmodule SigilGuard.TrustBundle.Verify do
     verify_threshold(signatures, context, payload_type, payload)
   end
 
-  defp terminal_root_matches?(terminal, current_root) do
-    if Map.take(terminal.descriptor, ~w(keyids threshold version expires_at)) ==
-         Map.take(current_root, ~w(keyids threshold version expires_at)) do
+  defp terminal_root_matches?(terminal, current_root, document) do
+    {:ok, keys} = public_keys(document)
+
+    if Map.take(keys, terminal.keyids) == Map.take(terminal.keys, terminal.keyids) and
+         Map.take(terminal.descriptor, ~w(keyids threshold version expires_at)) ==
+           Map.take(current_root, ~w(keyids threshold version expires_at)) do
       :ok
     else
       {:error, :invalid_bundle_format}

@@ -48,7 +48,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
     expected = read_json(["rotation", "expected.json"])
 
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
     genesis_root = root_pin(envelope_document(genesis))
 
     assert {:ok, %TrustBundle{digest: digest}} = TrustBundle.verify(genesis, now: @now)
@@ -76,7 +76,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
 
   test "rotation chain rejects missing quorums, gaps, and terminal mismatches" do
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
     genesis_root = root_pin(envelope_document(genesis))
     [rotation] = get_in(envelope_document(successor), ["rotation_chain"])
 
@@ -112,7 +112,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
 
   test "cached genesis pin verifies successor rotation chain" do
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
 
     assert {:ok, %TrustBundle{root_version: 1}} = TrustBundle.load({:map, genesis}, now: @now)
 
@@ -122,7 +122,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
 
   test "rotation chain rejects forked roots in-chain and against cached digests" do
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
     forked_rotation = read_json(["rotation", "forked-2.json"])
     genesis_root = root_pin(envelope_document(genesis))
 
@@ -149,7 +149,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
 
   test "pre-rotation bundles replay below the accepted floor" do
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
 
     assert {:ok, %TrustBundle{sequence: 1}} = TrustBundle.load({:map, genesis}, now: @now)
 
@@ -161,7 +161,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
 
   test "signer compromise ceremony revokes old key and keeps revocation irreversible" do
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
     genesis_document = envelope_document(genesis)
     old_bundle_keyid = read_json(["rotation", "expected.json"])["keyids"]["bundle"]
 
@@ -219,7 +219,7 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
   end
 
   defp signed_successor(document) do
-    signed_document(document, SuccessorSigner)
+    signed_document(document, SuccessorSigner) |> authorize_successor()
   end
 
   defp signed_old_bundle(document) do
@@ -324,5 +324,57 @@ defmodule SigilGuard.TrustBundle.GoldenFixtureTest do
       {_, private_key} = :crypto.generate_key(:eddsa, :ed25519, @seed)
       private_key
     end
+  end
+
+  defp authorize_successor(envelope) do
+    {:ok, signed} =
+      Envelope.add_signature(envelope, SigilGuard.TrustBundleFixtureGenerator.NewRootSigner)
+
+    signed
+  end
+
+  test "a cached root cannot be replaced by a self-authorized signing key" do
+    original = read_json(["minimal", "envelope.json"])
+    assert {:ok, _} = TrustBundle.load({:map, original}, now: @now)
+    key = Envelope.keyid(SuccessorSigner.public_key())
+
+    descriptor = %{
+      "alg" => "ed25519",
+      "public_key" => Base.url_encode64(SuccessorSigner.public_key(), padding: false)
+    }
+
+    document =
+      original
+      |> envelope_document()
+      |> Map.put("sequence", "2")
+      |> Map.put("keys", %{key => descriptor})
+      |> put_in(["roles", "root", "keyids"], [key])
+      |> put_in(["roles", "delegates", Access.at(0), "keyids"], [key])
+
+    malicious = signed_document(document, SuccessorSigner)
+    assert TrustBundle.load({:map, malicious}, now: @now) == {:error, :invalid_bundle_format}
+    assert Cache.floor("example-org-trust") == 1
+  end
+
+  test "rotation alone does not authorize a successor's newly declared delegates" do
+    original = read_json(["rotation", "genesis.json"])
+    incomplete = read_json(["rotation", "successor.json"])
+    assert {:ok, _} = TrustBundle.load({:map, original}, now: @now)
+    assert TrustBundle.verify(incomplete, now: @now) == {:error, :threshold_not_met}
+    assert {:ok, _} = TrustBundle.load({:map, authorize_successor(incomplete)}, now: @now)
+  end
+
+  test "a bundle delegate cannot change its own role under the pinned root version" do
+    original = read_json(["minimal", "envelope.json"])
+    assert {:ok, _} = TrustBundle.load({:map, original}, now: @now)
+
+    changed =
+      original
+      |> envelope_document()
+      |> Map.put("sequence", "2")
+      |> put_in(["roles", "delegates", Access.at(0), "expires_at"], "2027-10-01T12:00:00.000Z")
+      |> signed_old_bundle()
+
+    assert TrustBundle.verify(changed, now: @now) == {:error, :invalid_bundle_format}
   end
 end

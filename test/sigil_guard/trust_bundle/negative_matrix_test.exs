@@ -165,7 +165,7 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
 
   defp sequence_below_floor do
     genesis = read_json(["rotation", "genesis.json"])
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
 
     assert {:ok, _} = TrustBundle.load({:map, genesis}, now: @now)
     assert {:ok, _} = TrustBundle.load({:map, successor}, now: @now)
@@ -174,7 +174,7 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
   end
 
   defp forked_root_chain do
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
 
     successor
     |> envelope_document()
@@ -187,7 +187,7 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
   end
 
   defp rotation_below_threshold do
-    successor = read_json(["rotation", "successor.json"])
+    successor = read_json(["rotation", "successor.json"]) |> authorize_successor()
     [rotation] = get_in(envelope_document(successor), ["rotation_chain"])
 
     successor
@@ -403,5 +403,12 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
       {_, private_key} = :crypto.generate_key(:eddsa, :ed25519, @seed)
       private_key
     end
+  end
+
+  defp authorize_successor(envelope) do
+    {:ok, signed} =
+      Envelope.add_signature(envelope, SigilGuard.TrustBundleFixtureGenerator.NewRootSigner)
+
+    signed
   end
 end
