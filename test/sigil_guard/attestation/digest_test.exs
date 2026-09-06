@@ -473,4 +473,36 @@ defmodule SigilGuard.Attestation.DigestTest do
   end
 
   defp sha256(bytes), do: Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+
+  test "null-valued application fields cannot reuse an absent-field digest" do
+    assert {:ok, _} = Digest.payload_digest(%{"arguments" => %{}})
+
+    assert {:error, :invalid_payload} =
+             Digest.payload_digest(%{"arguments" => %{"delete_at" => nil}})
+
+    assert {:error, :invalid_payload} = Digest.payload_digest([%{"nested" => nil}])
+    assert {:ok, _} = Digest.payload_digest([nil])
+    assert Digest.normalize(%{"optional" => nil}) == {:ok, %{}}
+  end
+
+  test "MCP wrapper nullable profile fields do not allow null application arguments" do
+    alias SigilGuard.MCP.SecurityPayload
+    request = %{"method" => "tools/call", "params" => %{"name" => "update", "arguments" => %{}}}
+    wrapper = SecurityPayload.for_gate(request, :request)
+
+    assert {:ok, _} =
+             Digest.payload_digest(SecurityPayload.for_gate(%{"text" => "safe"}, :result))
+
+    assert {:ok, _} = Digest.payload_digest(wrapper)
+    tampered = put_in(wrapper.binding["payload"]["arguments"], %{"delete_at" => nil})
+    assert {:error, :invalid_payload} = Digest.payload_digest(tampered)
+    assert {:error, :invalid_payload} = Digest.payload_digest(Map.put(wrapper, :unexpected, nil))
+
+    assert {:ok, preimage} =
+             Digest.action_preimage(:tool_request, %{"name" => "other", "arguments" => %{}}, %{
+               tool: "authoritative"
+             })
+
+    assert preimage["tool"] == "authoritative"
+  end
 end

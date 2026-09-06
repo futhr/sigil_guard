@@ -43,10 +43,16 @@ defmodule SigilGuard.Attestation.Digest do
   Duplicate keys after normalization fail with `:invalid_payload`.
   """
   @spec normalize(term()) :: {:ok, term()} | {:error, :invalid_payload}
-  def normalize(value), do: normalize_value(value)
+  def normalize(value) do
+    with :ok <- SigilGuard.Limits.check(value), do: normalize_value(value)
+  end
 
   @doc """
   Compute the payload digest for any attestation payload class.
+
+  Application map entries with nil values fail `:invalid_payload` because v3
+  omission would otherwise equate null with absence. Fixed nullable MCP profile
+  fields keep their defined semantics, and null array elements are preserved.
   """
   @spec payload_digest(term()) :: {:ok, String.t()} | {:error, error_reason()}
   def payload_digest(payload) when is_binary(payload) do
@@ -60,13 +66,13 @@ defmodule SigilGuard.Attestation.Digest do
   def payload_digest(payload) when is_map(payload) do
     payload
     |> Attestation.strip_metadata()
-    |> normalized_jcs_digest()
+    |> unambiguous_payload_digest()
   end
 
   def payload_digest(payload) when is_list(payload) do
     payload
     |> Attestation.strip_metadata()
-    |> normalized_jcs_digest()
+    |> unambiguous_payload_digest()
   end
 
   def payload_digest(_), do: {:error, :invalid_payload}
@@ -264,9 +270,12 @@ defmodule SigilGuard.Attestation.Digest do
 
   defp normalized_payload_map(payload) when is_map(payload) do
     result =
-      payload
-      |> Attestation.strip_metadata()
-      |> normalize()
+      with :ok <- SigilGuard.Limits.check(payload),
+           :ok <- unambiguous_payload(payload) do
+        payload
+        |> Attestation.strip_metadata()
+        |> normalize()
+      end
 
     case result do
       {:ok, map} when is_map(map) -> {:ok, map}
@@ -276,6 +285,58 @@ defmodule SigilGuard.Attestation.Digest do
   end
 
   defp normalized_payload_map(_), do: {:error, :invalid_payload}
+
+  defp unambiguous_payload_digest(payload) do
+    with :ok <- SigilGuard.Limits.check(payload),
+         :ok <- unambiguous_payload(payload),
+         do: normalized_jcs_digest(payload)
+  end
+
+  # The MCP wrapper has fixed nullable profile fields. Application data stays
+  # subject to strict null/absence validation; the frozen v3 wrapper bytes stay intact.
+  defp unambiguous_payload(%{binding: %{"payload" => application} = binding} = wrapper)
+       when map_size(wrapper) == 4 do
+    if Enum.sort(Map.keys(wrapper)) == [:action, :binding, :text, :tool] and
+         Enum.all?(Map.keys(binding), &(&1 in ["kind", "method", "protocol_version", "payload"])) do
+      application_payload(application)
+    else
+      unambiguous_map(wrapper)
+    end
+  end
+
+  defp unambiguous_payload(%{"kind" => kind, "payload" => application} = projection)
+       when kind in ["request", "result"] do
+    if Enum.all?(Map.keys(projection), &(&1 in ["kind", "method", "protocol_version", "payload"])) do
+      application_payload(application)
+    else
+      unambiguous_map(projection)
+    end
+  end
+
+  defp unambiguous_payload(value) when is_map(value), do: unambiguous_map(value)
+
+  defp unambiguous_payload(value) when is_list(value) do
+    Enum.reduce_while(value, :ok, fn child, _ -> continue_payload(child) end)
+  end
+
+  defp unambiguous_payload(_), do: :ok
+
+  defp application_payload(nil), do: {:error, :invalid_payload}
+  defp application_payload(value), do: unambiguous_payload(value)
+
+  defp unambiguous_map(value) do
+    Enum.reduce_while(value, :ok, fn
+      {_, nil}, _ -> {:halt, {:error, :invalid_payload}}
+      {_, child}, _ -> continue_payload(child)
+    end)
+  end
+
+  defp continue_payload(value) do
+    case unambiguous_payload(value) do
+      :ok -> {:cont, :ok}
+      error -> {:halt, error}
+    end
+  end
 
   defp normalized_jcs_digest(value) do
     with {:ok, normalized} <- normalize(value),
@@ -411,7 +472,6 @@ defmodule SigilGuard.Attestation.Digest do
 
   defp optional_payload_field(payload, key) do
     case Map.get(payload, key) do
-      value when is_binary(value) and value != "" -> {:ok, value}
       nil -> :error
       value -> {:ok, value}
     end
