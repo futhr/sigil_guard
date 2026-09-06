@@ -191,4 +191,35 @@ defmodule SigilGuard.TrustBundle.QuarantineTest do
       "rollback_floor" => "1"
     }
   end
+
+  test "diagnostic retention removes old failures at the fixed capacity" do
+    for index <- 1..1_010 do
+      Quarantine.record(:invalid_envelope, %{bundle_id: "record-#{index}"})
+    end
+
+    records = Quarantine.list()
+    assert length(records) == 1_000
+    assert hd(records).bundle_id == "record-11"
+    assert List.last(records).bundle_id == "record-1010"
+  end
+
+  test "diagnostic fields and evidence are bounded independently of record count" do
+    id = String.duplicate("x", 2_000)
+
+    record =
+      Quarantine.record(:invalid_envelope, %{
+        bundle_id: id,
+        bundle_digest: String.duplicate("a", 500),
+        sequence: Integer.pow(10, 40),
+        evidence: List.duplicate(%{kind: "host", ref: id}, 100)
+      })
+
+    assert record.bundle_id =~ "sha256:"
+    assert byte_size(record.bundle_id) == 71
+    assert record.bundle_digest == nil
+    assert record.sequence == nil
+    assert length(record.evidence) == 16
+    assert Enum.all?(record.evidence, &(byte_size(&1.ref) == 71))
+    assert Quarantine.list(id) == [record]
+  end
 end
