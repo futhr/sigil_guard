@@ -219,30 +219,5 @@ defmodule SigilGuard.Audit.Anchor do
     |> DateTime.to_iso8601()
   end
 
-  defp canonical_iodata(value) when is_map(value) do
-    value
-    |> Enum.map(fn {key, item} -> {canonical_key(key), item} end)
-    |> Enum.sort_by(fn {key, _} -> key end)
-    |> Enum.map(fn {key, item} -> [Jason.encode!(key), ?:, canonical_iodata(item)] end)
-    |> Enum.intersperse(",")
-    |> then(&[?{, &1, ?}])
-  end
-
-  defp canonical_iodata(value) when is_list(value) do
-    value
-    |> Enum.map(&canonical_iodata/1)
-    |> Enum.intersperse(",")
-    |> then(&[?[, &1, ?]])
-  end
-
-  defp canonical_iodata(value)
-       when is_binary(value) or is_number(value) or is_boolean(value) or is_nil(value) do
-    Jason.encode!(value)
-  end
-
-  defp canonical_iodata(value), do: Jason.encode!(value)
-
-  defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
-  defp canonical_key(key) when is_binary(key), do: key
-  defp canonical_key(key), do: to_string(key)
+  defp canonical_iodata(value), do: SigilGuard.Canonical.LegacyJSON.encode(value)
 end

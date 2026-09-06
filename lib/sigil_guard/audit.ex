@@ -572,15 +572,9 @@ defmodule SigilGuard.Audit do
   # Constant-time comparison to prevent timing attacks on HMAC
   # verification. Regular == short-circuits on the first differing
   # byte, leaking information about matching prefix length.
-  defp secure_compare(a, b) when byte_size(a) == byte_size(b) do
-    secure_compare(a, b, 0)
+  defp secure_compare(a, b) when is_binary(a) and is_binary(b) do
+    byte_size(a) == byte_size(b) and :crypto.hash_equals(a, b)
   end
 
   defp secure_compare(_, _), do: false
-
-  defp secure_compare(<<a, rest_a::binary>>, <<b, rest_b::binary>>, diff) do
-    secure_compare(rest_a, rest_b, Bitwise.bor(diff, Bitwise.bxor(a, b)))
-  end
-
-  defp secure_compare(<<>>, <<>>, diff), do: diff == 0
 end

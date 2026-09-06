@@ -598,38 +598,7 @@ defmodule SigilGuard.Audit.Checkpoint do
     Map.drop(checkpoint, @metadata_keys ++ @metadata_atom_keys)
   end
 
-  defp canonical_iodata(value) when is_map(value) do
-    parts =
-      value
-      |> Enum.map(fn {key, item} -> {canonical_key(key), item} end)
-      |> Enum.sort_by(&elem(&1, 0))
-      |> Enum.map(fn {key, item} -> [Jason.encode!(key), ?:, canonical_iodata(item)] end)
-      |> Enum.intersperse(",")
-
-    [?{, parts, ?}]
-  end
-
-  defp canonical_iodata(value) when is_list(value) do
-    parts =
-      value
-      |> Enum.map(&canonical_iodata/1)
-      |> Enum.intersperse(",")
-
-    [?[, parts, ?]]
-  end
-
-  defp canonical_iodata(value)
-       when is_atom(value) and not is_boolean(value) and not is_nil(value) do
-    value
-    |> Atom.to_string()
-    |> Jason.encode!()
-  end
-
-  defp canonical_iodata(value), do: Jason.encode!(value)
-
-  defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
-  defp canonical_key(key) when is_binary(key), do: key
-  defp canonical_key(key), do: to_string(key)
+  defp canonical_iodata(value), do: SigilGuard.Canonical.LegacyJSON.encode(value)
 
   defp digest_canonical_bytes(canonical) do
     canonical
@@ -649,15 +618,9 @@ defmodule SigilGuard.Audit.Checkpoint do
     |> DateTime.to_iso8601()
   end
 
-  defp secure_compare(a, b) when is_binary(a) and is_binary(b) and byte_size(a) == byte_size(b) do
-    secure_compare(a, b, 0)
+  defp secure_compare(a, b) when is_binary(a) and is_binary(b) do
+    byte_size(a) == byte_size(b) and :crypto.hash_equals(a, b)
   end
 
   defp secure_compare(_, _), do: false
-
-  defp secure_compare(<<a, rest_a::binary>>, <<b, rest_b::binary>>, diff) do
-    secure_compare(rest_a, rest_b, Bitwise.bor(diff, Bitwise.bxor(a, b)))
-  end
-
-  defp secure_compare(<<>>, <<>>, diff), do: diff == 0
 end
