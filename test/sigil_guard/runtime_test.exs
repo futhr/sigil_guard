@@ -27,4 +27,38 @@ defmodule SigilGuard.RuntimeTest do
       assert :ets.info(table, :owner) == runtime
     end
   end
+
+  test "runtime configuration resolves explicit built-in scanner options" do
+    assert {:ok, []} = Runtime.scanner_options()
+  end
+
+  test "bundle pattern selection resolves explicitly and rejects an expired source" do
+    alias SigilGuard.TrustBundle
+    now = DateTime.utc_now(:millisecond)
+
+    {:ok, bundle} =
+      TrustBundle.dev_bundle(
+        now: now,
+        seed: :binary.copy(<<71>>, 32),
+        patterns: [
+          %{"name" => "custom", "set" => "secret", "regex" => "SPECIAL", "severity" => "high"}
+        ]
+      )
+
+    previous = Runtime.configuration()
+
+    config =
+      SigilGuard.Config.validate!(
+        scanner_patterns: :bundle,
+        trust_bundle: {:map, bundle.envelope}
+      )
+
+    :sys.replace_state(Runtime, fn _ -> config end)
+    on_exit(fn -> :sys.replace_state(Runtime, fn _ -> previous end) end)
+    assert {:ok, opts} = Runtime.scanner_options(Runtime, now: now)
+    assert {:hit, [%{name: "custom"}]} = SigilGuard.Scanner.scan("SPECIAL", opts)
+
+    assert {:error, :bundle_expired} =
+             Runtime.scanner_options(Runtime, now: DateTime.add(now, 2, :hour))
+  end
 end

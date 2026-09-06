@@ -16,11 +16,11 @@ defmodule SigilGuard.Patterns do
     * Private key headers (RSA, EC, OpenSSH)
     * Generic secret/password/token assignments
 
-  ## Compatibility Bundle Patterns
+  ## Trust Bundle Patterns
 
-  When the legacy remote-bundle cache is enabled, patterns from
-  `GET /patterns/bundle` are merged with built-in patterns. Remote bundle
-  patterns take precedence on name collision after provenance checks pass.
+  Resolve verified local patterns with `SigilGuard.TrustBundle.pattern_sets/1`
+  or `SigilGuard.Runtime.scanner_options/2`, then pass the resulting options to
+  scanning and boundary evaluation. No remote pattern cache exists.
   """
 
   @typedoc """
@@ -61,9 +61,8 @@ defmodule SigilGuard.Patterns do
   @default_max_match_bytes 256
   @max_match_bytes_limit 4096
 
-  # `max_match_bytes` is a conservative width for lookarounds, alternation, and
-  # bounded or unbounded quantifiers. It sizes the streaming holdback so no
-  # secret can straddle a chunk boundary undetected.
+  # Width hints size the minimum holdback; unbounded expressions additionally
+  # require candidate retention or whole-stream buffering.
   @built_in_patterns [
     %{
       name: "aws_access_key",

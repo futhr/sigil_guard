@@ -16,6 +16,10 @@ defmodule SigilGuard.Runtime do
          ]}
       ]
 
+  Obtain boundary options with `scanner_options/2` and pass them to the gate
+  or stream. Selecting `:bundle` in configuration alone does not alter standalone
+  scanner calls.
+
   Passing `:config` avoids global application environment. Include
   `runtime: false` in explicit configuration to describe that posture. When
   `:config` is omitted,
@@ -55,6 +59,29 @@ defmodule SigilGuard.Runtime do
   @doc "Return the validated configuration held by a running runtime."
   @spec configuration(GenServer.server()) :: keyword()
   def configuration(server \\ __MODULE__), do: GenServer.call(server, :configuration)
+
+  @doc """
+  Resolve scanner and quarantine options from this runtime's verified bundle.
+
+  Pass the returned options to `SigilGuard.Runtime.Gate.evaluate/3` or
+  `SigilGuard.Runtime.Stream.new/2`. Bare scanner calls use built-ins. Bundle
+  freshness is rechecked when resolving options; resolve again at each boundary.
+  """
+  @spec scanner_options(GenServer.server(), keyword()) :: {:ok, keyword()} | {:error, atom()}
+  def scanner_options(server \\ __MODULE__, opts \\ []) do
+    config = configuration(server)
+
+    case Keyword.fetch!(config, :scanner_patterns) do
+      :built_in ->
+        {:ok, []}
+
+      :bundle ->
+        with {:ok, bundle} <- TrustBundle.load(Keyword.fetch!(config, :trust_bundle), opts),
+             {:ok, sets} <- TrustBundle.pattern_sets(bundle) do
+          {:ok, [patterns: sets.secret, indicator_sets: Map.take(sets, [:injection, :poisoning])]}
+        end
+    end
+  end
 
   @impl GenServer
   def init(opts) do
