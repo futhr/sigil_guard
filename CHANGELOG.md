@@ -115,6 +115,47 @@ SigilGuard 1.0 is a deliberate breaking release. Apply
 
 <!-- changelog -->
 
+## [v1.0.1](https://github.com/refpath/sigil_guard/compare/v1.0.0...v1.0.1) (2026-09-07)
+
+
+
+
+### Bug Fixes:
+
+* package: validate a fresh unpacked Hex consumer by Tobias Bohwalli
+
+* quarantine: bound diagnostics and decode rejected bundles once by Tobias Bohwalli
+
+* scanner: merge overlapping redaction spans deterministically by Tobias Bohwalli
+
+* runtime: resolve configured scanner patterns explicitly by Tobias Bohwalli
+
+* stream: retain unbounded candidates and complete UTF-8 boundaries by Tobias Bohwalli
+
+* gate: bind policy facts and scan structured MCP object keys by Tobias Bohwalli
+
+* digest: reject ambiguous null-valued application fields by Tobias Bohwalli
+
+* hooks: load configured security modules before checking callbacks by Tobias Bohwalli
+
+* agent-card: enforce current issuer authority and revocations by Tobias Bohwalli
+
+* trust-cache: preserve rollback and revocations under contention by Tobias Bohwalli
+
+* trust: authenticate root and delegated authority transitions by Tobias Bohwalli
+
+* policy: enforce atomic quotas and reclaim expired identities by Tobias Bohwalli
+
+* replay: retain bounded claims for the full acceptance lifetime by Tobias Bohwalli
+
+* jcs: correct integral floats and reject improper lists by Tobias Bohwalli
+
+* security: bound untrusted input and signature verification work by Tobias Bohwalli
+
+### Performance Improvements:
+
+* scanner: reuse entropy and byte-frequency measurements by Tobias Bohwalli
+
 ## [1.0.0](https://github.com/refpath/sigil_guard/compare/v1.0.0...v1.0.0) (2026-08-24)
 
 

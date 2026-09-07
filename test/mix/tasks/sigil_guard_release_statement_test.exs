@@ -109,7 +109,7 @@ defmodule Mix.Tasks.SigilGuard.ReleaseStatementTest do
       assert {:ok, decoded} = Jason.decode(File.read!(output))
       assert decoded["predicateType"] == "https://sigilguard.dev/attestation/release/v1"
       assert decoded["predicate"]["release"]["package"] == "sigil_guard"
-      assert decoded["predicate"]["release"]["version"] == "1.0.0"
+      assert decoded["predicate"]["release"]["version"] == "1.0.1"
     end
 
     test "raises on invalid options" do
