@@ -49,11 +49,12 @@ jobs:
           (cd ../sigil-benchmark-parent && mix deps.get && mix bench)
           mix deps.get
           mix bench
-          mix run bench/compare.exs --baseline ../sigil-benchmark-parent/bench/output/benchmarks.json --run bench/output/benchmarks.json --require-comparable
+          cp ../sigil-benchmark-parent/bench/output/benchmarks.json bench/output/parent-benchmarks.json
+          mix run bench/compare.exs --baseline bench/output/parent-benchmarks.json --run bench/output/benchmarks.json --require-comparable
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: comparable-performance-reports
           path: |
             bench/output/benchmarks.json
-            ../sigil-benchmark-parent/bench/output/benchmarks.json
+            bench/output/parent-benchmarks.json
