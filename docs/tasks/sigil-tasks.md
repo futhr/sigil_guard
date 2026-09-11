@@ -63,7 +63,7 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 285 / 287 tasks done (99.3%).** Milestones: 14 complete, 1 in progress.
+**Overall: 286 / 287 tasks done (99.7%).** Milestones: 14 complete, 1 in progress.
 **Current milestone: M12 - production boundary hardening.**
 
 | # | Milestone | Done | Total | % | Status |
@@ -82,8 +82,8 @@ trailers (rule 10); the maintainer pushes manually.
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
 | M10 | External assessment projection | 1 | 1 | 100% | Complete |
 | M11 | Security audit remediation | 22 | 22 | 100% | Complete |
-| M12 | Production boundary hardening | 7 | 9 | 77.8% | In progress |
-| — | **Total** | **285** | **287** | **99.3%** | 14 done |
+| M12 | Production boundary hardening | 8 | 9 | 88.9% | In progress |
+| — | **Total** | **286** | **287** | **99.7%** | 14 done |
 
 ### Release Handoff
 
@@ -2212,8 +2212,11 @@ section is post-1.0.0 parking; neither is counted here.
   - Validation: guide example compiles at its pin; policy fixture parses.
   - Done: added `guides/integrations/tidewave.md`, wired it into ExDoc,
     shipped `examples/tidewave/SIGILGUARD_POLICY`, and documented the
-    dev-only defense-in-depth placement. Verified the Tidewave Plug wrapper in
-    a scratch project against `tidewave` 0.6.1 / `bandit` 1.12.0 with
+    dev-only policy scope. The initial compile-only check of a Plug wrapper
+    missed Tidewave's parsed-body rejection. Production hardening replaces that
+    wrapper with a tested authorization helper and explicitly leaves transport
+    adaptation unsupported for `tidewave` 0.6.1 / `bandit` 1.12.0. The original
+    compile-only check used
     `MIX_ENV=dev mix compile --warnings-as-errors`; verified the policy parses
     and evaluates eval-class tools to `:block`, repo writes to `:confirm`, and
     docs/schema reads to `:allow`; also ran `git diff --check`,
@@ -3018,5 +3021,5 @@ Hosted scheduled runs and reference-consumer deployment remain maintainer-owned.
 - [x] M12.05: Bound trust reads and local anchor writes (SP.02, SP.09).
 - [x] M12.06: Preserve vault state on malformed encryption (SP.10).
 - [x] M12.07: Validate stream configuration explicitly (SP.07).
-- [ ] M12.08: Preserve structured adapter values (SP.14).
+- [x] M12.08: Preserve structured adapter values (SP.14).
 - [ ] M12.09: Verify full gates and isolated runtime/package/dependency consumers.

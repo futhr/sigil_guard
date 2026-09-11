@@ -3,10 +3,11 @@
 Validation record:
 
 - Target packages: `langchain` `0.8.14`, `req_llm` `1.17.1`.
-- Package metadata checked: 2026-07-07.
-- Compile validation: passed on 2026-07-07 with Elixir 1.19.4 / Erlang/OTP 28.
-  A scratch project compiled the guarded LangChain function and ReqLLM tool
-  examples with `mix compile --warnings-as-errors`.
+- Validated 2026-09-11 with Elixir 1.19.6 / Erlang/OTP 28.5.0.6 against an
+  unpacked SigilGuard Hex artifact in an isolated consumer.
+- `mix compile --warnings-as-errors` and three consumer tests passed, including
+  actual tool construction, both frameworks' execution APIs, native result
+  maps and redaction refusal. No provider or remote model call was made.
 
 LangChain and ReqLLM both expose tool/function callbacks that execute host
 code on behalf of a model. SigilGuard belongs inside those callbacks: guard the
@@ -30,6 +31,13 @@ end
 
 The validation pin resolved to `langchain` `0.8.14` and `req_llm` `1.17.1`.
 
+Allowed structured values keep their original types. The callbacks reject
+`:redact` until the host implements and revalidates a schema-specific transform;
+scanner text is not a replacement for a map. Context trust and guard options
+are supplied by the authenticated host, never by model arguments. ReqLLM
+captures that context in its callback and gates its result once. A pipeline
+before-step only authorizes arguments; it does not execute the tool.
+
 ## Shared Gate Module
 
 Keep the SigilGuard boundary logic in a small module that both callback systems
@@ -45,69 +53,68 @@ defmodule MyApp.LLM.GuardedTools do
     Function.new!(%{
       name: "repo_lookup",
       description: "Looks up repository data after SigilGuard gating",
+      parameters_schema: %{
+        "type" => "object",
+        "properties" => %{"query" => %{"type" => "string"}},
+        "required" => ["query"]
+      },
       function: fn args, context -> guarded_lookup(args, context) end
     })
   end
 
-  def req_llm_tool do
+  def req_llm_tool(context \\ %{}) do
     ReqLLM.tool(
       name: "repo_lookup",
       description: "Looks up repository data after SigilGuard gating",
-      parameters: [query: [type: :string, required: true, doc: "Lookup query"]],
-      callback: fn args -> guarded_lookup(args, %{}) end
+      parameter_schema: [query: [type: :string, required: true, doc: "Lookup query"]],
+      callback: fn args -> guarded_lookup(args, context) end
     )
   end
 
-  def execute_req_llm_tool(args) do
-    req_llm_tool()
+  def execute_req_llm_tool(args, context \\ %{}) do
+    context
+    |> req_llm_tool()
     |> Tool.execute(args)
-    |> guard_result("repo_lookup", %{})
   end
 
   def guarded_lookup(args, context) do
-    actor = Map.get(context, :actor) || Map.get(context, "actor") || "anonymous"
+    with {:ok, allowed_args} <- guard_request("repo_lookup", args, context) do
+      result = %{query: Map.get(allowed_args, :query) || Map.get(allowed_args, "query"), status: "ok"}
+      guard_result({:ok, result}, "repo_lookup", context)
+    end
+  end
 
-    boundary = [
-      phase: :tool_request,
-      origin: :model,
-      sink: :tool,
-      tool: "repo_lookup",
-      actor: actor,
-      trust_zone: :semi_trusted
-    ]
+  def guard_request(tool_name, args, context) do
+    boundary = boundary(:tool_request, tool_name, context)
 
-    case ToolGateway.guard_request(args, boundary) do
-      %Decision{action: action} when action in [:allow, :redact] ->
-        result = %{query: Map.get(args, :query) || Map.get(args, "query"), status: "ok"}
-        guard_result({:ok, result}, "repo_lookup", context)
-
-      %Decision{} = denied ->
-        {:error, {:sigil_guard_denied, denied.action, denied.reason}}
+    case ToolGateway.guard_request(args, boundary, Map.get(context, :guard_options, [])) do
+      %Decision{action: :allow} -> {:ok, args}
+      %Decision{} = denied -> {:error, {:sigil_guard_denied, denied.action, denied.reason}}
     end
   end
 
   def guard_result({:ok, result}, tool_name, context) do
-    actor = Map.get(context, :actor) || Map.get(context, "actor") || "anonymous"
+    boundary = boundary(:tool_result, tool_name, context)
 
-    boundary = [
-      phase: :tool_result,
-      origin: :tool,
-      sink: :model,
-      tool: tool_name,
-      actor: actor,
-      trust_zone: :semi_trusted
-    ]
-
-    case ToolGateway.guard_result(result, boundary) do
-      %Decision{action: action} = decision when action in [:allow, :redact] ->
-        {:ok, decision.sanitized_text || result}
-
-      %Decision{} = denied ->
-        {:error, {:sigil_guard_denied, denied.action, denied.reason}}
+    case ToolGateway.guard_result(result, boundary, Map.get(context, :guard_options, [])) do
+      %Decision{action: :allow} -> {:ok, result}
+      %Decision{} = denied -> {:error, {:sigil_guard_denied, denied.action, denied.reason}}
     end
   end
 
   def guard_result(error, _tool_name, _context), do: error
+
+  defp boundary(phase, tool_name, context) do
+    [
+      phase: phase,
+      origin: if(phase == :tool_request, do: :model, else: :tool),
+      sink: if(phase == :tool_request, do: :tool, else: :model),
+      tool: tool_name,
+      actor: Map.get(context, :actor) || Map.get(context, "actor") || "anonymous",
+      trust_level: Map.get(context, :trust_level, :low),
+      trust_zone: :semi_trusted
+    ]
+  end
 end
 ```
 
@@ -136,12 +143,9 @@ ReqLLM tools use callbacks directly. Use the same guarded callback and expose it
 as a `ReqLLM.Tool`.
 
 ```elixir
-tool = MyApp.LLM.GuardedTools.req_llm_tool()
-
-{:ok, result} =
-  tool
-  |> ReqLLM.Tool.execute(%{query: "docs"})
-  |> MyApp.LLM.GuardedTools.guard_result("repo_lookup", %{actor: "agent:researcher"})
+context = %{actor: "agent:researcher", trust_level: :medium}
+tool = MyApp.LLM.GuardedTools.req_llm_tool(context)
+{:ok, result} = ReqLLM.Tool.execute(tool, %{query: "docs"})
 ```
 
 For normal generation, include the tool in the provider options your host
@@ -162,7 +166,7 @@ Hosts that wrap ReqLLM in a pipeline can split the two gates into named steps:
 ```elixir
 defmodule MyApp.LLM.SigilGuardPipelineStep do
   def before_tool_call(tool_name, args, context) do
-    MyApp.LLM.GuardedTools.guarded_lookup(args, Map.put(context, :tool, tool_name))
+    MyApp.LLM.GuardedTools.guard_request(tool_name, args, context)
   end
 
   def after_tool_call(tool_name, result, context) do
@@ -197,3 +201,10 @@ Before editing this guide:
 4. Run `mix compile --warnings-as-errors`.
 5. Record resolved package versions, Elixir/OTP versions, and result in the
    validation record above.
+
+For executable consumer checks, run the repository script from that scratch
+project after compiling the complete guide modules:
+
+```bash
+SIGIL_GUIDE_TARGET=llm mix run /path/to/sigil_guard/test/integration/guide_consumer.exs
+```

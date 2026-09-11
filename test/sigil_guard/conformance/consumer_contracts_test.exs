@@ -64,6 +64,163 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     assert %Stream{window_bytes: 256} = Stream.new(%{}, stream_window_bytes: -1, patterns: [])
   end
 
+  setup_all do
+    for {guide, module} <- [
+          {"hermes-mcp", MyApp.MCP.SigilGuardInterceptor},
+          {"hermes-mcp", MyAppWeb.SigilGuardMCPPlug},
+          {"jido", MyApp.Actions.ResultGate},
+          {"tidewave", MyApp.TidewavePolicy}
+        ] do
+      SigilGuard.GuideFixture.compile(guide, module)
+    end
+
+    :ok
+  end
+
+  describe "executable integration guide contracts" do
+    test "interceptor and result examples preserve complete allowed native values" do
+      value = %{"float" => 1.0, "int" => 1, "null" => nil, "flag" => false, "rows" => [%{}]}
+      args = ["read_file", value, "fixture:actor", [trust_level: :high]]
+
+      assert SigilGuard.GuideFixture.call(
+               MyApp.MCP.SigilGuardInterceptor,
+               :before_tool_call,
+               args
+             ) === {:cont, value}
+
+      assert SigilGuard.GuideFixture.call(MyApp.MCP.SigilGuardInterceptor, :after_tool_call, args) ===
+               {:cont, value}
+
+      context = %{agent_id: "fixture:actor", trust_level: :high}
+
+      assert SigilGuard.GuideFixture.call(MyApp.Actions.ResultGate, :release_result, [
+               "read_file",
+               value,
+               context
+             ]) ===
+               {:ok, value}
+    end
+
+    test "structured redaction is refused before dispatch and does not leak the value" do
+      value = %{"text" => "AKIAIOSFODNN7EXAMPLE"}
+      args = ["read_file", value, "fixture:actor", [trust_level: :high, on_sensitive: :redact]]
+
+      for function <- [:before_tool_call, :after_tool_call] do
+        assert {:halt, response} =
+                 SigilGuard.GuideFixture.call(MyApp.MCP.SigilGuardInterceptor, function, args)
+
+        assert response["error"]["code"] == -31_990
+        refute Jason.encode!(response) =~ value["text"]
+      end
+
+      context = %{trust_level: :high, guard_options: [on_sensitive: :redact]}
+
+      assert {:error, {:sigil_guard_denied, :redact, _}} =
+               SigilGuard.GuideFixture.call(MyApp.Actions.ResultGate, :release_result, [
+                 "read_file",
+                 value,
+                 context
+               ])
+
+      body = %{
+        "id" => 7,
+        "method" => "tools/call",
+        "params" => %{"name" => "read_file", "arguments" => value}
+      }
+
+      conn = Plug.Test.conn(:post, "/mcp", Jason.encode!(body))
+      conn = %{conn | body_params: body, assigns: %{trust_level: :high}}
+
+      result =
+        SigilGuard.GuideFixture.call(MyAppWeb.SigilGuardMCPPlug, :call, [
+          conn,
+          [on_sensitive: :redact]
+        ])
+
+      assert result.halted
+      assert Jason.decode!(result.resp_body)["error"]["code"] == -31_990
+    end
+
+    test "Tidewave helper composes policy with scanning and checks request identity" do
+      {:ok, policy} = SigilGuard.BoundaryPolicy.File.load("examples/tidewave")
+
+      request = %{
+        "method" => "tools/call",
+        "params" => %{"name" => "get_docs", "arguments" => %{"count" => 1.0}}
+      }
+
+      boundary = SigilGuard.GuideFixture.boundary(request, ["read"])
+
+      assert SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+               request,
+               boundary,
+               policy
+             ]) ===
+               {:ok, request}
+
+      changed = put_in(request, ["params", "arguments", "count"], 2)
+
+      assert SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+               changed,
+               boundary,
+               policy
+             ]) ==
+               {:error, :payload_binding_mismatch}
+
+      changed_tool = put_in(request, ["params", "name"], "project_eval")
+
+      assert SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+               changed_tool,
+               boundary,
+               policy
+             ]) ==
+               {:error, :tool_binding_mismatch}
+
+      for {tool, effects, action} <- [
+            {"project_eval", ["execute"], :block},
+            {"write_file", ["write"], :confirm}
+          ] do
+        call = put_in(request, ["params", "name"], tool)
+        facts = SigilGuard.GuideFixture.boundary(call, effects)
+
+        assert {:error, %{action: ^action}} =
+                 SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+                   call,
+                   facts,
+                   policy
+                 ])
+      end
+
+      secret = put_in(request, ["params", "arguments"], %{"text" => "AKIAIOSFODNN7EXAMPLE"})
+      facts = SigilGuard.GuideFixture.boundary(secret, ["read"])
+
+      assert {:error, %{action: :block}} =
+               SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+                 secret,
+                 facts,
+                 policy
+               ])
+
+      assert {:error, %{action: :confirm, effect: :redact}} =
+               SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+                 secret,
+                 facts,
+                 policy,
+                 [on_sensitive: :redact]
+               ])
+
+      facts = %{facts | trust_level: :high}
+
+      assert {:error, %{action: :redact}} =
+               SigilGuard.GuideFixture.call(MyApp.TidewavePolicy, :authorize, [
+                 secret,
+                 facts,
+                 policy,
+                 [on_sensitive: :redact]
+               ])
+    end
+  end
+
   defmodule ActorPatternIdentity do
     @behaviour SigilGuard.Identity
 

@@ -3,10 +3,14 @@
 Validation record:
 
 - Target package: `jido` `2.3.2`.
-- Package metadata checked: 2026-07-07.
-- Compile validation: passed on 2026-07-07 with Elixir 1.19.4 / Erlang/OTP 28.
-  A scratch project compiled the guarded Jido action with
-  `mix compile --warnings-as-errors`.
+- Validated 2026-09-11 with Elixir 1.19.6 / Erlang/OTP 28.5.0.6 against an
+  unpacked SigilGuard Hex artifact in an isolated consumer.
+- `mix compile --warnings-as-errors` and three consumer tests passed, including
+  `Jido.Exec.run/3`, allowed action output and structured redaction refusal.
+- Dependency compilation reported upstream optional Lua/Phoenix modules and
+  `:public_key` warnings. The consumer compilation passed; those dependency
+  warnings were not suppressed or treated as proof of compatibility for the
+  unused optional facilities.
 
 Jido actions are a natural SigilGuard insertion point: guard the action input
 inside `run/2` before side effects, thread the agent identity into the boundary
@@ -26,6 +30,12 @@ def deps do
   ]
 end
 ```
+
+Allowed arguments and results retain their original structure and types.
+These generic examples refuse structured redaction; scanner text is not a
+replacement map. Hosts must implement and revalidate any schema-specific
+transform before executing it. Actor, trust level and guard options in the
+context are trusted host inputs, never copied from model arguments.
 
 ## Guarded Action
 
@@ -59,11 +69,12 @@ defmodule MyApp.Actions.GuardedEcho do
       sink: :tool,
       tool: "guarded_echo",
       actor: actor,
+      trust_level: Map.get(context, :trust_level, :low),
       trust_zone: :semi_trusted
     ]
 
-    case ToolGateway.guard_request(params, boundary) do
-      %Decision{action: action} when action in [:allow, :redact] ->
+    case ToolGateway.guard_request(params, boundary, Map.get(context, :guard_options, [])) do
+      %Decision{action: :allow} ->
         {:ok, %{text: text}}
 
       %Decision{} = denied ->
@@ -81,10 +92,11 @@ should be stable enough to appear in attestations and audit evidence.
 ```elixir
 context = %{
   agent_id: "spiffe://example.test/agents/researcher",
-  tenant_id: "tenant-123"
+  tenant_id: "tenant-123",
+  trust_level: :medium
 }
 
-Jido.Action.Exec.run(MyApp.Actions.GuardedEcho, %{text: "hello"}, context)
+Jido.Exec.run(MyApp.Actions.GuardedEcho, %{text: "hello"}, context)
 ```
 
 If your host uses a different identity shape, normalize it before calling the
@@ -103,24 +115,27 @@ For actions that fetch or synthesize content that will be shown to a model,
 also guard the result before returning it:
 
 ```elixir
-defp release_result(tool_name, result, context) do
-  actor = Map.get(context, :agent_id) || "anonymous"
+defmodule MyApp.Actions.ResultGate do
+  def release_result(tool_name, result, context) do
+    actor = Map.get(context, :agent_id) || "anonymous"
 
-  boundary = [
-    phase: :tool_result,
-    origin: :tool,
-    sink: :model,
-    tool: tool_name,
-    actor: actor,
-    trust_zone: Map.get(context, :trust_zone, :semi_trusted)
-  ]
+    boundary = [
+      phase: :tool_result,
+      origin: :tool,
+      sink: :model,
+      tool: tool_name,
+      actor: actor,
+      trust_level: Map.get(context, :trust_level, :low),
+      trust_zone: Map.get(context, :trust_zone, :semi_trusted)
+    ]
 
-  case SigilGuard.ToolGateway.guard_result(result, boundary) do
-    %SigilGuard.Decision{action: action} = decision when action in [:allow, :redact] ->
-      {:ok, decision.sanitized_text || result}
+    case SigilGuard.ToolGateway.guard_result(result, boundary, Map.get(context, :guard_options, [])) do
+      %SigilGuard.Decision{action: :allow} ->
+        {:ok, result}
 
-    %SigilGuard.Decision{} = denied ->
-      {:error, {:sigil_guard_denied, denied.action, denied.reason}}
+      %SigilGuard.Decision{} = denied ->
+        {:error, {:sigil_guard_denied, denied.action, denied.reason}}
+    end
   end
 end
 ```
@@ -148,3 +163,10 @@ Before editing this guide:
 4. Run `mix compile --warnings-as-errors`.
 5. Record the Elixir/OTP versions, Jido version, and result in the validation
    record above.
+
+For executable consumer checks, run the repository script from that scratch
+project after compiling the complete guide modules:
+
+```bash
+SIGIL_GUIDE_TARGET=jido mix run /path/to/sigil_guard/test/integration/guide_consumer.exs
+```

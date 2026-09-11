@@ -692,3 +692,12 @@ Plaintext remains arbitrary binary data; descriptions are UTF-8 strings.
 `Runtime.Stream.new/2` now raises a deliberate `ArgumentError` for malformed
 option containers or uncompiled patterns instead of failing later with a field
 access error. Invalid window values still select the conservative default.
+
+Integration examples now preserve the original structured value on `:allow`
+and refuse `:redact` until the host supplies a validated schema-specific
+transformation. Update copied Hermes/Jido/LangChain/ReqLLM examples, including
+`Jido.Exec.run/3` and ReqLLM's `:parameter_schema` option. The Hermes notebook
+follows the same contract. The former Tidewave Plug wrapper was unusable with
+Tidewave 0.6.1's body-parsing contract and has been removed from the guide;
+only the tested authorization helper is provided, with transport adaptation
+explicitly left to the host.

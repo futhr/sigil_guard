@@ -95,23 +95,27 @@ defmodule HermesNotebookStub.Interceptor do
       %Decision{action: :allow} ->
         {:cont, arguments}
 
-      %Decision{action: :redact, sanitized_text: text} when is_binary(text) ->
-        {:cont, text}
-
       %Decision{} = denied ->
-        {:halt, ToolGateway.response_for_decision(denied, request["id"])}
+        {:halt, denial_response(denied, request["id"])}
     end
   end
 
   def after_tool_call(tool_name, result, actor, opts \\ []) do
     case ToolGateway.guard_result(result, result_context(tool_name, actor), opts) do
-      %Decision{action: action} = decision when action in [:allow, :redact] ->
-        {:cont, decision.sanitized_text || result, decision.action}
+      %Decision{action: :allow} ->
+        {:cont, result, :allow}
 
       %Decision{} = denied ->
-        {:halt, ToolGateway.response_for_decision(denied, "stub-call")}
+        {:halt, denial_response(denied, "stub-call")}
     end
   end
+
+  defp denial_response(%Decision{action: :redact} = decision, id) do
+    denial_response(%{decision | action: :block, verdict: :blocked, effect: nil,
+      sanitized_text: nil, reason: "structured redaction requires a host transform"}, id)
+  end
+
+  defp denial_response(decision, id), do: ToolGateway.response_for_decision(decision, id)
 
   defp request_context(tool_name, actor) do
     [
@@ -187,16 +191,22 @@ end
 ```elixir
 {:ok, echoed, allowed_frame} = HermesNotebookStub.GuardedEcho.execute(%{text: "hello"}, frame)
 
+true = echoed === %{text: "hello"}
+
 %{
   result: echoed,
   guard_action: allowed_frame.private.guard_action
 }
 ```
 
-## Redacted Tool Result
+## Structured Redaction Requires A Host Transform
+
+Scanner text cannot replace a result map. This generic interceptor refuses the
+redaction request; a host-specific transform must preserve the result schema
+and be revalidated before release.
 
 ```elixir
-{:cont, redacted, action} =
+{:halt, redaction_error} =
   HermesNotebookStub.Interceptor.after_tool_call(
     "echo",
     %{text: "temporary key AKIAIOSFODNN7EXAMPLE"},
@@ -204,11 +214,9 @@ end
     on_sensitive: :redact
   )
 
-%{
-  action: action,
-  redacted: redacted,
-  leaked?: String.contains?(redacted, "AKIAIOSFODNN7EXAMPLE")
-}
+"blocked" = redaction_error["error"]["data"]["status"]
+false = String.contains?(Jason.encode!(redaction_error), "AKIAIOSFODNN7EXAMPLE")
+redaction_error
 ```
 
 ## Denial Maps To JSON-RPC Error
@@ -232,7 +240,7 @@ end
 ```elixir
 %{
   allowed: allowed_frame.private.guard_action,
-  redacted_result: action,
+  redaction_refused: redaction_error["error"]["data"]["status"],
   denied_status: error_response["error"]["data"]["status"]
 }
 ```

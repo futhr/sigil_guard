@@ -105,8 +105,7 @@ defmodule MyApp.GuardInterceptor do
     context = [phase: :tool_request, origin: :model, sink: :tool, tool: ctx.tool_name]
 
     case ToolGateway.guard_request(req, context) do
-      %Decision{verdict: :allow} -> {:cont, req}
-      %Decision{verdict: :redact, sanitized_text: text} -> {:cont, text}
+      %Decision{action: :allow} -> {:cont, req}
       %Decision{} = denied -> {:halt, denied}
     end
   end
@@ -118,18 +117,19 @@ end
 - **Mechanism:** tool-wrapper / pre-execution hook around Jido actions.
 - **Insertion:** `guard_request/2` in the action's before-run hook; the
   Jido agent identity MUST thread into the boundary context as `actor`.
+  The maintained guide uses the supported `run/2` action callback.
 
 ```elixir
 # Illustrative only; validate against the pinned jido release.
 defmodule MyApp.GuardedAction do
   use Jido.Action, name: "guarded_action"
 
-  def on_before_run(params, context) do
+  def run(params, context) do
     boundary = [phase: :tool_request, origin: :model, sink: :tool,
                 tool: "guarded_action", actor: context[:agent_id]]
 
     case SigilGuard.ToolGateway.guard_request(params, boundary) do
-      %SigilGuard.Decision{verdict: :allow} -> {:ok, params}
+      %SigilGuard.Decision{action: :allow} -> {:ok, params}
       %SigilGuard.Decision{} = denied -> {:error, {:blocked_by_policy, denied.reason}}
     end
   end
@@ -154,7 +154,7 @@ defmodule MyApp.GuardedTool do
       context = [phase: :tool_request, origin: :model, sink: :tool, tool: name]
 
       case ToolGateway.guard_request(args, context) do
-        %Decision{verdict: :allow} -> fun.(args, chain_ctx)
+        %Decision{action: :allow} -> fun.(args, chain_ctx)
         %Decision{} = denied -> {:error, "blocked by policy: #{denied.reason}"}
       end
     end}
@@ -164,42 +164,17 @@ end
 
 ### Tier 1: Tidewave
 
-- **Mechanism:** gating guide for Tidewave's runtime-introspection MCP tools
-  (`project_eval`, `get_ecto_schemas`, and peers) - the tool class that most
-  needs gating (R.07). A guard plug runs ahead of the Tidewave plug; the
-  shipped example policy classifies tools by action: eval tools map to
-  `eval`, repo/file mutation to `modify`, introspection reads to `read`.
-- **Insertion:** `guard_request/2` on `tools/call` bodies with `sink: :exec`
-  and `trust_zone: :untrusted`.
+The shipped policy classifies eval, repository writes and introspection reads.
+Tidewave 0.6.1 rejects parsed request bodies at its public Plug entry point.
+A wrapper matching `conn.body_params` therefore cannot guard and then forward
+an allowed request. Its unparsed fallback bypasses that guard. Compilation
+alone did not establish a working integration.
 
-```elixir
-# Illustrative only; validate against the pinned tidewave release.
-# Mounted ahead of the Tidewave plug (dev only); imports Plug.Conn.
-defmodule MyAppWeb.TidewaveGuard do
-  @behaviour Plug
-  def init(opts), do: opts
-
-  def call(%Plug.Conn{body_params: %{"method" => "tools/call"} = body} = conn, _opts) do
-    context = [phase: :tool_request, origin: :model, sink: :exec,
-               tool: get_in(body, ["params", "name"]), trust_zone: :untrusted]
-
-    case SigilGuard.ToolGateway.guard_request(body["params"], context) do
-      %SigilGuard.Decision{verdict: :allow} -> conn
-      %SigilGuard.Decision{} = denied -> conn |> resp(403, denied.reason) |> halt()
-    end
-  end
-
-  def call(conn, _opts), do: conn
-end
-```
-
-```text
-# examples/tidewave/policy.sigilguard - shipped illustrative example
-default require_approval
-block agent:* action:eval **
-require_approval agent:* action:modify lib/** priv/** config/**
-allow agent:* action:read **
-```
+The guide must document this incompatibility and provide only a pure,
+executable authorization helper for host-owned decoded-message seams. It must
+not claim a drop-in Plug adapter. A future transport adapter requires separate
+design and must preserve Tidewave's local-address and Origin checks, body
+limits and parsing behavior. No such adapter is part of this library.
 
 ### Per-Target Acceptance
 
@@ -210,7 +185,7 @@ Each row is additional to the pinned-version validation procedure.
 | hermes_mcp | Interceptor and middleware/plug placements both shown; anubis_mcp compile variant passes; denials map onto the SP.03 JSON-RPC error registry. |
 | Jido | Denial surfaces as a Jido action error without raising; `actor` is populated from the agent identity. |
 | LangChain/ReqLLM | Request and result sides both gated; the ReqLLM pipeline-step variant appears in the same guide. |
-| Tidewave | Shipped policy blocks eval-class tools, requires approval for repo writes, allows schema/doc reads; guide states Tidewave is dev-only and the guard is defense in depth, not a production-exposure fix. |
+| Tidewave | Shipped policy blocks eval-class tools, requires approval for repo writes, allows schema/doc reads; guide states Tidewave is dev-only, documents the parsed-body incompatibility, and tests the pure authorization helper; no drop-in adapter or production-exposure guarantee. |
 
 For MCP-facing targets, the guide MUST disclose the adapter version that was
 compiled and MUST NOT imply that dependency supports MCP `2026-07-28`.
@@ -316,7 +291,7 @@ documentation and release artifacts are the files listed in the module map.
 | System | Integration | Direction | Protocol |
 |--------|-------------|-----------|----------|
 | hermes_mcp / Jido / LangChain / ReqLLM | seam calls `ToolGateway` | inbound | Elixir API |
-| Tidewave | guard plug ahead of the Tidewave plug | inbound | Plug/HTTP |
+| Tidewave | host-owned decoded-message seam; no drop-in Plug adapter | inbound | host-owned |
 | bestpractices.dev | badge checklist | outbound | maintainer-owned manual process |
 
 ## Telemetry And Observability
@@ -413,7 +388,7 @@ items are maintainer-owned release handoff.
 
 ## Structured Adapter Acceptance Criteria
 
-Planned guide corrections preserve the complete original value on `:allow`.
+The guide examples preserve the complete original value on `:allow`.
 Scanner text is not a replacement for an MCP object or tool argument map.
 The generic examples must refuse `:redact` before dispatch unless the host
 implements an explicit transformation preserving its schema and validates the
@@ -422,3 +397,7 @@ is forbidden. Behavior tests must exercise actual guide modules with clean
 structured data, sensitive inputs and denial paths, in addition to compiling
 the supported optional frameworks in isolated consumers. Core dependencies
 remain Jason, NimbleOptions and Telemetry only.
+
+Pinned consumer tests must invoke tool construction and execution, including
+`Jido.Exec.run/3` and ReqLLM's `:parameter_schema` option. A successful
+module compilation alone does not validate those dynamically called APIs.
