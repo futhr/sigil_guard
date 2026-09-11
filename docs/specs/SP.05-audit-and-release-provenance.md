@@ -874,3 +874,30 @@ cut lands in M6 per SP.12.
 - [GDPR Article 17 - Right to erasure](https://gdpr-info.eu/art-17-gdpr/)
 - [GDPR Recital 26](https://gdpr-info.eu/recitals/no-26/)
 - [NIST SP 800-88 Rev. 2 - Guidelines for Media Sanitization](https://csrc.nist.gov/pubs/sp/800/88/r2/final)
+
+## Evidence Validation Acceptance Criteria
+
+The following corrections are planned for the existing v1 evidence objects;
+no new wire format or trust source is introduced.
+
+- Every supplied export inclusion proof must bind the checkpoint event count.
+  Every supplied consistency proof must verify against the matching prefix of
+  the supplied events and the full checkpoint, with exact integer sizes.
+- An embedded checkpoint statement must contain the complete expected statement,
+  including its type, predicate, sole subject and checkpoint digest. This is
+  a consistency check. `Export.verify/3` authenticates checkpoint signatures
+  when configured; envelope authentication and witness thresholds remain
+  explicit host calls to `Envelope.verify/2` and `Witness.verify_threshold/3`.
+- Witness cosigning must validate the current checkpoint-state statement even
+  without prior state. With prior state, both statements must belong to the
+  same chain and the proof sizes must equal their declared tree sizes. Missing
+  chain IDs match only other missing chain IDs. Operator authentication and
+  persistence remain host responsibilities.
+- Duplicate JSON object keys, including escaped spellings of the same key,
+  and atom/string key collisions must be rejected before evidence is accepted.
+  Native JSON null, booleans, arrays and numeric types must survive decoding.
+- Batch inclusion generation must reuse one Merkle tree. Its bytes, index
+  ordering, duplicate requested indices and error behavior remain unchanged.
+  Empty-tree inclusion generation continues to return `:out_of_range`.
+- Regression tests must cover malformed proofs, swapped predicates, chain
+  substitution, count substitution, duplicate keys and existing golden vectors.

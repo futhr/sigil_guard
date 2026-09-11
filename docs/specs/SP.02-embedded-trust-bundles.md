@@ -681,3 +681,18 @@ DSSE work is a prerequisite, and legacy removal lands in M6 per SP.12.
 - [DSSE Protocol Specification v1.0](https://github.com/secure-systems-lab/dsse/blob/master/protocol.md)
 - [RFC 8785 - JSON Canonicalization Scheme](https://www.rfc-editor.org/info/rfc8785)
 - [in-toto Statement v1 Specification](https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md)
+
+## Input Budget Acceptance Criteria
+
+Planned corrections bound file-source reads to the existing 1 MiB input
+limit plus one overflow byte. Oversized or unreadable sources return
+`:invalid_source` and preserve the last accepted cache snapshot. Diagnostic
+metadata extraction must check budgets before base64 or JSON decoding.
+Duplicate JSON keys at the envelope, bundle and rotation levels are rejected
+before a map can erase their ambiguity. Existing unique-key payload bytes
+remain the bytes authenticated by DSSE; verification does not re-sign or
+re-canonicalize them.
+
+Local file paths are host configuration. Portable file checks do not prevent
+hostile concurrent replacement, and hosts own source permissions and I/O
+timeouts. No filesystem publication or cross-boot state store is added.

@@ -227,3 +227,14 @@ evidence. Current attestation error semantics are owned by SP.01.
 
 - [SP.01 - SigilGuard Trust Profile](SP.01-sigilguard-trust-profile.md)
 - [R.07 - Runtime Dependency Selection, Detection Placement, And Interoperability](../research/R.07-runtime-dependencies-and-interoperability.md)
+
+## Envelope Construction Acceptance Criteria
+
+Planned corrections require `sign_many/2` and `add_signature/3` to return
+only envelopes satisfying the verifier's structural limits: unique normalized
+key IDs, at most 64 signatures and the existing envelope input budget.
+Duplicate IDs return `:duplicate_keyid`; capacity failures return
+`:invalid_envelope`. Existing valid PAE bytes and signature order stay fixed.
+Atom/string aliases for the same envelope or signature field are ambiguous
+and must be rejected. Signing remains over opaque bytes; parsing a JSON
+statement is the higher-level caller's responsibility.

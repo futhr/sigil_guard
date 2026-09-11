@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 278 / 278 tasks done (100%).** Milestones: 14 complete.
-**Current milestone: complete - maintainer-owned release handoff remains.**
+**Overall: 278 / 287 tasks done (96.9%).** Milestones: 14 complete, 1 in progress.
+**Current milestone: M12 - production boundary hardening.**
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -82,7 +82,8 @@ trailers (rule 10); the maintainer pushes manually.
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
 | M10 | External assessment projection | 1 | 1 | 100% | Complete |
 | M11 | Security audit remediation | 22 | 22 | 100% | Complete |
-| — | **Total** | **278** | **278** | **100%** | 14 done |
+| M12 | Production boundary hardening | 0 | 9 | 0% | In progress |
+| — | **Total** | **278** | **287** | **96.9%** | 14 done |
 
 ### Release Handoff
 
@@ -107,7 +108,7 @@ are maintainer-owned operations and are intentionally outside this checklist.
 After the owner-managed package flow, validate the reference consumer against
 the actual 1.0.0 package artifact as release handoff evidence.
 
-The table counts every milestone task (F through M10, including M7A) exactly
+The table counts every milestone task (F through M12, including M7A) exactly
 once. The
 Mandatory Gates section is a recurring pre-commit checklist and the Deferred
 section is post-1.0.0 parking; neither is counted here.
@@ -3007,3 +3008,15 @@ independent JCS campaign, bounded security mutations and unpacked-package
 consumer pass. Benchmark results live in `bench/output/audit-remediation.json`;
 R.07 records the retained advisory exceptions.
 Hosted scheduled runs and reference-consumer deployment remain maintainer-owned.
+
+## M12 - Production Boundary Hardening
+
+- [ ] M12.01: Reject ambiguous JSON and canonical audit keys (SP.02, SP.05, SP.09).
+- [ ] M12.02: Produce structurally valid envelopes (SP.06).
+- [ ] M12.03: Validate complete audit and witness evidence (SP.05, SP.09).
+- [ ] M12.04: Reuse Merkle trees for batch proofs (SP.05).
+- [ ] M12.05: Bound trust reads and local anchor writes (SP.02, SP.09).
+- [ ] M12.06: Preserve vault state on malformed encryption (SP.10).
+- [ ] M12.07: Validate stream configuration explicitly (SP.07).
+- [ ] M12.08: Preserve structured adapter values (SP.14).
+- [ ] M12.09: Verify full gates and isolated runtime/package/dependency consumers.

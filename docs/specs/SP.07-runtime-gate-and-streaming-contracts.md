@@ -365,3 +365,11 @@ boundary labels) are normative in the V3 Decision Contract section.
 - [SP.01 - SigilGuard Trust Profile](SP.01-sigilguard-trust-profile.md)
 - [SP.04 - Boundary Scanner And Policy Kernel](SP.04-boundary-scanner-and-policy-kernel.md)
 - [R.06 - Agentic Threat Model And Control Mapping](../research/R.06-agentic-threat-model-and-control-mapping.md)
+
+## Stream Configuration Acceptance Criteria
+
+The planned stream correction validates the keyword option container and
+compiled pattern entries before calculating holdback sizes. Invalid
+configuration raises a deliberate `ArgumentError`, like scanner configuration,
+rather than leaking `KeyError` or `BadMapError`. Valid patterns and the
+documented default for an invalid window value retain their behavior.

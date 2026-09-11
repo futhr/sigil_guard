@@ -272,3 +272,28 @@ signed under the old string verify unchanged - names are data, not structure.
 
 - [R.04 - Audit Proofs, Witnessing, And Privacy](../research/R.04-audit-proofs-witnessing-and-privacy.md)
 - [SP.05 - Audit And Release Provenance](SP.05-audit-and-release-provenance.md)
+
+## Boundary Validation Acceptance Criteria
+
+Planned corrections preserve all unambiguous v1 canonical bytes. Checkpoint
+construction must reject malformed event entries and unsupported or ambiguous
+metadata with tagged errors. Canonical audit encoding must reject duplicate
+keys after normalization, retain JSON literals, and preserve the distinct
+legacy representations of integer `1` and float `1.0`. Summary comparisons
+must use exact types where those bytes distinguish values.
+
+Local-file writes must validate the complete encoded JSONL entry against
+`:max_line_bytes` (default 1 MiB), including receipt metadata, before creating
+or appending the file. A successful write must be readable with the same
+limit. Malformed or duplicate-key log objects fail closed. This adapter does
+not provide transactions, crash recovery, cross-process locking or WORM
+guarantees. Hosts serialize writers and own durable storage. A partial OS
+write can leave a damaged final line; an error does not promise rollback.
+
+HTTP stores can return an error after a remote write if receipt validation
+fails. Hosts must reconcile using the anchor digest and provide idempotent
+storage. Receipt validation is not a rollback operation.
+
+Local receipts must percent-encode path components so literal `#`, `?`, `%`,
+spaces and Unicode round-trip through their file URI without changing the
+location. URI fragments carry only the anchor digest.

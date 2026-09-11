@@ -342,3 +342,11 @@ In v3, bindings normalize into the Agent Trust `actor` map
 - [SP.01 - Agent Trust Profile](SP.01-sigilguard-trust-profile.md)
 - [SPIFFE ID Standard](https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md)
 - [RFC 8693 - OAuth 2.0 Token Exchange](https://datatracker.ietf.org/doc/html/rfc8693)
+
+## Encryption Input Acceptance Criteria
+
+The planned built-in vault correction returns `{:error, :invalid_plaintext}`
+for non-binary plaintext and `{:error, :invalid_description}` for a non-string
+description. Arbitrary binary plaintext, including empty and non-UTF-8 bytes,
+remains valid. Rejection must leave the owner process and every existing entry
+intact. This does not change the Vault behaviour or host backend policies.

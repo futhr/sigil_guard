@@ -410,3 +410,15 @@ items are maintainer-owned release handoff.
 - [MCP Interceptors Working Group charter](https://modelcontextprotocol.io/community/working-groups/interceptors)
 - [OpenSSF Best Practices badge](https://www.bestpractices.dev/)
 - [Livebook](https://livebook.dev/)
+
+## Structured Adapter Acceptance Criteria
+
+Planned guide corrections preserve the complete original value on `:allow`.
+Scanner text is not a replacement for an MCP object or tool argument map.
+The generic examples must refuse `:redact` before dispatch unless the host
+implements an explicit transformation preserving its schema and validates the
+transformed value. Returning unchanged arguments after a redaction decision
+is forbidden. Behavior tests must exercise actual guide modules with clean
+structured data, sensitive inputs and denial paths, in addition to compiling
+the supported optional frameworks in isolated consumers. Core dependencies
+remain Jason, NimbleOptions and Telemetry only.
