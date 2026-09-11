@@ -54,6 +54,16 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     assert Vault.decrypt(id, InMemory) == {:ok, <<0, 255>>}
   end
 
+  test "stream consumers receive deliberate configuration errors before accepting chunks" do
+    alias SigilGuard.Runtime.Stream
+
+    assert_raise ArgumentError, ~r/stream patterns must contain compiled regexes/, fn ->
+      Stream.new(%{}, patterns: [%{}])
+    end
+
+    assert %Stream{window_bytes: 256} = Stream.new(%{}, stream_window_bytes: -1, patterns: [])
+  end
+
   defmodule ActorPatternIdentity do
     @behaviour SigilGuard.Identity
 

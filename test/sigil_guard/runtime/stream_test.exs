@@ -11,6 +11,31 @@ defmodule SigilGuard.Runtime.StreamTest do
   alias SigilGuard.Runtime.Gate
   alias SigilGuard.Runtime.Stream
 
+  test "invalid stream configuration raises an explicit argument error at construction" do
+    for opts <- [%{}, [:bad], [bad: 1] ++ [:bad], [1 | 2]] do
+      assert_raise ArgumentError, "stream options must be a keyword list", fn ->
+        Stream.new(%{}, opts)
+      end
+    end
+
+    for patterns <- [
+          nil,
+          %{},
+          [%{}],
+          [%{regex: "uncompiled"}],
+          [%{regex: ~r/x/, max_match_bytes: :bad}],
+          [%{regex: ~r/x/, max_match_bytes: 0}],
+          [%{regex: ~r/x/} | :bad]
+        ] do
+      assert_raise ArgumentError, ~r/stream patterns must contain compiled regexes/, fn ->
+        Stream.new(%{}, patterns: patterns)
+      end
+    end
+
+    assert %Stream{window_bytes: 256} = Stream.new(%{}, patterns: [], stream_window_bytes: :bad)
+    assert %Stream{} = Stream.new(%{}, patterns: [%{regex: ~r/x/}])
+  end
+
   describe "push/2 and finish/1" do
     test "emits clean chunks after the holdback window" do
       # Small-bound patterns keep the configured window small; the built-in

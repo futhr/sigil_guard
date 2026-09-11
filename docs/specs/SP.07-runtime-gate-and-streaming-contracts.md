@@ -368,7 +368,7 @@ boundary labels) are normative in the V3 Decision Contract section.
 
 ## Stream Configuration Acceptance Criteria
 
-The planned stream correction validates the keyword option container and
+The stream constructor validates the keyword option container and
 compiled pattern entries before calculating holdback sizes. Invalid
 configuration raises a deliberate `ArgumentError`, like scanner configuration,
 rather than leaking `KeyError` or `BadMapError`. Valid patterns and the

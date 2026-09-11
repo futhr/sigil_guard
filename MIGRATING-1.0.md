@@ -688,3 +688,7 @@ sentinel byte; rejected loads preserve the last valid cached bundle.
 `Vault.InMemory.encrypt/2` returns `:invalid_plaintext` or
 `:invalid_description` for malformed arguments without losing existing entries.
 Plaintext remains arbitrary binary data; descriptions are UTF-8 strings.
+
+`Runtime.Stream.new/2` now raises a deliberate `ArgumentError` for malformed
+option containers or uncompiled patterns instead of failing later with a field
+access error. Invalid window values still select the conservative default.

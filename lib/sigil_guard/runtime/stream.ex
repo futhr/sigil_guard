@@ -47,10 +47,14 @@ defmodule SigilGuard.Runtime.Stream do
   Options are passed through to `SigilGuard.Runtime.Gate.evaluate/3`.
   `:stream_window_bytes` controls the trailing holdback window and defaults
   to `#{@default_window_bytes}` bytes. Invalid window values fall back to the
-  default so stream checks keep a conservative holdback.
+  default so stream checks keep a conservative holdback. Options must be a
+  keyword list. `:patterns` must contain compiled regex maps with positive
+  integer width hints when supplied; invalid configuration raises `ArgumentError`.
   """
   @spec new(Context.t() | map() | keyword(), keyword()) :: t()
   def new(context \\ %Context{}, opts \\ []) do
+    validate_options!(opts)
+
     %__MODULE__{
       context: Context.new(context),
       opts: opts,
@@ -218,15 +222,34 @@ defmodule SigilGuard.Runtime.Stream do
     end
   end
 
-  defp active_max_match_bytes(opts) do
-    case Keyword.get(opts, :patterns, Patterns.built_in()) do
-      patterns when is_list(patterns) ->
-        Enum.reduce(patterns, Patterns.largest_max_match_bytes(patterns), fn pattern, width ->
-          max(width, byte_size(Regex.source(pattern.regex)))
-        end)
+  defp validate_options!(opts) do
+    unless is_list(opts) and Keyword.keyword?(opts),
+      do: raise(ArgumentError, "stream options must be a keyword list")
 
-      _ ->
-        Patterns.default_max_match_bytes()
-    end
+    patterns = Keyword.get(opts, :patterns, Patterns.built_in())
+
+    unless valid_patterns?(patterns),
+      do:
+        raise(
+          ArgumentError,
+          "stream patterns must contain compiled regexes and positive integer widths"
+        )
+  end
+
+  defp valid_patterns?([]), do: true
+
+  defp valid_patterns?([%{regex: %Regex{}} = pattern | rest]) do
+    width = Map.get(pattern, :max_match_bytes, Patterns.default_max_match_bytes())
+    is_integer(width) and width > 0 and valid_patterns?(rest)
+  end
+
+  defp valid_patterns?(_), do: false
+
+  defp active_max_match_bytes(opts) do
+    patterns = Keyword.get(opts, :patterns, Patterns.built_in())
+
+    Enum.reduce(patterns, Patterns.largest_max_match_bytes(patterns), fn pattern, width ->
+      max(width, byte_size(Regex.source(pattern.regex)))
+    end)
   end
 end
