@@ -232,26 +232,14 @@ defmodule SigilGuard.Audit.Export do
   defp maybe_inclusion_proofs(events, opts) do
     case Keyword.get(opts, :inclusion_proofs) do
       nil -> {:ok, nil}
+      :all when events == [] -> {:error, :out_of_range}
       :all -> inclusion_proofs(events, 0..(length(events) - 1))
       indices when is_list(indices) -> inclusion_proofs(events, indices)
       _ -> {:error, :invalid_inclusion_proofs}
     end
   end
 
-  defp inclusion_proofs(events, indices) do
-    result =
-      Enum.reduce_while(indices, {:ok, []}, fn index, {:ok, acc} ->
-        case Proof.inclusion(events, index) do
-          {:ok, proof} -> {:cont, {:ok, [proof | acc]}}
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
-      end)
-
-    case result do
-      {:ok, proofs} -> {:ok, Enum.reverse(proofs)}
-      error -> error
-    end
-  end
+  defp inclusion_proofs(events, indices), do: Proof.inclusions(events, indices)
 
   defp maybe_consistency_proof(events, opts) do
     case Keyword.get(opts, :consistency_proof) do
@@ -361,7 +349,8 @@ defmodule SigilGuard.Audit.Export do
 
   defp verify_each_inclusion(proofs, checkpoint, events) do
     # Read the root tolerantly (string or atom key), like the rest of the module.
-    root = Map.get(checkpoint, "merkle_root") || Map.get(checkpoint, :merkle_root)
+    root = checkpoint_root(checkpoint)
+    events = List.to_tuple(events)
 
     Enum.reduce_while(proofs, :ok, fn proof, :ok ->
       case verify_one_inclusion(proof, root, events) do
@@ -375,7 +364,7 @@ defmodule SigilGuard.Audit.Export do
     case event_hmac(events, Map.get(proof, "leaf_index")) do
       hmac when is_binary(hmac) ->
         with :ok <- Proof.verify_inclusion(proof, hmac, root) do
-          match_tree_size(proof, length(events))
+          match_tree_size(proof, tuple_size(events))
         end
 
       _ ->
@@ -388,8 +377,9 @@ defmodule SigilGuard.Audit.Export do
   defp match_tree_size(%{"tree_size" => size}, size), do: :ok
   defp match_tree_size(_, _), do: {:error, :out_of_range}
 
-  defp event_hmac(events, index) when is_integer(index) and index >= 0 do
-    case Enum.at(events, index) do
+  defp event_hmac(events, index)
+       when is_integer(index) and index >= 0 and index < tuple_size(events) do
+    case elem(events, index) do
       %Audit{hmac: hmac} -> hmac
       _ -> nil
     end

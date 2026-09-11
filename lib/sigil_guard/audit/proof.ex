@@ -54,26 +54,51 @@ defmodule SigilGuard.Audit.Proof do
           {:ok, inclusion_proof()} | {:error, :out_of_range | :unsigned_event}
   def inclusion(events, leaf_index)
       when is_list(events) and is_integer(leaf_index) and leaf_index >= 0 do
-    with {:ok, leaves} <- Checkpoint.leaf_hashes(events),
-         tree_size = length(leaves),
-         true <- leaf_index < tree_size do
-      path = audit_path(Checkpoint.levels(leaves), leaf_index)
-
-      {:ok,
-       %{
-         "kind" => @inclusion_kind,
-         "version" => @version,
-         "leaf_index" => leaf_index,
-         "tree_size" => tree_size,
-         "audit_path" => Enum.map(path, &Base.encode16(&1, case: :lower))
-       }}
-    else
-      false -> {:error, :out_of_range}
-      {:error, reason} -> {:error, reason}
-    end
+    with {:ok, [proof]} <- inclusions(events, [leaf_index]), do: {:ok, proof}
   end
 
   def inclusion(_, _), do: {:error, :out_of_range}
+
+  @doc false
+  @spec inclusions([Audit.t()], Enumerable.t()) ::
+          {:ok, [inclusion_proof()]} | {:error, :out_of_range | :unsigned_event}
+  def inclusions(events, indices) do
+    with {:ok, leaves} <- Checkpoint.leaf_hashes(events) do
+      levels =
+        leaves
+        |> Checkpoint.levels()
+        |> Enum.drop(-1)
+        |> Enum.map(&List.to_tuple/1)
+
+      proofs_for_indices(indices, levels, length(leaves))
+    end
+  end
+
+  defp proofs_for_indices(indices, levels, size) do
+    result =
+      Enum.reduce_while(indices, {:ok, []}, fn index, {:ok, acc} ->
+        if is_integer(index) and index >= 0 and index < size do
+          {:cont, {:ok, [inclusion_proof(levels, index, size) | acc]}}
+        else
+          {:halt, {:error, :out_of_range}}
+        end
+      end)
+
+    case result do
+      {:ok, proofs} -> {:ok, Enum.reverse(proofs)}
+      error -> error
+    end
+  end
+
+  defp inclusion_proof(levels, index, size) do
+    %{
+      "kind" => @inclusion_kind,
+      "version" => @version,
+      "leaf_index" => index,
+      "tree_size" => size,
+      "audit_path" => Enum.map(audit_path(levels, index), &Base.encode16(&1, case: :lower))
+    }
+  end
 
   @doc """
   Verify an inclusion `proof` for `hmac` against a trusted checkpoint `merkle_root`.
@@ -154,9 +179,7 @@ defmodule SigilGuard.Audit.Proof do
   # index; an unpaired last (promoted) node contributes nothing at that level.
   defp audit_path(levels, leaf_index) do
     {_, path} =
-      levels
-      |> Enum.drop(-1)
-      |> Enum.reduce({leaf_index, []}, fn level, {index, acc} ->
+      Enum.reduce(levels, {leaf_index, []}, fn level, {index, acc} ->
         {div(index, 2), prepend_sibling(level, index, acc)}
       end)
 
@@ -172,8 +195,8 @@ defmodule SigilGuard.Audit.Proof do
 
   defp sibling(level, index) do
     cond do
-      rem(index, 2) == 1 -> Enum.at(level, index - 1)
-      index + 1 < length(level) -> Enum.at(level, index + 1)
+      rem(index, 2) == 1 -> elem(level, index - 1)
+      index + 1 < tuple_size(level) -> elem(level, index + 1)
       true -> nil
     end
   end

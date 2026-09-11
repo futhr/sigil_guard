@@ -63,7 +63,7 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 281 / 287 tasks done (97.9%).** Milestones: 14 complete, 1 in progress.
+**Overall: 282 / 287 tasks done (98.3%).** Milestones: 14 complete, 1 in progress.
 **Current milestone: M12 - production boundary hardening.**
 
 | # | Milestone | Done | Total | % | Status |
@@ -82,8 +82,8 @@ trailers (rule 10); the maintainer pushes manually.
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
 | M10 | External assessment projection | 1 | 1 | 100% | Complete |
 | M11 | Security audit remediation | 22 | 22 | 100% | Complete |
-| M12 | Production boundary hardening | 3 | 9 | 33.3% | In progress |
-| — | **Total** | **281** | **287** | **97.9%** | 14 done |
+| M12 | Production boundary hardening | 4 | 9 | 44.4% | In progress |
+| — | **Total** | **282** | **287** | **98.3%** | 14 done |
 
 ### Release Handoff
 
@@ -3014,7 +3014,7 @@ Hosted scheduled runs and reference-consumer deployment remain maintainer-owned.
 - [x] M12.01: Reject ambiguous JSON and canonical audit keys (SP.02, SP.05, SP.09).
 - [x] M12.02: Produce structurally valid envelopes (SP.06).
 - [x] M12.03: Validate complete audit and witness evidence (SP.05, SP.09).
-- [ ] M12.04: Reuse Merkle trees for batch proofs (SP.05).
+- [x] M12.04: Reuse Merkle trees for batch proofs (SP.05).
 - [ ] M12.05: Bound trust reads and local anchor writes (SP.02, SP.09).
 - [ ] M12.06: Preserve vault state on malformed encryption (SP.10).
 - [ ] M12.07: Validate stream configuration explicitly (SP.07).

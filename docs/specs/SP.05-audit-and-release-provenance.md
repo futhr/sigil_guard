@@ -878,8 +878,9 @@ cut lands in M6 per SP.12.
 ## Evidence Validation Acceptance Criteria
 
 The following checks apply to the existing v1 evidence objects;
-no new wire format or trust source is introduced. Batch tree reuse remains
-planned until its benchmark and regression checks pass.
+no new wire format or trust source is introduced. Batch generation reuses
+one indexed Merkle tree; regression tests preserve the committed golden paths,
+requested order, duplicate indices and empty-tree errors.
 
 - Every supplied export inclusion proof must bind the checkpoint event count.
   Every supplied consistency proof must verify against the matching prefix of

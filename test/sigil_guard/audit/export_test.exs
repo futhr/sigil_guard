@@ -59,6 +59,19 @@ defmodule SigilGuard.Audit.ExportTest do
     assert Export.verify(Map.put(export, "version", 1.0), events) == {:error, :invalid_version}
   end
 
+  test "batch proofs preserve requested order, duplicates, empty selections and golden paths" do
+    events = SigilGuard.AuditProofFixture.signed_events()
+    indices = [4, 0, 4, 2]
+    {:ok, export} = Export.create(events, inclusion_proofs: indices)
+    assert Enum.map(export["inclusion_proofs"], & &1["leaf_index"]) == indices
+    assert {:ok, _} = Export.verify(export, events)
+    golden = Jason.decode!(File.read!(SigilGuard.AuditProofFixture.path("inclusion_5.json")))
+    assert export["inclusion_proofs"] === Enum.map(indices, &Enum.at(golden["proofs"], &1))
+    assert {:ok, %{"inclusion_proofs" => []}} = Export.create([], inclusion_proofs: [])
+    assert Export.create([], inclusion_proofs: :all) == {:error, :out_of_range}
+    assert Export.create(events, inclusion_proofs: [0, 5]) == {:error, :out_of_range}
+  end
+
   describe "create/2" do
     test "creates a signed anchored export without raw event bodies" do
       events = build_signed_chain(3)
