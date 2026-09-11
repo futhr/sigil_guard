@@ -12,6 +12,45 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
   alias __MODULE__.SignerB
   alias SigilGuard.Attestation.Envelope
 
+  test "constructors reject duplicate identities and verifier capacity overflow" do
+    signer = SigilGuard.TestSigner
+    keys = %{"key-1" => signer.public_key()}
+    signers = for index <- 1..64, do: {signer, "key-#{index}"}
+
+    assert Envelope.sign("{}", signer, keyid: <<255>>) == {:error, :invalid_signer}
+    assert Envelope.sign_many("{}", [signer, signer]) == {:error, :duplicate_keyid}
+
+    assert Envelope.sign_many("{}", [{signer, "same"}, {signer, "same"}]) ==
+             {:error, :duplicate_keyid}
+
+    assert Envelope.sign_many("{}", [signer | signers]) == {:error, :invalid_envelope}
+    assert Envelope.sign_many("{}", [signer | :invalid]) == {:error, :invalid_envelope}
+    assert {:ok, envelope} = Envelope.sign_many("{}", signers)
+    assert Envelope.verify(envelope, keys) == {:ok, "{}"}
+
+    assert Envelope.add_signature(envelope, signer, keyid: "one-too-many") ==
+             {:error, :invalid_envelope}
+
+    assert Envelope.sign(String.duplicate("a", 1_048_576), signer) ==
+             {:error, :invalid_envelope}
+  end
+
+  test "cosigning an atom-keyed envelope replaces the existing signature field" do
+    signer = SigilGuard.TestSigner
+    {:ok, original} = Envelope.sign("{}", signer, keyid: "first")
+
+    atom_envelope = %{
+      payload: original["payload"],
+      payloadType: original["payloadType"],
+      signatures: original["signatures"]
+    }
+
+    assert {:ok, cosigned} = Envelope.add_signature(atom_envelope, signer, keyid: "second")
+    assert cosigned["signatures"] |> Enum.map(& &1["keyid"]) == ["first", "second"]
+    refute Map.has_key?(cosigned, :signatures)
+    assert Envelope.verify(cosigned, %{"first" => signer.public_key()}) == {:ok, "{}"}
+  end
+
   describe "pae/2" do
     test "emits the exact DSSE pre-authentication bytes" do
       assert Envelope.pae("application/vnd.sigilguard+json", ~s({"x":1})) ==
@@ -160,8 +199,8 @@ defmodule SigilGuard.Attestation.EnvelopeTest do
     end
 
     test "rejects duplicate keyids before verification" do
-      assert {:ok, envelope} =
-               Envelope.sign_many("payload", [{SignerA, "same"}, {SignerB, "same"}])
+      assert {:ok, envelope} = Envelope.sign("payload", SignerA, keyid: "same")
+      envelope = Map.update!(envelope, "signatures", fn [signature] -> [signature, signature] end)
 
       assert Envelope.verify(envelope, %{"same" => SignerA.public_key()}) ==
                {:error, :duplicate_keyid}

@@ -230,7 +230,7 @@ evidence. Current attestation error semantics are owned by SP.01.
 
 ## Envelope Construction Acceptance Criteria
 
-Planned corrections require `sign_many/2` and `add_signature/3` to return
+`sign_many/2` and `add_signature/3` return
 only envelopes satisfying the verifier's structural limits: unique normalized
 key IDs, at most 64 signatures and the existing envelope input budget.
 Duplicate IDs return `:duplicate_keyid`; capacity failures return

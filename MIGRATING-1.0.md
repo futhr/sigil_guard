@@ -663,3 +663,8 @@ objects with duplicate decoded keys (including escaped aliases), envelopes with
 atom/string aliases of the same field, and audit maps whose keys collide after
 normalization are rejected. Supply each object member exactly once. Native
 JSON booleans, nulls, arrays, integers and floats retain their existing meaning.
+
+Envelope signing rejects duplicate key IDs with `:duplicate_keyid` and
+verifier-capacity overflow with `:invalid_envelope`. Keep multisignatures
+within 64 entries and the existing envelope input budget. Cosigning an
+atom-keyed envelope replaces its signature field without retaining an alias.

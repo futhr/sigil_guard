@@ -84,7 +84,8 @@ defmodule SigilGuard.TrustBundle.NegativeMatrixTest do
       {"duplicate keyid", :duplicate_keyid,
        fn ->
          bundle_document()
-         |> envelope([BundleSigner, {BundleBackupSigner, bundle_keyid()}])
+         |> envelope([BundleSigner])
+         |> Map.update!("signatures", fn [signature] -> [signature, signature] end)
          |> TrustBundle.verify(now: @now)
        end},
       {"invalid bundle format", :invalid_bundle_format,

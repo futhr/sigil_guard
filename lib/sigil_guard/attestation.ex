@@ -73,6 +73,7 @@ defmodule SigilGuard.Attestation do
           | :invalid_payload
           | :unsupported_number_range
           | :invalid_signer
+          | :invalid_envelope
 
   @type verify_error ::
           :invalid_envelope

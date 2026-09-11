@@ -119,7 +119,8 @@ defmodule SigilGuard.TrustBundle.VerifyTest do
 
       duplicate_keyid =
         document
-        |> envelope([BundleSigner, {BundleBackupSigner, bundle_keyid()}])
+        |> envelope([BundleSigner])
+        |> Map.update!("signatures", fn [signature] -> [signature, signature] end)
 
       tampered_signature =
         document

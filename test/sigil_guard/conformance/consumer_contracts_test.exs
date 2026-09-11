@@ -158,6 +158,17 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     assert Envelope.verify(signed, keys) == {:ok, "{}"}
   end
 
+  test "successful envelope construction remains verifiable" do
+    alias SigilGuard.Attestation.Envelope
+
+    assert Envelope.sign_many("{}", [RequestSigningSigner, RequestSigningSigner]) ==
+             {:error, :duplicate_keyid}
+
+    assert {:ok, envelope} = Envelope.sign("{}", RequestSigningSigner)
+    keyid = Envelope.keyid(RequestSigningSigner.public_key())
+    assert Envelope.verify(envelope, %{keyid => RequestSigningSigner.public_key()}) == {:ok, "{}"}
+  end
+
   describe "export compatibility facade contracts" do
     test "scan/1 returns the stable clean and hit shapes" do
       assert {:ok, "safe text"} = SigilGuard.scan("safe text")

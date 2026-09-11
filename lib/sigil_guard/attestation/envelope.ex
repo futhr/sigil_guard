@@ -74,20 +74,24 @@ defmodule SigilGuard.Attestation.Envelope do
   Each signer can be a module implementing `SigilGuard.Signer` or
   `{module, keyid}`. A nil keyid derives the SigilGuard-local
   `"sha256:" <> hex` key id from the signer's raw public key.
+
+  Key IDs must be unique. At most 64 signatures and the verifier's envelope
+  input budget are accepted; construction never returns an oversized envelope.
   """
   @spec sign_many(binary(), [signer()]) ::
-          {:ok, envelope()} | {:error, :invalid_envelope | :invalid_signer}
+          {:ok, envelope()} | {:error, :invalid_envelope | :invalid_signer | :duplicate_keyid}
   def sign_many(payload, signers)
-      when is_binary(payload) and is_list(signers) and signers != [] do
+      when is_binary(payload) and is_list(signers) and signers != [] and length(signers) <= 64 do
     pae = pae(payload)
 
-    with {:ok, signatures} <- sign_all(signers, pae, []) do
-      {:ok,
-       %{
-         "payload" => encode_base64url(payload),
-         "payloadType" => @payload_type,
-         "signatures" => signatures
-       }}
+    with {:ok, signatures} <- sign_all(signers, pae, []),
+         {:ok, parsed} <- signature_fields(signatures),
+         :ok <- reject_duplicate_keyids(parsed) do
+      checked_envelope(%{
+        "payload" => encode_base64url(payload),
+        "payloadType" => @payload_type,
+        "signatures" => signatures
+      })
     end
   end
 
@@ -121,11 +125,18 @@ defmodule SigilGuard.Attestation.Envelope do
          {:ok, payload} <- decode_base64(fields.payload),
          {:ok, [entry]} <- sign_all([{signer, keyid}], pae(fields.payload_type, payload), []),
          :ok <- reject_present_keyid(existing, entry) do
-      {:ok, Map.put(envelope, "signatures", Enum.concat(fields.signatures, [entry]))}
+      envelope
+      |> Map.delete(:signatures)
+      |> Map.put("signatures", Enum.concat(fields.signatures, [entry]))
+      |> checked_envelope()
     end
   end
 
   def add_signature(_, _, _), do: {:error, :invalid_envelope}
+
+  defp checked_envelope(envelope) do
+    with {:ok, _} <- envelope_fields(envelope), do: {:ok, envelope}
+  end
 
   @doc """
   Verify a DSSE envelope and return the signed payload bytes.
@@ -193,7 +204,11 @@ defmodule SigilGuard.Attestation.Envelope do
   end
 
   defp signer_keyid(nil, public_key), do: {:ok, keyid(public_key)}
-  defp signer_keyid(keyid, _) when is_binary(keyid) and keyid != "", do: {:ok, keyid}
+
+  defp signer_keyid(keyid, _) when is_binary(keyid) and keyid != "" do
+    if String.valid?(keyid), do: {:ok, keyid}, else: {:error, :invalid_signer}
+  end
+
   defp signer_keyid(_, _), do: {:error, :invalid_signer}
 
   defp signer_signature(module, pae) do
