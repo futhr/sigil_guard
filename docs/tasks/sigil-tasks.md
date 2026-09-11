@@ -63,8 +63,8 @@ trailers (rule 10); the maintainer pushes manually.
 
 ## Progress Summary
 
-**Overall: 286 / 287 tasks done (99.7%).** Milestones: 14 complete, 1 in progress.
-**Current milestone: M12 - production boundary hardening.**
+**Overall: 287 / 287 tasks done (100%).** Milestones: 15 complete.
+**Current milestone: M12 complete - production boundary hardening.**
 
 | # | Milestone | Done | Total | % | Status |
 |----|-----------|-----:|------:|-----:|-------------|
@@ -82,8 +82,8 @@ trailers (rule 10); the maintainer pushes manually.
 | M9 | MCP `2026-07-28` alignment | 12 | 12 | 100% | Complete |
 | M10 | External assessment projection | 1 | 1 | 100% | Complete |
 | M11 | Security audit remediation | 22 | 22 | 100% | Complete |
-| M12 | Production boundary hardening | 8 | 9 | 88.9% | In progress |
-| — | **Total** | **286** | **287** | **99.7%** | 14 done |
+| M12 | Production boundary hardening | 9 | 9 | 100% | Complete |
+| — | **Total** | **287** | **287** | **100%** | 15 done |
 
 ### Release Handoff
 
@@ -3022,4 +3022,26 @@ Hosted scheduled runs and reference-consumer deployment remain maintainer-owned.
 - [x] M12.06: Preserve vault state on malformed encryption (SP.10).
 - [x] M12.07: Validate stream configuration explicitly (SP.07).
 - [x] M12.08: Preserve structured adapter values (SP.14).
-- [ ] M12.09: Verify full gates and isolated runtime/package/dependency consumers.
+- [x] M12.09: Verify full gates and isolated runtime/package/dependency consumers.
+
+Validation on 2026-09-11 passed all individual repository gates and all 18
+`./bin/check` checks with retries disabled: 1,666 tests, 22 properties,
+36 doctests, 95.3% coverage, and 100% public documentation and typespec
+coverage. Verdict mutation accounting recorded 71 killed, 18 invalid and
+3 equivalent mutants, with a 100% behavioral score.
+
+Full suites passed on Elixir/OTP 1.18.4/27.3.4.15,
+1.18.4/28.5.0.6, 1.19.6/28.5.0.6 and 1.20.4/29.0.4. The unpacked Hex
+artifact passed 40 behavior tests across locked and freshly resolved
+dependencies, selected runtime minimums, minimums with Decimal 2, and locked
+dependencies with Decimal 3. Selected
+minimums were Jason 1.4.0, NimbleOptions 1.1.0 and Telemetry 1.0.0;
+Jason 1.4.0 with Decimal 3.0.0 correctly failed dependency resolution.
+Five optional framework consumers passed 15 actual callback/policy tests;
+SP.14 and the guides record their pins, upstream warnings and the unsupported
+Tidewave transport seam. No dependency constraints or repository lock changed.
+
+These were local macOS checks. Existing Cowlib advisory exceptions remain;
+minimum dependency compilation and optional Jido dependencies emitted upstream
+warnings. Hosted CI, release publication, hostile filesystem races and a
+reference-consumer deployment were not exercised by this milestone.
