@@ -1,13 +1,13 @@
 # Run from an isolated consumer after compiling the guide's complete modules:
-# SIGIL_GUIDE_TARGET=hermes mix run /path/to/test/integration/guide_consumer.exs
+# SIGIL_GUIDE_TARGET=hermes mix run /path/to/sigil_guard/bin/guide_consumer.exs
 ExUnit.start()
-Code.require_file(Path.expand("../support/guide_fixture.ex", __DIR__))
+Code.require_file(Path.expand("../test/support/guide_fixture.ex", __DIR__))
 
 defmodule SigilGuard.IntegrationGuideConsumer do
   use ExUnit.Case, async: false
 
   @target System.fetch_env!("SIGIL_GUIDE_TARGET")
-  @repo Path.expand("../..", __DIR__)
+  @repo Path.expand("..", __DIR__)
 
   test "the real optional framework executes the documented allowed callback" do
     case @target do

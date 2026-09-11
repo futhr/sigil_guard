@@ -334,7 +334,7 @@ For executable consumer checks, run the repository script from that scratch
 project after compiling the complete guide modules:
 
 ```bash
-SIGIL_GUIDE_TARGET=hermes mix run /path/to/sigil_guard/test/integration/guide_consumer.exs
+SIGIL_GUIDE_TARGET=hermes mix run /path/to/sigil_guard/bin/guide_consumer.exs
 ```
 
 Use `SIGIL_GUIDE_TARGET=anubis` in the Anubis consumer.
