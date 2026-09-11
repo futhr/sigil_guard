@@ -329,7 +329,7 @@ defmodule SigilGuard.Audit.Export do
   defp statement_subject_digest(envelope) do
     with payload when is_binary(payload) <- Map.get(envelope, "payload"),
          {:ok, bytes} <- Base.url_decode64(payload, padding: false),
-         {:ok, decoded} <- Jason.decode(bytes),
+         {:ok, decoded} <- SigilGuard.Canonical.JSON.decode(bytes),
          digest when is_binary(digest) <- subject_digest(decoded) do
       {:ok, digest}
     else

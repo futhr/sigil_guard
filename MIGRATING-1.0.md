@@ -655,3 +655,11 @@ append root signatures with `SigilGuard.Attestation.Envelope.add_signature/3`.
 Unsigned authority changes, expired or revoked issuers, and stale replay claims
 fail closed. Review the [strict deployment guide](guides/strict-deployment.md)
 for work limits, explicit bundle scanner selection and streaming retention.
+
+## Boundary validation corrections
+
+Unambiguous v1 audit bytes and Agent Trust payload bytes are unchanged. JSON
+objects with duplicate decoded keys (including escaped aliases), envelopes with
+atom/string aliases of the same field, and audit maps whose keys collide after
+normalization are rejected. Supply each object member exactly once. Native
+JSON booleans, nulls, arrays, integers and floats retain their existing meaning.

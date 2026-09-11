@@ -152,7 +152,8 @@ defmodule SigilGuard.TrustBundle do
   end
 
   defp load_binary(bytes, source, opts) do
-    decoded = with :ok <- SigilGuard.Limits.check(bytes), do: Jason.decode(bytes)
+    decoded =
+      with :ok <- SigilGuard.Limits.check(bytes), do: SigilGuard.Canonical.JSON.decode(bytes)
 
     case decoded do
       {:ok, envelope} when is_map(envelope) ->
@@ -491,7 +492,7 @@ defmodule SigilGuard.TrustBundle do
     with payload when is_binary(payload) <-
            Map.get(envelope, "payload") || Map.get(envelope, :payload),
          {:ok, bytes} <- decode_base64(payload),
-         {:ok, %{} = document} <- Jason.decode(bytes) do
+         {:ok, %{} = document} <- SigilGuard.Canonical.JSON.decode(bytes) do
       document
     else
       _ -> nil

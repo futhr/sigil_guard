@@ -220,7 +220,8 @@ defmodule SigilGuard.Attestation.Envelope do
 
     valid_envelope? =
       is_binary(payload) and is_binary(payload_type) and is_list(signatures) and
-        signatures != [] and SigilGuard.Limits.check(envelope) == :ok and length(signatures) <= 64
+        signatures != [] and SigilGuard.Limits.check(envelope) == :ok and
+        SigilGuard.Canonical.JSON.unique_keys?(envelope) and length(signatures) <= 64
 
     if valid_envelope? do
       {:ok, %{payload: payload, payload_type: payload_type, signatures: signatures}}
@@ -266,7 +267,8 @@ defmodule SigilGuard.Attestation.Envelope do
     keyid = field(signature, "keyid")
     sig = field(signature, "sig")
 
-    if is_binary(keyid) and keyid != "" and is_binary(sig) do
+    if is_binary(keyid) and keyid != "" and is_binary(sig) and
+         SigilGuard.Canonical.JSON.unique_keys?(signature) do
       {:ok, %{keyid: keyid, sig: sig}}
     else
       {:error, :invalid_envelope}

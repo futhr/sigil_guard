@@ -288,7 +288,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp decode_entry(line) do
-    case Jason.decode(line) do
+    case SigilGuard.Canonical.JSON.decode(line) do
       {:ok, decoded} when is_map(decoded) -> {:ok, decoded}
       {:ok, _} -> {:error, :invalid_log}
       {:error, _} -> {:error, :invalid_log}

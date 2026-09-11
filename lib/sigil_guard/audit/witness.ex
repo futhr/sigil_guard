@@ -123,7 +123,7 @@ defmodule SigilGuard.Audit.Witness do
   defp envelope_statement_root(envelope) do
     with payload when is_binary(payload) <- Map.get(envelope, "payload"),
          {:ok, bytes} <- Base.url_decode64(payload, padding: false),
-         {:ok, statement} <- Jason.decode(bytes),
+         {:ok, statement} <- SigilGuard.Canonical.JSON.decode(bytes),
          {:ok, root} <- statement_root(statement) do
       {:ok, root}
     else

@@ -113,10 +113,11 @@ defmodule SigilGuard.Audit.Anchor.Receipt do
 
   defp verify_signature(receipt, signature, opts) do
     with {:ok, fields} <- signature_fields(signature),
-         :ok <- validate_signature_digest(receipt, fields.digest),
+         {:ok, canonical} <- receipt_canonical_bytes(receipt),
+         :ok <- validate_signature_digest(canonical, fields.digest),
          {:ok, public_key} <- public_key(fields.issuer, opts),
          {:ok, decoded_signature} <- decode_signature(fields.signature) do
-      verify_ed25519(receipt, decoded_signature, public_key)
+      verify_ed25519(canonical, decoded_signature, public_key)
     end
   end
 
@@ -132,8 +133,12 @@ defmodule SigilGuard.Audit.Anchor.Receipt do
          :ok <- require_binary(fields.algorithm, :missing_algorithm),
          :ok <- require_algorithm(fields.algorithm),
          :ok <- require_binary(fields.digest, :missing_digest),
-         :ok <- require_binary(fields.signature, :missing_signature) do
+         :ok <- require_binary(fields.signature, :missing_signature),
+         true <- SigilGuard.Canonical.JSON.unique_keys?(signature) do
       {:ok, fields}
+    else
+      false -> {:error, :invalid_signature_metadata}
+      error -> error
     end
   end
 
@@ -143,8 +148,19 @@ defmodule SigilGuard.Audit.Anchor.Receipt do
   defp require_algorithm(@signature_algorithm), do: :ok
   defp require_algorithm(_), do: {:error, :unsupported_algorithm}
 
-  defp validate_signature_digest(receipt, claimed_digest) do
-    if secure_compare(digest(receipt), claimed_digest) do
+  defp receipt_canonical_bytes(receipt) do
+    if SigilGuard.Canonical.JSON.unique_keys?(receipt),
+      do: {:ok, canonical_bytes(receipt)},
+      else: {:error, :invalid_receipt}
+  rescue
+    _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
+      {:error, :invalid_receipt}
+  end
+
+  defp validate_signature_digest(canonical, claimed_digest) do
+    digest = Base.encode16(:crypto.hash(:sha256, canonical), case: :lower)
+
+    if secure_compare(digest, claimed_digest) do
       :ok
     else
       {:error, :digest_mismatch}
@@ -228,8 +244,8 @@ defmodule SigilGuard.Audit.Anchor.Receipt do
     end
   end
 
-  defp verify_ed25519(receipt, signature, public_key) do
-    if :crypto.verify(:eddsa, :none, canonical_bytes(receipt), signature, [public_key, :ed25519]) do
+  defp verify_ed25519(canonical, signature, public_key) do
+    if :crypto.verify(:eddsa, :none, canonical, signature, [public_key, :ed25519]) do
       :ok
     else
       {:error, :invalid_signature}

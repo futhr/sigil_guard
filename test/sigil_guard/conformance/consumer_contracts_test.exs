@@ -129,6 +129,35 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     :ok
   end
 
+  test "trust JSON and envelope aliases cannot erase conflicting identities" do
+    alias SigilGuard.Attestation.Envelope
+    alias SigilGuard.TrustBundle
+
+    {:ok, bundle} = TrustBundle.dev_bundle(cache: false)
+    envelope = bundle.envelope
+    bytes = String.trim_trailing(Jason.encode!(envelope), "}") <> ~s(,"payloadType":"wrong"})
+
+    assert TrustBundle.load({:binary, bytes}, cache: false, quarantine: false) ==
+             {:error, :invalid_source}
+
+    keys = %{
+      Envelope.keyid(RequestSigningSigner.public_key()) => RequestSigningSigner.public_key()
+    }
+
+    {:ok, signed} = Envelope.sign("{}", RequestSigningSigner)
+
+    assert Envelope.verify(Map.put(signed, :payload, signed["payload"]), keys) ==
+             {:error, :invalid_envelope}
+
+    ambiguous =
+      update_in(signed, ["signatures"], fn [signature] ->
+        [Map.put(signature, :keyid, signature["keyid"])]
+      end)
+
+    assert Envelope.verify(ambiguous, keys) == {:error, :invalid_envelope}
+    assert Envelope.verify(signed, keys) == {:ok, "{}"}
+  end
+
   describe "export compatibility facade contracts" do
     test "scan/1 returns the stable clean and hit shapes" do
       assert {:ok, "safe text"} = SigilGuard.scan("safe text")

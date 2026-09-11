@@ -45,11 +45,10 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   @spec verify_file(String.t()) :: :ok | {:error, term()}
   def verify_file(path) when is_binary(path) do
     with {:ok, body} <- File.read(path),
-         {:ok, document} <- Jason.decode(body),
+         {:ok, document} <- SigilGuard.Canonical.JSON.decode(body),
          :ok <- verify_document(document) do
       :ok
     else
-      {:error, %Jason.DecodeError{}} -> {:error, :invalid_json}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -68,11 +67,10 @@ defmodule Mix.Tasks.SigilGuard.Sbom do
   def verify_file(path, expected_sha256) when is_binary(path) and is_binary(expected_sha256) do
     with {:ok, body} <- File.read(path),
          :ok <- verify_sbom_digest(body, expected_sha256),
-         {:ok, document} <- Jason.decode(body),
+         {:ok, document} <- SigilGuard.Canonical.JSON.decode(body),
          :ok <- verify_document(document) do
       :ok
     else
-      {:error, %Jason.DecodeError{}} -> {:error, :invalid_json}
       {:error, reason} -> {:error, reason}
     end
   end

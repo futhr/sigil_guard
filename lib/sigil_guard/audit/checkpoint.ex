@@ -403,7 +403,9 @@ defmodule SigilGuard.Audit.Checkpoint do
   end
 
   defp checkpoint_canonical_bytes(checkpoint) do
-    {:ok, canonical_bytes(checkpoint)}
+    if SigilGuard.Canonical.JSON.unique_keys?(checkpoint),
+      do: {:ok, canonical_bytes(checkpoint)},
+      else: {:error, :invalid_checkpoint}
   rescue
     _ in [ArgumentError, FunctionClauseError, Jason.EncodeError, Protocol.UndefinedError] ->
       {:error, :invalid_checkpoint}
@@ -447,8 +449,12 @@ defmodule SigilGuard.Audit.Checkpoint do
          :ok <-
            require_field(signature, "algorithm", @signature_algorithm, :unsupported_algorithm),
          :ok <- require_binary(fields.digest, :missing_digest),
-         :ok <- require_binary(fields.signature, :missing_signature) do
+         :ok <- require_binary(fields.signature, :missing_signature),
+         true <- SigilGuard.Canonical.JSON.unique_keys?(signature) do
       {:ok, fields}
+    else
+      false -> {:error, :invalid_signature_metadata}
+      error -> error
     end
   end
 

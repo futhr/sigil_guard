@@ -11,6 +11,18 @@ defmodule SigilGuard.Audit.CheckpointTest do
   @generated_at "2026-01-01T00:00:00.000Z"
   @issuer "did:web:checkpoint.example"
 
+  test "rejects conflicting signature aliases" do
+    {:ok, checkpoint} = Checkpoint.create([])
+    signed = Checkpoint.sign(checkpoint, TestSigner, issuer: "issuer")
+    opts = [public_key_b64u: TestSigner.public_key_b64u()]
+
+    assert Checkpoint.verify(Map.put(signed, :signature, signed["signature"]), [], opts) ==
+             {:error, :invalid_checkpoint}
+
+    invalid = update_in(signed, ["signature"], &Map.put(&1, :issuer, "issuer"))
+    assert Checkpoint.verify(invalid, [], opts) == {:error, :invalid_signature_metadata}
+  end
+
   describe "merkle_root/1" do
     test "returns a deterministic root over signed event HMACs" do
       events = build_signed_chain(3)

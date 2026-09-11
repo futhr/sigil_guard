@@ -33,6 +33,22 @@ defmodule SigilGuard.Audit.Anchor.ReceiptTest do
     end
   end
 
+  test "rejects ambiguous and unsupported signed receipt values without raising" do
+    signed = Receipt.sign(receipt_fixture(), TestSigner, issuer: @issuer)
+    opts = [public_key_b64u: TestSigner.public_key_b64u()]
+
+    for invalid <- [
+          Map.put(signed, :signature, signed["signature"]),
+          Map.put(signed, "metadata", %{:a => 1, "a" => 2}),
+          Map.put(signed, "metadata", %{pid: self()})
+        ] do
+      assert Receipt.verify(invalid, opts) == {:error, :invalid_receipt}
+    end
+
+    invalid = update_in(signed, ["signature"], &Map.put(&1, :issuer, @issuer))
+    assert Receipt.verify(invalid, opts) == {:error, :invalid_signature_metadata}
+  end
+
   describe "sign/3 and verify/2" do
     test "signs receipts and verifies them by issuer public key" do
       receipt = receipt_fixture()

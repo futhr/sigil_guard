@@ -125,7 +125,7 @@ defmodule SigilGuard.TrustBundle.Quarantine do
     case decoded_payload(envelope) do
       {:ok, payload} ->
         document =
-          case Jason.decode(payload) do
+          case SigilGuard.Canonical.JSON.decode(payload) do
             {:ok, %{} = document} -> document
             _ -> nil
           end

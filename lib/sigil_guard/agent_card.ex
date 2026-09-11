@@ -356,7 +356,7 @@ defmodule SigilGuard.AgentCard do
   end
 
   defp parse_and_validate(payload) do
-    case Jason.decode(payload) do
+    case SigilGuard.Canonical.JSON.decode(payload) do
       {:ok, decoded} -> new(decoded)
       {:error, _} -> {:error, :invalid_agent_card}
     end

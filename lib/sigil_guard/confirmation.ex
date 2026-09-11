@@ -209,7 +209,7 @@ defmodule SigilGuard.Confirmation do
     case String.split(token, ".", parts: 2) do
       [body_b64u, signature_b64u] ->
         with {:ok, body} <- decode_b64u(body_b64u),
-             {:ok, claims} <- Jason.decode(body),
+             {:ok, claims} <- SigilGuard.Canonical.JSON.decode(body),
              :ok <- validate_canonical_body(body, claims),
              {:ok, signature} <- decode_b64u(signature_b64u) do
           {:ok, claims, signature}

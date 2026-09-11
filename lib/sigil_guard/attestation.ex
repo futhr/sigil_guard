@@ -701,7 +701,7 @@ defmodule SigilGuard.Attestation do
   defp require_same_payload(_, _), do: {:error, :pae_mismatch}
 
   defp decode_statement(payload) do
-    case Jason.decode(payload) do
+    case SigilGuard.Canonical.JSON.decode(payload) do
       {:ok, statement} when is_map(statement) ->
         with :ok <- SigilGuard.Limits.check(statement), do: {:ok, statement}
 
