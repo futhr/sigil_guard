@@ -684,7 +684,7 @@ DSSE work is a prerequisite, and legacy removal lands in M6 per SP.12.
 
 ## Input Budget Acceptance Criteria
 
-Planned corrections bound file-source reads to the existing 1 MiB input
+File-source reads are bounded to the existing 1 MiB input
 limit plus one overflow byte. Oversized or unreadable sources return
 `:invalid_source` and preserve the last accepted cache snapshot. Diagnostic
 metadata extraction must check budgets before base64 or JSON decoding.

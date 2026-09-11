@@ -20,6 +20,39 @@ defmodule SigilGuard.TrustBundleTest do
     on_exit(fn -> Cache.clear() end)
   end
 
+  test "file byte limits preserve the last valid cached bundle" do
+    encoded = Jason.encode!(envelope(bundle_document()))
+    path = Path.join(System.tmp_dir!(), "sigil-bounded-#{System.unique_integer()}.json")
+    {rel, priv_path, priv_root} = priv_bundle_fixture_path("bounded")
+
+    on_exit(fn ->
+      File.rm(path)
+      File.rm_rf!(priv_root)
+    end)
+
+    File.mkdir_p!(Path.dirname(priv_path))
+    padded = encoded <> String.duplicate(" ", 1_048_576 - byte_size(encoded))
+    File.write!(path, padded)
+    assert {:ok, cached} = TrustBundle.load({:file, path}, now: @now, quarantine: false)
+
+    File.write!(path, padded <> " ")
+    File.write!(priv_path, padded <> " ")
+
+    assert TrustBundle.load({:file, path}, now: @now, quarantine: false) ==
+             {:error, :invalid_source}
+
+    assert TrustBundle.load({:priv, :sigil_guard, rel}, now: @now, quarantine: false) ==
+             {:error, :invalid_source}
+
+    assert Cache.get(cached.bundle_id) == {:ok, cached}
+    File.write!(path, "")
+    assert TrustBundle.load({:file, path}, quarantine: false) == {:error, :invalid_source}
+    File.write!(priv_path, "")
+
+    assert TrustBundle.load({:priv, :sigil_guard, rel}, quarantine: false) ==
+             {:error, :invalid_source}
+  end
+
   describe "public API shell" do
     test "exposes the trust-bundle struct fields and section accessors" do
       bundle = %TrustBundle{

@@ -280,9 +280,10 @@ rejects malformed event entries and unsupported or ambiguous
 metadata with tagged errors. Canonical audit encoding must reject duplicate
 keys after normalization, retain JSON literals, and preserve the distinct
 legacy representations of integer `1` and float `1.0`. Summary comparisons
-must use exact types where those bytes distinguish values.
+must use exact types where those bytes distinguish values. This includes
+anchor versions and every copied checkpoint summary field.
 
-Planned local-file corrections must validate the complete encoded JSONL entry against
+Local-file writes validate the complete encoded JSONL entry against
 `:max_line_bytes` (default 1 MiB), including receipt metadata, before creating
 or appending the file. A successful write must be readable with the same
 limit. Malformed or duplicate-key log objects fail closed. This adapter does

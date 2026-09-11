@@ -25,6 +25,26 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     assert Export.verify(invalid, events) == {:error, :invalid_consistency_proof}
   end
 
+  test "local anchor consumers get readable receipts or a checked pre-write rejection" do
+    alias SigilGuard.Audit.Anchor
+    alias SigilGuard.Audit.Anchor.Store
+    alias SigilGuard.Audit.Anchor.Store.LocalFile
+    alias SigilGuard.Audit.Checkpoint
+
+    {:ok, checkpoint} = Checkpoint.create([])
+    anchor = Anchor.create(checkpoint)
+    path = Path.join(System.tmp_dir!(), "sigil-consumer-#{System.unique_integer()}#?.jsonl")
+    on_exit(fn -> File.rm(path) end)
+
+    assert Store.put(LocalFile, anchor, path: path, max_line_bytes: 1) ==
+             {:error, :log_line_too_large}
+
+    refute File.exists?(path)
+    assert {:ok, receipt} = Store.put(LocalFile, anchor, path: path)
+    assert Store.fetch(LocalFile, receipt) == {:ok, anchor}
+    assert Anchor.validate(Map.put(anchor, "version", 1.0)) == {:error, :invalid_version}
+  end
+
   defmodule ActorPatternIdentity do
     @behaviour SigilGuard.Identity
 

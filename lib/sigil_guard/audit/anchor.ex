@@ -154,18 +154,18 @@ defmodule SigilGuard.Audit.Anchor do
 
   defp verify_checkpoint_summary(record, checkpoint) do
     matches? =
-      field(record, "checkpoint_kind") == field(checkpoint, "kind") and
-        field(record, "chain_id") == field(checkpoint, "chain_id") and
-        field(record, "event_count") == field(checkpoint, "event_count") and
-        field(record, "last_event_id") == field(checkpoint, "last_event_id") and
-        field(record, "last_hmac") == field(checkpoint, "last_hmac") and
-        field(record, "merkle_root") == field(checkpoint, "merkle_root")
+      field(record, "checkpoint_kind") === field(checkpoint, "kind") and
+        field(record, "chain_id") === field(checkpoint, "chain_id") and
+        field(record, "event_count") === field(checkpoint, "event_count") and
+        field(record, "last_event_id") === field(checkpoint, "last_event_id") and
+        field(record, "last_hmac") === field(checkpoint, "last_hmac") and
+        field(record, "merkle_root") === field(checkpoint, "merkle_root")
 
     if matches?, do: :ok, else: {:error, :anchor_mismatch}
   end
 
   defp require_field(record, key, value, reason) do
-    if field(record, key) == value, do: :ok, else: {:error, reason}
+    if field(record, key) === value, do: :ok, else: {:error, reason}
   end
 
   defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
@@ -209,7 +209,7 @@ defmodule SigilGuard.Audit.Anchor do
   defp normalize_value(value), do: value
 
   defp secure_compare(left, right) when is_binary(left) and is_binary(right) do
-    byte_size(left) == byte_size(right) and :crypto.hash_equals(left, right)
+    byte_size(left) === byte_size(right) and :crypto.hash_equals(left, right)
   end
 
   defp secure_compare(_, _), do: false

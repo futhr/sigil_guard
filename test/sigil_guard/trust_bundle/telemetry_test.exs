@@ -22,6 +22,16 @@ defmodule SigilGuard.TrustBundle.TelemetryTest do
     :ok
   end
 
+  test "diagnostics reject over-budget envelopes before decoding their payloads" do
+    {handler_id, ref} = attach_events()
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+    document = %{"bundle_id" => "oversized", "padding" => String.duplicate("x", 1_048_576)}
+    envelope = %{"payload" => Base.url_encode64(Jason.encode!(document), padding: false)}
+    assert {:error, :invalid_envelope} = TrustBundle.verify(envelope, quarantine: false)
+    assert_receive {^ref, [:sigil_guard, :trust_bundle, :verify, :start], _, metadata}
+    assert metadata.bundle_id == nil
+  end
+
   test "load and verify spans emit redacted success metadata without legacy registry events" do
     {handler_id, ref} = attach_events()
     on_exit(fn -> :telemetry.detach(handler_id) end)

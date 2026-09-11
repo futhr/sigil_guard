@@ -13,6 +13,18 @@ defmodule SigilGuard.Audit.AnchorTest do
   @anchored_at "2026-01-01T00:00:05.000Z"
   @issuer "did:web:anchor.example"
 
+  test "anchor versions and copied identities use exact JSON types" do
+    {checkpoint, _} = signed_checkpoint()
+    checkpoint = Map.put(checkpoint, "last_event_id", 1)
+    anchor = Anchor.create(checkpoint)
+    assert Anchor.validate(Map.put(anchor, "version", 1.0)) == {:error, :invalid_version}
+
+    assert Anchor.verify(Map.put(anchor, "last_event_id", 1.0), checkpoint) ==
+             {:error, :anchor_mismatch}
+
+    assert {:ok, _} = Anchor.verify(anchor, checkpoint)
+  end
+
   describe "create/2" do
     test "creates a compact external WORM anchor record" do
       {checkpoint, _} = signed_checkpoint()

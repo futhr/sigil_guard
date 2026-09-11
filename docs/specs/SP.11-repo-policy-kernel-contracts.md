@@ -118,8 +118,10 @@ Legacy filename handling is fail-closed:
   Explicit candidates may add non-default v3 paths, but they do not authorize
   old `SIGIL` filenames as fallbacks.
 - Candidate files and their parent components MUST NOT be symbolic links.
-  Symlinked candidates are treated as absent so lexical root containment cannot
-  be bypassed by filesystem indirection.
+  Symlinked candidates are treated as absent. These checks reject observed
+  filesystem indirection; they do not protect against hostile writers replacing
+  paths between inspection and reading. Hosts own filesystem permissions and
+  must prevent concurrent untrusted replacement.
 
 Migration table (reproduced 1:1 in `MIGRATING-1.0.md`):
 

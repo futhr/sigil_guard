@@ -677,3 +677,10 @@ proof. Witness cosigning validates the current statement and binds the prior
 and current chain IDs and tree sizes to the consistency proof. These are
 consistency checks; hosts still authenticate operator keys and persist prior
 witness state themselves. Optional evidence remains optional.
+
+Local anchor stores apply `:max_line_bytes` to the complete encoded entry on
+both writes and reads. Oversized writes return `:log_line_too_large` before
+creating or appending a file. Receipt URIs now escape reserved filename
+characters. Anchor versions and copied checkpoint identities use exact types.
+Trust-bundle file and priv reads stop after the existing 1 MiB budget plus one
+sentinel byte; rejected loads preserve the last valid cached bundle.

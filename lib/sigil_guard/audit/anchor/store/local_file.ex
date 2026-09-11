@@ -6,7 +6,11 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   JSONL file to append-only or WORM storage using external infrastructure. Each
   line contains a receipt plus the compact anchor record. Fetching validates the
   record digest before returning it, so corrupted or mismatched log entries are
-  rejected.
+  rejected. Writes enforce the same `:max_line_bytes` limit as reads (default
+  1 MiB), including receipt metadata, before touching the file. Hosts serialize
+  writers and provide durable storage; this adapter does not supply locking,
+  transactions, rollback, crash recovery, or protection against hostile
+  concurrent filesystem replacement.
   """
 
   @behaviour SigilGuard.Audit.Anchor.Store
@@ -31,9 +35,11 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
          :ok <- allow_local_receipt(opts),
          {:ok, path} <- path_from_opts(opts),
          {:ok, metadata} <- metadata(opts),
-         :ok <- ensure_parent(path),
+         {:ok, max_line_bytes} <- max_line_bytes(opts),
          {:ok, receipt} <- receipt(record, path, metadata),
-         :ok <- append_entry(path, receipt, record) do
+         {:ok, entry} <- encode_entry(receipt, record, max_line_bytes),
+         :ok <- ensure_parent(path),
+         :ok <- append_entry(path, entry) do
       {:ok, receipt}
     end
   end
@@ -145,7 +151,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   end
 
   defp validate_metadata_json(metadata) do
-    case Jason.encode(metadata) do
+    case Jason.encode(metadata, maps: :strict) do
       {:ok, _} -> {:ok, metadata}
       {:error, _} -> {:error, :invalid_metadata}
     end
@@ -172,18 +178,22 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
   # sobelow_skip ["Traversal.FileModule"]
   defp ensure_parent(path), do: File.mkdir_p(Path.dirname(path))
 
-  # sobelow_skip ["Traversal.FileModule"]
-  defp append_entry(path, receipt, record) do
-    entry =
-      receipt
-      |> Map.put("record", record)
-      |> Jason.encode!()
+  defp encode_entry(receipt, record, max_line_bytes) do
+    case Jason.encode_to_iodata(Map.put(receipt, "record", record), maps: :strict) do
+      {:ok, entry} ->
+        if IO.iodata_length(entry) <= max_line_bytes,
+          do: {:ok, entry},
+          else: {:error, :log_line_too_large}
 
-    case File.write(path, [entry, ?\n], [:append, :binary]) do
-      :ok -> :ok
-      {:error, reason} -> {:error, reason}
+      {:error, _} ->
+        {:error, :invalid_anchor}
     end
+  rescue
+    Protocol.UndefinedError -> {:error, :invalid_anchor}
   end
+
+  # sobelow_skip ["Traversal.FileModule"]
+  defp append_entry(path, entry), do: File.write(path, [entry, ?\n], [:append, :binary])
 
   # sobelow_skip ["Traversal.FileModule"]
   defp find_record(path, digest, max_line_bytes) do
@@ -360,7 +370,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
     encoded_path =
       path
       |> String.split("/", trim: false)
-      |> Enum.map_join("/", &URI.encode/1)
+      |> Enum.map_join("/", &URI.encode(&1, fn char -> URI.char_unreserved?(char) end))
 
     "file://#{encoded_path}##{digest}"
   end

@@ -39,6 +39,51 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
     def fetch(_, _), do: {:ok, %{"kind" => "other"}}
   end
 
+  test "write limits include receipt metadata and failures leave the file unchanged" do
+    {_, anchor} = anchor_fixture()
+    path = tmp_path()
+    assert {:ok, receipt} = LocalFile.put(anchor, path: path)
+    bytes = File.read!(path)
+    line_bytes = byte_size(bytes) - 1
+    assert {:ok, _} = LocalFile.put(anchor, path: path, max_line_bytes: line_bytes)
+    assert {:ok, ^anchor} = LocalFile.fetch(receipt, max_line_bytes: line_bytes)
+    committed = File.read!(path)
+
+    assert LocalFile.put(anchor, path: path, max_line_bytes: line_bytes - 1) ==
+             {:error, :log_line_too_large}
+
+    assert LocalFile.put(anchor, path: path, metadata: %{large: String.duplicate("x", 1_048_576)}) ==
+             {:error, :log_line_too_large}
+
+    assert LocalFile.put(anchor, path: path, max_line_bytes: 0) ==
+             {:error, :invalid_max_line_bytes}
+
+    assert LocalFile.put(anchor, path: path, metadata: %{"a" => 1, a: 2}) ==
+             {:error, :invalid_metadata}
+
+    assert File.read!(path) === committed
+    assert {:ok, ^anchor} = LocalFile.fetch(receipt, [])
+
+    fresh_path = tmp_path()
+
+    assert LocalFile.put(anchor, path: fresh_path, max_line_bytes: 1) ==
+             {:error, :log_line_too_large}
+
+    refute File.exists?(fresh_path)
+  end
+
+  test "receipt URIs round-trip reserved path characters and Unicode" do
+    {_, anchor} = anchor_fixture()
+    path = tmp_path() <> "#hash?query%20 space-å.jsonl"
+    on_exit(fn -> File.rm(path) end)
+    assert {:ok, receipt} = LocalFile.put(anchor, path: path)
+    uri = URI.parse(receipt["uri"])
+    assert uri.fragment == Anchor.digest(anchor)
+    assert uri.query == nil
+    assert URI.decode(uri.path) == Path.expand(path)
+    assert {:ok, ^anchor} = LocalFile.fetch(receipt, [])
+  end
+
   describe "put/3, fetch/3, and verify/4" do
     test "persists, fetches, and verifies anchors through the store facade" do
       {checkpoint, anchor} = anchor_fixture()

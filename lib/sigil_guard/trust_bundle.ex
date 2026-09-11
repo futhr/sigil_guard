@@ -113,9 +113,9 @@ defmodule SigilGuard.TrustBundle do
 
   # sobelow_skip ["Traversal.FileModule"]
   defp do_load({:file, path}, opts) when is_binary(path) do
-    case File.read(path) do
-      {:ok, bytes} -> load_binary(bytes, {:file, path}, opts)
-      {:error, _} -> quarantine_error(:invalid_source, %{source: {:file, path}}, opts)
+    case File.open(path, [:read, :binary], &IO.binread(&1, 1_048_577)) do
+      {:ok, bytes} when is_binary(bytes) -> load_binary(bytes, {:file, path}, opts)
+      _ -> quarantine_error(:invalid_source, %{source: {:file, path}}, opts)
     end
   end
 
@@ -123,9 +123,9 @@ defmodule SigilGuard.TrustBundle do
   defp do_load({:priv, app, rel}, opts) when is_atom(app) and is_binary(rel) do
     path = Application.app_dir(app, Path.join("priv", rel))
 
-    case File.read(path) do
-      {:ok, bytes} -> load_binary(bytes, {:priv, app, rel}, opts)
-      {:error, _} -> quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
+    case File.open(path, [:read, :binary], &IO.binread(&1, 1_048_577)) do
+      {:ok, bytes} when is_binary(bytes) -> load_binary(bytes, {:priv, app, rel}, opts)
+      _ -> quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
     end
   rescue
     ArgumentError -> quarantine_error(:invalid_source, %{source: {:priv, app, rel}}, opts)
@@ -489,10 +489,12 @@ defmodule SigilGuard.TrustBundle do
   defp verify_document_metadata(_), do: %{bundle_id: nil, sequence: nil, root_version: nil}
 
   defp envelope_document(%{} = envelope) do
-    with payload when is_binary(payload) <-
+    with :ok <- SigilGuard.Limits.check(envelope),
+         payload when is_binary(payload) <-
            Map.get(envelope, "payload") || Map.get(envelope, :payload),
          {:ok, bytes} <- decode_base64(payload),
-         {:ok, %{} = document} <- SigilGuard.Canonical.JSON.decode(bytes) do
+         {:ok, %{} = document} <- SigilGuard.Canonical.JSON.decode(bytes),
+         :ok <- SigilGuard.Limits.check(document) do
       document
     else
       _ -> nil
