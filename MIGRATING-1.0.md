@@ -684,3 +684,7 @@ creating or appending a file. Receipt URIs now escape reserved filename
 characters. Anchor versions and copied checkpoint identities use exact types.
 Trust-bundle file and priv reads stop after the existing 1 MiB budget plus one
 sentinel byte; rejected loads preserve the last valid cached bundle.
+
+`Vault.InMemory.encrypt/2` returns `:invalid_plaintext` or
+`:invalid_description` for malformed arguments without losing existing entries.
+Plaintext remains arbitrary binary data; descriptions are UTF-8 strings.

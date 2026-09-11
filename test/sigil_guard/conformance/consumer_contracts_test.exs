@@ -45,6 +45,15 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     assert Anchor.validate(Map.put(anchor, "version", 1.0)) == {:error, :invalid_version}
   end
 
+  test "vault facade rejects malformed encryption without losing prior entries" do
+    alias SigilGuard.Vault.InMemory
+    start_supervised!({InMemory, []})
+    assert {:ok, id} = Vault.encrypt(<<0, 255>>, "binary", InMemory)
+    assert Vault.encrypt(%{}, "invalid", InMemory) == {:error, :invalid_plaintext}
+    assert Vault.encrypt("secret", nil, InMemory) == {:error, :invalid_description}
+    assert Vault.decrypt(id, InMemory) == {:ok, <<0, 255>>}
+  end
+
   defmodule ActorPatternIdentity do
     @behaviour SigilGuard.Identity
 

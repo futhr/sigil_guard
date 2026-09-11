@@ -11,6 +11,27 @@ defmodule SigilGuard.Vault.InMemoryTest do
     %{key: key}
   end
 
+  test "invalid encryption preserves the vault process and all existing entries" do
+    pid = Process.whereis(InMemory)
+    {:ok, existing} = InMemory.encrypt("retained", "valid")
+
+    for value <- [%{}, nil, ["iodata"], self()] do
+      assert InMemory.encrypt(value, "description") == {:error, :invalid_plaintext}
+      assert InMemory.encrypt("secret", value) == {:error, :invalid_description}
+    end
+
+    assert InMemory.encrypt("secret", <<255>>) == {:error, :invalid_description}
+    assert Process.whereis(InMemory) == pid
+    assert Process.alive?(pid)
+    assert InMemory.decrypt(existing) == {:ok, "retained"}
+    assert InMemory.list_entries() == [{existing, "valid"}]
+
+    for plaintext <- ["", <<0, 255, 128>>] do
+      assert {:ok, id} = InMemory.encrypt(plaintext, "")
+      assert InMemory.decrypt(id) == {:ok, plaintext}
+    end
+  end
+
   test "encrypts, lists, decrypts, and deletes entries through the singleton process" do
     assert {:ok, id} = InMemory.encrypt("secret", "API key")
     assert InMemory.exists?(id)

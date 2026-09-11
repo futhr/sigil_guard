@@ -19,6 +19,10 @@ defmodule SigilGuard.Vault.InMemory do
       # Retrieve it
       {:ok, "my-secret"} = SigilGuard.Vault.InMemory.decrypt(vault_id)
 
+  Plaintext accepts arbitrary binary bytes. Malformed plaintext or descriptions
+  return `:invalid_plaintext` or `:invalid_description` without contacting the
+  vault process. Descriptions must be UTF-8 strings; empty values are allowed.
+
   ## Encryption
 
   Each entry is encrypted with AES-256-GCM using a per-entry random IV.
@@ -72,8 +76,13 @@ defmodule SigilGuard.Vault.InMemory do
   def validate_master_key_option(master_key), do: {:ok, master_key}
 
   @impl SigilGuard.Vault
+  def encrypt(plaintext, _) when not is_binary(plaintext), do: {:error, :invalid_plaintext}
+  def encrypt(_, description) when not is_binary(description), do: {:error, :invalid_description}
+
   def encrypt(plaintext, description) do
-    GenServer.call(__MODULE__, {:encrypt, plaintext, description})
+    if String.valid?(description),
+      do: GenServer.call(__MODULE__, {:encrypt, plaintext, description}),
+      else: {:error, :invalid_description}
   end
 
   @impl SigilGuard.Vault
