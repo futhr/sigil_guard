@@ -33,6 +33,25 @@ defmodule SigilGuard.Canonical.LegacyJSON do
     Jason.encode!(value)
   end
 
+  @doc false
+  @spec valid?(term()) :: boolean()
+  def valid?(%_{}), do: false
+
+  def valid?(value) when is_map(value) do
+    pairs = Enum.map(value, fn {key, item} -> {canonical_key(key), item} end)
+    keys = Enum.map(pairs, &elem(&1, 0))
+
+    length(keys) == MapSet.size(MapSet.new(keys)) and
+      Enum.all?(pairs, fn {key, item} -> String.valid?(key) and valid?(item) end)
+  rescue
+    _ in [ArgumentError, Protocol.UndefinedError] -> false
+  end
+
+  def valid?([]), do: true
+  def valid?([value | rest]), do: valid?(value) and valid?(rest) and is_list(rest)
+  def valid?(value) when is_binary(value), do: String.valid?(value)
+  def valid?(value), do: is_atom(value) or is_number(value)
+
   defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
   defp canonical_key(key) when is_binary(key), do: key
   defp canonical_key(key), do: to_string(key)

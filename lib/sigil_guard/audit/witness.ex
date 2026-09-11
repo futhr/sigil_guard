@@ -19,13 +19,14 @@ defmodule SigilGuard.Audit.Witness do
 
   `verify_threshold/3` counts the distinct witness keyids from a named key set
   whose signatures verify; a bad or unresolved witness signature is not
-  counted, duplicate signatures are tolerated but ignored, and fewer than
+  counted, duplicate key IDs are rejected, and fewer than
   `threshold` valid signatures produces `:witness_threshold_not_met`.
   Thresholds are opt-in: an unwitnessed
   single-signature checkpoint stays valid where no threshold policy applies.
   """
 
   alias SigilGuard.Attestation.Envelope
+  alias SigilGuard.Audit.Checkpoint
   alias SigilGuard.Audit.Proof
 
   @typedoc "A prior cosigned checkpoint: its statement and a consistency proof to the current one."
@@ -62,7 +63,8 @@ defmodule SigilGuard.Audit.Witness do
 
   def cosign(envelope, signer, opts)
       when is_map(envelope) and is_atom(signer) and is_list(opts) do
-    with :ok <- verify_previous(envelope, Keyword.get(opts, :previous)) do
+    with {:ok, state} <- envelope_statement_state(envelope),
+         :ok <- verify_previous(state, Keyword.get(opts, :previous)) do
       Envelope.add_signature(envelope, signer, Keyword.take(opts, [:keyid]))
     end
   end
@@ -105,27 +107,24 @@ defmodule SigilGuard.Audit.Witness do
 
   defp verify_previous(_, nil), do: :ok
 
-  defp verify_previous(envelope, %{statement: previous, consistency_proof: proof})
+  defp verify_previous(current, %{statement: previous, consistency_proof: proof})
        when is_map(previous) and is_map(proof) do
-    with {:ok, first_root} <- statement_root(previous),
-         {:ok, second_root} <- envelope_statement_root(envelope) do
-      Proof.verify_consistency(proof, first_root, second_root)
+    with {:ok, prior} <- Checkpoint.statement_state(previous),
+         :ok <- Proof.verify_consistency(proof, prior.root, current.root) do
+      if prior.chain_id === current.chain_id and
+           proof["first_size"] === prior.size and proof["second_size"] === current.size,
+         do: :ok,
+         else: {:error, :inconsistent_tree}
     end
   end
 
   defp verify_previous(_, _), do: {:error, :invalid_proof}
 
-  defp statement_root(%{"predicate" => %{"merkle_root" => root}}) when is_binary(root),
-    do: {:ok, root}
-
-  defp statement_root(_), do: {:error, :invalid_proof}
-
-  defp envelope_statement_root(envelope) do
-    with payload when is_binary(payload) <- Map.get(envelope, "payload"),
-         {:ok, bytes} <- Base.url_decode64(payload, padding: false),
-         {:ok, statement} <- SigilGuard.Canonical.JSON.decode(bytes),
-         {:ok, root} <- statement_root(statement) do
-      {:ok, root}
+  defp envelope_statement_state(envelope) do
+    with {:ok, decoded} <- Envelope.decode(envelope),
+         {:ok, statement} <- SigilGuard.Canonical.JSON.decode(decoded.payload),
+         {:ok, state} <- Checkpoint.statement_state(statement) do
+      {:ok, state}
     else
       _ -> {:error, :invalid_envelope}
     end

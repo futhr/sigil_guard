@@ -147,16 +147,31 @@ defmodule SigilGuard.Attestation.Envelope do
   """
   @spec verify(envelope() | term(), map()) :: {:ok, binary()} | {:error, verify_error()}
   def verify(envelope, public_keys) when is_map(public_keys) do
+    with {:ok, decoded} <- decode(envelope) do
+      verify_signatures(
+        decoded.signatures,
+        public_keys,
+        pae(decoded.payload_type, decoded.payload),
+        decoded.payload
+      )
+    end
+  end
+
+  def verify(_, _), do: {:error, :missing_trust_bundle}
+
+  @doc false
+  @spec decode(term()) ::
+          {:ok, %{payload: binary(), payload_type: binary(), signatures: [map()]}}
+          | {:error, verify_error()}
+  def decode(envelope) do
     with {:ok, fields} <- envelope_fields(envelope),
          :ok <- require_payload_type(fields.payload_type),
          {:ok, signatures} <- signature_fields(fields.signatures),
          :ok <- reject_duplicate_keyids(signatures),
          {:ok, payload} <- decode_base64(fields.payload) do
-      verify_signatures(signatures, public_keys, pae(fields.payload_type, payload), payload)
+      {:ok, %{payload: payload, payload_type: fields.payload_type, signatures: signatures}}
     end
   end
-
-  def verify(_, _), do: {:error, :missing_trust_bundle}
 
   @doc """
   Derive the SigilGuard-local key id for a raw Ed25519 public key.

@@ -154,6 +154,48 @@ defmodule SigilGuard.Audit.WitnessTest do
     end
   end
 
+  test "cosigning requires a valid current checkpoint state even without a previous state" do
+    statement = Fixture.statement()
+
+    malformed = [
+      %{},
+      Map.put(statement, "predicateType", "other"),
+      Map.put(statement, "subject", []),
+      put_in(statement, ["predicate", "profile"], "other"),
+      put_in(statement, ["predicate", "tree_size"], "05"),
+      put_in(statement, ["predicate", "tree_size"], 5),
+      put_in(statement, ["predicate", "merkle_root"], "bad"),
+      put_in(statement, ["predicate", "generated_at"], ""),
+      put_in(statement, ["predicate", "chain_id"], 1)
+    ]
+
+    for value <- malformed do
+      {:ok, envelope} = Envelope.sign(Jason.encode!(value), Fixture.signer())
+      assert Witness.cosign(envelope, Witness1) == {:error, :invalid_envelope}
+    end
+  end
+
+  test "consistency binds both statement sizes and chain identities", ctx do
+    {:ok, prior_checkpoint} = Checkpoint.create(Enum.take(Fixture.signed_events(), 3))
+    {:ok, prior} = Checkpoint.to_statement(prior_checkpoint)
+    proof = Fixture.consistency_proof(3)
+
+    for changed <- [
+          put_in(prior, ["predicate", "tree_size"], "999"),
+          put_in(prior, ["predicate", "chain_id"], "another-chain")
+        ] do
+      previous = %{statement: changed, consistency_proof: proof}
+
+      assert Witness.cosign(ctx.envelope, Witness1, previous: previous) ==
+               {:error, :inconsistent_tree}
+    end
+
+    current = put_in(Fixture.statement(), ["predicate", "tree_size"], "999")
+    {:ok, envelope} = Envelope.sign(Jason.encode!(current), Fixture.signer())
+    previous = %{statement: prior, consistency_proof: proof}
+    assert Witness.cosign(envelope, Witness1, previous: previous) == {:error, :inconsistent_tree}
+  end
+
   describe "verify_threshold/3" do
     setup ctx do
       {:ok, one} = Witness.cosign(ctx.envelope, Witness1)

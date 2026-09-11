@@ -23,6 +23,49 @@ defmodule SigilGuard.Audit.CheckpointTest do
     assert Checkpoint.verify(invalid, [], opts) == {:error, :invalid_signature_metadata}
   end
 
+  test "malformed events and non-JSON metadata return checked errors" do
+    [first] = build_signed_chain(1)
+
+    for events <- [[%{}], [first, %{}], [nil], [first | :bad]] do
+      assert Checkpoint.create(events) == {:error, :invalid_events}
+    end
+
+    for value <- [
+          %{"pid" => self()},
+          %{"a" => 2, a: 1},
+          %{a: [1 | :bad]},
+          %{a: <<255>>},
+          %{a: {1, 2}},
+          %{self() => 1},
+          DateTime.utc_now()
+        ] do
+      assert Checkpoint.create([], metadata: value) == {:error, :invalid_metadata}
+      assert Checkpoint.create([], anchor: value) == {:error, :invalid_anchor_metadata}
+    end
+
+    assert Checkpoint.create([], chain_id: self()) == {:error, :invalid_checkpoint}
+    assert Checkpoint.create([], generated_at: <<255>>) == {:error, :invalid_checkpoint}
+    assert Checkpoint.levels([]) == []
+  end
+
+  test "native JSON types survive checkpoint creation and evidence is type-strict" do
+    metadata = %{values: [1, 1.0, true, false, nil, "text", %{1 => :value}]}
+    {:ok, checkpoint} = Checkpoint.create([], metadata: metadata)
+    assert {:ok, _} = Checkpoint.verify(checkpoint, [])
+    decoded = Jason.decode!(Checkpoint.canonical_bytes(checkpoint))
+    assert decoded["metadata"]["values"] === [1, 1.0, true, false, nil, "text", %{"1" => "value"}]
+
+    assert Checkpoint.verify(Map.put(checkpoint, "version", 1.0), []) ==
+             {:error, :invalid_version}
+
+    assert Checkpoint.to_statement(Map.put(checkpoint, "metadata", %{bad: self()})) ==
+             {:error, :invalid_checkpoint}
+
+    [event] = build_signed_chain(1)
+    {:ok, integer_id} = Checkpoint.create([%{event | id: 1}])
+    assert Checkpoint.verify(integer_id, [%{event | id: 1.0}]) == {:error, :checkpoint_mismatch}
+  end
+
   describe "merkle_root/1" do
     test "returns a deterministic root over signed event HMACs" do
       events = build_signed_chain(3)

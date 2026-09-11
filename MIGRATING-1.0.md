@@ -668,3 +668,12 @@ Envelope signing rejects duplicate key IDs with `:duplicate_keyid` and
 verifier-capacity overflow with `:invalid_envelope`. Keep multisignatures
 within 64 entries and the existing envelope input budget. Cosigning an
 atom-keyed envelope replaces its signature field without retaining an alias.
+
+Checkpoint constructors now return checked errors for malformed events and
+metadata that cannot be serialized as unambiguous JSON. Valid native JSON
+values retain their types. Export verification checks the entire embedded
+checkpoint statement, inclusion tree size, and every supplied consistency
+proof. Witness cosigning validates the current statement and binds the prior
+and current chain IDs and tree sizes to the consistency proof. These are
+consistency checks; hosts still authenticate operator keys and persist prior
+witness state themselves. Optional evidence remains optional.

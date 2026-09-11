@@ -93,6 +93,10 @@ defmodule SigilGuard.Audit.Export do
   Options are forwarded to `SigilGuard.Audit.Checkpoint.verify/3`. Set
   `:require_signature` to require Ed25519 checkpoint provenance and
   `:require_anchor` to require an anchor record.
+
+  Present statements and proofs must match the complete checkpoint state.
+  Statement checks establish consistency, not signer authentication. Verify
+  the envelope or a witness threshold separately against host-owned trust keys.
   """
   @spec verify(t(), [Audit.t()], keyword()) :: {:ok, verified()} | {:error, atom()}
   def verify(export, events, opts \\ [])
@@ -303,8 +307,9 @@ defmodule SigilGuard.Audit.Export do
   # keys are a no-op; a present statement must digest the same checkpoint and a
   # present inclusion proof must recompute the checkpoint's Merkle root.
   defp verify_evidence(export, checkpoint, events) do
-    with :ok <- verify_statement_evidence(export, checkpoint) do
-      verify_inclusion_evidence(export, checkpoint, events)
+    with :ok <- verify_statement_evidence(export, checkpoint),
+         :ok <- verify_inclusion_evidence(export, checkpoint, events) do
+      verify_consistency_evidence(field(export, "consistency_proof"), checkpoint, events)
     end
   end
 
@@ -317,28 +322,34 @@ defmodule SigilGuard.Audit.Export do
   end
 
   defp match_statement_digest(envelope, checkpoint) do
-    with {:ok, subject_digest} <- statement_subject_digest(envelope) do
-      if subject_digest == Checkpoint.digest(checkpoint) do
-        :ok
-      else
-        {:error, :statement_mismatch}
-      end
-    end
-  end
-
-  defp statement_subject_digest(envelope) do
-    with payload when is_binary(payload) <- Map.get(envelope, "payload"),
-         {:ok, bytes} <- Base.url_decode64(payload, padding: false),
-         {:ok, decoded} <- SigilGuard.Canonical.JSON.decode(bytes),
-         digest when is_binary(digest) <- subject_digest(decoded) do
-      {:ok, digest}
+    with {:ok, decoded} <- Envelope.decode(envelope),
+         {:ok, statement} <- SigilGuard.Canonical.JSON.decode(decoded.payload),
+         true <- is_map(statement),
+         {:ok, expected} <- Checkpoint.to_statement(checkpoint) do
+      if statement === expected, do: :ok, else: {:error, :statement_mismatch}
     else
       _ -> {:error, :invalid_checkpoint_statement}
     end
   end
 
-  defp subject_digest(%{"subject" => [%{"digest" => %{"sha256" => digest}} | _]}), do: digest
-  defp subject_digest(_), do: nil
+  defp verify_consistency_evidence(nil, _, _), do: :ok
+
+  defp verify_consistency_evidence(%{"first_size" => size} = proof, checkpoint, events)
+       when is_integer(size) and size >= 1 do
+    count = length(events)
+
+    with true <- size <= count and proof["second_size"] === count,
+         {:ok, first_root} <- Checkpoint.merkle_root(Enum.take(events, size)) do
+      Proof.verify_consistency(proof, first_root, checkpoint_root(checkpoint))
+    else
+      _ -> {:error, :invalid_consistency_proof}
+    end
+  end
+
+  defp verify_consistency_evidence(_, _, _), do: {:error, :invalid_consistency_proof}
+
+  defp checkpoint_root(checkpoint),
+    do: Map.get(checkpoint, "merkle_root") || Map.get(checkpoint, :merkle_root)
 
   defp verify_inclusion_evidence(export, checkpoint, events) do
     case field(export, "inclusion_proofs") do
@@ -362,12 +373,20 @@ defmodule SigilGuard.Audit.Export do
 
   defp verify_one_inclusion(proof, root, events) when is_map(proof) and is_binary(root) do
     case event_hmac(events, Map.get(proof, "leaf_index")) do
-      hmac when is_binary(hmac) -> Proof.verify_inclusion(proof, hmac, root)
-      _ -> {:error, :invalid_inclusion_proof}
+      hmac when is_binary(hmac) ->
+        with :ok <- Proof.verify_inclusion(proof, hmac, root) do
+          match_tree_size(proof, length(events))
+        end
+
+      _ ->
+        {:error, :invalid_inclusion_proof}
     end
   end
 
   defp verify_one_inclusion(_, _, _), do: {:error, :invalid_inclusion_proof}
+
+  defp match_tree_size(%{"tree_size" => size}, size), do: :ok
+  defp match_tree_size(_, _), do: {:error, :out_of_range}
 
   defp event_hmac(events, index) when is_integer(index) and index >= 0 do
     case Enum.at(events, index) do
@@ -379,7 +398,7 @@ defmodule SigilGuard.Audit.Export do
   defp event_hmac(_, _), do: nil
 
   defp require_field(map, key, value, reason) do
-    if field(map, key) == value, do: :ok, else: {:error, reason}
+    if field(map, key) === value, do: :ok, else: {:error, reason}
   end
 
   defp require_binary(value, _) when is_binary(value) and value != "", do: :ok

@@ -275,14 +275,14 @@ signed under the old string verify unchanged - names are data, not structure.
 
 ## Boundary Validation Acceptance Criteria
 
-Planned corrections preserve all unambiguous v1 canonical bytes. Checkpoint
-construction must reject malformed event entries and unsupported or ambiguous
+Checkpoint construction preserves all unambiguous v1 canonical bytes and
+rejects malformed event entries and unsupported or ambiguous
 metadata with tagged errors. Canonical audit encoding must reject duplicate
 keys after normalization, retain JSON literals, and preserve the distinct
 legacy representations of integer `1` and float `1.0`. Summary comparisons
 must use exact types where those bytes distinguish values.
 
-Local-file writes must validate the complete encoded JSONL entry against
+Planned local-file corrections must validate the complete encoded JSONL entry against
 `:max_line_bytes` (default 1 MiB), including receipt metadata, before creating
 or appending the file. A successful write must be readable with the same
 limit. Malformed or duplicate-key log objects fail closed. This adapter does

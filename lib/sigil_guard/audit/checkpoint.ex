@@ -82,16 +82,21 @@ defmodule SigilGuard.Audit.Checkpoint do
     with {:ok, generated_at} <- generated_at(opts),
          {:ok, metadata} <- metadata(opts),
          {:ok, anchor} <- anchor(opts),
+         :ok <- valid_chain_id(Keyword.get(opts, :chain_id)),
          :ok <- validate_links(events, prev_hmac),
          {:ok, root} <- merkle_root(events) do
-      {:ok,
-       base_checkpoint(events, root, %{
-         prev_hmac: prev_hmac,
-         chain_id: Keyword.get(opts, :chain_id),
-         metadata: metadata,
-         anchor: anchor,
-         generated_at: generated_at
-       })}
+      checkpoint =
+        base_checkpoint(events, root, %{
+          prev_hmac: prev_hmac,
+          chain_id: Keyword.get(opts, :chain_id),
+          metadata: metadata,
+          anchor: anchor,
+          generated_at: generated_at
+        })
+
+      if SigilGuard.Canonical.LegacyJSON.valid?(checkpoint),
+        do: {:ok, checkpoint},
+        else: {:error, :invalid_checkpoint}
     end
   end
 
@@ -169,6 +174,7 @@ defmodule SigilGuard.Audit.Checkpoint do
   levels. The empty tree has no levels (proofs over it fail `:out_of_range`).
   """
   @spec levels([binary()]) :: [[binary()]]
+  def levels([]), do: []
   def levels([root]), do: [[root]]
 
   def levels([_ | _] = leaves), do: [leaves | levels(pair_level(leaves, []))]
@@ -213,13 +219,54 @@ defmodule SigilGuard.Audit.Checkpoint do
   """
   @spec to_statement(t()) :: {:ok, map()} | {:error, :invalid_checkpoint}
   def to_statement(checkpoint) when is_map(checkpoint) do
-    case verify_static_fields(checkpoint) do
-      :ok -> {:ok, checkpoint_statement(checkpoint)}
-      {:error, _} -> {:error, :invalid_checkpoint}
+    with :ok <- verify_static_fields(checkpoint),
+         :ok <- valid_chain_id(field(checkpoint, "chain_id")),
+         {:ok, canonical} <- checkpoint_canonical_bytes(checkpoint) do
+      {:ok, checkpoint_statement(checkpoint, digest_canonical_bytes(canonical))}
+    else
+      _ -> {:error, :invalid_checkpoint}
     end
   end
 
   def to_statement(_), do: {:error, :invalid_checkpoint}
+
+  @doc false
+  @spec statement_state(term()) ::
+          {:ok, %{root: String.t(), size: non_neg_integer(), chain_id: String.t() | nil}}
+          | {:error, :invalid_proof}
+  def statement_state(
+        %{
+          "_type" => "https://in-toto.io/Statement/v1",
+          "predicateType" => @checkpoint_state_predicate_type,
+          "subject" => [%{"name" => "checkpoint", "digest" => %{"sha256" => digest}}],
+          "predicate" =>
+            %{
+              "profile" => @checkpoint_profile,
+              "merkle_root" => root,
+              "tree_size" => size,
+              "generated_at" => generated_at
+            } = predicate
+        } = statement
+      ) do
+    with :ok <- SigilGuard.Limits.check(statement),
+         true <- SigilGuard.Canonical.LegacyJSON.valid?(statement),
+         true <- hex_digest?(root) and hex_digest?(digest),
+         true <- is_binary(generated_at) and generated_at != "",
+         true <- is_binary(size),
+         {count, ""} when count >= 0 <- Integer.parse(size),
+         true <- Integer.to_string(count) === size,
+         chain_id = Map.get(predicate, "chain_id"),
+         true <- is_nil(chain_id) or is_binary(chain_id) do
+      {:ok, %{root: root, size: count, chain_id: chain_id}}
+    else
+      _ -> {:error, :invalid_proof}
+    end
+  end
+
+  def statement_state(_), do: {:error, :invalid_proof}
+
+  defp hex_digest?(value) when is_binary(value), do: Regex.match?(~r/\A[0-9a-f]{64}\z/, value)
+  defp hex_digest?(_), do: false
 
   @doc """
   Sign a checkpoint with an Ed25519 `SigilGuard.Signer` module.
@@ -316,7 +363,7 @@ defmodule SigilGuard.Audit.Checkpoint do
   end
 
   defp require_field(checkpoint, key, value, reason) do
-    if field(checkpoint, key) == value, do: :ok, else: {:error, reason}
+    if field(checkpoint, key) === value, do: :ok, else: {:error, reason}
   end
 
   defp require_binary(value, _) when is_binary(value) and value != "", do: :ok
@@ -325,13 +372,13 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp require_integer(value, _) when is_integer(value) and value >= 0, do: :ok
   defp require_integer(_, reason), do: {:error, reason}
 
-  defp checkpoint_statement(checkpoint) do
+  defp checkpoint_statement(checkpoint, digest) do
     %{
       "_type" => Statement.statement_type(),
       "predicateType" => @checkpoint_state_predicate_type,
       "predicate" => checkpoint_predicate(checkpoint),
       "subject" => [
-        %{"name" => "checkpoint", "digest" => %{"sha256" => digest(checkpoint)}}
+        %{"name" => "checkpoint", "digest" => %{"sha256" => digest}}
       ]
     }
   end
@@ -352,6 +399,10 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp put_chain_id(predicate, _), do: predicate
 
+  defp valid_chain_id(nil), do: :ok
+  defp valid_chain_id(value) when is_binary(value), do: :ok
+  defp valid_chain_id(_), do: {:error, :invalid_checkpoint}
+
   defp generated_at(opts) do
     case Keyword.get_lazy(opts, :generated_at, &timestamp/0) do
       value when is_binary(value) and value != "" -> {:ok, value}
@@ -361,16 +412,20 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp metadata(opts) do
     case Keyword.get(opts, :metadata, %{}) do
-      metadata when is_map(metadata) -> {:ok, metadata}
+      metadata when is_map(metadata) -> json_metadata(metadata, :invalid_metadata)
       _ -> {:error, :invalid_metadata}
     end
   end
 
   defp anchor(opts) do
     case Keyword.get(opts, :anchor, %{}) do
-      anchor when is_map(anchor) -> {:ok, anchor}
+      anchor when is_map(anchor) -> json_metadata(anchor, :invalid_anchor_metadata)
       _ -> {:error, :invalid_anchor_metadata}
     end
+  end
+
+  defp json_metadata(value, reason) do
+    if SigilGuard.Canonical.LegacyJSON.valid?(value), do: {:ok, value}, else: {:error, reason}
   end
 
   defp checkpoint_prev_hmac(checkpoint) do
@@ -383,8 +438,8 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp verify_event_summary(checkpoint, events) do
     with {:ok, root} <- merkle_root(events),
-         true <- field(checkpoint, "event_count") == length(events),
-         true <- field(checkpoint, "merkle_root") == root,
+         true <- field(checkpoint, "event_count") === length(events),
+         true <- field(checkpoint, "merkle_root") === root,
          true <- endpoints_match?(checkpoint, events) do
       :ok
     else
@@ -396,10 +451,10 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp endpoints_match?(checkpoint, events) do
     {first_event, last_event} = endpoints(events)
 
-    field(checkpoint, "first_event_id") == event_field(first_event, :id) and
-      field(checkpoint, "last_event_id") == event_field(last_event, :id) and
-      field(checkpoint, "first_hmac") == event_field(first_event, :hmac) and
-      field(checkpoint, "last_hmac") == event_field(last_event, :hmac)
+    field(checkpoint, "first_event_id") === event_field(first_event, :id) and
+      field(checkpoint, "last_event_id") === event_field(last_event, :id) and
+      field(checkpoint, "first_hmac") === event_field(first_event, :hmac) and
+      field(checkpoint, "last_hmac") === event_field(last_event, :hmac)
   end
 
   defp checkpoint_canonical_bytes(checkpoint) do
@@ -504,7 +559,7 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp decode_public_key(value) do
     case decode_base64(value) do
-      key when is_binary(key) and byte_size(key) == 32 -> {:ok, key}
+      key when is_binary(key) and byte_size(key) === 32 -> {:ok, key}
       key when is_binary(key) -> {:error, :invalid_key}
       nil -> {:error, :invalid_base64}
     end
@@ -512,7 +567,7 @@ defmodule SigilGuard.Audit.Checkpoint do
 
   defp decode_signature(value) do
     case decode_base64(value) do
-      signature when is_binary(signature) and byte_size(signature) == 64 -> {:ok, signature}
+      signature when is_binary(signature) and byte_size(signature) === 64 -> {:ok, signature}
       signature when is_binary(signature) -> {:error, :invalid_signature}
       nil -> {:error, :invalid_base64}
     end
@@ -560,26 +615,32 @@ defmodule SigilGuard.Audit.Checkpoint do
   defp validate_links([], prev_hmac) when is_binary(prev_hmac) and prev_hmac != "", do: :ok
   defp validate_links([], _), do: {:error, :invalid_prev_hmac}
 
-  defp validate_links([first | rest], prev_hmac)
+  defp validate_links([%Audit{} = first | rest], prev_hmac)
        when is_nil(prev_hmac) or (is_binary(prev_hmac) and prev_hmac != "") do
-    if first.prev_hmac == prev_hmac and signed_event?(first) do
+    if first.prev_hmac === prev_hmac and signed_event?(first) do
       validate_next_links(rest, first.hmac)
     else
       {:error, :broken_chain}
     end
   end
 
+  defp validate_links([_ | _], prev_hmac)
+       when is_nil(prev_hmac) or (is_binary(prev_hmac) and prev_hmac != ""),
+       do: {:error, :invalid_events}
+
   defp validate_links(_, _), do: {:error, :invalid_prev_hmac}
 
   defp validate_next_links([], _), do: :ok
 
-  defp validate_next_links([event | rest], prev_hmac) do
-    if event.prev_hmac == prev_hmac and signed_event?(event) do
+  defp validate_next_links([%Audit{} = event | rest], prev_hmac) do
+    if event.prev_hmac === prev_hmac and signed_event?(event) do
       validate_next_links(rest, event.hmac)
     else
       {:error, :broken_chain}
     end
   end
+
+  defp validate_next_links(_, _), do: {:error, :invalid_events}
 
   defp signed_event?(%Audit{hmac: hmac}) when is_binary(hmac) and byte_size(hmac) > 0, do: true
   defp signed_event?(_), do: false
@@ -625,7 +686,7 @@ defmodule SigilGuard.Audit.Checkpoint do
   end
 
   defp secure_compare(a, b) when is_binary(a) and is_binary(b) do
-    byte_size(a) == byte_size(b) and :crypto.hash_equals(a, b)
+    byte_size(a) === byte_size(b) and :crypto.hash_equals(a, b)
   end
 
   defp secure_compare(_, _), do: false

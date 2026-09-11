@@ -8,6 +8,23 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
   alias SigilGuard.Signer.Ed25519
   alias SigilGuard.Vault
 
+  test "audit consumers can serialize successful checkpoints and reject mismatched evidence" do
+    alias SigilGuard.Audit.Checkpoint
+    alias SigilGuard.Audit.Export
+    events = SigilGuard.AuditProofFixture.signed_events()
+    assert Checkpoint.create(events, metadata: %{pid: self()}) == {:error, :invalid_metadata}
+    {:ok, export} = Export.create(events, inclusion_proofs: :all, consistency_proof: 3)
+
+    portable =
+      export
+      |> Export.canonical_bytes()
+      |> Jason.decode!()
+
+    assert {:ok, _} = Export.verify(portable, events)
+    invalid = put_in(portable, ["consistency_proof", "second_size"], 6)
+    assert Export.verify(invalid, events) == {:error, :invalid_consistency_proof}
+  end
+
   defmodule ActorPatternIdentity do
     @behaviour SigilGuard.Identity
 

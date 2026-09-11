@@ -14,6 +14,51 @@ defmodule SigilGuard.Audit.ExportTest do
   @anchored_at "2026-01-01T00:00:05.000Z"
   @issuer "did:web:export.example"
 
+  test "verifies every supplied evidence object and its complete checkpoint identity" do
+    events = SigilGuard.AuditProofFixture.signed_events()
+    {:ok, export} = Export.create(events)
+    {:ok, statement} = Checkpoint.to_statement(export["checkpoint"])
+
+    altered = [
+      Map.put(statement, "_type", "other"),
+      Map.put(statement, "predicateType", "other"),
+      Map.update!(statement, "subject", &(&1 ++ &1)),
+      put_in(statement, ["predicate", "merkle_root"], String.duplicate("0", 64)),
+      put_in(statement, ["predicate", "tree_size"], "6"),
+      put_in(statement, ["predicate", "chain_id"], "different")
+    ]
+
+    for value <- altered do
+      {:ok, envelope} = SigilGuard.Attestation.Envelope.sign(Jason.encode!(value), TestSigner)
+
+      assert Export.verify(Map.put(export, "checkpoint_statement", envelope), events) ==
+               {:error, :statement_mismatch}
+    end
+
+    proof = SigilGuard.AuditProofFixture.consistency_proof(3)
+    assert {:ok, _} = Export.verify(Map.put(export, "consistency_proof", proof), events)
+
+    for value <- [
+          %{},
+          "garbage",
+          Map.put(proof, "first_size", 0),
+          Map.put(proof, "second_size", 6)
+        ] do
+      assert Export.verify(Map.put(export, "consistency_proof", value), events) ==
+               {:error, :invalid_consistency_proof}
+    end
+
+    bad = Map.put(proof, "proof_nodes", [String.duplicate("0", 64)])
+    assert {:error, _} = Export.verify(Map.put(export, "consistency_proof", bad), events)
+    {:ok, inclusion} = SigilGuard.Audit.Proof.inclusion(events, 0)
+    wrong_size = Map.put(inclusion, "tree_size", 6)
+
+    assert Export.verify(Map.put(export, "inclusion_proofs", [wrong_size]), events) ==
+             {:error, :out_of_range}
+
+    assert Export.verify(Map.put(export, "version", 1.0), events) == {:error, :invalid_version}
+  end
+
   describe "create/2" do
     test "creates a signed anchored export without raw event bodies" do
       events = build_signed_chain(3)
