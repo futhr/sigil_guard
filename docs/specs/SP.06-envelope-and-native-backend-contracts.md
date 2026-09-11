@@ -235,6 +235,7 @@ only envelopes satisfying the verifier's structural limits: unique normalized
 key IDs, at most 64 signatures and the existing envelope input budget.
 Duplicate IDs return `:duplicate_keyid`; capacity failures return
 `:invalid_envelope`. Existing valid PAE bytes and signature order stay fixed.
-Atom/string aliases for the same envelope or signature field are ambiguous
-and must be rejected. Signing remains over opaque bytes; parsing a JSON
+Keys that collide after JSON normalization, including atom/string and
+numeric/string spellings in envelope or signature objects, are ambiguous and
+must be rejected. Unsupported key terms return a checked envelope error. Signing remains over opaque bytes; parsing a JSON
 statement is the higher-level caller's responsibility.

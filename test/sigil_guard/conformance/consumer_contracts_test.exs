@@ -8,6 +8,24 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
   alias SigilGuard.Signer.Ed25519
   alias SigilGuard.Vault
 
+  test "envelopes reject JSON key collisions beyond atom aliases" do
+    alias SigilGuard.Attestation.Envelope
+    {:ok, envelope} = Envelope.sign("{}", SigilGuard.TestSigner)
+
+    keys = %{
+      Envelope.keyid(SigilGuard.TestSigner.public_key()) => SigilGuard.TestSigner.public_key()
+    }
+
+    ambiguous = Map.merge(envelope, %{1 => true, "1" => false})
+    assert Envelope.verify(ambiguous, keys) == {:error, :invalid_envelope}
+
+    assert Envelope.verify(Map.put(envelope, [0x110000], true), keys) ==
+             {:error, :invalid_envelope}
+
+    assert Envelope.verify(Map.put(envelope, <<255>>, true), keys) == {:error, :invalid_envelope}
+    assert {:ok, "{}"} = Envelope.verify(Map.put(envelope, 1, true), keys)
+  end
+
   test "audit consumers can serialize successful checkpoints and reject mismatched evidence" do
     alias SigilGuard.Audit.Checkpoint
     alias SigilGuard.Audit.Export
@@ -346,6 +364,8 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
     alias SigilGuard.Attestation.Envelope
     alias SigilGuard.TrustBundle
 
+    TrustBundle.Cache.clear()
+    on_exit(&TrustBundle.Cache.clear/0)
     {:ok, bundle} = TrustBundle.dev_bundle(cache: false)
     envelope = bundle.envelope
     bytes = String.trim_trailing(Jason.encode!(envelope), "}") <> ~s(,"payloadType":"wrong"})
@@ -368,6 +388,7 @@ defmodule SigilGuard.Conformance.ConsumerContractsTest do
       end)
 
     assert Envelope.verify(ambiguous, keys) == {:error, :invalid_envelope}
+
     assert Envelope.verify(signed, keys) == {:ok, "{}"}
   end
 

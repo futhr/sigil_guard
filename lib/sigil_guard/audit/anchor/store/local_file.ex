@@ -156,7 +156,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
       {:error, _} -> {:error, :invalid_metadata}
     end
   rescue
-    Protocol.UndefinedError -> {:error, :invalid_metadata}
+    _ in [Protocol.UndefinedError, UnicodeConversionError] -> {:error, :invalid_metadata}
   end
 
   defp receipt(record, path, metadata) do
@@ -189,7 +189,7 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFile do
         {:error, :invalid_anchor}
     end
   rescue
-    Protocol.UndefinedError -> {:error, :invalid_anchor}
+    _ in [Protocol.UndefinedError, UnicodeConversionError] -> {:error, :invalid_anchor}
   end
 
   # sobelow_skip ["Traversal.FileModule"]

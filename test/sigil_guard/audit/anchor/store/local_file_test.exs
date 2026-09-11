@@ -61,6 +61,9 @@ defmodule SigilGuard.Audit.Anchor.Store.LocalFileTest do
     assert LocalFile.put(anchor, path: path, metadata: %{"a" => 1, a: 2}) ==
              {:error, :invalid_metadata}
 
+    assert LocalFile.put(anchor, path: path, metadata: %{[0x110000] => true}) ==
+             {:error, :invalid_metadata}
+
     assert File.read!(path) === committed
     assert {:ok, ^anchor} = LocalFile.fetch(receipt, [])
 

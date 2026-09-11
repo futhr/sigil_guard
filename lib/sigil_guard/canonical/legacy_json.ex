@@ -54,7 +54,13 @@ defmodule SigilGuard.Canonical.LegacyJSON do
 
   defp canonical_key(key) when is_atom(key), do: Atom.to_string(key)
   defp canonical_key(key) when is_binary(key), do: key
-  defp canonical_key(key), do: to_string(key)
+
+  defp canonical_key(key) do
+    to_string(key)
+  rescue
+    UnicodeConversionError ->
+      reraise ArgumentError, "invalid Unicode in JSON object key", __STACKTRACE__
+  end
 
   defp require_unique_keys!(pairs) do
     keys = Enum.map(pairs, &elem(&1, 0))

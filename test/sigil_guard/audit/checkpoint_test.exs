@@ -37,6 +37,7 @@ defmodule SigilGuard.Audit.CheckpointTest do
           %{a: <<255>>},
           %{a: {1, 2}},
           %{self() => 1},
+          %{[0x110000] => 1},
           DateTime.utc_now()
         ] do
       assert Checkpoint.create([], metadata: value) == {:error, :invalid_metadata}

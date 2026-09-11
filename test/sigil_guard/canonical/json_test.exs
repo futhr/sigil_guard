@@ -6,6 +6,16 @@ defmodule SigilGuard.Canonical.JSONTest do
   alias SigilGuard.Canonical.JSON
   alias SigilGuard.Canonical.LegacyJSON
 
+  test "native key normalization rejects every JSON spelling collision" do
+    assert JSON.unique_keys?(%{1 => true, 1.0 => false})
+    refute JSON.unique_keys?(%{1 => true, "1" => false})
+    refute JSON.unique_keys?(%{1.0 => true, "1.0" => false})
+    refute JSON.unique_keys?(%{~c"name" => true, "name" => false})
+    refute JSON.unique_keys?(%{{:unsupported} => true})
+    refute JSON.unique_keys?(%{[0x110000] => true})
+    refute JSON.unique_keys?(%{<<255>> => true})
+  end
+
   test "decodes native JSON values without numeric or literal coercion" do
     assert {:ok, value} = JSON.decode(~s({"values":[null,true,false,1,1.0,{"empty":[]}]}))
     assert value === %{"values" => [nil, true, false, 1, 1.0, %{"empty" => []}]}

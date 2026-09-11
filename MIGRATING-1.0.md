@@ -701,3 +701,7 @@ follows the same contract. The former Tidewave Plug wrapper was unusable with
 Tidewave 0.6.1's body-parsing contract and has been removed from the guide;
 only the tested authorization helper is provided, with transport adaptation
 explicitly left to the host.
+
+Envelope key checks also reject numeric/string and character-list/string
+collisions after JSON key normalization, including extension fields. Malformed Unicode keys produce checked errors at envelope and audit storage
+boundaries. Unique serializable keys keep their existing behavior.

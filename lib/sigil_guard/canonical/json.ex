@@ -16,11 +16,14 @@ defmodule SigilGuard.Canonical.JSON do
   @spec unique_keys?(map()) :: boolean()
   def unique_keys?(map) do
     keys = Enum.map(Map.keys(map), &string_key/1)
-    length(keys) == MapSet.size(MapSet.new(keys))
+    Enum.all?(keys, &String.valid?/1) and length(keys) == MapSet.size(MapSet.new(keys))
+  rescue
+    _ in [ArgumentError, Protocol.UndefinedError, UnicodeConversionError] -> false
   end
 
   defp string_key(key) when is_atom(key), do: Atom.to_string(key)
-  defp string_key(key), do: key
+  defp string_key(key) when is_binary(key), do: key
+  defp string_key(key), do: to_string(key)
 
   defp native_value(%Jason.OrderedObject{values: pairs}) do
     Enum.reduce_while(pairs, {:ok, %{}}, fn {key, value}, {:ok, map} ->
